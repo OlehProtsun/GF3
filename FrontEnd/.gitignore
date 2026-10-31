@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+artifacts/promo/
+src/promo/real-ui/private-captures/
+src/promo/real-ui/*storage-state*.json

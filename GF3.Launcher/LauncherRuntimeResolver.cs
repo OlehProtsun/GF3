@@ -117,9 +117,15 @@ internal static class LauncherRuntimeResolver
             ["ASPNETCORE_ENVIRONMENT"] = environmentName,
             ["DOTNET_ENVIRONMENT"] = environmentName,
             ["ASPNETCORE_URLS"] = listenUrl,
-            // Launcher runs only the local desktop instance, so keep admin/database tooling fully available.
+            // Launcher runs only the local desktop instance, so keep admin/database tooling fully
+            // available even when the UI is opened from another machine on the same LAN.
             ["GF3_ADMIN_ENABLED"] = bool.TrueString,
+            ["GF3_ADMIN_ALLOW_REMOTE"] = bool.TrueString,
             ["GF3_ADMIN_ALLOW_WRITE"] = bool.TrueString,
+            ["GF3_ADMIN_DEVELOPER_PASSWORD"] =
+                Environment.GetEnvironmentVariable("GF3_ADMIN_DEVELOPER_PASSWORD") ?? "123456",
+            ["GF3_BOOTSTRAP_MANAGER_PASSWORD"] =
+                Environment.GetEnvironmentVariable("GF3_BOOTSTRAP_MANAGER_PASSWORD") ?? "123456",
             ["GF3_DATABASE_PATH"] = databasePath,
             ["GF3_CONNECTION_STRING"] = connectionString,
             ["ConnectionStrings__Default"] = connectionString,

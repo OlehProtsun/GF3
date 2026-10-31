@@ -3,3 +3,152 @@
   max-width: none;
   margin: 0;
 }
+
+.publicationOverview {
+  display: grid;
+  grid-template-columns: minmax(112px, 0.28fr) minmax(0, 1fr);
+  gap: 8px;
+}
+
+.publicationStatusPanel,
+.visibilityPanel {
+  min-width: 0;
+  display: grid;
+  gap: 7px;
+  align-content: start;
+  padding: 10px 12px;
+  border-radius: 18px;
+  border: 1px solid rgba(148, 163, 184, 0.1);
+  background:
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0)),
+    rgba(244, 244, 245, 0.72);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.78),
+    0 6px 14px rgba(15, 23, 42, 0.035);
+}
+
+.publicationStatusPanel {
+  align-content: center;
+  justify-items: center;
+  text-align: center;
+}
+
+.publicationLabel {
+  color: rgba(17, 24, 39, 0.46);
+  font-size: 0.69rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
+.statusBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  min-height: 26px;
+  padding: 0.28rem 0.58rem;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  background: rgba(255, 255, 255, 0.74);
+  color: #475569;
+  font-size: 0.76rem;
+  font-weight: 850;
+  line-height: 1;
+}
+
+.statusBadgePublic {
+  border-color: rgba(37, 99, 235, 0.18);
+  background: rgba(219, 234, 254, 0.82);
+  color: #1d4ed8;
+}
+
+.visibilityTimeline {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+}
+
+.visibilityEndpoint {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+  padding: 7px 9px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(148, 163, 184, 0.08);
+}
+
+.visibilityEndpoint small {
+  color: rgba(17, 24, 39, 0.44);
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.visibilityEndpoint strong {
+  min-width: 0;
+  color: #111827;
+  font-size: 0.8rem;
+  line-height: 1.2;
+  font-weight: 850;
+  overflow-wrap: anywhere;
+}
+
+.visibilityLine {
+  width: 14px;
+  height: 2px;
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.16);
+}
+
+.visibilityEmpty {
+  width: fit-content;
+  padding: 7px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.68);
+  color: #6b7280;
+  font-size: 0.8rem;
+  font-weight: 750;
+}
+
+@media (max-width: 760px) {
+  .publicationOverview,
+  .visibilityTimeline {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .visibilityLine {
+    width: 2px;
+    height: 14px;
+    margin-inline: 12px;
+  }
+}
+
+.phoneCard { width: 100%; max-width: 100%; min-width: 0; margin: 0; padding: 14px; border-radius: 26px; box-sizing: border-box; background: var(--card-background, #fff); border-color: #94a3b829; }
+.phoneCard .phoneTitle { gap: 8px; font-size: 1rem; color: var(--text-primary, #0f172a); }
+.phoneCard .phoneTitle > svg { width: 32px; height: 32px; padding: 7px; flex-shrink: 0; box-sizing: border-box; border-radius: 10px; color: #2563eb; background: #eff6ff; }
+.phoneContent { display: grid; gap: 12px; min-width: 0; }
+.phoneIdentity { display: flex; align-items: center; gap: 12px; padding: 12px; min-width: 0; border-radius: 18px; background: #eff6ff; }
+.phoneAvatar { width: 52px; height: 52px; flex-shrink: 0; display: grid; place-items: center; border-radius: 17px; background: linear-gradient(180deg, #3b82f6, #2563eb); color: #fff; font-size: 1.05rem; font-weight: 900; box-shadow: 0 12px 24px #2563eb2e; }
+.phoneIdentityText { display: grid; gap: 4px; min-width: 0; overflow-wrap: anywhere; }
+.phoneIdentityText h2 { margin: 0; color: #0f172a; font-size: 1rem; line-height: 1.2; }
+.phoneIdentityText p { margin: 0; color: #64748b; font-size: .8rem; font-weight: 700; }
+.phoneDetailsGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; min-width: 0; }
+.phoneDetailTile, .phoneCard .publicationStatusPanel, .phoneCard .visibilityPanel { display: grid; grid-template-columns: 24px minmax(0, 1fr); align-content: start; gap: 3px 7px; min-width: 0; padding: 10px 8px; border-radius: 16px; border: 1px solid #94a3b829; background: var(--card-background, #f8fafc); box-shadow: none; box-sizing: border-box; }
+.phoneDetailIcon { width: 24px; height: 28px; grid-row: 1 / 3; display: grid; place-items: center; align-self: start; border-radius: 8px; background: #eff6ff; color: #2563eb; }
+.phoneCard .publicationLabel { min-width: 0; overflow-wrap: anywhere; color: var(--text-secondary, #64748b); font-size: .72rem; line-height: 1.25; text-align: left; }
+.phoneDetailTile strong { min-width: 0; color: var(--text-primary, #0f172a); font-size: .82rem; line-height: 1.35; overflow-wrap: anywhere; }
+.phoneCard .publicationOverview { display: contents; }
+.phoneCard .publicationStatusPanel { justify-items: start; text-align: left; }
+.phoneCard .statusBadge { max-width: 100%; min-height: 0; box-sizing: border-box; background: #fee2e2; color: #991b1b; line-height: 1.3; overflow-wrap: anywhere; }
+.phoneCard .statusBadgePublic { background: #dcfce7; color: #166534; border-color: #1665341f; }
+.phoneCard .visibilityPanel { grid-column: 1 / -1; }
+.phoneCard .visibilityTimeline { grid-column: 2; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.phoneCard .visibilityLine { display: none; }
+.phoneCard .visibilityEndpoint { padding: 0; border: 0; border-radius: 0; background: transparent; }
+.phoneCard .visibilityEndpoint small { color: var(--text-secondary, #64748b); font-size: .72rem; }
+.phoneCard .visibilityEndpoint strong { color: var(--text-primary, #0f172a); font-size: .82rem; }
+.phoneCard .visibilityEmpty { padding: 0; background: transparent; color: var(--text-secondary, #64748b); font-size: .82rem; overflow-wrap: anywhere; }
+@media (max-width: 350px) { .phoneDetailsGrid { grid-template-columns: minmax(0, 1fr); } }

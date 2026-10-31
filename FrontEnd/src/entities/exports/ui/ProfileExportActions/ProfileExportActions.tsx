@@ -1,3 +1,4 @@
+import { t } from "@shared/i18n";
 import { CodeIcon, ExcelIcon } from "@shared/ui/icons";
 import styles from "./ProfileExportActions.module.css";
 
@@ -17,8 +18,8 @@ function joinClassNames(...values: Array<string | false | null | undefined>) {
 }
 
 export function ProfileExportActions({
-  excelLabel = "Export",
-  codeLabel = "Export",
+  excelLabel = t("Export"),
+  codeLabel = t("Export"),
   isExcelPending = false,
   isCodePending = false,
   disabled = false,
@@ -31,13 +32,13 @@ export function ProfileExportActions({
 
   return (
     <div className={joinClassNames(styles.actions, className)}>
-      <span className={styles.label}>Export</span>
+      <span className={styles.label}>{t("Export")}</span>
 
       <div className={styles.buttonRow}>
         <button
           type="button"
-          aria-label={isExcelPending ? "Preparing Excel export" : excelLabel}
-          title={isExcelPending ? "Preparing Excel export" : excelLabel}
+          aria-label={isExcelPending ? t("Preparing Excel export") : excelLabel}
+          title={isExcelPending ? t("Preparing Excel export") : excelLabel}
           disabled={buttonsDisabled}
           className={joinClassNames(
             styles.actionButton,
@@ -51,8 +52,8 @@ export function ProfileExportActions({
 
         <button
           type="button"
-          aria-label={isCodePending ? "Preparing code export" : codeLabel}
-          title={isCodePending ? "Preparing code export" : codeLabel}
+          aria-label={isCodePending ? t("Preparing code export") : codeLabel}
+          title={isCodePending ? t("Preparing code export") : codeLabel}
           disabled={buttonsDisabled}
           className={joinClassNames(
             styles.actionButton,

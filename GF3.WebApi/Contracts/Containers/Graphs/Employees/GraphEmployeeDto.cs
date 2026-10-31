@@ -5,6 +5,8 @@ namespace WebApi.Contracts.Containers.Graphs.Employees;
 /// </summary>
 public sealed class GraphEmployeeDto
 {
+    public bool IsPriority { get; set; }
+
     /// <summary>
     /// Persistent assignment identifier.
     /// </summary>

@@ -24,4 +24,20 @@ public sealed class AvailabilityGroupDto
     /// Calendar month that the group applies to.
     /// </summary>
     public int Month { get; set; }
+
+    /// <summary>
+    /// Publication state exposed to assigned employees.
+    /// </summary>
+    public string PublicationStatus { get; set; } = "private";
+
+    /// <summary>
+    /// UTC moment when assigned employees can start seeing this group.
+    /// </summary>
+    public DateTimeOffset? VisibleFromUtc { get; set; }
+
+    /// <summary>
+    /// UTC moment after which assigned employees no longer see this group.
+    /// </summary>
+    public DateTimeOffset? VisibleToUtc { get; set; }
+
 }

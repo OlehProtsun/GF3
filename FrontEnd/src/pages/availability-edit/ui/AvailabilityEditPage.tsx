@@ -1,5 +1,16 @@
+import { useQueryClient } from "@tanstack/react-query";
+import { queryKeys } from "@shared/api/queryKeys";
+import { buildEffectiveManagerAvailabilityCellMap, getAutomaticManagerEmployeeIds, getAutomaticManagerAvailabilityCellKeys } from "@entities/availability-groups/model/automaticAvailability";
+import { useEmploymentContractSettingsQuery } from "@entities/employment-contracts";
+import { useLanguageRevision } from "@shared/i18n/useLanguageRevision";
+import { t } from "@shared/i18n";
 import { useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
+import {
+  buildManagerEditLockMessage,
+  managerEditResourceTypes,
+  useManagerEditLocks,
+} from "@app/providers/PresenceProvider";
 import {
   buildActiveAvailabilityBindMap,
   normalizeBindKey,
@@ -12,23 +23,37 @@ import {
 } from "@entities/availability-binds";
 import {
   buildAvailabilityCellMap,
+  buildAvailabilityTransferSourceHintData,
   clampAvailabilityMonth,
   clampAvailabilityYear,
   getAvailabilityCellKey,
   parseAvailabilityCode,
+  removeStagedAvailabilityTransferDay,
   sanitizeAvailabilityCellMap,
+  stageAvailabilityTransfer,
   type AvailabilityMatrixCellMap,
+  type StagedAvailabilityTransfer,
   useAvailabilityGroupByIdQuery,
   useAvailabilityGroupMembersQuery,
   useAvailabilityGroupSlotsQuery,
   useSaveAvailabilityGroupGraphMutation,
+  useAvailabilityTransferPreviewQuery,
 } from "@entities/availability-groups";
-import { AvailabilityGroupEditor } from "@entities/availability-groups/ui";
+import {
+  AvailabilityGroupEditor,
+  AvailabilityRelatedHintDialog,
+  AvailabilityTransferDialog,
+} from "@entities/availability-groups/ui";
+import type { AvailabilityPublicationStatus } from "@entities/availability-groups/model/types";
 import { useEmployeesListQuery } from "@entities/employees/api/queries";
 import { getEmployeeFullName } from "@entities/employees/model/presentation";
+import { stableSerialize } from "@shared/lib/stableSerialize";
 import { useSyncedDraft } from "@shared/lib/useSyncedDraft";
+import { useUnsavedChangesPrompt } from "@shared/lib/useUnsavedChangesPrompt";
 import { ConfirmDialog } from "@shared/ui/ConfirmDialog";
+import { ManagerEditLockDialog } from "@shared/ui/ManagerEditLockDialog";
 import { PageHeader } from "@shared/ui/PageHeader";
+import { SavingOverlay } from "@shared/ui/SavingOverlay";
 import styles from "./AvailabilityEditPage.module.css";
 
 type EditableAvailabilityBind = {
@@ -48,15 +73,25 @@ type AvailabilityEditorInformationErrors = {
   year?: string;
 };
 
+type AvailabilityEditorPublicationErrors = {
+  visibleFrom?: string;
+  visibleTo?: string;
+};
+
 type AvailabilityEditorState = {
   name: string;
   month: number;
   year: number;
+  publicationStatus: AvailabilityPublicationStatus;
+  visibleFrom: string;
+  visibleTo: string;
   selectedEmployeeId: number | null;
   selectedEmployeeIds: number[];
   cellMap: AvailabilityMatrixCellMap;
+  stagedTransfers: StagedAvailabilityTransfer[];
   cellErrors: Record<string, string>;
   informationErrors: AvailabilityEditorInformationErrors;
+  publicationErrors: AvailabilityEditorPublicationErrors;
   employeeError?: string;
   editorError?: string;
 };
@@ -65,6 +100,9 @@ type AvailabilityGroupSource = {
   name: string;
   month: number;
   year: number;
+  publicationStatus?: AvailabilityPublicationStatus | string | null;
+  visibleFromUtc?: string | null;
+  visibleToUtc?: string | null;
 } | null | undefined;
 
 type AvailabilityMembersSource = Parameters<typeof buildAvailabilityCellMap>[0] | null | undefined;
@@ -84,7 +122,7 @@ function toErrorMessage(error: unknown) {
     return error.message;
   }
 
-  return "Something went wrong while saving this availability group.";
+  return t("Something went wrong while saving this availability group.");
 }
 
 function getDefaultDateParts() {
@@ -93,6 +131,34 @@ function getDefaultDateParts() {
     month: clampAvailabilityMonth(today.getMonth() + 1),
     year: clampAvailabilityYear(today.getFullYear()),
   };
+}
+
+function toDateTimeLocalValue(value?: string | null) {
+  if (!value) {
+    return "";
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  const offsetDate = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  return offsetDate.toISOString().slice(0, 16);
+}
+
+function toIsoDateTime(value: string) {
+  const trimmedValue = value.trim();
+  if (!trimmedValue) {
+    return null;
+  }
+
+  const date = new Date(trimmedValue);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
+function toDraftPublicationStatus(status?: string | null): AvailabilityPublicationStatus {
+  return status?.toLowerCase() === "public" ? "public" : "private";
 }
 
 function toEditableAvailabilityBind(bind: AvailabilityBind): EditableAvailabilityBind {
@@ -178,11 +244,16 @@ function createAvailabilityEditorState({
       name: "",
       month: defaults.month,
       year: defaults.year,
+      publicationStatus: "private",
+      visibleFrom: "",
+      visibleTo: "",
       selectedEmployeeId: null,
       selectedEmployeeIds: [],
       cellMap: {},
+      stagedTransfers: [],
       cellErrors: {},
       informationErrors: {},
+      publicationErrors: {},
       employeeError: undefined,
       editorError: undefined,
     };
@@ -195,11 +266,16 @@ function createAvailabilityEditorState({
     name: group.name,
     month: group.month,
     year: group.year,
+    publicationStatus: toDraftPublicationStatus(group.publicationStatus),
+    visibleFrom: toDateTimeLocalValue(group.visibleFromUtc),
+    visibleTo: toDateTimeLocalValue(group.visibleToUtc),
     selectedEmployeeId: selectedEmployeeIds[0] ?? null,
     selectedEmployeeIds,
     cellMap: sanitizeAvailabilityCellMap(hydratedCellMap, selectedEmployeeIds, group.year, group.month),
+    stagedTransfers: [],
     cellErrors: {},
     informationErrors: {},
+    publicationErrors: {},
     employeeError: undefined,
     editorError: undefined,
   };
@@ -233,7 +309,101 @@ function buildAvailabilityEditorSourceKey({
     .map(slot => `${slot.id}:${slot.availabilityGroupMemberId}:${slot.dayOfMonth}:${slot.kind}:${slot.intervalStr ?? ""}`)
     .join("|");
 
-  return `group:${groupId}:${group.name}:${group.month}:${group.year}:${memberKey}:${slotKey}`;
+  return [
+    "group",
+    groupId,
+    group.name,
+    group.month,
+    group.year,
+    toDraftPublicationStatus(group.publicationStatus),
+    group.visibleFromUtc ?? "",
+    group.visibleToUtc ?? "",
+    memberKey,
+    slotKey,
+  ].join(":");
+}
+
+function buildAvailabilityEditorSnapshot({
+  name,
+  month,
+  year,
+  selectedEmployeeIds,
+  cellMap,
+  stagedTransfers,
+  publicationStatus,
+  visibleFrom,
+  visibleTo,
+}: Pick<
+  AvailabilityEditorState,
+  "name" | "month" | "year" | "selectedEmployeeIds" | "cellMap" | "stagedTransfers" | "publicationStatus" | "visibleFrom" | "visibleTo"
+>) {
+  const sanitizedCellMap = sanitizeAvailabilityCellMap(cellMap, selectedEmployeeIds, year, month);
+
+  return stableSerialize({
+    name,
+    month,
+    year,
+    publicationStatus,
+    visibleFrom,
+    visibleTo,
+    selectedEmployeeIds,
+    cellMap: Object.entries(sanitizedCellMap).sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey)),
+    stagedTransfers: stagedTransfers
+      .map(transfer => ({
+        ...transfer,
+        dayOfMonths: [...transfer.dayOfMonths].sort((left, right) => left - right),
+      }))
+      .sort((left, right) =>
+        left.employeeId - right.employeeId || left.sourceGroupId - right.sourceGroupId),
+  });
+}
+
+function validatePublicationFields({
+  publicationStatus,
+  visibleFrom,
+  visibleTo,
+}: Pick<AvailabilityEditorState, "publicationStatus" | "visibleFrom" | "visibleTo">) {
+  const errors: AvailabilityEditorPublicationErrors = {};
+  const visibleFromDate = visibleFrom ? new Date(visibleFrom) : null;
+  const visibleToDate = visibleTo ? new Date(visibleTo) : null;
+
+  if (publicationStatus === "public") {
+    if (!visibleFrom) {
+      errors.visibleFrom = t("Publication start is required.");
+    }
+
+    if (!visibleTo) {
+      errors.visibleTo = t("Publication end is required.");
+    }
+  }
+
+  if (visibleFrom && (!visibleFromDate || Number.isNaN(visibleFromDate.getTime()))) {
+    errors.visibleFrom = t("Use a valid publication start.");
+  }
+
+  if (visibleTo && (!visibleToDate || Number.isNaN(visibleToDate.getTime()))) {
+    errors.visibleTo = t("Use a valid publication end.");
+  }
+
+  if (visibleFromDate && visibleToDate && visibleFromDate > visibleToDate) {
+    errors.visibleTo = t("Publication end must be after publication start.");
+  }
+
+  return errors;
+}
+
+function hasPendingBindDraftChanges(bindRows: EditableAvailabilityBind[]) {
+  return bindRows.some(bind => {
+    if (bind.id === null) {
+      return bind.key.trim().length > 0 || bind.value.trim().length > 0 || bind.isActive !== true;
+    }
+
+    return (
+      bind.key !== bind.persistedKey ||
+      bind.value !== bind.persistedValue ||
+      bind.isActive !== bind.persistedIsActive
+    );
+  });
 }
 
 function CompactSizeHeaderToggle({ checked, onToggle }: CompactSizeHeaderToggleProps) {
@@ -244,7 +414,7 @@ function CompactSizeHeaderToggle({ checked, onToggle }: CompactSizeHeaderToggleP
       aria-pressed={checked}
       onClick={onToggle}
     >
-      <span className={styles.compactToggleTitle}>Compact Size</span>
+      <span className={styles.compactToggleTitle}>{t("Compact Size")}</span>
 
       <span className={styles.compactToggleTrack} aria-hidden="true">
         <span className={styles.compactToggleThumb} />
@@ -254,6 +424,7 @@ function CompactSizeHeaderToggle({ checked, onToggle }: CompactSizeHeaderToggleP
 }
 
 export function AvailabilityEditPage() {
+  const language = useLanguageRevision();
   const location = useLocation();
   const navigate = useNavigate();
   const { availabilityId } = useParams<{ availabilityId: string }>();
@@ -261,7 +432,23 @@ export function AvailabilityEditPage() {
   const isCreate = !availabilityId;
   const groupId = !isCreate && Number.isFinite(parsedId) ? parsedId : null;
   const defaults = useMemo(() => getDefaultDateParts(), []);
+  const editLockTargets = useMemo(
+    () => groupId
+      ? [{
+        resourceType: managerEditResourceTypes.availabilityGroup,
+        resourceId: String(groupId),
+      }]
+      : [],
+    [groupId],
+  );
+  const { lockedByOtherState, isCheckingLocks } = useManagerEditLocks(editLockTargets);
+  const editLockMessage = lockedByOtherState
+    ? buildManagerEditLockMessage(lockedByOtherState, t("This availability group"))
+    : null;
+  const canEdit = !editLockMessage && !isCheckingLocks;
 
+  const queryClient = useQueryClient();
+  const contractSettingsQuery = useEmploymentContractSettingsQuery();
   const groupQuery = useAvailabilityGroupByIdQuery(groupId);
   const membersQuery = useAvailabilityGroupMembersQuery(groupId);
   const slotsQuery = useAvailabilityGroupSlotsQuery(groupId);
@@ -301,11 +488,16 @@ export function AvailabilityEditPage() {
     name,
     month,
     year,
+    publicationStatus,
+    visibleFrom,
+    visibleTo,
     selectedEmployeeId,
     selectedEmployeeIds,
     cellMap,
+    stagedTransfers,
     cellErrors,
     informationErrors,
+    publicationErrors,
     employeeError,
     editorError,
   } = editorState;
@@ -318,10 +510,28 @@ export function AvailabilityEditPage() {
   const bindRows = localBindRows ?? remoteBindRows;
   const [selectedBindClientId, setSelectedBindClientId] = useState<string | null>(null);
   const [bindDeleteTarget, setBindDeleteTarget] = useState<EditableAvailabilityBind | null>(null);
+  const [employeeRemoveTargetId, setEmployeeRemoveTargetId] = useState<number | null>(null);
   const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(false);
   const [isCompactMatrix, setIsCompactMatrix] = useState(false);
+  const [transferEmployeeId, setTransferEmployeeId] = useState<number | null>(null);
+  const [activeRelatedHintCellKey, setActiveRelatedHintCellKey] = useState<string | null>(null);
 
   const employees = useMemo(() => employeesQuery.data ?? [], [employeesQuery.data]);
+  const automaticEmployeeIds = useMemo(
+    () => getAutomaticManagerEmployeeIds(selectedEmployeeIds, employees, contractSettingsQuery.data?.automaticWeekdayAvailability === true),
+    [selectedEmployeeIds, employees, contractSettingsQuery.data],
+  );
+  const effectiveCellMap = useMemo(
+    () => buildEffectiveManagerAvailabilityCellMap(cellMap, automaticEmployeeIds, year, month),
+    [cellMap, automaticEmployeeIds, year, month],
+  );
+  const readOnlyCellKeys = useMemo(
+    () => getAutomaticManagerAvailabilityCellKeys(automaticEmployeeIds, year, month),
+    [automaticEmployeeIds, year, month],
+  );
+  const hasUnresolvedEmployees = Boolean(employeesQuery.data) && selectedEmployeeIds.some(id => !employees.some(employee => employee.id === id));
+  const hasPolicyError = contractSettingsQuery.isError || employeesQuery.isError || hasUnresolvedEmployees;
+  const isPolicyLoading = !hasPolicyError && (!contractSettingsQuery.data || !employeesQuery.data);
   const employeeNameById = useMemo(() => {
     return new Map(employees.map(employee => [employee.id, getEmployeeFullName(employee)]));
   }, [employees]);
@@ -333,6 +543,78 @@ export function AvailabilityEditPage() {
   const existingMemberByEmployeeId = useMemo(() => {
     return new Map((membersQuery.data ?? []).map(member => [member.employeeId, member]));
   }, [membersQuery.data]);
+  const transferEmployeeName = transferEmployeeId !== null
+    ? employeeNameById.get(transferEmployeeId) ?? t("Employee #") + transferEmployeeId
+    : "";
+  const transferPreviewQuery = useAvailabilityTransferPreviewQuery(
+    selectedEmployeeIds,
+    year,
+    month,
+    groupId,
+  );
+  const stagedTransferCellKeys = useMemo(
+    () => new Set(stagedTransfers.flatMap(transfer =>
+      transfer.dayOfMonths.map(dayOfMonth => getAvailabilityCellKey(transfer.employeeId, dayOfMonth)))),
+    [stagedTransfers],
+  );
+  const transferSources = useMemo(() => {
+    if (transferEmployeeId === null) {
+      return [];
+    }
+
+    return (transferPreviewQuery.data ?? [])
+      .filter(source => source.employeeId === transferEmployeeId)
+      .map(source => ({
+        ...source,
+        days: source.days.map(day => {
+          const cellKey = getAvailabilityCellKey(transferEmployeeId, day.dayOfMonth);
+          const parsedTarget = parseAvailabilityCode(cellMap[cellKey] ?? "-");
+          const targetIsEmpty = parsedTarget.ok && parsedTarget.value.normalizedCode === "-";
+
+          return {
+            ...day,
+            canTransfer: day.canTransfer && targetIsEmpty && !stagedTransferCellKeys.has(cellKey),
+          };
+        }),
+      }));
+  }, [cellMap, stagedTransferCellKeys, transferEmployeeId, transferPreviewQuery.data]);
+  const transferVisualHintData = useMemo(
+    () => buildAvailabilityTransferSourceHintData(transferPreviewQuery.data ?? []),
+    [transferPreviewQuery.data],
+  );
+  const transferVisualHintMap = useMemo(
+    () => Object.fromEntries(Object.entries(transferVisualHintData.visualHintMap).filter(([key]) => !readOnlyCellKeys.has(key))),
+    [transferVisualHintData.visualHintMap, readOnlyCellKeys],
+  );
+  const activeRelatedHint = activeRelatedHintCellKey
+    ? transferVisualHintData.detailMap[activeRelatedHintCellKey] ?? null
+    : null;
+  const activeRelatedSource = activeRelatedHint
+    ? (transferPreviewQuery.data ?? []).find(source => (
+      source.employeeId === activeRelatedHint.employeeId &&
+      source.groupId === activeRelatedHint.sourceGroupId
+    )) ?? null
+    : null;
+  const activeRelatedHighlightedDays = useMemo(() => {
+    if (!activeRelatedHint || !activeRelatedSource) {
+      return [];
+    }
+
+    return activeRelatedSource.days.flatMap(day => {
+      const cellKey = getAvailabilityCellKey(activeRelatedHint.employeeId, day.dayOfMonth);
+      const detail = transferVisualHintData.detailMap[cellKey];
+      const parsedTarget = parseAvailabilityCode(cellMap[cellKey] ?? "-");
+      const isRenderedAsHint = parsedTarget.ok && parsedTarget.value.normalizedCode === "-";
+
+      return detail?.sourceGroupId === activeRelatedHint.sourceGroupId && isRenderedAsHint
+        ? [day.dayOfMonth]
+        : [];
+    });
+  }, [activeRelatedHint, activeRelatedSource, cellMap, transferVisualHintData.detailMap]);
+  const activeRelatedEmployeeName = activeRelatedHint
+    ? employeeNameById.get(activeRelatedHint.employeeId) ?? t("Employee #{0}", activeRelatedHint.employeeId)
+    : "";
+
 
   const columns = useMemo(() => {
     return selectedEmployeeIds.map((employeeId, index) => {
@@ -342,14 +624,28 @@ export function AvailabilityEditPage() {
         employeeId,
         memberId: member?.id ?? null,
         displayOrder: member?.displayOrder ?? index,
-        label: employeeNameById.get(employeeId) ?? `Employee #${employeeId}`,
+        employeeLastModifiedAtUtc: member?.employeeLastModifiedAtUtc ?? null,
+        label: employeeNameById.get(employeeId) ?? t("Employee #{0}", employeeId),
       };
     });
-  }, [employeeNameById, existingMemberByEmployeeId, selectedEmployeeIds]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- Translation helpers read the current language internally.
+  }, [employeeNameById, existingMemberByEmployeeId, selectedEmployeeIds, language]);
 
   const assignedEmployees = useMemo(() => {
-    return columns.map(column => ({ id: column.employeeId, label: column.label }));
-  }, [columns]);
+    return columns.map(column => ({
+      id: column.employeeId,
+      label: automaticEmployeeIds.has(column.employeeId) ? `${column.label} — ${t("Automatic availability (read-only)")}` : column.label,
+      canChooseFromAnother: !automaticEmployeeIds.has(column.employeeId) && (transferPreviewQuery.data ?? []).some(source =>
+        source.employeeId === column.employeeId && source.days.some(day => {
+          const cellKey = getAvailabilityCellKey(column.employeeId, day.dayOfMonth);
+          const parsedTarget = parseAvailabilityCode(cellMap[cellKey] ?? "-");
+          return day.canTransfer &&
+            parsedTarget.ok &&
+            parsedTarget.value.normalizedCode === "-" &&
+            !stagedTransferCellKeys.has(cellKey);
+        })),
+    }));
+  }, [automaticEmployeeIds, cellMap, columns, stagedTransferCellKeys, transferPreviewQuery.data]);
 
   const selectedBindRow = useMemo(
     () => bindRows.find(bind => bind.clientId === resolvedSelectedBindClientId) ?? null,
@@ -357,18 +653,74 @@ export function AvailabilityEditPage() {
   );
 
   const activeBindValueByKey = useMemo(() => buildActiveAvailabilityBindMap(bindRows), [bindRows]);
-  const bindDeleteLabel = bindDeleteTarget?.key.trim() || "this bind";
+  const bindDeleteLabel = bindDeleteTarget?.key.trim() || t("this bind");
+  const employeeRemoveTargetLabel = employeeRemoveTargetId !== null
+    ? employeeNameById.get(employeeRemoveTargetId) ?? t("Employee #{0}", employeeRemoveTargetId)
+    : t("this employee");
 
   const backTo = isCreate ? "/availability" : `/availability/${groupId}`;
   const hasGroupLoadError = (groupQuery.isError || Boolean(groupQuery.error)) && !groupQuery.data;
   const hasMembersLoadError = (membersQuery.isError || Boolean(membersQuery.error)) && !membersQuery.data;
   const hasSlotsLoadError = (slotsQuery.isError || Boolean(slotsQuery.error)) && !slotsQuery.data;
-  const isLoading = !isCreate && (!groupQuery.data || !membersQuery.data || !slotsQuery.data) && (
+  const isLoading = isPolicyLoading || !isCreate && (!groupQuery.data || !membersQuery.data || !slotsQuery.data) && (
     groupQuery.isLoading || membersQuery.isLoading || slotsQuery.isLoading || groupQuery.isFetching || membersQuery.isFetching || slotsQuery.isFetching
   );
-  const hasLoadError =
+  const hasLoadError = hasPolicyError ||
     !isCreate &&
     (!Number.isFinite(parsedId) || (!isLoading && (hasGroupLoadError || hasMembersLoadError || hasSlotsLoadError)));
+  const initialEditorSnapshot = useMemo(
+    () => buildAvailabilityEditorSnapshot(initialEditorState),
+    [initialEditorState],
+  );
+  const currentEditorSnapshot = useMemo(
+    () =>
+      buildAvailabilityEditorSnapshot({
+        name,
+        month,
+        year,
+        publicationStatus,
+        visibleFrom,
+        visibleTo,
+        selectedEmployeeIds,
+        cellMap,
+        stagedTransfers,
+      }),
+    [cellMap, month, name, publicationStatus, selectedEmployeeIds, stagedTransfers, visibleFrom, visibleTo, year],
+  );
+  const hasUnsavedChanges = useMemo(() => {
+    if (isLoading || hasLoadError) {
+      return false;
+    }
+
+    const hasEditorChanges = currentEditorSnapshot !== initialEditorSnapshot;
+    const hasPendingBindChanges = hasPendingBindDraftChanges(bindRows);
+
+    if (isCreate) {
+      return hasEditorChanges || hasPendingBindChanges;
+    }
+
+    return Boolean(groupQuery.data && membersQuery.data && slotsQuery.data) && (hasEditorChanges || hasPendingBindChanges);
+  }, [
+    bindRows,
+    currentEditorSnapshot,
+    groupQuery.data,
+    hasLoadError,
+    initialEditorSnapshot,
+    isCreate,
+    isLoading,
+    membersQuery.data,
+    slotsQuery.data,
+  ]);
+  const {
+    dialog: unsavedChangesDialog,
+    runWithoutPrompt,
+  } = useUnsavedChangesPrompt({
+    when: hasUnsavedChanges && !saveMutation.isPending,
+  });
+
+  const handleEditLockDialogClose = () => {
+    runWithoutPrompt(() => navigate(backTo));
+  };
 
   const updateBindRows = (nextRows: EditableAvailabilityBind[]) => {
     setLocalBindRows(nextRows);
@@ -401,7 +753,7 @@ export function AvailabilityEditPage() {
         return {
           ...current,
           employeeError: undefined,
-          editorError: "Select employee first.",
+          editorError: t("Select employee first."),
         };
       }
 
@@ -409,7 +761,7 @@ export function AvailabilityEditPage() {
         return {
           ...current,
           employeeError: undefined,
-          editorError: "This employee is already added.",
+          editorError: t("This employee is already added."),
         };
       }
 
@@ -431,32 +783,30 @@ export function AvailabilityEditPage() {
     });
   };
 
-  const handleRemoveEmployee = () => {
-    setEditorState((current) => {
-      if (!current.selectedEmployeeId) {
-        return {
-          ...current,
-          employeeError: undefined,
-          editorError: "Select employee first.",
-        };
-      }
+  const handleRemoveEmployeeConfirm = () => {
+    if (employeeRemoveTargetId === null) {
+      return;
+    }
 
-      if (!current.selectedEmployeeIds.includes(current.selectedEmployeeId)) {
+    const employeeId = employeeRemoveTargetId;
+    setEditorState((current) => {
+      if (!current.selectedEmployeeIds.includes(employeeId)) {
         return {
           ...current,
           employeeError: undefined,
-          editorError: "This employee is not in the group.",
+          editorError: t("This employee is not in the group."),
         };
       }
 
       const nextSelectedEmployeeIds = current.selectedEmployeeIds.filter(
-        employeeId => employeeId !== current.selectedEmployeeId,
+        currentEmployeeId => currentEmployeeId !== employeeId,
       );
 
       return {
         ...current,
-        selectedEmployeeId: null,
+        selectedEmployeeId: current.selectedEmployeeId === employeeId ? null : current.selectedEmployeeId,
         selectedEmployeeIds: nextSelectedEmployeeIds,
+        stagedTransfers: current.stagedTransfers.filter(transfer => transfer.employeeId !== employeeId),
         employeeError: undefined,
         editorError: undefined,
         ...sanitizeAvailabilityEditorMatrices(
@@ -468,9 +818,50 @@ export function AvailabilityEditPage() {
         ),
       };
     });
+    setEmployeeRemoveTargetId(null);
+  };
+
+  const handleChooseFromAnother = (employeeId: number) => {
+    if (isPolicyLoading || hasPolicyError || automaticEmployeeIds.has(employeeId)) return;
+    setEditorState(current => ({
+      ...current,
+      editorError: undefined,
+    }));
+    setTransferEmployeeId(employeeId);
+  };
+
+  const handleTransferConfirm = (sourceGroupId: number, dayOfMonths: number[]) => {
+    if (transferEmployeeId === null || isPolicyLoading || hasPolicyError || automaticEmployeeIds.has(transferEmployeeId)) {
+      return;
+    }
+
+    setEditorState(current => {
+      const staged = stageAvailabilityTransfer({
+        cellMap: current.cellMap,
+        transfers: current.stagedTransfers,
+        sources: transferSources,
+        employeeId: transferEmployeeId,
+        sourceGroupId,
+        dayOfMonths,
+      });
+
+      return {
+        ...current,
+        cellMap: staged.cellMap,
+        stagedTransfers: staged.transfers,
+        editorError: undefined,
+      };
+    });
+    setTransferEmployeeId(null);
+  };
+
+  const handleVisualHintClick = (employeeId: number, dayOfMonth: number) => {
+    const cellKey = getAvailabilityCellKey(employeeId, dayOfMonth);
+    setActiveRelatedHintCellKey(transferVisualHintData.detailMap[cellKey] ? cellKey : null);
   };
 
   const handleCellChange = (employeeId: number, dayOfMonth: number, value: string) => {
+    if (isPolicyLoading || hasPolicyError || automaticEmployeeIds.has(employeeId)) return;
     const cellKey = getAvailabilityCellKey(employeeId, dayOfMonth);
 
     setEditorState((current) => {
@@ -484,6 +875,11 @@ export function AvailabilityEditPage() {
           ...current.cellMap,
           [cellKey]: value,
         },
+        stagedTransfers: removeStagedAvailabilityTransferDay(
+          current.stagedTransfers,
+          employeeId,
+          dayOfMonth,
+        ),
         cellErrors: nextErrors,
       };
     });
@@ -516,19 +912,19 @@ export function AvailabilityEditPage() {
     }
 
     if (!trimmedKey || !trimmedValue) {
-      setBindError("Bind key and value are required before the bind can be saved.");
+      setBindError(t("Bind key and value are required before the bind can be saved."));
       return;
     }
 
     const normalizedKey = normalizeBindKey(trimmedKey);
     if (!normalizedKey) {
-      setBindError("Invalid bind key format.");
+      setBindError(t("Invalid bind key format."));
       return;
     }
 
     const duplicateBindExists = bindRows.some(item => item.clientId !== clientId && normalizeBindKey(item.key) === normalizedKey);
     if (duplicateBindExists) {
-      setBindError(`Bind '${normalizedKey}' already exists.`);
+      setBindError(t("Bind '{0}' already exists.", normalizedKey));
       return;
     }
 
@@ -599,7 +995,7 @@ export function AvailabilityEditPage() {
     setBindError(undefined);
 
     if (!selectedBindRow) {
-      setBindError("Select bind first.");
+      setBindError(t("Select bind first."));
       return;
     }
 
@@ -630,12 +1026,34 @@ export function AvailabilityEditPage() {
   };
 
   const handleSave = () => {
+    if (isPolicyLoading || hasPolicyError) return;
+    if (editLockMessage) {
+      setEditorState((current) => ({
+        ...current,
+        editorError: editLockMessage,
+      }));
+      return;
+    }
+
+    if (isCheckingLocks) {
+      setEditorState((current) => ({
+        ...current,
+        editorError: t("Checking edit access. Please wait a moment."),
+      }));
+      return;
+    }
+
     const trimmedName = name.trim();
     const nextInformationErrors: AvailabilityEditorInformationErrors = {};
-    const nextEmployeeError = selectedEmployeeIds.length === 0 ? "Add at least one employee to the group." : undefined;
+    const nextPublicationErrors = validatePublicationFields({
+      publicationStatus,
+      visibleFrom,
+      visibleTo,
+    });
+    const nextEmployeeError = selectedEmployeeIds.length === 0 ? t("Add at least one employee to the group.") : undefined;
 
     if (!trimmedName) {
-      nextInformationErrors.name = "Availability name is required.";
+      nextInformationErrors.name = t("Availability name is required.");
     }
 
     const nextCellErrors: Record<string, string> = {};
@@ -656,14 +1074,20 @@ export function AvailabilityEditPage() {
     setEditorState((current) => ({
       ...current,
       informationErrors: nextInformationErrors,
+      publicationErrors: nextPublicationErrors,
       employeeError: nextEmployeeError,
       cellErrors: nextCellErrors,
     }));
 
-    if (Object.keys(nextInformationErrors).length > 0 || nextEmployeeError || Object.keys(nextCellErrors).length > 0) {
+    if (
+      Object.keys(nextInformationErrors).length > 0 ||
+      Object.keys(nextPublicationErrors).length > 0 ||
+      nextEmployeeError ||
+      Object.keys(nextCellErrors).length > 0
+    ) {
       setEditorState((current) => ({
         ...current,
-        editorError: "Check highlighted fields before saving.",
+        editorError: t("Check highlighted fields before saving."),
       }));
       return;
     }
@@ -680,15 +1104,19 @@ export function AvailabilityEditPage() {
           name: trimmedName,
           month,
           year,
+          publicationStatus,
+          visibleFromUtc: toIsoDateTime(visibleFrom),
+          visibleToUtc: toIsoDateTime(visibleTo),
         },
         employeeIds: selectedEmployeeIds,
         cellMap,
+        transfers: stagedTransfers,
         existingMembers: membersQuery.data ?? [],
         existingSlots: slotsQuery.data ?? [],
       },
       {
         onSuccess: result => {
-          navigate(`/availability/${result.id}`);
+          runWithoutPrompt(() => navigate(`/availability/${result.id}`));
         },
         onError: error => {
           setEditorState((current) => ({
@@ -702,9 +1130,11 @@ export function AvailabilityEditPage() {
 
   return (
     <div className={styles.page}>
+      <p>{t("Automatic employment contract availability is read-only. Saved availability is restored when the rule is disabled.")}</p>
+      {hasPolicyError ? <button type="button" onClick={() => { void contractSettingsQuery.refetch(); void queryClient.invalidateQueries({ queryKey: queryKeys.employees.all }); }}>{t("Retry")}</button> : null}
       <PageHeader
-        title={isCreate ? "Add Availability" : "Availability Edit"}
-        subtitle={isCreate ? "Create a new monthly availability schedule" : "Update availability information, employees and day codes"}
+        title={isCreate ? t("Add Availability") : t("Availability Edit")}
+        subtitle={isCreate ? t("Create a new monthly availability schedule") : t("Update availability information, employees and day codes")}
         backTo={backTo}
         onCollapseChange={setIsHeaderCollapsed}
         rightSlot={(
@@ -715,19 +1145,43 @@ export function AvailabilityEditPage() {
         )}
       />
 
-      <AvailabilityGroupEditor
+      {isCheckingLocks ? (
+        <ManagerEditLockDialog
+          open
+          title={t("Checking edit access")}
+          message={t("Please wait while we check whether this availability can be edited.")}
+        />
+      ) : null}
+
+      {editLockMessage ? (
+        <ManagerEditLockDialog
+          open
+          message={editLockMessage}
+          actionText={t("Back to availability")}
+          onClose={handleEditLockDialogClose}
+        />
+      ) : null}
+
+      {canEdit ? (
+        <AvailabilityGroupEditor
         name={name}
         month={month}
         year={year}
         isHeaderCollapsed={isHeaderCollapsed}
         compactSize={isCompactMatrix}
         informationErrors={informationErrors}
+        publicationStatus={publicationStatus}
+        visibleFrom={visibleFrom}
+        visibleTo={visibleTo}
+        publicationErrors={publicationErrors}
         employeeError={employeeError}
         employees={employees}
         selectedEmployeeId={selectedEmployeeId}
         assignedEmployees={assignedEmployees}
         columns={columns}
-        cellMap={cellMap}
+        cellMap={effectiveCellMap}
+        readOnlyCellKeys={readOnlyCellKeys}
+        visualHintMap={transferVisualHintMap}
         cellErrors={cellErrors}
         binds={bindRows}
         selectedBindClientId={resolvedSelectedBindClientId}
@@ -738,7 +1192,7 @@ export function AvailabilityEditPage() {
         isBindsLoading={bindsQuery.isLoading && bindRows.length === 0}
         isBindBusy={createBindMutation.isPending || updateBindMutation.isPending || deleteBindMutation.isPending}
         errorMessage={editorError}
-        bindErrorMessage={bindError ?? (bindsQuery.isError && bindRows.length === 0 ? "Could not load bind information." : undefined)}
+        bindErrorMessage={bindError ?? (bindsQuery.isError && bindRows.length === 0 ? t("Could not load bind information.") : undefined)}
         onNameChange={value => {
           setEditorState((current) => {
             const nextInformationErrors = { ...current.informationErrors };
@@ -762,6 +1216,7 @@ export function AvailabilityEditPage() {
             return {
               ...current,
               month: nextMonth,
+              stagedTransfers: [],
               informationErrors: nextInformationErrors,
               editorError: undefined,
               ...sanitizeAvailabilityEditorMatrices(
@@ -784,6 +1239,7 @@ export function AvailabilityEditPage() {
             return {
               ...current,
               year: nextYear,
+              stagedTransfers: [],
               informationErrors: nextInformationErrors,
               editorError: undefined,
               ...sanitizeAvailabilityEditorMatrices(
@@ -793,6 +1249,40 @@ export function AvailabilityEditPage() {
                 nextYear,
                 current.month,
               ),
+            };
+          });
+        }}
+        onPublicationStatusChange={value => {
+          setEditorState((current) => ({
+            ...current,
+            publicationStatus: value,
+            publicationErrors: {},
+            editorError: undefined,
+          }));
+        }}
+        onVisibleFromChange={value => {
+          setEditorState((current) => {
+            const nextPublicationErrors = { ...current.publicationErrors };
+            delete nextPublicationErrors.visibleFrom;
+
+            return {
+              ...current,
+              visibleFrom: value,
+              publicationErrors: nextPublicationErrors,
+              editorError: undefined,
+            };
+          });
+        }}
+        onVisibleToChange={value => {
+          setEditorState((current) => {
+            const nextPublicationErrors = { ...current.publicationErrors };
+            delete nextPublicationErrors.visibleTo;
+
+            return {
+              ...current,
+              visibleTo: value,
+              publicationErrors: nextPublicationErrors,
+              editorError: undefined,
             };
           });
         }}
@@ -810,24 +1300,63 @@ export function AvailabilityEditPage() {
         onBindFieldChange={handleBindFieldChange}
         onBindCommit={handleBindCommit}
         onAddEmployee={handleAddEmployee}
-        onRemoveEmployee={handleRemoveEmployee}
+        onRemoveEmployee={setEmployeeRemoveTargetId}
+        onChooseFromAnother={handleChooseFromAnother}
         onAddBind={handleAddBind}
         onDeleteBind={handleDeleteBind}
         onColumnMove={handleColumnMove}
         onCellChange={handleCellChange}
+        onVisualHintClick={handleVisualHintClick}
         onSave={handleSave}
+        />
+      ) : null}
+
+      <AvailabilityTransferDialog
+        open={transferEmployeeId !== null}
+        employeeId={transferEmployeeId ?? 0}
+        employeeName={transferEmployeeName}
+        year={year}
+        month={month}
+        sources={transferSources}
+        isLoading={transferPreviewQuery.isLoading || transferPreviewQuery.isFetching}
+        isPending={false}
+        errorMessage={transferPreviewQuery.isError ? t("Could not load availability transfer sources.") : undefined}
+        onCancel={() => setTransferEmployeeId(null)}
+        onConfirm={handleTransferConfirm}
+      />
+
+      <AvailabilityRelatedHintDialog
+        open={activeRelatedHint !== null}
+        employeeId={activeRelatedHint?.employeeId ?? 0}
+        employeeName={activeRelatedEmployeeName}
+        year={year}
+        month={month}
+        source={activeRelatedSource}
+        highlightedDayOfMonths={activeRelatedHighlightedDays}
+        onCancel={() => setActiveRelatedHintCellKey(null)}
       />
 
       <ConfirmDialog
+        open={employeeRemoveTargetId !== null}
+        title={t("Remove employee")}
+        message={t("Are you sure you want to remove '{0}' from this availability? Their availability data in this editor will be removed.", employeeRemoveTargetLabel)}
+        onCancel={() => setEmployeeRemoveTargetId(null)}
+        onConfirm={handleRemoveEmployeeConfirm}
+        confirmText={t("Remove")}
+      />
+      <ConfirmDialog
         open={bindDeleteTarget !== null}
-        title="Delete bind"
-        message={`Are you sure you want to delete '${bindDeleteLabel}' from the bind list?`}
+        title={t("Delete bind")}
+        message={t("Are you sure you want to delete '{0}' from the bind list?", bindDeleteLabel)}
         onCancel={() => setBindDeleteTarget(null)}
         onConfirm={handleDeleteBindConfirm}
-        confirmText={deleteBindMutation.isPending ? "Deleting..." : "Delete"}
+        confirmText={deleteBindMutation.isPending ? t("Deleting...") : t("Delete")}
         confirmDisabled={deleteBindMutation.isPending}
         cancelDisabled={deleteBindMutation.isPending}
       />
+
+      <SavingOverlay active={saveMutation.isPending} />
+      {unsavedChangesDialog}
     </div>
   );
 }

@@ -1,4 +1,5 @@
 using BusinessLogicLayer.Common;
+using BusinessLogicLayer.Contracts.Enums;
 using BusinessLogicLayer.Contracts.Models;
 
 namespace BusinessLogicLayer.Services.Abstractions;
@@ -31,6 +32,11 @@ public interface IContainerService : IBaseService<ContainerModel>
     Task<ScheduleModel?> GetGraphByIdAsync(int containerId, int graphId, CancellationToken ct = default);
 
     /// <summary>
+    /// Returns public graphs assigned to one employee for the employee workflow.
+    /// </summary>
+    Task<List<ScheduleModel>> GetPublishedGraphsForEmployeeAsync(int employeeId, CancellationToken ct = default);
+
+    /// <summary>
     /// Creates a new graph inside the specified container.
     /// </summary>
     Task<ScheduleModel> CreateGraphAsync(int containerId, ScheduleModel model, CancellationToken ct = default);
@@ -39,6 +45,15 @@ public interface IContainerService : IBaseService<ContainerModel>
     /// Updates an existing graph inside the specified container.
     /// </summary>
     Task UpdateGraphAsync(int containerId, int graphId, ScheduleModel model, CancellationToken ct = default);
+
+    /// <summary>
+    /// Updates publication settings for every graph inside the specified container.
+    /// </summary>
+    Task<int> UpdateGraphPublicationAsync(
+        int containerId,
+        SchedulePublicationStatus publicationStatus,
+        bool? allowSwap,
+        CancellationToken ct = default);
 
     /// <summary>
     /// Deletes one graph from the specified container.

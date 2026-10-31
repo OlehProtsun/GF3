@@ -1,0 +1,10 @@
+.calendar { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; width: 100%; }
+.weekday { text-align: center; font-size: .8rem; color: var(--text-muted, #667085); }
+.day { min-height: 76px; min-width: 0; border: 1px solid #dce2e8; border-radius: 12px; padding: 7px 4px; background: rgba(255,255,255,.8); color: inherit; display: flex; flex-direction: column; align-items: center; gap: 3px; cursor: pointer; }
+.day small { font-size: .65rem; max-width: 100%; overflow-wrap: anywhere; }
+.day:disabled { cursor: default; opacity: .7; }
+.day:focus-visible { outline: 3px solid #5279de; outline-offset: 2px; }
+.pending { background: #fff6db; }
+.approved { background: #e3f3ed; color: #11604a; }
+.selected { box-shadow: inset 0 0 0 2px #5279de; background: #eaf0ff; }
+@media (max-width: 430px) { .calendar { gap: 3px; } .day { min-height: 60px; border-radius: 8px; padding: 5px 2px; } .day small { font-size: .55rem; } }

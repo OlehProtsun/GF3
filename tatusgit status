@@ -1,0 +1,458 @@
+[33mcommit 997f88288821ff83e71e3732f43e6fddb2b9318c[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mDEV2[m[33m, [m[1;31morigin/DEV2[m[33m)[m
+Author: Oleh Protsun <olegprocun@gmail.com>
+Date:   Sat Aug 15 13:44:39 2026 +0200
+
+    15.08.2026 ui, backend update
+
+[33mcommit a411b8cf46474cb229963c0a330dbc6574ee2d10[m
+Author: Oleh Protsun <olegprocun@gmail.com>
+Date:   Tue Aug 4 21:39:40 2026 +0200
+
+    04.08.2026 Add regulations workflow and UI improvements
+
+[33mcommit 7aa1ba25cbd6f85c393ec619273e2cb4cb98ed63[m
+Author: Oleh Protsun <olegprocun@gmail.com>
+Date:   Sun Jul 26 15:28:41 2026 +0200
+
+    26.07.2026 fix update
+
+[33mcommit 2a4f7ddb2fb018a0274ac03d9dff584465488e22[m
+Author: Oleh Protsun <olegprocun@gmail.com>
+Date:   Sun Jul 26 15:00:38 2026 +0200
+
+    26.07.2026 - update
+
+[33mcommit 24db55aed1a6a3c057816732310fc90c6f0bcb81[m
+Author: Oleh Protsun <olegprocun@gmail.com>
+Date:   Tue Jul 21 17:03:41 2026 +0200
+
+    21.07.2026 new pack of updates
+
+[33mcommit ae414de2a7222b359487050b0ef393e2a476dcfe[m
+Author: Oleh Protsun <olegprocun@gmail.com>
+Date:   Sat Jul 4 18:34:24 2026 +0200
+
+    update: ui updates
+
+[33mcommit 3974a30d48d9aa447bd3247decfc75602ece4e88[m
+Author: Oleh Protsun <olegprocun@gmail.com>
+Date:   Thu Jul 2 23:19:46 2026 +0200
+
+    prod: new version of system 02.07.2026
+
+[33mcommit 10c20dc7f0695ea7fa51bb62eefefc7337c23ce1[m
+Author: Oleh Protsun <olegprocun@gmail.com>
+Date:   Sun Jun 14 12:37:45 2026 +0200
+
+    Deploy
+
+[33mcommit 6b1fb46a857d0fbfbdc7830f37d89d6a94e179f4[m
+Author: Oleh Protsun <olegprocun@gmail.com>
+Date:   Fri May 22 17:37:43 2026 +0200
+
+    MVP step 3
+
+[33mcommit e5616b08553af46ed2185701625f741caaaa284c[m
+Author: Oleh Protsun <olegprocun@gmail.com>
+Date:   Tue May 12 22:24:17 2026 +0200
+
+    mvp before opt.
+
+[33mcommit 8ae5d79516e041c9d5ba17acd8fbfe3b21f7b19c[m
+Author: Oleh Protsun <olegprocun@gmail.com>
+Date:   Sun May 10 12:13:24 2026 +0200
+
+    MVP Step 1
+
+[33mcommit 5e7ead1c16d39bb6c1e0429cc4883231cb8dcd40[m
+Author: Oleh Protsun <olegprocun@gmail.com>
+Date:   Wed May 6 22:28:41 2026 +0200
+
+    feat: Employee workflow
+
+[33mcommit ac505c6b3201f255a145e24fdd1b88d32ebc8c50[m[33m ([m[1;31morigin/Recreate-Tests[m[33m, [m[1;32mRecreate-Tests[m[33m)[m
+Author: Oleh Protsun <olegprocun@gmail.com>
+Date:   Wed Apr 22 16:31:36 2026 +0200
+
+    Recreate tests
+
+[33mcommit 18b8eff3cdad75bd57b1c0e5ced529afc7e24ab6[m[33m ([m[1;31morigin/DEV[m[33m, [m[1;32mDEV[m[33m)[m
+Merge: 408b5d9 d54b697
+Author: OlehProtsun <olegprocun@gmail.com>
+Date:   Sun Apr 19 21:32:20 2026 +0200
+
+    Merge pull request #138 from OlehProtsun/BackupAdd
+    
+    Logic added succsesfully
+
+[33mcommit d54b697e0844f110084bd878120495a502fcf4e6[m[33m ([m[1;31morigin/BackupAdd[m[33m, [m[1;32mBackupAdd[m[33m)[m
+Author: Oleh Protsun <olegprocun@gmail.com>
+Date:   Sun Apr 19 21:31:13 2026 +0200
+
+    Logic added succsesfully
+
+[33mcommit 408b5d9e74355f7949606100dac50dfcdd4b7e95[m
+Merge: b4133f7 6ad43b4
+Author: OlehProtsun <olegprocun@gmail.com>
+Date:   Thu Apr 16 12:18:56 2026 +0200
+
+    Merge pull request #137 from OlehProtsun/FixUiIssue
+    
+    Done
+
+[33mcommit 6ad43b4f7d25eb4cf22ca25f6863f7862517878f[m[33m ([m[1;31morigin/FixUiIssue[m[33m, [m[1;32mFixUiIssue[m[33m)[m
+Author: Oleh Protsun <olegprocun@gmail.com>
+Date:   Thu Apr 16 12:17:29 2026 +0200
+
+    Done
+
+[33mcommit b4133f70e57ca7fbb76657cdde255d54e1bb3319[m
+Merge: f0b9dfe 459b702
+Author: OlehProtsun <olegprocun@gmail.com>
+Date:   Thu Apr 16 11:12:15 2026 +0200
+
+    Merge pull request #135 from OlehProtsun/Manually-test-the-program-and-identify-bugs-and-errors-on-the-front-end-and-back-end
+    
+    End branch
+
+[33mcommit 459b7024181384093b294a1e23bc13968fecf2d4[m[33m ([m[1;31morigin/Manually-test-the-program-and-identify-bugs-and-errors-on-the-front-end-and-back-end[m[33m, [m[1;32mManually-test-the-program-and-identify-bugs-and-errors-on-the-front-end-and-back-end[m[33m)[m
+Author: Oleh Protsun <olegprocun@gmail.com>
+Date:   Thu Apr 16 11:11:17 2026 +0200
+
+    End branch
+
+[33mcommit f0b9dfedba06e009a7a95c0181a29a3e719d7779[m
+Merge: c3f9247 e8a1b70
+Author: OlehProtsun <olegprocun@gmail.com>
+Date:   Thu Apr 9 16:02:41 2026 +0200
+
+    Merge pull request #132 from OlehProtsun/Manually-test-the-program-and-identify-bugs-and-errors-on-the-front-end-and-back-end
+    
+    Manually test the program and identify bugs and errors on the front end and back end
+
+[33mcommit e8a1b7062794b6c43bca84fcfcfe07e8562db95d[m
+Author: Oleh Protsun <olegprocun@gmail.com>
+Date:   Thu Apr 9 16:01:54 2026 +0200
+
+    Finall setup MVP
+
+[33mcommit b53844326ac89581c6102e03b2f2afbb9feb9773[m
+Author: Oleh Protsun <olegprocun@gmail.com>
+Date:   Thu Apr 9 12:30:27 2026 +0200
+
+    Small ui fix
+
+[33mcommit c3f92472771419c3e94e1356b0cfa54decbcf145[m
+Merge: 6258585 e2fab2c
+Author: OlehProtsun <olegprocun@gmail.com>
+Date:   Thu Apr 9 12:05:34 2026 +0200
+
+    Merge pull request #131 from OlehProtsun/Manually-test-the-program-and-identify-bugs-and-errors-on-the-front-end-and-back-end
+    
+    Big update pack
+
+[33mcommit e2fab2c08f2e90c39988495767544c3b5c8c3afe[m
+Author: Oleh Protsun <olegprocun@gmail.com>
+Date:   Thu Apr 9 12:03:16 2026 +0200
+
+    Big update pack
+
+[33mcommit 6258585c0be2e074e1df2f305f19e3b9fa63def2[m
+Merge: 7a46b16 f3f322d
+Author: OlehProtsun <olegprocun@gmail.com>
+Date:   Tue Mar 24 09:46:15 2026 +0100
+
+    Merge pull request #130 from OlehProtsun/Fixing-visual-imperfections-in-the-front-end
+    
+    Task Done
+
+[33mcommit f3f322d4daa9cf1adf7685b16506f036eed2af76[m[33m ([m[1;31morigin/Fixing-visual-imperfections-in-the-front-end[m[33m, [m[1;32mFixing-visual-imperfections-in-the-front-end[m[33m)[m
+Author: Oleh Protsun <olegprocun@gmail.com>
+Date:   Tue Mar 24 09:18:36 2026 +0100
+
+    Task Done
+
+[33mcommit 7a46b16e8253d8ac168b76359a174d989ab9ea2f[m
+Author: Oleh Protsun <olegprocun@gmail.com>
+Date:   Thu Mar 19 17:07:59 2026 +0100
+
+    Completed task: Fix visual issues in the schedule edit page
+
+[33mcommit 72177e3c6ba8812162e345e212e8ec5bcfe390c8[m
+Merge: b277b2e aa0acf9
+Author: OlehProtsun <olegprocun@gmail.com>
+Date:   Thu Mar 19 16:36:56 2026 +0100
+
+    Merge pull request #129 from OlehProtsun/master
+    
+    sync
+
+[33mcommit aa0acf911d34facd9eb44bee3ed6a75154ee7ff1[m
+Merge: b277b2e 6524657
+Author: OlehProtsun <olegprocun@gmail.com>
+Date:   Thu Mar 19 16:36:00 2026 +0100
+
+    Merge pull request #128 from OlehProtsun/FrontEndDeploy
+    
+    Completed task: Optimize CancellationToken which is called on the bac…
+
+[33mcommit 652465761ed1c532173c181a9d960b9186e9b50a[m[33m ([m[1;31morigin/FrontEndDeploy[m[33m, [m[1;32mFrontEndDeploy[m[33m)[m
+Author: Oleh Protsun <olegprocun@gmail.com>
+Date:   Thu Mar 19 16:33:16 2026 +0100
+
+    Completed task: Optimize CancellationToken which is called on the backend when routing phantom.
+    Completed task: Replace the grid style in the Availability frontend logic with the same one that is implemented in the Schedule matrix.
+
+[33mcommit b277b2e4e3ccd24913fc4f8304f93601d6fc50f5[m
+Merge: baa7faf f105fc9
+Author: OlehProtsun <olegprocun@gmail.com>
+Date:   Thu Mar 19 14:13:19 2026 +0100
+
+    Merge pull request #127 from OlehProtsun/FrontEndDeploy
+    
+    Front end deploy
+
+[33mcommit f105fc9871e2ae6088bd99eca6705c3262b3ae53[m
+Author: Oleh Protsun <olegprocun@gmail.com>
+Date:   Thu Mar 19 12:40:26 2026 +0100
+
+    chore: finalize frontend batch update and switch to new branch flow
+    chore: close frontend branch and start Branch - Dev / Branch - Prod workflow
+
+[33mcommit 29bcf59e637e886c172a02cf3fb378c9ab578760[m
+Author: Oleh Protsun <olegprocun@gmail.com>
+Date:   Wed Mar 11 10:09:52 2026 +0100
+
+    11.03.2026: A large batch of updates to the front end
+
+[33mcommit a5078c6278b065bb9b4c75d6608c7e70263f5d7e[m
+Author: Oleh Protsun <olegprocun@gmail.com>
+Date:   Fri Mar 6 22:19:48 2026 +0100
+
+    06.03.2026: FrontEnd Update
+
+[33mcommit 96dd854f5e2615d319a31a72c4527f6c485281ce[m
+Author: Oleh Protsun <olegprocun@gmail.com>
+Date:   Thu Mar 5 13:40:31 2026 +0100
+
+    05.03.2026: step 1
+
+[33mcommit 8e77d2cdd4e1fd559c5971aa28c468481d7aa34a[m
+Merge: a9aeb41 7aa2e45
+Author: OlehProtsun <olegprocun@gmail.com>
+Date:   Wed Mar 4 11:24:06 2026 +0100
+
+    Merge pull request #126 from OlehProtsun/codex/refactor-employeelistpage-for-reusability-8t461v
+    
+    Extract reusable ListCardSection and IosButton; refactor EmployeeListPage
+
+[33mcommit 7aa2e45f415d336c42a5188ec29c7a7496528f92[m[33m ([m[1;31morigin/codex/refactor-employeelistpage-for-reusability-8t461v[m[33m)[m
+Author: OlehProtsun <olegprocun@gmail.com>
+Date:   Wed Mar 4 11:21:55 2026 +0100
+
+    refactor employee list card and ios action button into shared components
+
+[33mcommit a9aeb41f1f46f7459dc396a66e0349ce8ce613d7[m
+Author: Oleh Protsun <olegprocun@gmail.com>
+Date:   Wed Mar 4 11:13:26 2026 +0100
+
+    04.03.2026: pre codex
+
+[33mcommit c03d40aa6ee96660553f2227753300089e64d038[m
+Merge: 185336d 45248d9
+Author: OlehProtsun <olegprocun@gmail.com>
+Date:   Tue Mar 3 18:36:50 2026 +0100
+
+    Merge pull request #124 from OlehProtsun/codex/fix-pageheader-positioning-and-animations
+    
+    Fix sticky PageHeader stability and add smooth overlay/back-button motion
+
+[33mcommit 45248d9e4184051c89a90ae7c056aa193bdbef46[m[33m ([m[1;31morigin/codex/fix-pageheader-positioning-and-animations[m[33m)[m
+Author: OlehProtsun <olegprocun@gmail.com>
+Date:   Tue Mar 3 18:36:39 2026 +0100
+
+    Fix viewport-sticky page header and smooth overlay glass transitions
+
+[33mcommit 185336d7032a58072515cbae82ffc00ef8f702db[m
+Author: Oleh Protsun <olegprocun@gmail.com>
+Date:   Tue Mar 3 18:23:24 2026 +0100
+
+    03.03.2026: Pre Codex step 3
+
+[33mcommit 8b403d41cedd8a80a4b0c1cecbd6295af219cd56[m
+Merge: 7686f34 0cd0987
+Author: OlehProtsun <olegprocun@gmail.com>
+Date:   Tue Mar 3 17:21:07 2026 +0100
+
+    Merge pull request #123 from OlehProtsun/codex/implement-changes-to-pageheader
+    
+    Make PageHeader sticky glass header and move Search into header
+
+[33mcommit 0cd0987f390b606307950c1877543c01551d80e7[m[33m ([m[1;31morigin/codex/implement-changes-to-pageheader[m[33m)[m
+Author: OlehProtsun <olegprocun@gmail.com>
+Date:   Tue Mar 3 17:20:56 2026 +0100
+
+    Refactor PageHeader as sticky glass header with integrated search
+
+[33mcommit 7686f345f210a172455520b8c34519706ace9b3b[m
+Author: Oleh Protsun <olegprocun@gmail.com>
+Date:   Tue Mar 3 17:11:58 2026 +0100
+
+    03.03.2026: Pre Codex step2
+
+[33mcommit d05a765dee5ff520951db304c4d756c3ff6821f8[m
+Merge: 59dcdc2 213da7a
+Author: OlehProtsun <olegprocun@gmail.com>
+Date:   Tue Mar 3 16:38:24 2026 +0100
+
+    Merge pull request #122 from OlehProtsun/codex/refactor-pageheader-for-reusability
+    
+    Refactor PageHeader into reusable self-contained card with back icon
+
+[33mcommit 213da7a0809f6f18e0f5d7362b7b1c2416ef8db6[m[33m ([m[1;31morigin/codex/refactor-pageheader-for-reusability[m[33m)[m
+Author: OlehProtsun <olegprocun@gmail.com>
+Date:   Tue Mar 3 16:38:13 2026 +0100
+
+    refactor frontend page header to self-contained card component
+
+[33mcommit 59dcdc2c14fa9eb15299f53f1061bb1b11b45973[m
+Author: Oleh Protsun <olegprocun@gmail.com>
+Date:   Tue Mar 3 16:23:30 2026 +0100
+
+    03.03.2026: pre codex
+
+[33mcommit 0a79bc66c6a0aa37b62312339d58c202a0f2796b[m
+Merge: 7507ec9 4a60c6b
+Author: OlehProtsun <olegprocun@gmail.com>
+Date:   Tue Mar 3 10:02:53 2026 +0100
+
+    Merge pull request #121 from OlehProtsun/codex/create-pages-for-sidebar-navigation
+    
+    Implement sidebar routing and Employee CRUD pages
+
+[33mcommit 4a60c6b38bb23cdd79ce1c0ca8db0618724491b6[m[33m ([m[1;31morigin/codex/create-pages-for-sidebar-navigation[m[33m)[m
+Author: OlehProtsun <olegprocun@gmail.com>
+Date:   Tue Mar 3 10:02:39 2026 +0100
+
+    Implement sidebar routes and employee CRUD pages
+
+[33mcommit 7507ec91175e11125f94ea13754b2710d49382ee[m
+Author: Oleh Protsun <olegprocun@gmail.com>
+Date:   Mon Mar 2 13:23:28 2026 +0100
+
+    02.03.2026: SideBar - completed
+
+[33mcommit cb1c54bdeaabb7e372b7157987b698cfff7df2d6[m
+Merge: 1b911cf 4ea36bf
+Author: OlehProtsun <olegprocun@gmail.com>
+Date:   Sun Mar 1 13:08:12 2026 +0100
+
+    Merge pull request #120 from OlehProtsun/codex/remove-pages-and-create-hometest-page
+    
+    Frontend: switch to HomeTest-only route with overlay sidebar layout
+
+[33mcommit 4ea36bfde12c285b8f7a1496d4d1c3f83128159b[m[33m ([m[1;31morigin/codex/remove-pages-and-create-hometest-page[m[33m)[m
+Author: OlehProtsun <olegprocun@gmail.com>
+Date:   Sun Mar 1 13:08:04 2026 +0100
+
+    frontend: replace pages with HomeTest and overlay sidebar layout
+
+[33mcommit 1b911cf7c6a3445f2e15c917068f12f9c0fda7ad[m
+Merge: 1e2701e 7e66c4d
+Author: OlehProtsun <olegprocun@gmail.com>
+Date:   Sun Mar 1 12:19:09 2026 +0100
+
+    Merge pull request #119 from OlehProtsun/codex/fix-and-stabilize-spa-proxy-integration
+    
+    Stabilize SPA proxy startup and same-origin dev integration
+
+[33mcommit 7e66c4d56c9d7e2adb7a5e947c9683f3bcf8a500[m[33m ([m[1;31morigin/codex/fix-and-stabilize-spa-proxy-integration[m[33m)[m
+Author: OlehProtsun <olegprocun@gmail.com>
+Date:   Sun Mar 1 12:18:45 2026 +0100
+
+    Stabilize WebApi SPA proxy and local dev flow
+
+[33mcommit 1e2701e3ae4636db7828c2e2c05dfd899573b15d[m
+Merge: a3df75a 560a8aa
+Author: OlehProtsun <olegprocun@gmail.com>
+Date:   Sun Mar 1 12:04:25 2026 +0100
+
+    Merge pull request #118 from OlehProtsun/codex/fix-data-fetching-and-input-lag-issues
+    
+    Fix query refetch loop and add simple Employees CRUD page
+
+[33mcommit 560a8aa1f557fe318e12e3ac2c649fcc43506b96[m[33m ([m[1;31morigin/codex/fix-data-fetching-and-input-lag-issues[m[33m)[m
+Author: OlehProtsun <olegprocun@gmail.com>
+Date:   Sun Mar 1 12:04:15 2026 +0100
+
+    Fix query refetch loop and add simple employees CRUD page
+
+[33mcommit a3df75a27ff791a36e6fc9a0f3b007e4ac36ec32[m
+Merge: d365741 811906b
+Author: OlehProtsun <olegprocun@gmail.com>
+Date:   Sun Mar 1 11:54:37 2026 +0100
+
+    Merge pull request #117 from OlehProtsun/codex/integrate-frontend-with-webapi-8jhjwk
+    
+    Frontend: add API clients, TanStack Query plumbing, entity hooks/UI and http client; update app entry and docs
+
+[33mcommit 811906b5e38bb74ba2d1f82c93bf8998855f65d3[m[33m ([m[1;31morigin/codex/integrate-frontend-with-webapi-8jhjwk[m[33m)[m
+Merge: 3239d7b d365741
+Author: OlehProtsun <olegprocun@gmail.com>
+Date:   Sun Mar 1 11:54:30 2026 +0100
+
+    Merge branch 'FrontEndDeploy' into codex/integrate-frontend-with-webapi-8jhjwk
+
+[33mcommit 3239d7bf31229e33afd2bfafd4de81a012f8c3ee[m
+Author: OlehProtsun <olegprocun@gmail.com>
+Date:   Sun Mar 1 11:24:57 2026 +0100
+
+    Complete frontend API coverage for all WebApi endpoints
+
+[33mcommit d3657415b7fb087add89f807f6fa24e2613aa1dc[m
+Merge: b8c80b2 170e2fd
+Author: OlehProtsun <olegprocun@gmail.com>
+Date:   Sun Mar 1 11:04:52 2026 +0100
+
+    Merge pull request #116 from OlehProtsun/codex/integrate-frontend-with-webapi
+    
+    Integrate React frontend with ASP.NET WebApi: typed API layer & TanStack Query hooks
+
+[33mcommit 170e2fd538b2d19ac4915d75a14c423b2e5a98d2[m[33m ([m[1;31morigin/codex/integrate-frontend-with-webapi[m[33m)[m
+Author: OlehProtsun <olegprocun@gmail.com>
+Date:   Sun Mar 1 11:04:28 2026 +0100
+
+    Integrate frontend with WebApi via typed API layer and query hooks
+
+[33mcommit b8c80b2f8ff712e11d4fc8a7faec99ae2ddc4f18[m
+Author: Oleh Protsun <olegprocun@gmail.com>
+Date:   Sun Mar 1 10:48:27 2026 +0100
+
+    01.03.2026: Pre Codex
+
+[33mcommit d270a4d25820b3bf5f34548b82052a7dc98427b3[m
+Author: Oleh Protsun <olegprocun@gmail.com>
+Date:   Fri Feb 27 18:55:18 2026 +0100
+
+    Init
+
+[33mcommit d1317785bc6460197ddeaaf676827da1648b5235[m[33m ([m[1;31morigin/MigrationToAspNetWebApi[m[33m, [m[1;32mMigrationToAspNetWebApi[m[33m)[m
+Author: Oleh Protsun <olegprocun@gmail.com>
+Date:   Fri Feb 27 18:52:22 2026 +0100
+
+    27.02.2026: React created
+
+[33mcommit d42776bba6162ff290d112c4f95138510d012a8c[m
+Merge: bf994cc 8c165c6
+Author: OlehProtsun <olegprocun@gmail.com>
+Date:   Fri Feb 27 13:33:10 2026 +0100
+
+    Merge pull request #115 from OlehProtsun/codex/fix-excel-export-time-parsing-bug
+    
+    Fix schedule matrix time parsing for Excel export and totals
+
+[33mcommit 8c165c6e99eb6f12b1a03304974493bf39012366[m[33m ([m[1;31morigin/codex/fix-excel-export-time-parsing-bug[m[33m)[m
+Author: OlehProtsun <olegprocun@gmail.com>
+Date:   Fri Feb 27 13:33:01 2026 +0100
+
+    Fix schedule time parsing for matrix export and totals

@@ -28,6 +28,8 @@ internal static class BackendLocator
         {
             yield return Path.Combine(current.FullName, "backend");
             yield return current.FullName;
+            yield return Path.Combine(current.FullName, "artifacts", "manual-release", "app", "backend");
+            yield return Path.Combine(current.FullName, "artifacts", "local-app", "app", "backend");
             yield return Path.Combine(current.FullName, ".codex-temp", "publish", "webapi");
             yield return Path.Combine(current.FullName, "GF3.WebApi", "bin", "Release", "net10.0");
             yield return Path.Combine(current.FullName, "GF3.WebApi", "bin", "Release", "net10.0", "win-x64");

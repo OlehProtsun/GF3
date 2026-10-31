@@ -1,5 +1,7 @@
 ﻿using System.Data;
 using System.Globalization;
+using BusinessLogicLayer.Common;
+using BusinessLogicLayer.Contracts.Enums;
 using BusinessLogicLayer.Contracts.Models;
 using BusinessLogicLayer.Schedule;
 using BusinessLogicLayer.Services.Abstractions;
@@ -41,6 +43,7 @@ public sealed class GraphTemplateExportService : IGraphTemplateExportService
     private const int M_LastDataCol = 27;
     private const int M_FirstDayRow = 2;
     private const int M_DayCount = 31;
+    private const double M_MaxAutoDataColumnWidth = 64d;
 
     private const int S_ValueCol = 2;
     private const int S_EmployeesLineRow = 12;
@@ -74,10 +77,28 @@ public sealed class GraphTemplateExportService : IGraphTemplateExportService
         _logger = logger;
     }
 
-    public async Task<(byte[] content, string fileName)> ExportGraphToXlsxAsync(int containerId, int graphId, bool includeStyles, bool includeEmployees, CancellationToken ct = default)
+    public Task<(byte[] content, string fileName)> ExportGraphToXlsxAsync(int containerId, int graphId, bool includeStyles, bool includeEmployees, CancellationToken ct = default)
+        => ExportGraphWorkbookCoreAsync(containerId, graphId, includeStyles, includeEmployees, false, ct);
+
+    public async Task<(byte[] content, string fileName)> ExportPublishedGraphToXlsxAsync(int employeeId, int graphId, CancellationToken ct = default)
+    {
+        if (employeeId <= 0)
+            throw ValidationException.ForField(nameof(employeeId), "Employee ID must be positive.");
+        if (graphId <= 0)
+            throw ValidationException.ForField(nameof(graphId), "Graph ID must be positive.");
+
+        var schedules = await _containerService.GetPublishedGraphsForEmployeeAsync(employeeId, ct).ConfigureAwait(false);
+        var schedule = schedules.FirstOrDefault(graph => graph.Id == graphId)
+            ?? throw new KeyNotFoundException("Schedule was not found.");
+        return await ExportGraphWorkbookCoreAsync(schedule.ContainerId, graphId, true, true, true, ct).ConfigureAwait(false);
+    }
+
+    private async Task<(byte[] content, string fileName)> ExportGraphWorkbookCoreAsync(int containerId, int graphId, bool includeStyles, bool includeEmployees, bool onlyPublishedRelatedHints, CancellationToken ct)
     {
         var loadedGraphData = await LoadGraphDataAsync(containerId, graphId, includeStyles, includeEmployees, ct).ConfigureAwait(false);
-        var relatedGraphSources = await LoadRelatedGraphHintSourcesAsync(containerId, loadedGraphData.Graph, ct).ConfigureAwait(false);
+        if (onlyPublishedRelatedHints && loadedGraphData.Graph.PublicationStatus != SchedulePublicationStatus.Public)
+            throw new KeyNotFoundException("Schedule was not found.");
+        var relatedGraphSources = await LoadRelatedGraphHintSourcesAsync(containerId, loadedGraphData.Graph, onlyPublishedRelatedHints, ct).ConfigureAwait(false);
         var graphData = BuildGraphExcelContext(loadedGraphData, relatedGraphSources);
         using var workbook = OpenWorkbook(_templateLocator.GetScheduleTemplatePath());
 
@@ -216,7 +237,7 @@ public sealed class GraphTemplateExportService : IGraphTemplateExportService
         return new GraphExcelContext(effectiveGraph, graphData.Shop, graphData.Employees, graphData.Slots, scheduleContext);
     }
 
-    private async Task<List<GraphRelatedScheduleHintSource>> LoadRelatedGraphHintSourcesAsync(int containerId, ScheduleModel graph, CancellationToken ct)
+    private async Task<List<GraphRelatedScheduleHintSource>> LoadRelatedGraphHintSourcesAsync(int containerId, ScheduleModel graph, bool onlyPublishedRelatedHints, CancellationToken ct)
     {
         var graphs = await _containerService.GetGraphsAsync(containerId, ct).ConfigureAwait(false)
             ?? throw new KeyNotFoundException($"Container with id {containerId} was not found.");
@@ -225,7 +246,8 @@ public sealed class GraphTemplateExportService : IGraphTemplateExportService
         foreach (var relatedGraph in graphs.Where(relatedGraph =>
                      relatedGraph.Id != graph.Id
                      && relatedGraph.Year == graph.Year
-                     && relatedGraph.Month == graph.Month))
+                     && relatedGraph.Month == graph.Month
+                     && (!onlyPublishedRelatedHints || relatedGraph.PublicationStatus == SchedulePublicationStatus.Public)))
         {
             var relatedSlots = await _containerService.GetGraphSlotsAsync(containerId, relatedGraph.Id, ct).ConfigureAwait(false)
                 ?? throw new KeyNotFoundException($"Graph with id {relatedGraph.Id} was not found.");
@@ -488,10 +510,24 @@ public sealed class GraphTemplateExportService : IGraphTemplateExportService
                 sheet.Cell(excelRow, c).Value = "-";
         }
 
+        AdjustMatrixDataColumnWidths(sheet, dataCols.Count);
+
         sheet.PageSetup.SetRowsToRepeatAtTop(M_HeaderRow, M_HeaderRow);
         sheet.PageSetup.SetColumnsToRepeatAtLeft(M_DateCol, M_DateCol);
         sheet.PageSetup.PrintAreas.Clear();
         sheet.PageSetup.PrintAreas.Add(MatrixClearRange);
+    }
+
+    private static void AdjustMatrixDataColumnWidths(IXLWorksheet sheet, int dataColumnCount)
+    {
+        for (var i = 0; i < dataColumnCount; i++)
+        {
+            var column = sheet.Column(M_FirstDataCol + i);
+            column.AdjustToContents(M_FirstDayRow, M_FirstDayRow + M_DayCount - 1);
+
+            if (column.Width > M_MaxAutoDataColumnWidth)
+                column.Width = M_MaxAutoDataColumnWidth;
+        }
     }
 
     private static void SetDashIfEmpty(IXLCell cell, object? value)

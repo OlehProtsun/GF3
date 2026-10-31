@@ -14,9 +14,9 @@ public class SchedulePresetModel
     [Column("id")]
     public int Id { get; set; }
 
-    [Required]
+    /// <summary>Optional originating container.</summary>
     [Column("container_id")]
-    public int ContainerId { get; set; }
+    public int? ContainerId { get; set; }
 
     [Required]
     [Column("name")]

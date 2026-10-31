@@ -1,0 +1,1597 @@
+
+
+.panelHeaderRow {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.sectionHeading {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sectionHeading > div {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.sectionIcon {
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  border-radius: 18px;
+  border: 1px solid rgba(37, 99, 235, 0.16);
+  background: rgba(219, 234, 254, 0.8);
+  color: #1d4ed8;
+}
+
+.collapseButton {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  padding: 0;
+  border-radius: 13px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: rgba(255, 255, 255, 0.9);
+  color: #64748b;
+  cursor: pointer;
+  transition:
+    transform 140ms ease,
+    border-color 140ms ease,
+    background 140ms ease,
+    color 140ms ease;
+}
+
+.collapseButton:hover {
+  border-color: rgba(37, 99, 235, 0.22);
+  background: rgba(239, 246, 255, 0.94);
+  color: #1d4ed8;
+}
+
+.collapseButton:active {
+  transform: scale(0.98);
+}
+
+.collapseButton svg {
+  transform: rotate(180deg);
+  transition: transform 140ms ease;
+}
+
+.collapseButton[aria-expanded="true"] svg {
+  transform: rotate(0deg);
+}
+
+.pinButton svg {
+  transform: none;
+}
+
+.pinButtonActive {
+  border-color: rgba(37, 99, 235, 0.42);
+  background: rgba(219, 234, 254, 0.94);
+  color: #1d4ed8;
+  box-shadow: 0 5px 14px rgba(37, 99, 235, 0.14);
+}
+
+.select,
+.primaryButton,
+.secondaryButton {
+  width: 100%;
+  min-height: 42px;
+  box-sizing: border-box;
+  border-radius: 16px;
+  font: inherit;
+  font-weight: 800;
+}
+
+.select {
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(248, 250, 252, 0.94);
+  color: #0f172a;
+  padding: 0 12px;
+}
+
+.comboBox {
+  position: relative;
+  z-index: 12;
+}
+
+.comboTrigger {
+  width: 100%;
+  min-height: 54px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  border-radius: 18px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 252, 0.9));
+  color: #0f172a;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  box-shadow:
+    0 10px 24px rgba(15, 23, 42, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.comboTrigger:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
+.comboTrigger:not(:disabled):hover,
+.comboTrigger[aria-expanded="true"] {
+  border-color: rgba(37, 99, 235, 0.24);
+  background: #ffffff;
+  box-shadow:
+    0 12px 28px rgba(15, 23, 42, 0.06),
+    0 0 0 3px rgba(37, 99, 235, 0.08);
+}
+
+.comboAvatar,
+.comboOptionAvatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  border-radius: 14px;
+  border: 1px solid rgba(37, 99, 235, 0.12);
+  background: rgba(219, 234, 254, 0.72);
+  color: #1d4ed8;
+  font-weight: 950;
+  letter-spacing: 0;
+}
+
+.comboAvatar {
+  width: 38px;
+  height: 38px;
+  font-size: 0.78rem;
+}
+
+.comboContent {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.comboLabel {
+  color: #0f172a;
+  font-size: 0.9rem;
+  line-height: 1.15;
+  font-weight: 900;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.comboArrow {
+  color: #64748b;
+  transform: rotate(180deg);
+  transition: transform 140ms ease;
+}
+
+.comboArrowOpen {
+  transform: rotate(0deg);
+}
+
+.comboMenu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  max-height: 236px;
+  display: grid;
+  gap: 4px;
+  padding: 6px;
+  border-radius: 20px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow:
+    0 18px 44px rgba(15, 23, 42, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  overflow-y: auto;
+}
+
+.comboOption {
+  min-width: 0;
+  min-height: 48px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: 15px;
+  background: transparent;
+  color: #0f172a;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.comboOption:hover,
+.comboOptionActive {
+  background: rgba(239, 246, 255, 0.9);
+}
+
+.comboOptionAvatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 12px;
+  font-size: 0.68rem;
+}
+
+.comboOptionText {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.comboOptionText strong {
+  min-width: 0;
+  color: #0f172a;
+  font-size: 0.84rem;
+  line-height: 1.15;
+  font-weight: 900;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.comboCheck {
+  color: #1d4ed8;
+}
+
+.primaryButton,
+.secondaryButton {
+  border: none;
+  cursor: pointer;
+}
+
+.primaryButton {
+  background: #2563eb;
+  color: #ffffff;
+  box-shadow: 0 14px 26px rgba(37, 99, 235, 0.18);
+}
+
+.secondaryButton {
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(255, 255, 255, 0.94);
+  color: #334155;
+}
+
+.primaryButton:disabled,
+.secondaryButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+  box-shadow: none;
+}
+
+.offerList {
+  display: grid;
+  gap: 10px;
+}
+
+.offerListScrollable {
+  max-height: min(480px, 62vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 6px;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.52) transparent;
+}
+
+.offerListScrollable::-webkit-scrollbar {
+  width: 7px;
+}
+
+.offerListScrollable::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.48);
+}
+
+.offerToolbar {
+  display: grid;
+  gap: 9px;
+}
+
+.swapSearchField {
+  min-width: 0;
+  min-height: 44px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  box-sizing: border-box;
+  padding: 0 8px 0 12px;
+  border-radius: 16px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: rgba(248, 250, 252, 0.92);
+  color: #64748b;
+  transition:
+    border-color 140ms ease,
+    background 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.swapSearchField:focus-within {
+  border-color: rgba(37, 99, 235, 0.25);
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.08);
+}
+
+.swapSearchIcon {
+  flex: 0 0 auto;
+  color: #94a3b8;
+}
+
+.swapSearchInput {
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #0f172a;
+  font: inherit;
+  font-size: 0.88rem;
+  line-height: 1.2;
+  font-weight: 800;
+}
+
+.swapSearchInput::placeholder {
+  color: #94a3b8;
+}
+
+.clearSearchButton {
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  background: rgba(255, 255, 255, 0.86);
+  color: #64748b;
+  cursor: pointer;
+}
+
+.clearSearchButton:hover {
+  color: #1d4ed8;
+  background: rgba(239, 246, 255, 0.94);
+}
+
+.searchResultText {
+  justify-self: start;
+  color: #64748b;
+  font-size: 0.75rem;
+  line-height: 1;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.offerCard {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 20px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  background: rgba(248, 250, 252, 0.92);
+  cursor: pointer;
+  transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.offerCard:hover {
+  transform: translateY(-1px);
+}
+
+.offerCard:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14);
+}
+
+.offerCardPinned {
+  border-color: rgba(37, 99, 235, 0.48);
+  background: rgba(219, 234, 254, 0.78);
+  box-shadow: 0 12px 26px rgba(37, 99, 235, 0.12);
+}
+
+.offerHeader {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.offerHeaderActions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 0;
+  gap: 8px;
+}
+
+.offerBadges {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.offerTitle {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.offerTitle strong {
+  color: #0f172a;
+  font-size: 0.96rem;
+  line-height: 1.25;
+  font-weight: 900;
+  overflow-wrap: anywhere;
+}
+
+.offerMeta {
+  min-width: 0;
+  width: 100%;
+  color: #64748b;
+  font-size: 0.8rem;
+  line-height: 1.35;
+  font-weight: 750;
+}
+
+.offerMeta span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 26px;
+  padding: 0 9px;
+  border-radius: 999px;
+  background: rgba(219, 234, 254, 0.88);
+  color: #1d4ed8;
+  font-size: 0.72rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.badgePrivate,
+.badgeCan {
+  background: rgba(220, 252, 231, 0.92);
+  color: #15803d;
+}
+
+.badgeCant {
+  background: rgba(254, 226, 226, 0.94);
+  color: #b91c1c;
+}
+
+.badgeMuted {
+  background: rgba(226, 232, 240, 0.9);
+  color: #475569;
+}
+
+.badgeLocked {
+  background: rgba(254, 226, 226, 0.94);
+  color: #b91c1c;
+}
+
+.unavailableText {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(220, 38, 38, 0.16);
+  background: rgba(254, 242, 242, 0.9);
+  color: #991b1b;
+  font-size: 0.8rem;
+  line-height: 1.35;
+  font-weight: 850;
+}
+
+.emptyText {
+  margin: 0;
+  color: #64748b;
+  line-height: 1.55;
+}
+
+.emptyState {
+  min-height: 180px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  text-align: center;
+  font-size: 14px;
+}
+
+.emptyState > span {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  color: #2f6df5;
+  background: #edf3ff;
+  font-size: 26px;
+}
+
+@container employee-workspace (min-width: 760px) {
+
+  .offerToolbar {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+  }
+
+  .searchResultText {
+    justify-self: end;
+  }
+}
+
+@container employee-workspace (max-width: 460px) {
+  .offerHeader {
+    align-items: start;
+  }
+
+  .offerHeaderActions {
+    gap: 6px;
+  }
+}
+
+@container employee-workspace (max-width: 360px) {
+}
+
+/* Employee swap concept */
+.swapPage {
+  height: calc(100% + 14px);
+  margin-top: -14px;
+  min-height: 0;
+  min-width: 0;
+  width: 100%;
+  display: grid;
+  justify-items: center;
+  gap: 16px;
+}
+
+.swapStage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  color: #111827;
+
+}
+
+.swapBackdrop {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+  filter: none;
+}
+
+.swapBackdrop path {
+  fill: rgba(255, 255, 255, 0.98);
+  stroke: rgba(226, 232, 240, 0.95);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.swapHeader {
+  position: absolute;
+  inset: 29px 24px auto 30px;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 12px;
+}
+
+.swapIdentity {
+  min-width: 0;
+  transform: translateX(-8px);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-top: 19px;
+}
+
+.swapIdentity > div {
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+}
+
+.swapIdentity h1 {
+  margin: 0;
+  color: #111827;
+  font-size: 1.3rem;
+  line-height: 1.05;
+  font-weight: 600;
+  letter-spacing: -0.035em;
+}
+
+.swapIdentity > div > span {
+  color: #7c8799;
+  font-size: 0.68rem;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.swapLogo {
+  width: 46px;
+  height: 46px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: #2f6fed;
+  color: #ffffff;
+  font-size: 1.55rem;
+  line-height: 1;
+  font-weight: 500;
+  box-shadow: 0 10px 20px rgba(47, 111, 237, 0.2);
+}
+
+.swapLogoMark {
+  display: inline-block;
+  transform: translateY(-2px);
+}
+
+.createOfferButton {
+  position: absolute;
+  top: 0;
+  right: 0;
+  --create-offer-clearance: 12px;
+  width: min(176px, max(0px, calc(100% - 138px - var(--create-offer-clearance))));
+  min-width: 0;
+  box-sizing: border-box;
+  height: 58px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 999px;
+  background: #2f6fed;
+  color: #ffffff;
+  font: inherit;
+  font-size: 0.94rem;
+  font-weight: 850;
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: 0 13px 25px rgba(37, 99, 235, 0.24);
+  transition: transform 150ms ease, box-shadow 150ms ease, background 150ms ease;
+}
+
+.createOfferButton > svg {
+  flex: 0 0 auto;
+}
+
+.createOfferButton > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.createOfferButton:hover {
+  transform: translateY(-1px);
+  background: #2563eb;
+  box-shadow: 0 16px 28px rgba(37, 99, 235, 0.28);
+}
+
+.createOfferButton:active {
+  transform: translateY(0) scale(0.985);
+}
+
+.swapContentClip {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
+.swapBody {
+  position: absolute;
+  inset: 114px 8px 22px;
+  z-index: 2;
+  min-height: 0;
+  display: grid;
+  align-content: start;
+  gap: 11px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.42) transparent;
+  box-sizing: border-box;
+  max-width: none;
+  margin: 0;
+  padding: 24px 0 32px;
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 24px, #000 calc(100% - 32px), transparent);
+  mask-image: linear-gradient(to bottom, transparent, #000 24px, #000 calc(100% - 32px), transparent);
+}
+
+.swapBody::-webkit-scrollbar {
+  width: 5px;
+}
+
+.swapBody::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.42);
+}
+.historyPanel {
+  box-sizing: border-box;
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid rgba(203, 213, 225, 0.74);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 16px 34px rgba(15, 23, 42, 0.1);
+}
+
+.creationDialog {
+  width: min(430px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  padding: 0;
+  border: 0;
+  border-radius: 24px;
+  background: #fff;
+  color: #111827;
+  box-shadow: 0 28px 60px rgba(15, 23, 42, 0.24);
+  overscroll-behavior: contain;
+}
+
+.creationDialog[open] {
+  animation: var(--motion-reveal) var(--motion-enter) var(--motion-ease) backwards;
+}
+
+.creationDialog[open]::backdrop {
+  animation: swap-backdrop-enter 360ms ease-out both;
+}
+
+@keyframes swap-backdrop-enter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.creationDialog::backdrop {
+  background: rgba(10, 15, 28, 0.34);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.dialogCloseButton {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border: 1px solid #dbe2ec;
+  border-radius: 50%;
+  background: #f8fafc;
+  color: #475569;
+  cursor: pointer;
+}
+
+.historyPanel {
+  width: 100%;
+}
+
+.offersSection {
+  min-height: 0;
+  display: grid;
+  gap: 8px;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.offerToolbar {
+  display: grid;
+  gap: 8px;
+  padding: 9px 10px 10px;
+  border-radius: 25px;
+  background: rgba(248, 250, 252, 0.94);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.swapSearchField {
+  min-height: 50px;
+  padding: 0 12px 0 16px;
+  gap: 11px;
+  border-color: rgba(203, 213, 225, 0.78);
+  border-radius: 17px;
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 3px 8px rgba(15, 23, 42, 0.025);
+}
+
+.swapSearchInput {
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+
+.swapSearchInput::placeholder {
+  color: #71809a;
+  opacity: 1;
+}
+
+.swapSearchIcon {
+  color: #71809a;
+}
+
+.filterRow {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 2px;
+}
+
+.filterButton {
+  min-width: 0;
+  min-height: 34px;
+  padding: 0 14px;
+  border: 1px solid rgba(203, 213, 225, 0.66);
+  border-radius: 999px;
+  background: rgba(248, 250, 252, 0.88);
+  color: #566176;
+  font: inherit;
+  font-size: 0.66rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 140ms ease, border-color 140ms ease, color 140ms ease;
+}
+
+.filterButtonActive {
+  border-color: rgba(37, 99, 235, 0.46);
+  background: #dbeafe;
+  color: #2563eb;
+}
+
+.searchResultText {
+  margin-left: auto;
+  justify-self: auto;
+  color: #8490a3;
+  font-size: 0.64rem;
+  line-height: 1;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  white-space: nowrap;
+}
+
+.offerList {
+  display: grid;
+  gap: 10px;
+}
+
+.offerListScrollable {
+  max-height: none;
+  overflow: visible;
+  padding-right: 0;
+}
+
+.offerCard {
+  position: relative;
+  min-width: 0;
+  min-height: 100px;
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: 50px minmax(0, 1fr);
+  grid-template-areas:
+    "avatar summary"
+    "expanded expanded";
+  align-items: center;
+  column-gap: 10px;
+  row-gap: 7px;
+  padding: 8px 10px;
+  border: 1px solid rgba(203, 213, 225, 0.72);
+  border-radius: 23px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 2px 5px rgba(15, 23, 42, 0.015);
+  cursor: pointer;
+}
+
+.offerCard:hover {
+  transform: none;
+  border-color: rgba(148, 163, 184, 0.72);
+  background: #ffffff;
+}
+
+.offerCardPinned {
+  border-color: rgba(37, 99, 235, 0.35);
+  background: rgba(248, 251, 255, 0.98);
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.07);
+}
+
+.offerAvatar {
+  grid-area: avatar;
+  width: 46px;
+  height: 46px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  border-radius: 999px;
+  background: #e6efff;
+  color: #2f6fed;
+  font-size: 0.82rem;
+  line-height: 1;
+  font-weight: 850;
+}
+
+.offerSummary {
+  grid-area: summary;
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+  padding-bottom: 14px;
+}
+
+.offerHeader {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 7px;
+}
+
+.offerTitle {
+  gap: 0;
+}
+
+.offerTitle strong {
+  color: #111827;
+  font-size: 0.88rem;
+  line-height: 1.15;
+  font-weight: 850;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.offerHeaderActions {
+  gap: 5px;
+}
+
+.offerBadges {
+  flex-wrap: nowrap;
+  gap: 5px;
+}
+
+.collapseButton.pinButton {
+  width: 27px;
+  height: 27px;
+  border-radius: 999px;
+  border-color: #cbd5e1;
+  background: #f1f5f9;
+  color: #64748b;
+  box-shadow: none;
+}
+
+.collapseButton.pinButton:not(.pinButtonActive):hover {
+  border-color: #94a3b8;
+  background: #e2e8f0;
+  color: #475569;
+}
+
+.collapseButton.pinButtonActive {
+  border-color: rgba(37, 99, 235, 0.42);
+  background: #dbeafe;
+  color: #1d4ed8;
+  box-shadow: none;
+}
+
+.badge {
+  min-height: 27px;
+  padding: 0 11px;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 650;
+}
+
+.badgePublic {
+  background: #e7e9fb;
+  color: #4f46c8;
+}
+
+.badgePrivate {
+  background: #fbf3df;
+  color: #9a7a28;
+}
+
+.badgeCan {
+  background: #ddf8ed;
+  color: #13815e;
+}
+
+.badgeMine {
+  background: #e1ecff;
+  color: #2f6fed;
+}
+
+.badgeCant,
+.badgeLocked {
+  background: #fbe5e5;
+  color: #9f3232;
+}
+
+.badgeMuted {
+  background: #edf0f4;
+  color: #64748b;
+}
+
+.offerMeta {
+  display: grid;
+  gap: 5px;
+  color: #58667c;
+  font-size: 0.67rem;
+  line-height: 1.2;
+  font-weight: 500;
+}
+
+.offerMeta small {
+  min-width: 0;
+  color: #7c8799;
+  font-size: 0.61rem;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.unavailableText {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #b4232a;
+  font-size: 0.58rem;
+  line-height: 1.15;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.historyButton {
+  position: absolute;
+  left: 24px;
+  bottom: 29px;
+  z-index: 3;
+  width: min(176px, max(0px, calc(100% - 204px)));
+  min-width: 0;
+  height: 58px;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 7px 15px 7px 10px;
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #475569;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 850;
+  cursor: pointer;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+  transition: transform 150ms ease, box-shadow 150ms ease;
+}
+
+.historyButton > span:first-child {
+  width: 37px;
+  height: 37px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: #64748b;
+  color: #ffffff;
+}
+
+.historyButtonLabel {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.historyButton:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 26px rgba(15, 23, 42, 0.13);
+}
+
+@container employee-workspace (max-width: 460px) {
+  .historyButton {
+    bottom: 22px;
+    width: min(176px, max(0px, calc(100% - 211px)));
+  }
+
+  .swapPage {
+    margin-top: -14px;
+  }
+
+  .swapStage {
+    height: 100%;
+  }
+
+  .swapHeader {
+    inset: 22px 24px auto 30px;
+  }
+
+  .swapIdentity {
+    gap: 8px;
+    padding-top: 19px;
+  }
+
+  .swapLogo {
+    width: 46px;
+    height: 46px;
+  }
+
+  .createOfferButton {
+    --create-offer-clearance: 19px;
+    min-width: 0;
+    height: 58px;
+    padding-inline: 16px;
+    font-size: 0.94rem;
+  }
+
+  .swapBody {
+    top: 106px;
+    left: 8px;
+    right: 8px;
+  }
+
+  .filterRow {
+    gap: 4px;
+  }
+
+  .filterButton {
+    padding-inline: 10px;
+    font-size: 0.61rem;
+  }
+
+  .offerHeader {
+    align-items: center;
+  }
+
+  .offerHeaderActions {
+    gap: 4px;
+  }
+
+  .badge {
+    padding-inline: 8px;
+  }
+}
+
+@container employee-workspace (max-width: 380px) {
+  .swapHeader {
+    left: 30px;
+  }
+
+  .swapIdentity h1 {
+    font-size: 1.1rem;
+  }
+
+  .swapIdentity > div > span {
+    font-size: 0.61rem;
+  }
+
+  .createOfferButton {
+    min-width: 0;
+    padding-inline: 12px;
+    gap: 8px;
+  }
+
+  .swapBody {
+    left: 8px;
+    right: 8px;
+  }
+
+  .filterButton {
+    padding-inline: 8px;
+  }
+
+  .searchResultText {
+    display: none;
+  }
+
+  .offerCard {
+    grid-template-columns: 44px minmax(0, 1fr);
+    column-gap: 7px;
+  }
+
+  .offerAvatar {
+    width: 41px;
+    height: 41px;
+  }
+
+  .badge {
+    min-height: 25px;
+    padding-inline: 7px;
+    font-size: 0.56rem;
+  }
+
+  .collapseButton.pinButton {
+    width: 25px;
+    height: 25px;
+  }
+}
+
+
+.swapStage .offerToolbar {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.filterRow {
+  flex-wrap: wrap;
+}
+
+.offerUnavailableReason {
+  position: absolute;
+  right: 10px;
+  bottom: 8px;
+  width: 91px;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.offerUnavailableReason .unavailableText {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.offersSection > .offerList {
+  margin-inline: 8px;
+}
+
+.offersSection > .offerList:has(.offerCard)::after {
+  content: "";
+  display: block;
+  min-height: 220px;
+  pointer-events: none;
+}
+
+.shortActionLabel {
+  display: none;
+}
+
+@container employee-workspace (max-width: 460px) {
+  .fullActionLabel {
+    display: none;
+  }
+
+  .shortActionLabel {
+    display: inline;
+  }
+
+  .historyButton {
+    padding-inline: 8px;
+    gap: 5px;
+  }
+
+  .historyButton > span:first-child {
+    width: 28px;
+    height: 28px;
+  }
+}
+
+.offerCard { display: flex; align-items: stretch; gap: 0; padding: 0; cursor: default; }
+.offerCard > .pinButton { position: absolute; top: 12px; right: 10px; }
+.offerOpenButton { display: flex; align-items: flex-start; gap: 12px; flex: 1; min-width: 0; border: 0; padding: 12px 44px 12px 12px; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; border-radius: 23px; }
+.offerOpenButton:focus-visible { outline: 3px solid #729dff; outline-offset: 4px; }
+.offerOpenButton .offerSummary { min-width: 0; display: grid; gap: 6px; padding-bottom: 0; }
+.offerOpenButton .offerTitle { display: block; min-width: 0; }
+.offerOpenButton .offerTitle strong { display: block; max-width: 100%; }
+.offerOpenButton .offerBadges { display: flex; flex-wrap: wrap; gap: 5px; }
+.offerOpenButton .offerUnavailableReason { position: static; display: block; width: auto; min-height: 0; min-width: 0; margin: 0; text-align: left; }
+.badgeExchange { background: #eee9ff; color: #6746c5; }
+
+/* Offer-list refinement; the floating History section retains its existing geometry. */
+.offersSection .offerToolbar {
+  gap: 10px;
+  background: transparent;
+  box-shadow: none;
+}
+.offersSection .swapSearchField {
+  min-height: 44px;
+  border-color: #e7edf5;
+  border-radius: 17px;
+  background: #fff;
+  box-shadow: 0 5px 14px #264b7e0b, 0 1px 3px #264b7e04;
+}
+.offersSection .swapSearchInput { font-size: .76rem; }
+.offersSection .filterRow { gap: 6px; }
+.offersSection .filterButton {
+  padding-inline: 12px;
+  border-color: #e3eaf4;
+  background: #f8faff;
+  color: #62718a;
+  font-weight: 500;
+  box-shadow: 0 2px 5px #264b7e04;
+}
+.offersSection .filterButtonActive {
+  border-color: #94b7ff;
+  background: #e8f1ff;
+  color: #246bff;
+  box-shadow: 0 3px 8px #246bff12;
+}
+.offersSection .searchResultText { display: inline; margin-left: auto; font-size: .65rem; }
+.offersSection .offerList { gap: 12px; }
+.offersSection .offerCard {
+  border-color: #edf2f8;
+  border-radius: 19px;
+  background: #fff;
+  box-shadow: 0 6px 17px #264b7e0a, 0 2px 5px #264b7e04;
+}
+.offersSection .offerCard:hover { border-color: #e2eaf6; box-shadow: 0 7px 20px #264b7e10; }
+.offersSection .offerCardPinned { border-color: #c9dcff; background: #fff; box-shadow: 0 6px 18px #246bff12; }
+.offersSection .offerOpenButton { padding: 14px; gap: 12px; border-radius: 19px; }
+.offersSection .offerAvatar {
+  flex: none;
+  align-self: flex-start;
+  width: 48px;
+  height: 48px;
+  background: #eaf1ff;
+  color: #246bff;
+  font-size: 1rem;
+  font-weight: 800;
+  box-shadow: 0 5px 12px #246bff06;
+}
+.offersSection .offerCard[data-own="true"] .offerAvatar { background: #f0ebff; color: #7138dc; box-shadow: 0 5px 12px #7138dc06; }
+.offersSection .offerSummary { gap: 6px; flex: 1; }
+.offersSection .offerTitle { padding-right: 30px; }
+.offersSection .offerTitle strong { color: #111b36; font-size: .94rem; line-height: 1.25; font-weight: 800; }
+.offersSection .offerMeta { gap: 5px; font-size: .7rem; line-height: 1.35; color: #52647f; }
+.offersSection .offerMeta .offerDateLine, .offerFromLine { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.offerDateLine > svg, .offerFromLine > svg { flex: none; color: #7b8ba5; }
+.offerDateLine > span { min-width: 0; }
+.offersSection .offerMeta .offerFromLine { font-size: .69rem; line-height: 1.35; color: #7b8ba5; }
+.offerFromLine > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.offersSection .offerBadges { justify-content: flex-start; gap: 5px; }
+.offersSection .badge { display: inline-flex; align-items: center; gap: 4px; min-height: 25px; padding: 3px 8px; box-sizing: border-box; font-size: .63rem; line-height: 1.3; font-weight: 600; }
+.offersSection .badge > svg { flex: none; }
+.offersSection .badgeExchange { background: #f1eaff; color: #7946dc; }
+.offersSection .badgePublic { background: #e9f1ff; color: #246bff; }
+.offersSection .badgePrivate { background: #fff5e2; color: #b17d1b; }
+.offersSection .badgeCan { background: #e7f8f0; color: #24a477; }
+.badgePartial { background: #f3e8ff; color: #8b5cf6; }
+.offersSection .badgeMine { background: #e9f1ff; color: #246bff; }
+.offersSection .badgeCant, .offersSection .badgeLocked { background: #ffedf0; color: #d9425d; }
+.offersSection .offerOpenButton .offerUnavailableReason {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  justify-self: start;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 5px 8px;
+  margin-top: 1px;
+  border-radius: 10px;
+  background: #fff0f2;
+  color: #db4059;
+}
+.offersSection .offerUnavailableReason > svg { flex: none; margin-top: 1px; }
+.offersSection .offerUnavailableReason .unavailableText {
+  display: block;
+  min-width: 0;
+  overflow: visible;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  color: inherit;
+  font-size: .65rem;
+  line-height: 1.4;
+  -webkit-line-clamp: unset;
+}
+.offersSection .offerCard > .pinButton {
+  top: 12px;
+  right: 11px;
+  width: 32px;
+  height: 32px;
+  border-color: #e5ecf5;
+  background: #f8faff;
+  box-shadow: 0 3px 8px #264b7e08;
+}
+.offersSection .offerCard > .pinButtonActive { border-color: #bcd3ff; background: #e9f1ff; color: #246bff; }
+@container employee-workspace (max-width: 380px) {
+  .offersSection .filterRow { gap: 4px; }
+  .offersSection .filterButton { padding-inline: 8px; font-size: .6rem; }
+  .offersSection .searchResultText { font-size: .6rem; }
+  .offersSection .offerOpenButton { padding: 12px; gap: 10px; }
+  .offersSection .offerAvatar { width: 44px; height: 44px; }
+}
+
+.creationDialog {
+  --history-top-gap: max(12px, env(safe-area-inset-top, 0px));
+  --history-bottom-gap: max(12px, env(safe-area-inset-bottom, 0px));
+  position: fixed;
+  top: calc(var(--swap-visual-top, 0px) + var(--history-top-gap));
+  bottom: auto;
+  left: 0;
+  right: 0;
+  margin: 0 auto;
+  box-sizing: border-box;
+  height: calc(var(--swap-visual-height, 100dvh) - var(--history-top-gap) - var(--history-bottom-gap));
+  max-height: calc(var(--swap-visual-height, 100dvh) - var(--history-top-gap) - var(--history-bottom-gap));
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+.creationDialog .historyPanel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+.historyPanel .panelHeaderRow { flex: none; }
+.historyPanel .panelHeaderRow > div { min-width: 0; overflow-wrap: anywhere; }
+.historyPanel > .offerList {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: none;
+  scrollbar-gutter: stable;
+  padding: 3px;
+}
+.historyPanel .offerCard { flex: none; }
+.historyPanel .offerOpenButton .offerBadges { justify-content: flex-start; align-items: center; flex-wrap: wrap; gap: 5px; }
+.historyPanel .badge { gap: 4px; }
+.historyPanel .badge > svg { flex: none; }
+.historyPanel .offerTitle strong { white-space: normal; overflow-wrap: anywhere; }
+.historyPanel .offerDateLine, .historyPanel .offerFromLine { display: flex; align-items: center; gap: 7px; }
+.historyPanel .offerDateLine > svg, .historyPanel .offerFromLine > svg { flex: none; }
+.historyPanel .offerDateLine > span, .historyPanel .offerFromLine > span { white-space: normal; overflow-wrap: anywhere; }
+
+.creationDialog:not(:has(.offerListScrollable)) { height: auto; }
+.creationDialog:not(:has(.offerListScrollable)) .historyPanel {
+  height: auto;
+  max-height: calc(var(--swap-visual-height, 100dvh) - var(--history-top-gap) - var(--history-bottom-gap));
+}
+
+.historyPanel .offerOpenButton { padding-right: 12px; }
+.historyPanel .offerTitle { padding-right: 32px; }
+.historyPanel .offerDateLine { box-sizing: border-box; padding-right: 30px; }
+
+.swapPage, .swapStage, .swapContentClip { overflow: hidden; }
+.swapBody {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding-bottom: 0;
+  mask-image: none;
+  -webkit-mask-image: none;
+}
+.swapBody > :not(.offersSection) { flex: none; }
+.swapBody > .offersSection {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.offersSection .offerToolbar { flex: none; }
+.offersSection > .offerList {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, .42) transparent;
+  padding: 4px 2px 32px;
+  mask-image: linear-gradient(to bottom, transparent, #000 4px, #000 calc(100% - 32px), transparent);
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 4px, #000 calc(100% - 32px), transparent);
+}
+.offersSection > .offerList > * { flex: none; }
+.offersSection > .offerList:focus-visible { outline: 2px solid #729dff; outline-offset: -2px; }
+
+.offerTitle.managerManualTitle { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.managerManualTitle strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.managerManualIndicator {
+  flex: 0 0 21px;
+  display: inline-grid;
+  place-items: center;
+  box-sizing: border-box;
+  width: 21px;
+  height: 21px;
+  border-radius: 50%;
+  background: #fff4f0;
+  border: 1px solid #ffcfc4;
+  font-size: 13px;
+  line-height: 1;
+}
+.offerCard > .cardActionButton {
+  position: absolute; right: 11px; top: 12px;
+  display: grid; place-items: center; width: 32px; height: 32px;
+  box-sizing: border-box;
+  border: 1px solid #e5ecf5; border-radius: 50%; background: #f8faff; color: #64748b; cursor: pointer;
+  box-shadow: 0 3px 8px #264b7e08;
+}
+.offerCard > .pinButtonActive { border-color: #bcd3ff; background: #e9f1ff; color: #246bff; }
+.offersSection .offerCard > .copyLinkButton, .historyPanel .offerCard > .copyLinkButton { top: 50px; }
+.copyLinkButton:hover { border-color: #94a3b8; background: #e2e8f0; color: #475569; }
+.cardActionButton:focus-visible { outline: 2px solid #246bff; outline-offset: 2px; }
+.shareStatus { position: absolute; right: 48px; bottom: 8px; max-width: calc(100% - 64px); padding: 4px 8px; border-radius: 8px; background: #edf4ff; color: #174c9b; font-size: .7rem; pointer-events: none; }
+.offersSection .offerCard.deepLinkedOffer, .historyPanel .offerCard.deepLinkedOffer {
+  outline: none;
+  border-color: #9cbbff;
+  background: #f4f8ff;
+  box-shadow: inset 0 0 0 .5px #9cbbff;
+}
+.offerCard .offerOpenButton:focus-visible { outline: 1px solid #729dff; outline-offset: -3px; border-radius: inherit; }
+.deepLinkedOffer .offerOpenButton:focus-visible { outline: none; }
+.offersSection .offerMeta, .historyPanel .offerMeta { box-sizing: border-box; padding-right: 32px; }
+
+@media (max-height: 430px) and (min-width: 560px) {
+  .swapBody { top: 100px; bottom: 100px; padding-top: 0; }
+  .offersSection .offerToolbar { display: flex; align-items: center; gap: 6px; padding: 0 10px 4px; }
+  .offersSection .swapSearchField { flex: 1; min-width: 0; padding-inline: 8px; }
+  .offersSection .filterRow { flex-wrap: nowrap; gap: 3px; padding: 0; }
+  .offersSection .filterButton { padding-inline: 6px; }
+  .offersSection .searchResultText { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .offersSection > .offerList { mask-image: none; -webkit-mask-image: none; }
+}
+
+.badgeApproval {
+  background: #eef0f7;
+  color: #586580;
+}

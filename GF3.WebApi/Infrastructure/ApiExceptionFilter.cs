@@ -22,12 +22,12 @@ public sealed class ApiExceptionFilter : IAsyncExceptionFilter
 
     public Task OnExceptionAsync(ExceptionContext context)
     {
-        if (context.HttpContext.Response.HasStarted)
+        if (TryHandleClientCancellation(context))
         {
             return Task.CompletedTask;
         }
 
-        if (TryHandleClientCancellation(context))
+        if (context.HttpContext.Response.HasStarted)
         {
             return Task.CompletedTask;
         }
@@ -49,7 +49,7 @@ public sealed class ApiExceptionFilter : IAsyncExceptionFilter
             return false;
         }
 
-        if (context.HttpContext.RequestAborted.IsCancellationRequested)
+        if (!context.HttpContext.Response.HasStarted && context.HttpContext.RequestAborted.IsCancellationRequested)
         {
             context.HttpContext.Response.StatusCode = 499;
         }
@@ -62,11 +62,14 @@ public sealed class ApiExceptionFilter : IAsyncExceptionFilter
     {
         return context.Exception switch
         {
+            BusinessLogicLayer.Contracts.Urlop.UrlopConflictException conflict => CreateUrlopConflictResult(context.HttpContext, conflict),
+            WebApi.ShiftSwaps.ContractShiftConflictException conflict => CreateContractConflictResult(context.HttpContext, conflict),
             ValidationException validationException => CreateValidationResult(context.HttpContext, validationException),
             BusinessLogicValidationException validationException => CreateValidationResult(context.HttpContext, validationException),
             KeyNotFoundException notFoundException => CreateNotFoundResult(context.HttpContext, notFoundException),
             InvalidOperationException invalidOperationException => CreateNotFoundResult(context.HttpContext, invalidOperationException),
             BadHttpRequestException badHttpRequestException => CreateBadRequestResult(context.HttpContext, badHttpRequestException),
+            Microsoft.Data.Sqlite.SqliteException { SqliteErrorCode: 5 or 6 } busy => CreateDatabaseConflictResult(context.HttpContext, busy, "This request changed during another operation. Refresh and try again."),
             DbUpdateConcurrencyException dbUpdateConcurrencyException => CreateDatabaseConflictResult(
                 context.HttpContext,
                 dbUpdateConcurrencyException,
@@ -77,6 +80,23 @@ public sealed class ApiExceptionFilter : IAsyncExceptionFilter
                 "The requested change could not be completed because related data still exists or the database rejected the operation."),
             _ => CreateServerErrorResult(context.HttpContext, context.Exception),
         };
+    }
+
+    private static ObjectResult CreateContractConflictResult(HttpContext context, WebApi.ShiftSwaps.ContractShiftConflictException exception)
+    {
+        var problem = ApiProblemDetailsFactory.CreateProblem(context, StatusCodes.Status409Conflict,
+            "Contract approval conflict", exception.Message, exception.Code);
+        problem.Extensions["code"] = exception.Code;
+        return CreateResult(StatusCodes.Status409Conflict, problem);
+    }
+
+    private static ObjectResult CreateUrlopConflictResult(HttpContext context, BusinessLogicLayer.Contracts.Urlop.UrlopConflictException exception)
+    {
+        var problem = ApiProblemDetailsFactory.CreateProblem(context, StatusCodes.Status409Conflict, "Vacation conflict", exception.Message, exception.Code);
+        problem.Extensions["code"] = exception.Code;
+        problem.Extensions["conflictingDates"] = exception.ConflictingDates;
+        problem.Extensions["scheduleIds"] = exception.ScheduleIds;
+        return CreateResult(StatusCodes.Status409Conflict, problem);
     }
 
     private ObjectResult CreateValidationResult(HttpContext httpContext, Exception exception)

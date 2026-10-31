@@ -1,0 +1,613 @@
+.page {
+  min-height: 100%;
+  padding: 0 18px 40px;
+}
+
+.panel {
+  width: min(1100px, 100%);
+  margin: 18px auto 0;
+  transform: translateX(-18px);
+  padding: 18px;
+  border: 1px solid rgba(17, 17, 17, 0.08);
+  border-radius: 32px;
+  background:
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0)),
+    rgba(255, 255, 255, 0.68);
+  box-shadow:
+    0 18px 44px rgba(17, 17, 17, 0.08),
+    0 1px 0 rgba(255, 255, 255, 0.42) inset;
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+}
+
+.panelHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 2px 4px 14px;
+  border-bottom: 1px solid rgba(17, 17, 17, 0.08);
+  flex-wrap: wrap;
+}
+
+.panelTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.panelIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 18px;
+  border: 1px solid rgba(113, 113, 122, 0.12);
+  background: rgba(255, 255, 255, 0.68);
+  color: #2563eb;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.4) inset;
+}
+
+.panelTitle div {
+  display: grid;
+  gap: 2px;
+}
+
+.eyebrow {
+  color: rgba(17, 17, 17, 0.62);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.panelTitle strong {
+  color: #111827;
+  font-size: 1.05rem;
+  font-weight: 900;
+}
+
+.headerPills {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.livePill,
+.pausedPill,
+.countPill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  border: 1px solid rgba(113, 113, 122, 0.12);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.livePill {
+  background: rgba(37, 99, 235, 0.1);
+  color: #1d4ed8;
+}
+
+.pausedPill {
+  background: rgba(100, 116, 139, 0.12);
+  color: #475569;
+}
+
+.countPill {
+  min-width: 38px;
+  background: rgba(17, 17, 17, 0.06);
+  color: rgba(17, 17, 17, 0.76);
+}
+.stateText {
+  margin-top: 16px;
+  padding: 18px;
+  border-radius: 22px;
+  border: 1px solid rgba(113, 113, 122, 0.1);
+  background: rgba(255, 255, 255, 0.62);
+  color: rgba(17, 17, 17, 0.62);
+  font-size: 14px;
+}
+
+.activityLayout {
+  display: grid;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.dayRailShell {
+  min-width: 0;
+}
+
+.dayRail {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 6px 10px 12px 6px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.48) transparent;
+}
+
+.dayRail::-webkit-scrollbar {
+  height: 8px;
+}
+
+.dayRail::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.5);
+}
+
+.dayButton {
+  min-width: 88px;
+  min-height: 58px;
+  display: grid;
+  align-content: center;
+  justify-items: start;
+  gap: 5px;
+  padding: 10px 12px;
+  border-radius: 18px;
+  border: 1px solid rgba(113, 113, 122, 0.12);
+  background: rgba(255, 255, 255, 0.68);
+  color: #475569;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.42) inset;
+  transition:
+    transform 0.16s ease,
+    border-color 0.16s ease,
+    background 0.16s ease,
+    color 0.16s ease,
+    box-shadow 0.16s ease;
+}
+
+.dayButton:hover {
+  transform: translateY(-1px);
+  border-color: rgba(37, 99, 235, 0.2);
+  background: rgba(255, 255, 255, 0.86);
+  color: #1d4ed8;
+}
+
+.dayButton span {
+  font-size: 0.76rem;
+  font-weight: 850;
+  text-transform: capitalize;
+}
+
+.dayButton strong {
+  color: inherit;
+  font-size: 1rem;
+  line-height: 1;
+  font-weight: 950;
+}
+
+.dayButtonActive {
+  border-color: rgba(37, 99, 235, 0.28);
+  background: rgba(219, 234, 254, 0.86);
+  color: #1d4ed8;
+  box-shadow:
+    0 6px 14px rgba(37, 99, 235, 0.1),
+    0 1px 0 rgba(255, 255, 255, 0.62) inset;
+}
+
+.timelinePanel {
+  min-width: 0;
+  display: grid;
+  gap: 14px;
+}
+
+.timelineHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 20px;
+  border: 1px solid rgba(113, 113, 122, 0.1);
+  background: rgba(255, 255, 255, 0.58);
+}
+
+.timelineHeader > div {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.timelineHeader strong {
+  color: #111827;
+  font-size: 0.98rem;
+  line-height: 1.25;
+  font-weight: 900;
+  text-transform: capitalize;
+  overflow-wrap: anywhere;
+}
+
+.timelineList {
+  display: grid;
+  gap: 10px;
+  max-height: calc((92px * 6) + (10px * 5) + 4px);
+  overflow-y: auto;
+  padding: 2px 8px 2px 2px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.48) transparent;
+}
+
+.timelineList::-webkit-scrollbar {
+  width: 8px;
+}
+
+.timelineList::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.5);
+}
+
+.timelineItem {
+  display: grid;
+  grid-template-columns: 76px 12px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+  min-height: 92px;
+  padding: 13px 14px;
+  border: 1px solid rgba(113, 113, 122, 0.11);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.74);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.42) inset;
+}
+
+.timelineTime {
+  padding-top: 1px;
+  color: #64748b;
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  font-size: 0.78rem;
+  font-weight: 850;
+  line-height: 1.3;
+}
+
+.timelineDot {
+  width: 8px;
+  height: 8px;
+  margin-top: 5px;
+  border-radius: 999px;
+  background: #2563eb;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
+}
+
+.timelineContent {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.actorLine {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.actorLine strong {
+  min-width: 0;
+  color: #111827;
+  font-size: 0.92rem;
+  line-height: 1.25;
+  font-weight: 900;
+  overflow-wrap: anywhere;
+}
+
+.roleBadge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 900;
+}
+
+.roleBadgeManager {
+  border: 1px solid rgba(37, 99, 235, 0.18);
+  background: rgba(219, 234, 254, 0.82);
+  color: #1d4ed8;
+}
+
+.roleBadgeEmployee {
+  border: 1px solid rgba(5, 150, 105, 0.16);
+  background: rgba(209, 250, 229, 0.78);
+  color: #047857;
+}
+
+.timelineContent p {
+  margin: 0;
+  color: rgba(17, 17, 17, 0.78);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.managementGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.managementCard {
+  min-width: 0;
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid rgba(113, 113, 122, 0.11);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.58);
+}
+
+.managementHeading,
+.timelineHeaderActions,
+.rangeControls,
+.audienceGroup {
+  display: flex;
+  align-items: center;
+}
+
+.managementHeading {
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.managementHeading > div {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.managementHeading strong {
+  color: #111827;
+  font-size: 0.94rem;
+  font-weight: 900;
+}
+
+.toggleButton,
+.audienceButton,
+.audienceButtonActive,
+.dangerButton,
+.rangeDeleteButton,
+.logDeleteButton {
+  min-height: 32px;
+  padding: 6px 11px;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 0.76rem;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.toggleButton {
+  border: 1px solid rgba(100, 116, 139, 0.2);
+  background: rgba(241, 245, 249, 0.92);
+  color: #475569;
+}
+
+.toggleButtonActive {
+  border-color: rgba(5, 150, 105, 0.22);
+  background: rgba(209, 250, 229, 0.8);
+  color: #047857;
+}
+
+.audienceGroup {
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(226, 232, 240, 0.68);
+}
+
+.audienceButton,
+.audienceButtonActive {
+  flex: 1 1 0;
+  border: 1px solid transparent;
+}
+
+.audienceButton {
+  background: transparent;
+  color: #64748b;
+}
+
+.audienceButtonActive {
+  border-color: rgba(37, 99, 235, 0.17);
+  background: rgba(255, 255, 255, 0.94);
+  color: #1d4ed8;
+  box-shadow: 0 5px 14px rgba(15, 23, 42, 0.08);
+}
+
+.managementHint {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.76rem;
+  line-height: 1.45;
+}
+
+.rangeControls {
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.rangeControls > div {
+  min-width: 180px;
+  flex: 1 1 180px;
+}
+
+.rangeDeleteButton {
+  align-self: end;
+  border: 1px solid rgba(220, 38, 38, 0.16);
+  background: rgba(254, 242, 242, 0.88);
+  color: #dc2626;
+}
+
+.dangerButton,
+.logDeleteButton {
+  border: 1px solid rgba(220, 38, 38, 0.16);
+  background: rgba(254, 242, 242, 0.86);
+  color: #dc2626;
+}
+
+.logDeleteButton {
+  align-self: center;
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+}
+
+.logSearch {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 13px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.74);
+  color: #64748b;
+  transition:
+    border-color 0.16s ease,
+    box-shadow 0.16s ease,
+    background 0.16s ease;
+}
+
+.logSearch:focus-within {
+  border-color: rgba(37, 99, 235, 0.3);
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.08);
+}
+
+.logSearch input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #111827;
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.logSearch input::placeholder {
+  color: rgba(100, 116, 139, 0.72);
+}
+
+.emptySearch {
+  padding: 18px;
+  border: 1px dashed rgba(148, 163, 184, 0.28);
+  border-radius: 18px;
+  color: #64748b;
+  font-size: 0.84rem;
+  text-align: center;
+}
+
+.timelineHeaderActions {
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.errorText {
+  margin-top: 12px;
+  padding: 11px 13px;
+  border: 1px solid rgba(220, 38, 38, 0.16);
+  border-radius: 16px;
+  background: rgba(254, 242, 242, 0.82);
+  color: #b91c1c;
+  font-size: 0.82rem;
+  font-weight: 750;
+}
+
+.toggleButton:disabled,
+.audienceButton:disabled,
+.audienceButtonActive:disabled,
+.dangerButton:disabled,
+.rangeDeleteButton:disabled,
+.logDeleteButton:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+@media (min-width: 820px) {
+  .activityLayout {
+    grid-template-columns: 230px minmax(0, 1fr);
+    align-items: stretch;
+  }
+
+  .dayRailShell {
+    position: relative;
+    min-height: 0;
+  }
+
+  .dayRail {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    grid-auto-rows: minmax(58px, max-content);
+    align-content: start;
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding: 6px 10px 12px 6px;
+    box-sizing: border-box;
+  }
+
+  .dayButton {
+    width: 100%;
+  }
+}
+
+@media (max-width: 640px) {
+  .managementGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .managementHeading {
+    align-items: flex-start;
+  }
+
+  .timelineHeaderActions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .panel {
+    transform: none;
+    border-radius: 26px;
+    padding: 14px;
+  }
+
+  .panelHeader {
+    align-items: stretch;
+  }
+
+  .headerPills {
+    width: 100%;
+  }
+
+  .timelineHeader {
+    align-items: flex-start;
+  }
+
+  .timelineItem {
+    grid-template-columns: 1fr;
+  }
+
+  .logDeleteButton {
+    justify-self: end;
+  }
+
+  .timelineDot {
+    display: none;
+  }
+}

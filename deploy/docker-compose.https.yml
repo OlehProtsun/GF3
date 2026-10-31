@@ -1,0 +1,9 @@
+services:
+  nginx:
+    ports:
+      - "${GF3_HTTP_PORT:-80}:80"
+      - "${GF3_HTTPS_PORT:-443}:443"
+    volumes:
+      - ./nginx/https-templates/gf3.conf.template:/etc/nginx/templates/default.conf.template:ro
+      - ${GF3_TLS_CERT_PATH:-./certs/fullchain.pem}:/etc/nginx/certs/fullchain.pem:ro
+      - ${GF3_TLS_KEY_PATH:-./certs/privkey.pem}:/etc/nginx/certs/privkey.pem:ro

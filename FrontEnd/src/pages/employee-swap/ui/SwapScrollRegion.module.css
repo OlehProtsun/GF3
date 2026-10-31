@@ -1,0 +1,10 @@
+.frame { position: relative; min-width: 0; min-height: 0; flex: 1 1 auto; overflow: hidden; display: flex; flex-direction: column; }
+.scroller { flex: 1 1 auto; min-width: 0; min-height: 0; overflow-y: auto; overscroll-behavior: none; scrollbar-width: thin; }
+.frame::before, .frame::after { content: ""; position: absolute; left: 0; right: 0; height: 24px; z-index: 2; pointer-events: none; opacity: 0; transition: opacity .12s ease; }
+.frame::before { top: 0; background: linear-gradient(to bottom, #fff 0%, #ffffffed 18%, #ffffffa6 45%, #ffffff3d 72%, #ffffff00 100%); }
+.frame::after { bottom: 0; background: linear-gradient(to top, #fff 0%, #ffffffed 18%, #ffffffa6 45%, #ffffff3d 72%, #ffffff00 100%); }
+.frame[data-scroll-top="true"]::before, .frame[data-scroll-bottom="true"]::after { opacity: 1; }
+:global([data-compact-viewport="true"]) .frame { flex: none; overflow: visible; }
+:global([data-compact-viewport="true"]) .scroller { flex: none; overflow: visible; }
+:global([data-compact-viewport="true"]) .frame::before, :global([data-compact-viewport="true"]) .frame::after { display: none; }
+@media (prefers-reduced-motion: reduce) { .frame::before, .frame::after { transition: none; } }

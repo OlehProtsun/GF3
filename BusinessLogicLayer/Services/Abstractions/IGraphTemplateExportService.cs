@@ -23,4 +23,7 @@ public interface IGraphTemplateExportService
         bool includeStyles,
         bool includeEmployees,
         CancellationToken ct = default);
+
+    Task<(byte[] content, string fileName)> ExportPublishedGraphToXlsxAsync(
+        int employeeId, int graphId, CancellationToken ct = default);
 }

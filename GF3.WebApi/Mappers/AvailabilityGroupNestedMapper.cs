@@ -16,6 +16,7 @@ public static class AvailabilityGroupNestedMapper
         AvailabilityGroupId = model.AvailabilityGroupId,
         EmployeeId = model.EmployeeId,
         DisplayOrder = model.DisplayOrder,
+        EmployeeLastModifiedAtUtc = model.EmployeeLastModifiedAtUtc,
     };
 
     public static AvailabilityGroupMemberModel ToCreateMemberModel(this CreateAvailabilityGroupMemberRequest request, int groupId)

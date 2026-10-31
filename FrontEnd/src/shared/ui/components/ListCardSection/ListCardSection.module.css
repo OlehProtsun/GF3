@@ -1,4 +1,4 @@
-﻿.card {
+.card {
   padding: 0;
   background: transparent;
   border: none;
@@ -43,4 +43,8 @@
   flex-wrap: wrap;
   justify-content: center;
   gap: 10px;
+}
+
+.state {
+  animation: var(--motion-reveal) 180ms var(--motion-ease);
 }

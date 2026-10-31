@@ -1,5 +1,6 @@
 using BusinessLogicLayer.Generators;
 using BusinessLogicLayer.Options;
+using BusinessLogicLayer.Security;
 using BusinessLogicLayer.Services;
 using BusinessLogicLayer.Services.Abstractions;
 using DataAccessLayer.Administration;
@@ -25,14 +26,25 @@ public static class Extensions
     {
         serviceCollection.AddScoped<IContainerService, ContainerService>();
         serviceCollection.AddScoped<IEmployeeService, EmployeeService>();
+        serviceCollection.AddScoped<IEmploymentContractPolicyService, EmploymentContractPolicyService>();
+        serviceCollection.AddScoped<IEmployeeAccountService, EmployeeAccountService>();
+        serviceCollection.AddScoped<IEmployeeProfileService, EmployeeProfileService>();
+        serviceCollection.AddScoped<IManagerAccountService, ManagerAccountService>();
+        serviceCollection.AddSingleton<IEmployeePresenceService, EmployeePresenceService>();
+        serviceCollection.AddSingleton<IManagerPresenceService, ManagerPresenceService>();
+        serviceCollection.AddScoped<ICommunicationService, CommunicationService>();
+        serviceCollection.AddScoped<IRegulationService, RegulationService>();
         serviceCollection.AddScoped<IShopService, ShopService>();
         serviceCollection.AddScoped<IScheduleService, ScheduleService>();
         serviceCollection.AddScoped<IScheduleEmployeeService, ScheduleEmployeeService>();
         serviceCollection.AddScoped<IScheduleSlotService, ScheduleSlotService>();
         serviceCollection.AddScoped<IBindService, BindService>();
         serviceCollection.AddScoped<IAvailabilityGroupService, AvailabilityGroupService>();
+        serviceCollection.AddScoped<IUrlopService, UrlopService>();
+        serviceCollection.AddScoped<IAvailabilityGroupTransferService, AvailabilityGroupTransferService>();
         serviceCollection.AddScoped<IShopFacade, ShopFacade>();
         serviceCollection.AddScoped<IEmployeeFacade, EmployeeFacade>();
+        serviceCollection.AddScoped<IAuthService, AuthService>();
         serviceCollection.AddScoped<IScheduleExportDataBuilder, Services.Export.ScheduleExportDataBuilder>();
         serviceCollection.AddScoped<IScheduleExcelContextBuilder, Services.Export.ScheduleExcelContextBuilder>();
         serviceCollection.AddScoped<IGraphExportService, GraphExportService>();
@@ -40,7 +52,10 @@ public static class Extensions
         serviceCollection.AddSingleton<IExcelTemplateLocator, ExcelTemplateLocator>();
         serviceCollection.AddScoped<ISqliteAdminFacade, SqliteAdminFacade>();
         serviceCollection.AddScoped<IAdminDbService, AdminDbService>();
-        serviceCollection.AddTransient<IScheduleGenerator, ScheduleGenerator>();
+        serviceCollection.AddTransient<ScheduleGenerator>();
+        serviceCollection.AddTransient<PriorityScheduleGenerator>();
+        serviceCollection.AddTransient<IScheduleGenerator, PriorityAwareScheduleGenerator>();
+        serviceCollection.AddSingleton<IPasswordHasher, PasswordHasher>();
 
         return serviceCollection;
     }
@@ -69,9 +84,10 @@ public static class Extensions
     /// </summary>
     public static IServiceCollection AddBusinessLogicStack(this IServiceCollection serviceCollection, string connectionString, string databasePath)
     {
-        serviceCollection.AddDataAccess(connectionString);
+        serviceCollection.AddSingleton<ISqliteDatabaseWorkspace>(_ => new SqliteDatabaseWorkspace(databasePath));
+        serviceCollection.AddDataAccess();
         serviceCollection.AddBusinessLogicLayer();
-        serviceCollection.AddSingleton<ISqliteAdminService>(_ => new SqliteAdminService(connectionString, databasePath));
+        serviceCollection.AddSingleton<ISqliteAdminService, SqliteAdminService>();
         serviceCollection.AddOptions<ExportTemplatesOptions>();
 
         return serviceCollection;
@@ -85,12 +101,11 @@ public static class Extensions
             return connectionString;
         }
 
-        var root = Path.Combine(
+        var defaultDatabasePath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            DefaultDatabaseFolderName);
-
-        Directory.CreateDirectory(root);
-        var databasePath = Path.Combine(root, DefaultDatabaseFileName);
+            DefaultDatabaseFolderName,
+            DefaultDatabaseFileName);
+        var databasePath = SqliteDatabaseSelectionStore.ResolveDatabasePath(defaultDatabasePath);
         return $"Data Source={databasePath}";
     }
 
@@ -104,11 +119,10 @@ public static class Extensions
             return dataSourcePart[DataSourceMarker.Length..];
         }
 
-        var root = Path.Combine(
+        var defaultDatabasePath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            DefaultDatabaseFolderName);
-
-        Directory.CreateDirectory(root);
-        return Path.Combine(root, DefaultDatabaseFileName);
+            DefaultDatabaseFolderName,
+            DefaultDatabaseFileName);
+        return SqliteDatabaseSelectionStore.ResolveDatabasePath(defaultDatabasePath);
     }
 }

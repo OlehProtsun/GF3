@@ -1,0 +1,271 @@
+.tile {
+  display: block;
+  position: relative;
+  isolation: isolate;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  overflow: hidden;
+  appearance: none;
+  text-align: left;
+  border: 1px solid rgba(255, 255, 255, 0.92);
+  border-radius: 32px;
+  padding: 0;
+  background:
+    radial-gradient(ellipse at var(--reflection-x) 0%, var(--schedule-wash), transparent 48%),
+    linear-gradient(160deg, rgba(255, 255, 255, 0.98), rgba(250, 252, 255, 0.96));
+  box-shadow: 0 18px 42px -12px rgba(71, 91, 123, 0.15), 0 4px 14px -8px rgba(71, 91, 123, 0.08);
+  cursor: pointer;
+  font: inherit;
+  transition: transform 180ms ease, box-shadow 180ms ease;
+}
+
+.ribbon {
+  display: block;
+  position: relative;
+  height: 82px;
+  overflow: hidden;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at var(--reflection-x) 5%, rgba(255, 255, 255, 0.82), transparent 48%),
+    radial-gradient(ellipse at 45% -30%, var(--schedule-wave-end), transparent 68%),
+    linear-gradient(var(--flow-angle), var(--schedule-wave-start), var(--schedule-wave-end));
+  mask-image: linear-gradient(#000 55%, transparent 100%);
+}
+
+.ribbon::before {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  top: var(--orb-top, 12px);
+  left: var(--orb-left, 25px);
+  width: 66px;
+  height: 66px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 26% 18%, rgba(255, 255, 255, 0.8), transparent 62%),
+    linear-gradient(140deg, var(--schedule-wave-start), var(--schedule-wave-end));
+  box-shadow: inset 1px 1px 2px rgba(255, 255, 255, 0.72), inset -8px -8px 18px rgba(255, 255, 255, 0.2);
+  opacity: 0.78;
+}
+
+.ribbon::after {
+  content: "";
+  position: absolute;
+  top: -52px;
+  left: 12%;
+  width: 105%;
+  height: 106px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 50%;
+  transform: rotate(var(--reflection-angle, 12deg));
+  background: linear-gradient(170deg, rgba(255, 255, 255, 0.02) 35%, rgba(255, 255, 255, 0.28));
+}
+
+.waveSvg {
+  position: absolute;
+  z-index: 1;
+  bottom: -1px;
+  left: 0;
+  width: 100%;
+  height: 88px;
+  pointer-events: none;
+}
+
+.waveReflection {
+  fill: rgba(255, 255, 255, 0.24);
+  stroke: rgba(255, 255, 255, 0.28);
+  stroke-width: 1;
+}
+
+.waveFront {
+  fill: rgba(255, 255, 255, 0.73);
+  stroke: rgba(255, 255, 255, 0.8);
+  stroke-width: 1;
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 2px 22px 22px;
+}
+
+.title {
+  color: #0d1221;
+  font-size: 1.3rem;
+  font-weight: 850;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+  margin-bottom: 3px;
+}
+
+.metaRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px 9px;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  border: 1px solid rgba(225, 230, 238, 0.58);
+  border-radius: 999px;
+  padding: 5px 10px;
+  background: linear-gradient(150deg, rgba(246, 248, 251, 0.92), rgba(243, 245, 249, 0.72));
+  font-size: 0.84rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.chipLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #697386;
+  font-weight: 750;
+  min-width: 0;
+}
+
+.chipIcon {
+  display: inline-flex;
+  flex: 0 0 15px;
+  align-items: center;
+  justify-content: center;
+  color: #768296;
+}
+
+.chipValue {
+  color: #626e82;
+  min-width: 0;
+}
+
+.statusPublic, .statusPrivate, .lastUpdate {
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-weight: 800;
+}
+
+.statusPublic { color: #15803d; background: #e0f5ea; }
+.statusPrivate { color: #b91c1c; background: #fee2e2; }
+.lastUpdate { color: #1d4ed8; background: #e6edff; }
+
+.selectionIndicator {
+  position: absolute;
+  top: 28px;
+  right: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: 1px solid rgba(210, 220, 234, 0.55);
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 4px 14px rgba(72, 91, 124, 0.08), inset 0 1px 0 #fff;
+  pointer-events: none;
+}
+
+.decoration { color: #111827; }
+.selectionIndicatorSelected {
+  background: linear-gradient(145deg, #3982ff, #245ce0);
+  border-color: rgba(37, 99, 235, 0.35);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.23), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+.tile.selectedTile {
+  outline: 2px solid rgba(59, 130, 246, 0.7);
+  outline-offset: -2px;
+  box-shadow: 0 18px 42px -12px rgba(71, 91, 123, 0.15), 0 0 16px rgba(59, 130, 246, 0.12);
+}
+
+.tile:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 22px 48px -12px rgba(71, 91, 123, 0.19), 0 5px 18px -8px rgba(71, 91, 123, 0.1);
+}
+
+.tile:focus-visible { outline: 3px solid #1d4ed8; outline-offset: 3px; }
+.tile:active { transform: translateY(0); }
+
+.toneBlue {
+  --schedule-wave-start: #e2f2ff;
+  --schedule-wave-end: #96cafa;
+  --schedule-wash: #e7f3ff;
+  --reflection-x: 95%;
+  --flow-angle: 115deg;
+  --orb-left: 30px;
+}
+
+.toneLavender {
+  --schedule-wave-start: #f4eaff;
+  --schedule-wave-end: #bca5f4;
+  --schedule-wash: #f0ebff;
+  --reflection-x: 4%;
+  --flow-angle: 150deg;
+  --reflection-angle: 24deg;
+}
+
+.tonePeach {
+  --schedule-wave-start: #fff0dc;
+  --schedule-wave-end: #f9b9c2;
+  --schedule-wash: #fff0ee;
+  --reflection-x: 90%;
+  --flow-angle: 125deg;
+  --orb-top: 20px;
+  --reflection-angle: 8deg;
+}
+
+.toneMint {
+  --schedule-wave-start: #e2f9ef;
+  --schedule-wave-end: #86cfce;
+  --schedule-wash: #eaf8f5;
+  --reflection-x: 7%;
+  --flow-angle: 115deg;
+  --orb-left: 20px;
+  --reflection-angle: -20deg;
+}
+
+.tonePink {
+  --schedule-wave-start: #ffe9f3;
+  --schedule-wave-end: #dcadf1;
+  --schedule-wash: #fff0fb;
+  --reflection-x: 8%;
+  --flow-angle: 110deg;
+  --orb-top: 22px;
+  --reflection-angle: 32deg;
+}
+
+.toneSky {
+  --schedule-wave-start: #e9f6ff;
+  --schedule-wave-end: #9dcdfb;
+  --schedule-wash: #eaf4ff;
+  --reflection-x: 95%;
+  --flow-angle: 145deg;
+  --orb-left: 48px;
+  --orb-top: -18px;
+  --reflection-angle: -14deg;
+}
+
+.toneViolet {
+  --schedule-wave-start: #ece8ff;
+  --schedule-wave-end: #b7a2f3;
+  --schedule-wash: #f0edff;
+  --reflection-x: 12%;
+  --flow-angle: 100deg;
+  --orb-left: 30px;
+  --orb-top: -22px;
+  --reflection-angle: 22deg;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tile { transition: none; }
+  .tile:hover, .tile:active { transform: none; }
+}
