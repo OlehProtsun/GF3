@@ -19,6 +19,7 @@ vi.mock("@app/layouts/employee-workspace-layout", () => ({ EmployeeWorkspaceLayo
 vi.mock("./PageTransition", () => ({ PageTransition: ({ children }: PropsWithChildren) => <>{children}</> }));
 vi.mock("@entities/regulations/ui/RegulationAcceptanceGate", () => ({ RegulationAcceptanceGate: () => null }));
 vi.mock("@pages/home", () => ({ HomePage: () => { return <div>HomePage</div>; } }));
+vi.mock("@pages/manager-urlop", () => ({ ManagerUrlopPage: () => <div>ManagerUrlopPage</div> }));
 vi.mock("@pages/employee-notifications", () => ({ EmployeeNotificationsPage: () => { return <div>EmployeeNotificationsPage</div>; } }));
 vi.mock("@pages/employee-availability", () => ({ EmployeeAvailabilityPage: () => { return <div>EmployeeAvailabilityPage</div>; } }));
 vi.mock("@pages/employee-schedule", () => ({ EmployeeSchedulePage: () => { return <div>EmployeeSchedulePage</div>; } }));
@@ -53,6 +54,14 @@ function mount(path: string) {
 }
 
 describe("AppRouter system access", () => {
+  it("Urlop route is available only in manager PC mode", async () => {
+    auth.session = { ...manager(), workspaceMode: "pc" };
+    const view = mount("/urlop");
+    expect(await screen.findByText("ManagerUrlopPage")).toBeInTheDocument();
+    auth.session = employee; view.rerender(<AppRouter />);
+    await screen.findByText("EmployeeNotificationsPage");
+    expect(screen.queryByText("ManagerUrlopPage")).toBeNull();
+  });
   it("preserves a swap link through login", async () => {
     auth.status = "unauthenticated";
     auth.session = null;

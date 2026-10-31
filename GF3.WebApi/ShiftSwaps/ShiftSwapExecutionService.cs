@@ -32,8 +32,10 @@ public sealed class ShiftSwapExecutionService(
     IWorkflowLogService workflowLogService,
     IRealtimeNotifier realtimeNotifier,
     ScheduleVersionCommitService versionCommitService,
-    IEmploymentContractPolicyService? contractPolicy = null)
+    IEmploymentContractPolicyService? contractPolicy = null,
+    IUrlopService? urlopService = null)
 {
+    private readonly IUrlopService urlop = urlopService ?? new UrlopService(db, TimeProvider.System);
     private int? reviewingManagerId;
     private readonly IEmploymentContractPolicyService policy = contractPolicy ?? new EmploymentContractPolicyService(db);
 
@@ -305,6 +307,8 @@ public sealed class ShiftSwapExecutionService(
             EnsureScheduleIsNotLocked(swap.Schedule);
             EnsurePeriodWithinSlot(slot, offeredPeriod);
             ValidateClaimedPeriod(swap, offeredPeriod, request, employeeMonthSlots, employeeId);
+            await urlop.EnsureAssignmentsAllowedAsync(swap.Schedule.ShopId, swap.Schedule.Year, swap.Schedule.Month,
+                [(employeeId, slot.DayOfMonth)], cancellationToken);
             writingVersion = true;
             await versionCommitService.CommitAsync(swap.ScheduleId, null, "System (before accepted swap)", cancellationToken).ConfigureAwait(false);
             writingVersion = false;
@@ -791,6 +795,10 @@ public sealed class ShiftSwapExecutionService(
             throw EmploymentSwapRules.ClaimApprovalRequired();
         var returnPeriod = valid.ReturnPeriod!.Value;
         var ownerId = swap.FromEmployeeId.Value;
+        await urlop.EnsureAssignmentsAllowedAsync(source.Schedule.ShopId, source.Schedule.Year, source.Schedule.Month,
+            [(employeeId, source.DayOfMonth)], ct);
+        await urlop.EnsureAssignmentsAllowedAsync(back.Schedule.ShopId, back.Schedule.Year, back.Schedule.Month,
+            [(ownerId, back.DayOfMonth)], ct);
         if ((await EmploymentSwapRules.CheckOutgoingMinimumAsync(ownerId, source.Schedule, valid.Period,
             back.Schedule, returnPeriod, policy, ct))?.RequiresException == true && !await HasApprovedExceptionAsync(swap, ownerId, valid.Period, ct) ||
             (await EmploymentSwapRules.CheckOutgoingMinimumAsync(employeeId, back.Schedule, returnPeriod,

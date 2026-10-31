@@ -15,6 +15,20 @@ beforeEnglishTest(() => setTestLanguage("en"));
 describe("per-cell read-only availability", () => {
   const columns = [7, 8].map(employeeId => ({ employeeId, kind: "employee" as const, manualColumnId: null,
     graphEmployeeId: employeeId, label: employeeId === 7 ? "Ada" : "Grace", minHoursMonth: null, totalMinutes: 0, totalText: "" }));
+  test("UR is a read-only overlay and legacy shifts remain visible as conflicts", () => {
+    const changed = vi.fn(); const raw = { "7:1": "-", "8:1": "09:00 - 17:00" };
+    render(<ContainerGraphMatrix graph={{ year: 2026, month: 11 }} columns={columns} cellMap={raw}
+      urlopCellKeys={new Set(["7:1", "8:1"])} onCellChange={changed} selectedCellKeys={["7:1"]} onSelectedCellKeysChange={vi.fn()}
+      bindValueByKey={new Map([["F4", "09:00 - 17:00"]])} />);
+    const vacation = screen.getByRole("button", { name: "Ada day 1", exact: true });
+    expect(vacation).toHaveTextContent("UR");
+    fireEvent.doubleClick(vacation); fireEvent.keyDown(vacation, { key: "F4" });
+    fireEvent.paste(vacation, { clipboardData: { getData: () => "09:00 - 17:00" } });
+    expect(changed).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Grace day 1", exact: true })).toHaveTextContent("09:00 - 17:00");
+    expect(screen.getByRole("button", { name: "Grace day 1", exact: true })).toHaveAttribute("title", "Conflict with scheduled shift.");
+    expect(raw).toEqual({ "7:1": "-", "8:1": "09:00 - 17:00" });
+  });
   test("blocks pointer, direct input, F2, paste and binds while bulk erase skips only locked cells", () => {
     const changed = vi.fn();
     const { rerender } = render(<ContainerGraphMatrix graph={{ year: 2026, month: 12 }} columns={columns}

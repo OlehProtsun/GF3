@@ -108,6 +108,7 @@ type ToolbarActionButtonProps = {
 };
 
 type ContainerGraphEditorProps = {
+  urlopCellKeys?: ReadonlySet<string>;
   graph?: Graph | null;
   isHeaderCollapsed?: boolean;
   compactSize?: boolean;
@@ -361,6 +362,7 @@ function PreviewLayoutButton({ mode, active, onClick }: PreviewLayoutButtonProps
 }
 
 export function ContainerGraphEditor({
+  urlopCellKeys,
   graph,
   isHeaderCollapsed = false,
   compactSize = false,
@@ -1131,6 +1133,7 @@ export function ContainerGraphEditor({
                     compactSize && styles.matrixCardCompact,
                   )}
                   style={scheduleMatrixCardStyle}
+                    urlopCellKeys={urlopCellKeys}
                   compactSize={compactSize}
                   helperText=""
                   graph={{

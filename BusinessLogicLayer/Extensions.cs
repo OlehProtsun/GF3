@@ -40,6 +40,7 @@ public static class Extensions
         serviceCollection.AddScoped<IScheduleSlotService, ScheduleSlotService>();
         serviceCollection.AddScoped<IBindService, BindService>();
         serviceCollection.AddScoped<IAvailabilityGroupService, AvailabilityGroupService>();
+        serviceCollection.AddScoped<IUrlopService, UrlopService>();
         serviceCollection.AddScoped<IAvailabilityGroupTransferService, AvailabilityGroupTransferService>();
         serviceCollection.AddScoped<IShopFacade, ShopFacade>();
         serviceCollection.AddScoped<IEmployeeFacade, EmployeeFacade>();

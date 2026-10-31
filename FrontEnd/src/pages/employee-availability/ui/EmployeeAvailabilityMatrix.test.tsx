@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { setLanguage } from "@shared/i18n";
 import { EmployeeAvailabilityMatrix } from "./EmployeeAvailabilityMatrix";
-import { buildDraftFromAvailability } from "../model/employeeAvailabilityMatrix";
+import { buildDraftFromAvailability, buildSaveSlots } from "../model/employeeAvailabilityMatrix";
 import type { EmployeeAvailabilityGroup } from "@entities/employee-availability";
 import styles from "./EmployeeAvailabilityPage.module.css";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -27,6 +27,16 @@ function setup(canEdit = true, g = group) {
 beforeEach(() => { setLanguage("en"); vi.stubGlobal("PointerEvent", TestPointerEvent); vi.useFakeTimers(); });
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 describe("EmployeeAvailabilityMatrix", () => {
+  test("UR wins over raw availability with shop tooltip and cannot enter the save payload", () => {
+    const { props, rerender, cell } = setup();
+    const draft = { ...props.ownDraft, 1: { available: true, intervalStr: null } };
+    const before = buildSaveSlots(group, draft);
+    rerender(<EmployeeAvailabilityMatrix {...props} ownDraft={draft} urlopCalendar={{ shops: [{ id: 1, name: "A" }, { id: 2, name: "B" }],
+      months: [1, 2].map(shopId => ({ shopId, year: 2026, month: 5, isOpen: false, requests: [], approved: [{ shopId, employeeId: 12, date: "2026-05-01" }] })) }} />);
+    expect(cell(1)).toHaveTextContent("UR"); expect(cell(1)).toHaveAttribute("title", "UR (A, B)");
+    expect(buildSaveSlots(group, draft)).toEqual(before);
+    expect(JSON.stringify(before)).not.toContain("UR");
+  });
   test("OFF removes holiday labels and titles but keeps weekends and editing", async () => {
     vi.spyOn(publicHolidaySettingsApi, "get").mockResolvedValue({ showPublicHolidays: false });
     const edit = vi.fn();

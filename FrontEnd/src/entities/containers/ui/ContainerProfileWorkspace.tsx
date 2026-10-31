@@ -637,6 +637,7 @@ export function ContainerProfileWorkspace({
                     <th>{t("Employee")}</th>
                     <th>{t("Work Days")}</th>
                     <th>{t("Free Days")}</th>
+                    <th>{t("Urlop Days")}</th>
                     {showPublicHolidays && <th className={styles.holidayColumn}>{t("Holiday Days")}</th>}
                     <th>{t("Hours Sum")}</th>
                     {statistics.shopHeaders.map(shopHeader => (
@@ -650,6 +651,7 @@ export function ContainerProfileWorkspace({
                       <td>{row.employee}</td>
                       <td>{row.workDays}</td>
                       <td>{row.freeDays}</td>
+                      <td>{row.urlopDays}</td>
                       {showPublicHolidays && <td className={styles.holidayColumn}>{row.holidayDays}</td>}
                       <td>{row.hoursSum}</td>
                       {statistics.shopHeaders.map(shopHeader => (

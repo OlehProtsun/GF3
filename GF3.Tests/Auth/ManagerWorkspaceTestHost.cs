@@ -32,7 +32,7 @@ internal sealed class ManagerWorkspaceTestHost(SqliteTestDatabase database, WebA
     public HttpClient Client { get; } = client;
     public SqliteTestDatabase Database => database;
     public WebApplication App => app;
-    public static async Task<ManagerWorkspaceTestHost> CreateAsync()
+    public static async Task<ManagerWorkspaceTestHost> CreateAsync(TimeProvider? timeProvider = null)
     {
         var database = await SqliteTestDatabase.CreateAsync();
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = "Testing" });
@@ -46,6 +46,7 @@ internal sealed class ManagerWorkspaceTestHost(SqliteTestDatabase database, WebA
         });
         builder.WebHost.UseUrls("http://127.0.0.1:0");
         builder.Services.AddWebApiCore(builder.Configuration, readEnvironmentVariable: _ => null);
+        if (timeProvider is not null) builder.Services.Replace(ServiceDescriptor.Singleton(timeProvider));
         builder.Services.RemoveAll<IHostedService>();
         builder.Services.AddControllers().AddApplicationPart(typeof(AuthController).Assembly);
         var app = builder.Build();

@@ -352,3 +352,8 @@
 .timeInput input:focus { outline: none; }
 .dialogActions .dialogActionButton { --btn-shadow: transparent; }
 .dialogActions .dialogActionButton:first-child { --btn-bg: #f2f4f8; --btn-bg-hover: #e8edf5; --btn-border: #e5eaf2; --btn-focus: #cbdaf1; color: #61708a; }
+.urlopTabs { display: flex; gap: 6px; padding: 5px; border-radius: 18px; background: #e8edf3; width: fit-content; }
+.urlopTabs button { min-height: 44px; padding: 8px 18px; border: 0; border-radius: 13px; background: transparent; font: inherit; color: inherit; cursor: pointer; }
+.urlopTabs button[aria-selected="true"] { background: #fff; box-shadow: 0 2px 7px #182c4814; }
+.urlopTabs button:focus-visible { outline: 3px solid #5279de; }
+.urlopCell { color: #11604a; font-weight: 700; background: #e3f3ed; border-radius: 7px; }

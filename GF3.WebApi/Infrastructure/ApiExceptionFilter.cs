@@ -62,6 +62,7 @@ public sealed class ApiExceptionFilter : IAsyncExceptionFilter
     {
         return context.Exception switch
         {
+            BusinessLogicLayer.Contracts.Urlop.UrlopConflictException conflict => CreateUrlopConflictResult(context.HttpContext, conflict),
             WebApi.ShiftSwaps.ContractShiftConflictException conflict => CreateContractConflictResult(context.HttpContext, conflict),
             ValidationException validationException => CreateValidationResult(context.HttpContext, validationException),
             BusinessLogicValidationException validationException => CreateValidationResult(context.HttpContext, validationException),
@@ -86,6 +87,15 @@ public sealed class ApiExceptionFilter : IAsyncExceptionFilter
         var problem = ApiProblemDetailsFactory.CreateProblem(context, StatusCodes.Status409Conflict,
             "Contract approval conflict", exception.Message, exception.Code);
         problem.Extensions["code"] = exception.Code;
+        return CreateResult(StatusCodes.Status409Conflict, problem);
+    }
+
+    private static ObjectResult CreateUrlopConflictResult(HttpContext context, BusinessLogicLayer.Contracts.Urlop.UrlopConflictException exception)
+    {
+        var problem = ApiProblemDetailsFactory.CreateProblem(context, StatusCodes.Status409Conflict, "Vacation conflict", exception.Message, exception.Code);
+        problem.Extensions["code"] = exception.Code;
+        problem.Extensions["conflictingDates"] = exception.ConflictingDates;
+        problem.Extensions["scheduleIds"] = exception.ScheduleIds;
         return CreateResult(StatusCodes.Status409Conflict, problem);
     }
 

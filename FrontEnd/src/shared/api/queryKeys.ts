@@ -1,4 +1,11 @@
 export const queryKeys = {
+  urlop: {
+    all: ["urlop"] as const,
+    employeeCalendar: () => ["urlop", "employeeCalendar"] as const,
+    employeeApproved: (shopId: number, year: number, month: number) => ["urlop", "employeeApproved", shopId, year, month] as const,
+    managerMonth: (shopId: number, year: number, month: number) => ["urlop", "managerMonth", shopId, year, month] as const,
+    approved: (from: string, to: string, shopId?: number) => ["urlop", "approved", from, to, shopId ?? null] as const,
+  },
   employmentContracts: { settings: () => ["employmentContracts", "settings"] as const },
   priorityGenerationSettings: {
     current: () => ["priorityGenerationSettings", "current"] as const,

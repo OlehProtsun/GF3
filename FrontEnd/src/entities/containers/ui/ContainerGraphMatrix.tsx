@@ -40,6 +40,8 @@ export type ContainerGraphMatrixEditMode = "deferred" | "inline";
 export type ContainerGraphMatrixEmptyCellVariant = "neutral" | "danger";
 
 type ContainerGraphMatrixProps = {
+  urlopCellKeys?: ReadonlySet<string>;
+  urlopInfoLabels?: ReadonlyMap<string, string>;
   graph: Pick<Graph, "year" | "month"> & Partial<Pick<Graph, "shift1Time" | "shift2Time">>;
   columns: GraphMatrixColumn[];
   cellMap: GraphMatrixCellMap;
@@ -142,6 +144,7 @@ type MatrixValueCellProps = {
   columnLabel: string;
   value: string;
   visualHint?: string;
+  urlopLabel?: string;
   mutedSuffix?: string;
   lockVisualHint?: boolean;
   error?: string;
@@ -431,6 +434,7 @@ const MatrixValueCell = memo(function MatrixValueCell({
   columnLabel,
   value,
   visualHint,
+  urlopLabel,
   mutedSuffix,
   lockVisualHint,
   error,
@@ -472,13 +476,13 @@ const MatrixValueCell = memo(function MatrixValueCell({
     : renderedValue;
   const isTextValue = parseGraphCellContent(rawRenderedPrefix).kind === "text";
   const renderedPrefix = formatGraphCellValueForDisplay(rawRenderedPrefix);
-  const renderedContent = trimmedMutedSuffix ? (
+  const renderedContent = urlopLabel ? <span className={styles.urlopBadge} title={urlopLabel}>UR</span> : trimmedMutedSuffix ? (
     <>
       {renderedPrefix ? renderedPrefix + ",\u00a0" : null}
       <span className={styles.mutedSuffix}>{trimmedMutedSuffix}</span>
     </>
   ) : renderedPrefix;
-  const cellTitle = error ?? (hasVisualHint ? t("Also works in: {0}", trimmedVisualHint) : value);
+  const cellTitle = error ?? urlopLabel ?? (hasVisualHint ? t("Also works in: {0}", trimmedVisualHint) : value);
   const interactiveCellTitle =
     hasVisualHint && onVisualHintClick
       ? t("{0}. Click for details.", cellTitle)
@@ -635,6 +639,7 @@ const MatrixValueCell = memo(function MatrixValueCell({
     <td
       className={joinClassNames(
         styles.matrixCell,
+        urlopLabel && isInlineEditing && styles.urlopInfoCell,
         isEmpty && styles.emptyCell,
         isDangerEmpty && styles.emptyCellDanger,
         isDangerEmpty && isWeekend && styles.emptyCellDangerWeekend,
@@ -653,6 +658,7 @@ const MatrixValueCell = memo(function MatrixValueCell({
       data-cell-key={interactionEnabled ? cellKey : undefined}
     >
       <div className={styles.cellSurface}>
+        {urlopLabel && isInlineEditing ? <span className={styles.urlopBadge} title={urlopLabel}>UR</span> : null}
         {preview ? (
           <div className={styles.manualShiftValue}>
             {readOnly && !isSelectionOnlyReadOnlyCell ? (
@@ -818,6 +824,8 @@ export function ContainerGraphMatrix({
   helperText,
   readOnly = false,
   readOnlyCellKeys,
+  urlopCellKeys,
+  urlopInfoLabels,
   highlightReadOnlyEmpty = false,
   emptyMessage,
   className,
@@ -1283,7 +1291,7 @@ export function ContainerGraphMatrix({
     });
   };
 
-  const isEffectiveCellReadOnly = (cellKey: string) => readOnly || Boolean(readOnlyCellKeys?.has(cellKey));
+  const isEffectiveCellReadOnly = (cellKey: string) => readOnly || Boolean(readOnlyCellKeys?.has(cellKey)) || Boolean(urlopCellKeys?.has(cellKey));
 
   const commitCellValue = (employeeId: number, dayOfMonth: number, value: string) => {
     const cellKey = getGraphCellKey(employeeId, dayOfMonth);
@@ -1932,7 +1940,8 @@ export function ContainerGraphMatrix({
                         const cellValue = cellMap[cellKey] ?? GRAPH_EMPTY_MARK;
                         const visualHint = visualHintMap[cellKey];
                         const visualHintDetail = visualHintDetailMap[cellKey];
-                        const error = cellErrors[cellKey];
+                        const vacation = column.kind !== "manual" && Boolean(urlopCellKeys?.has(cellKey));
+                        const error = cellErrors[cellKey] ?? (vacation && parseGraphCellContent(cellValue).kind === "intervals" ? t("Conflict with scheduled shift.") : undefined);
                         const isEmpty = cellValue.trim() === GRAPH_EMPTY_MARK;
                         const isSelected = selectedCellKeySet.has(cellKey);
                         const isEditing = editingCellKey === cellKey;
@@ -1950,6 +1959,7 @@ export function ContainerGraphMatrix({
                             dayOfMonth={day.dayOfMonth}
                             columnLabel={column.label}
                             value={cellValue}
+                            urlopLabel={urlopInfoLabels?.get(cellKey) ?? (vacation && isEmpty ? t("Urlop") : undefined)}
                             visualHint={visualHint}
                             mutedSuffix={mutedSuffixMap[cellKey]}
                             lockVisualHint={lockVisualHintCells}

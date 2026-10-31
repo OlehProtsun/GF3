@@ -14,6 +14,10 @@ import {
 } from "@entities/availability-groups/model/editor";
 import { getAvailabilityMemberLastModifiedLabel } from "@entities/availability-groups/model/presentation";
 import { AvailabilityIcon } from "@shared/ui/icons";
+import { useApprovedUrlopQuery, isoDate, monthDays } from "@entities/urlop";
+import { useShopsListQuery } from "@entities/shops";
+import { ErrorBanner } from "@shared/ui/components/ErrorBanner";
+import { getErrorMessage } from "@shared/api/httpClient";
 
 type AvailabilityScheduleMatrixProps = {
   year: number;
@@ -71,6 +75,14 @@ export function AvailabilityScheduleMatrix({
   onVisualHintClick,
 }: AvailabilityScheduleMatrixProps) {
   const language = useLanguageRevision();
+  const urlop = useApprovedUrlopQuery(isoDate(year, month, 1), isoDate(year, month, monthDays(year, month).length));
+  const shops = useShopsListQuery();
+  const urlopLabels = new Map<string, string>();
+  for (const day of urlop.data ?? []) {
+    const key = getAvailabilityCellKey(day.employeeId, Number(day.date.slice(8, 10)));
+    const name = shops.data?.find(x => x.id === day.shopId)?.name ?? String(day.shopId);
+    urlopLabels.set(key, [urlopLabels.get(key) ?? "UR", name].join(" · "));
+  }
   const graphColumns = useMemo<GraphMatrixColumn[]>(
     () =>
       columns.map(column => ({
@@ -103,7 +115,10 @@ export function AvailabilityScheduleMatrix({
   }, [bindValueByKey]);
 
   return (
+    <>
+    {urlop.error ? <ErrorBanner>{getErrorMessage(urlop.error)}</ErrorBanner> : null}
     <ContainerGraphMatrix
+      urlopInfoLabels={urlopLabels}
       className={className}
       style={style}
       title={title}
@@ -143,5 +158,6 @@ export function AvailabilityScheduleMatrix({
       onCellChange={onCellChange}
       onVisualHintCellClick={onVisualHintClick}
     />
+    </>
   );
 }

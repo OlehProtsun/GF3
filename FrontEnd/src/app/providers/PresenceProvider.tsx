@@ -381,6 +381,13 @@ export function PresenceProvider({ children }: PropsWithChildren) {
     const resourceId = Number.isFinite(parsedResourceId) ? parsedResourceId : null;
 
     switch (update.resourceType) {
+      case "urlop":
+        invalidateRealtimeQuery(queryClient, queryKeys.urlop.all);
+        invalidateRealtimeQuery(queryClient, queryKeys.employeeAvailability.all);
+        invalidateRealtimeQuery(queryClient, queryKeys.employeeSchedules.all);
+        invalidateRealtimeQuery(queryClient, queryKeys.containers.all);
+        invalidateRealtimeQuery(queryClient, queryKeys.availabilityGroups.all);
+        break;
       case "employment-contract-settings":
         invalidateRealtimeQuery(queryClient, queryKeys.employmentContracts.settings());
         invalidateRealtimeQuery(queryClient, queryKeys.employeeAvailability.all);

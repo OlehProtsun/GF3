@@ -7,8 +7,10 @@ import { getPolishPublicHoliday } from "@shared/lib/polishPublicHolidays";
 import { usePublicHolidayVisibility } from "@app/providers/PublicHolidayVisibilityProvider";
 import { buildEmployeeAvailabilityCells, buildEmployeeAvailabilityColumns, getContiguousAvailabilityDays, type DayDraftMap } from "../model/employeeAvailabilityMatrix";
 import styles from "./EmployeeAvailabilityPage.module.css";
+import { isoDate, vacationShopNames, type UrlopEmployeeCalendar } from "@entities/urlop";
 
 type Props = {
+  urlopCalendar?: UrlopEmployeeCalendar;
   group: EmployeeAvailabilityGroup;
   currentEmployeeId: number;
   ownDraft: DayDraftMap;
@@ -150,18 +152,20 @@ export function EmployeeAvailabilityMatrix(props: Props) {
           const own = member.employeeId === currentEmployeeId;
           const draft = ownDraft[day];
           const value = own ? (draft?.available ? draft.intervalStr ?? "+" : "-") : cells[getAvailabilityCellKey(member.employeeId, day)] ?? "-";
-          const display = value === "-" ? "−" : value;
-          const valueClass = value === "+" ? styles.wholeDay : value === "-" ? styles.unavailable : styles.timeValue;
+          const shops = vacationShopNames(props.urlopCalendar?.months.flatMap(x => x.approved) ?? [], props.urlopCalendar?.shops ?? [], member.employeeId, isoDate(group.year, group.month, day));
+          const display = shops.length ? "UR" : value === "-" ? "−" : value;
+          const title = shops.length ? `UR (${shops.join(", ")})` : display;
+          const valueClass = shops.length ? styles.urlopCell : value === "+" ? styles.wholeDay : value === "-" ? styles.unavailable : styles.timeValue;
           return <td key={member.employeeId} className={[own ? styles.ownColumn : "", own && selectedDays.includes(day) ? styles.selectedCell : ""].join(" ")}>
             {own ? <button type="button" data-own-availability-cell={day} className={`${styles.ownCell} ${valueClass}`} disabled={!enabled}
-              title={display} aria-label={t("{0} {1}, your availability: {2}", day, getAvailabilityMonthLabel(group.month), display)}
+              title={title} aria-label={t("{0} {1}, your availability: {2}", day, getAvailabilityMonthLabel(group.month), title)}
               onContextMenu={event => { if (enabled) event.preventDefault(); }}
               onClick={event => {
                 if (!enabled) return;
                 if (suppressClick.current && event.detail !== 0) { suppressClick.current = false; return; }
                 callbacks.current.onSelectedDaysChange([day]);
                 callbacks.current.onRequestEdit([day]);
-              }}>{display}</button> : <span className={`${styles.teamCell} ${valueClass}`} title={display}>{display}</span>}
+              }}>{display}</button> : <span className={`${styles.teamCell} ${valueClass}`} title={title}>{display}</span>}
           </td>;
         })}
       </tr>;

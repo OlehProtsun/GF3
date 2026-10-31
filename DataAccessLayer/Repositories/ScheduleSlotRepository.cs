@@ -34,7 +34,8 @@ public class ScheduleSlotRepository : GenericRepository<ScheduleSlotModel>, ISch
     {
         var incomingSlots = slots?.ToList() ?? [];
 
-        await using var transaction = await _db.Database.BeginTransactionAsync(ct).ConfigureAwait(false);
+        await using var transaction = _db.Database.CurrentTransaction is null
+            ? await _db.Database.BeginTransactionAsync(ct).ConfigureAwait(false) : null;
 
         if (overwrite)
         {
@@ -87,7 +88,7 @@ public class ScheduleSlotRepository : GenericRepository<ScheduleSlotModel>, ISch
         }
 
         var written = await _db.SaveChangesAsync(ct).ConfigureAwait(false);
-        await transaction.CommitAsync(ct).ConfigureAwait(false);
+        if (transaction is not null) await transaction.CommitAsync(ct).ConfigureAwait(false);
 
         // Batch replacement can leave many tracked entries in the DbContext.
         // Clearing the tracker keeps the context lightweight for subsequent operations.

@@ -62,6 +62,15 @@ const employeesById = new Map<number, Employee>([
 ]);
 
 describe("container graph workspace model", () => {
+  test("summary keeps work and Urlop independent and excludes their union from free days", () => {
+    const employees: GraphEmployee[] = [{ id: 1, scheduleId: 1, employeeId: 1, minHoursMonth: 0 }];
+    const slots: GraphSlot[] = [{ id: 1, scheduleId: 1, employeeId: 1, dayOfMonth: 1, slotNo: 1, fromTime: "09:00", toTime: "17:00", status: 1 }];
+    const [row] = buildGraphSummaryRows(graph, employees, employeesById, slots, new Set(["1:1", "1:4"]));
+    expect(row).toMatchObject({ workDays: 1, urlopDays: 2, freeDays: 29, holidayDays: 1, sum: "8" });
+    expect(row.days[3]).toEqual({ from: "UR", to: "", hours: "" });
+    expect(row.days[0].from).toBe("09:00");
+    expect(slots).toHaveLength(1);
+  });
   test("minimum staffing counts distinct employees across every segment", () => {
     const slot = (employeeId: number, fromTime: string, toTime: string): GraphSlot => ({
       id: 1, scheduleId: 1, dayOfMonth: 1, slotNo: 1, employeeId, fromTime, toTime, status: 1,

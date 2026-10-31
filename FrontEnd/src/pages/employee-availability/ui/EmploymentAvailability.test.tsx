@@ -8,6 +8,10 @@ import { AVAILABILITY_KIND_ANY, AVAILABILITY_KIND_NONE } from "@entities/availab
 import { EmployeeAvailabilityPage } from "./EmployeeAvailabilityPage";
 
 beforeEnglishTest(() => setTestLanguage("en"));
+vi.mock("@entities/urlop", async importOriginal => ({ ...await importOriginal<typeof import("@entities/urlop")>(),
+  useEmployeeUrlopCalendarQuery: () => ({ data: { shops: [], months: [] }, isLoading: false, error: null }),
+}));
+vi.mock("./EmployeeUrlopPanel", () => ({ EmployeeUrlopPanel: () => <div>Vacation panel</div> }));
 
 const mocks = vi.hoisted(() => ({
   availabilityQuery: vi.fn(),

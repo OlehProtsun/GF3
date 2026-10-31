@@ -900,3 +900,7 @@
 .tablePhoneViewport .visualHintShell { position: relative; min-height: var(--matrix-cell-min-height); flex-wrap: wrap; gap: 2px; }
 .tablePhoneViewport .visualHintButton, .tablePhoneViewport .visualHintCurrentValue { white-space: normal; overflow-wrap: anywhere; overflow: visible; }
 @media (max-width: 350px) { .cardPhoneViewport.cardWithStaffing { --matrix-day-column-width: 88px; } }
+.urlopBadge { display: inline-block; color: #11604a; background: #e3f3ed; border-radius: 7px; padding: 3px 8px; font-weight: 700; }
+.urlopInfoCell .urlopBadge { position: absolute; left: 50%; transform: translateX(-50%); pointer-events: none; z-index: 1; }
+.urlopInfoCell input:not(:focus) { color: transparent; }
+.urlopInfoCell:focus-within .urlopBadge { display: none; }

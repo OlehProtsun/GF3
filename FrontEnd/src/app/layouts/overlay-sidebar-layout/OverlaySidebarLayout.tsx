@@ -108,6 +108,7 @@ export function OverlaySidebarLayout({ children }: OverlaySidebarLayoutProps) {
         { label: t("Employee"), to: "/employee", icon: <EmployeeIcon size={22} /> },
         { label: t("Shop"), to: "/shop", icon: <ShopIcon size={28} style={{ transform: "scaleY(-1)" }} /> },
         { label: t("Availability"), to: "/availability", icon: <AvailabilityIcon size={22} /> },
+        { label: t("Urlop"), to: "/urlop", icon: <AvailabilityIcon size={22} /> },
         { label: t("Container"), to: "/container", icon: <ContainerIcon size={25} /> },
         ...(isSystemManager ? [{ label: t("Information"), to: "/information", icon: <InfoIcon size={26} /> }] : []),
         { label: t("Message"), to: "/communications", icon: <NoteIcon size={24} /> },

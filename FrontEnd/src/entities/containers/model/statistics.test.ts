@@ -56,6 +56,20 @@ const shopsById = new Map<number, Shop>([
 ]);
 
 describe("container statistics model", () => {
+  test("Urlop counts unique employee dates across shops and only container graph periods", () => {
+    const statistics = buildContainerStatistics({ graphs: [graph, { ...graph, id: 11 }, { ...graph, id: 12, shopId: 3 }],
+      graphRecordsById: { 10: { employees: graphEmployees, slots } }, employeesById,
+      approvedUrlopDays: [
+        { shopId: 2, employeeId: 1, date: "2026-05-01" },
+        { shopId: 2, employeeId: 1, date: "2026-05-04" },
+        { shopId: 3, employeeId: 1, date: "2026-05-04" },
+        { shopId: 999, employeeId: 1, date: "2026-05-05" },
+        { shopId: 2, employeeId: 1, date: "2026-06-05" },
+      ] });
+    expect(statistics.pivotRows[0]).toMatchObject({ employee: "Ada Lovelace", workDays: 1, urlopDays: 2, freeDays: 29, holidayDays: 1, hoursSum: "4h 30m" });
+    expect(statistics.pivotRows.at(-1)).toMatchObject({ urlopDays: 2, freeDays: 59 });
+    expect(statistics.workFreeRows[0].urlopDays).toBe(2);
+  });
   test("formats durations and preview lists", () => {
     expect(getSlotDurationMinutes({ fromTime: "22:00", toTime: "02:00" })).toBe(240);
     expect(getSlotDurationMinutes({ fromTime: "bad", toTime: "02:00" })).toBe(0);
@@ -102,14 +116,14 @@ describe("container statistics model", () => {
     expect(statistics.totalEmployeesListText).toBe("Ada Lovelace, Grace Hopper");
     expect(statistics.shopHeaders).toEqual([{ key: "2", name: "Central Shop" }]);
     expect(statistics.pivotRows).toEqual([
-      { employee: "Ada Lovelace", workDays: 1, freeDays: 30, holidayDays: 1, hoursSum: "4h 30m", hoursByShop: { "2": "4h 30m" } },
-      { employee: "Grace Hopper", workDays: 1, freeDays: 30, holidayDays: 0, hoursSum: "4", hoursByShop: { "2": "4" } },
-      { employee: "TOTAL", workDays: 2, freeDays: 60, holidayDays: 1, hoursSum: "8h 30m", hoursByShop: { "2": "8h 30m" }, isTotal: true },
+      { employee: "Ada Lovelace", workDays: 1, freeDays: 30, urlopDays: 0, holidayDays: 1, hoursSum: "4h 30m", hoursByShop: { "2": "4h 30m" } },
+      { employee: "Grace Hopper", workDays: 1, freeDays: 30, urlopDays: 0, holidayDays: 0, hoursSum: "4", hoursByShop: { "2": "4" } },
+      { employee: "TOTAL", workDays: 2, freeDays: 60, urlopDays: 0, holidayDays: 1, hoursSum: "8h 30m", hoursByShop: { "2": "8h 30m" }, isTotal: true },
     ]);
     statistics.pivotRows.forEach(row => expect(row.holidayDays).toBeLessThanOrEqual(row.workDays));
     expect(statistics.workFreeRows).toEqual([
-      { employee: "Ada Lovelace", workDays: 1, freeDays: 30 },
-      { employee: "Grace Hopper", workDays: 1, freeDays: 30 },
+      { employee: "Ada Lovelace", workDays: 1, freeDays: 30, urlopDays: 0 },
+      { employee: "Grace Hopper", workDays: 1, freeDays: 30, urlopDays: 0 },
     ]);
   });
 
@@ -139,13 +153,13 @@ describe("container statistics model", () => {
     });
 
     expect(statistics.pivotRows).toEqual(expect.arrayContaining([
-      expect.objectContaining({ employee: "Ada Lovelace", workDays: 2, freeDays: 29, holidayDays: 1 }),
-      expect.objectContaining({ employee: "Grace Hopper", workDays: 1, freeDays: 30 }),
+      expect.objectContaining({ employee: "Ada Lovelace", workDays: 2, freeDays: 29, urlopDays: 0, holidayDays: 1 }),
+      expect.objectContaining({ employee: "Grace Hopper", workDays: 1, freeDays: 30, urlopDays: 0 }),
     ]));
     statistics.pivotRows.forEach(row => expect(row.holidayDays).toBeLessThanOrEqual(row.workDays));
     expect(statistics.workFreeRows).toEqual([
-      { employee: "Ada Lovelace", workDays: 2, freeDays: 29 },
-      { employee: "Grace Hopper", workDays: 1, freeDays: 30 },
+      { employee: "Ada Lovelace", workDays: 2, freeDays: 29, urlopDays: 0 },
+      { employee: "Grace Hopper", workDays: 1, freeDays: 30, urlopDays: 0 },
     ]);
   });
 });

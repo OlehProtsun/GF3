@@ -13,6 +13,9 @@ import { PublicHolidayVisibilityProvider } from "@app/providers/PublicHolidayVis
 import { publicHolidaySettingsApi } from "@entities/public-holidays/api/publicHolidaySettingsApi";
 
 beforeEnglishTest(() => setTestLanguage("en"));
+vi.mock("@entities/urlop", async importOriginal => ({ ...await importOriginal<typeof import("@entities/urlop")>(),
+  useEmployeeApprovedUrlopQuery: () => ({ data: [], error: null }),
+}));
 
 const mocks = vi.hoisted(() => ({
   scheduleQuery: vi.fn(),

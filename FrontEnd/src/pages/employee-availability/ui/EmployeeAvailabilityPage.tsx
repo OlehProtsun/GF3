@@ -9,6 +9,8 @@ import {
 import { createPortal } from "react-dom";
 import { useEmployeeAvailabilityTimePresetsQuery, useSaveEmployeeAvailabilityTimePresetsMutation } from "@entities/employee-ui-state";
 import { EmployeeAvailabilityMatrix } from "./EmployeeAvailabilityMatrix";
+import { EmployeeUrlopPanel } from "./EmployeeUrlopPanel";
+import { useEmployeeUrlopCalendarQuery } from "@entities/urlop";
 import { estimateAvailabilityHours } from "@entities/employee-availability/model/estimatedHours";
 import { applyEmployeeAvailabilityValue, buildAvailabilityDraftSource, buildDraftFromAvailability, buildDraftSnapshot, buildSaveSlots, type DayDraft, type DayDraftMap } from "../model/employeeAvailabilityMatrix";
 import {
@@ -335,6 +337,8 @@ function AvailabilitySelectionSheet({ open, editingDays, dateLabel, day, storage
 }
 
 export function EmployeeAvailabilityPage() {
+  const [tab, setTab] = useState<"availability" | "urlop">("availability");
+  const urlopCalendar = useEmployeeUrlopCalendarQuery();
   const { session } = useAuth();
   const presetStorageKey = session?.employeeId
     ? `gf3:employee-availability:time-presets:${session.employeeId}`
@@ -527,6 +531,12 @@ export function EmployeeAvailabilityPage() {
 
   return (
     <div className={workspaceStyles.page}>
+      <div className={styles.urlopTabs} role="tablist" aria-label={t("Availability")}>
+        <button type="button" role="tab" id="availability-tab" aria-controls="availability-panel" aria-selected={tab === "availability"} onClick={() => setTab("availability")}>{t("Availability")}</button>
+        <button type="button" role="tab" id="urlop-tab" aria-controls="urlop-panel" aria-selected={tab === "urlop"} onClick={() => setTab("urlop")}>{t("Urlop")}</button>
+      </div>
+      <div role="tabpanel" id="urlop-panel" aria-labelledby="urlop-tab" hidden={tab !== "urlop"}><EmployeeUrlopPanel /></div>
+      <div role="tabpanel" id="availability-panel" aria-labelledby="availability-tab" hidden={tab !== "availability"}>
       <h1 className={styles.pageTitle}>{t("Public windows")}</h1>
       {queryErrorMessage ? <ErrorBanner dismissible={false}>{queryErrorMessage}</ErrorBanner> : null}
       {saveErrorMessage ? <ErrorBanner>{saveErrorMessage}</ErrorBanner> : null}
@@ -616,7 +626,7 @@ export function EmployeeAvailabilityPage() {
                       <strong>{t("Team availability")}</strong><span>{t("{0} employees", new Set((selectedAvailability.members ?? []).map(member => member.employeeId)).size)}</span>
                       <small>{t("You can edit only your availability")}</small>
                     </div>
-                    <EmployeeAvailabilityMatrix group={selectedAvailability} currentEmployeeId={session?.employeeId ?? 0} ownDraft={draft} canEdit={canSubmit} selectedDays={selectedDays} onSelectedDaysChange={setSelectedDays} onRequestEdit={handleOpenDayDialog} />
+                    <EmployeeAvailabilityMatrix group={selectedAvailability} currentEmployeeId={session?.employeeId ?? 0} ownDraft={draft} canEdit={canSubmit} selectedDays={selectedDays} onSelectedDaysChange={setSelectedDays} onRequestEdit={handleOpenDayDialog} urlopCalendar={urlopCalendar.data} />
                     <div className={styles.legend}><span>+ {t("Available (whole day)")}</span><span>− {t("Not available")}</span><span>09:00–15:00 {t("Other time")}</span></div>
                     {estimatedHours && estimatedHours.status !== "unsubmitted" ? (
                       <div className={styles.hoursSummary} role="region" aria-label={t("Estimated working hours")}>
@@ -673,6 +683,7 @@ export function EmployeeAvailabilityPage() {
         />
       ) : null}
 
+      </div>
       {unsavedChangesDialog}
     </div>
   );

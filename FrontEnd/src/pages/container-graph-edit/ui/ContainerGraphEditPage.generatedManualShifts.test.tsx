@@ -13,6 +13,9 @@ import { QueryClient } from "@tanstack/react-query";
 import { ContainerGraphEditPage } from "./ContainerGraphEditPage";
 
 type EditorProps = ComponentProps<typeof ContainerGraphEditor>;
+vi.mock("@entities/urlop", async importOriginal => ({ ...await importOriginal<typeof import("@entities/urlop")>(),
+  useGraphApprovedUrlopQuery: () => ({ data: [], error: null, isError: false }),
+}));
 const mocks = vi.hoisted(() => ({
   params: { containerId: "1", graphId: "1" as string | undefined },
   location: { key: "test", pathname: "/container/1/graphs/1/edit", search: "?openGraphIds=1,2" },

@@ -2,6 +2,7 @@ import { useLanguageRevision } from "@shared/i18n/useLanguageRevision";
 import { usePublicHolidayVisibility } from "@app/providers/PublicHolidayVisibilityProvider";
 import { getPolishPublicHoliday } from "@shared/lib/polishPublicHolidays";
 import { t, numberFormat, dateTimeFormat } from "@shared/i18n";
+import { useEmployeeApprovedUrlopQuery, approvedKeys } from "@entities/urlop";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { NavLink } from "react-router-dom";
@@ -676,6 +677,8 @@ export function EmployeeSchedulePage() {
     () => schedules.find(schedule => schedule.id === selectedScheduleId) ?? schedules[0] ?? null,
     [schedules, selectedScheduleId],
   );
+  const urlop = useEmployeeApprovedUrlopQuery(selectedSchedule?.shopId ?? 0, selectedSchedule?.year ?? 0, selectedSchedule?.month ?? 0);
+  const urlopCellKeys = approvedKeys(urlop.data ?? [], selectedSchedule?.shopId ?? 0, selectedSchedule?.year ?? 2000, selectedSchedule?.month ?? 1);
 
   useEffect(() => {
     setIsPdfLoading(false);
@@ -821,8 +824,8 @@ export function EmployeeSchedulePage() {
     () => buildScheduleMatrixDisplayCellMap(selectedSchedule, scheduleMatrixCellMap),
     [scheduleMatrixCellMap, selectedSchedule],
   );
-  const queryErrorMessage = scheduleQuery.error
-    ? getErrorMessage(scheduleQuery.error, t("Could not load published schedules."))
+  const queryErrorMessage = scheduleQuery.error || urlop.error
+    ? getErrorMessage(scheduleQuery.error || urlop.error, t("Could not load published schedules."))
     : null;
 
   const handleSummaryYearChange = (value: string) => {
@@ -1045,6 +1048,7 @@ export function EmployeeSchedulePage() {
         <div className={styles.scheduleViewStage} data-employee-motion="schedule-content" data-motion-key={`${selectedSchedule.id}:${scheduleViewMode}`}>
           {scheduleViewMode === "matrix" ? (
             <ContainerGraphMatrix
+              urlopCellKeys={urlopCellKeys}
               className={styles.openScheduleMatrix}
               icon={null}
               graph={selectedSchedule}
@@ -1124,6 +1128,9 @@ export function EmployeeSchedulePage() {
                   </div>
 
                   <div className={styles.dailyScheduleWorkers}>
+                    {(urlop.data ?? []).filter(x => Number(x.date.slice(8, 10)) === activeDailyScheduleDay).map(x => <article key={`urlop-${x.employeeId}`} className={styles.dailyScheduleWorker}>
+                      <span>{scheduleMatrixColumns.find(c => c.employeeId === x.employeeId)?.label ?? x.employeeName ?? t("Employee #{0}", x.employeeId)}</span><strong title={t("Urlop")}>UR</strong>
+                    </article>)}
                     {dailyScheduleWorkers.length > 0 ? dailyScheduleWorkers.map(worker => (
                       <article key={worker.employeeId} className={styles.dailyScheduleWorker}>
                         <span>{worker.label}</span>

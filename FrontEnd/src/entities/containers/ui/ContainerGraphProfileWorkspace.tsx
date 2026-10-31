@@ -35,6 +35,7 @@ import { ContainerGraphRelatedHintDialog } from "./ContainerGraphRelatedHintDial
 import styles from "./ContainerGraphProfileWorkspace.module.css";
 
 type ContainerGraphProfileWorkspaceProps = {
+  urlopCellKeys?: ReadonlySet<string>;
   container?: Container | null;
   graph?: Graph | null;
   shop?: Shop | null;
@@ -149,6 +150,7 @@ function sanitizeScheduleColumnOrder(
 }
 
 export function ContainerGraphProfileWorkspace({
+  urlopCellKeys,
   graph,
   shop,
   availabilityGroup,
@@ -255,7 +257,7 @@ export function ContainerGraphProfileWorkspace({
   const dayConflictMap = buildGraphConflictDayMap(graph, slots);
   const totals = buildGraphTotals(graphEmployees, slots, employeesById);
   const summaryHeaders = buildGraphSummaryHeaders(graph.year, graph.month);
-  const summaryRows = buildGraphSummaryRows(graph, graphEmployees, employeesById, slots);
+  const summaryRows = buildGraphSummaryRows(graph, graphEmployees, employeesById, slots, urlopCellKeys);
   const hasSummarySearch = summarySearchQuery.trim().length > 0;
   const filteredSummaryRows = hasSummarySearch
     ? summaryRows.filter(row => matchesEmployeeSearch(row.employee, summarySearchQuery))
@@ -318,6 +320,7 @@ export function ContainerGraphProfileWorkspace({
       } as CSSProperties);
   const matrix = (
     <ContainerGraphMatrix
+      urlopCellKeys={urlopCellKeys}
       className={joinClassNames(styles.matrixCard, compactSize && styles.matrixCardCompact)}
       style={matrixCardStyle}
       headerClassName={phoneMatrixViewport ? styles.phoneMatrixHeader : undefined}
@@ -480,6 +483,7 @@ export function ContainerGraphProfileWorkspace({
               <dl className={joinClassNames(styles.phoneSummaryMetrics, showPublicHolidays && styles.phoneSummaryMetricsWithHolidays)}>
                 <div><dt>{t("Work Days")}</dt><dd>{row.workDays}</dd></div>
                 <div><dt>{t("Free Days")}</dt><dd>{row.freeDays}</dd></div>
+                <div><dt>{t("Urlop Days")}</dt><dd>{row.urlopDays}</dd></div>
                 <div><dt>{t("Hours")}</dt><dd>{row.sum || "0"}</dd></div>
                 {showPublicHolidays && <div><dt>{t("Holiday Days")}</dt><dd>{row.holidayDays}</dd></div>}
               </dl>
@@ -504,6 +508,7 @@ export function ContainerGraphProfileWorkspace({
                 <th rowSpan={2} className={joinClassNames(styles.stickyColumnTertiary, styles.statColumn)}>{t("Free Days")}</th>
                 <th rowSpan={2} className={joinClassNames(styles.stickyColumnQuaternary, styles.statColumn)}>{t("Sum")}</th>
                 {showPublicHolidays && <th rowSpan={2} className={joinClassNames(styles.stickyColumnQuinary, styles.statColumn, styles.holidayStatColumn)}>{t("Holiday Days")}</th>}
+                <th rowSpan={2} className={styles.statColumn}>{t("Urlop Days")}</th>
                 {summaryHeaders.map(header => (
                   <th key={header.dayOfMonth} colSpan={3}>{header.label}</th>
                 ))}
@@ -531,6 +536,7 @@ export function ContainerGraphProfileWorkspace({
                           <td rowSpan={row.dayRows.length} className={joinClassNames(styles.stickyColumnTertiary, styles.statValue)}>{row.freeDays}</td>
                           <td rowSpan={row.dayRows.length} className={joinClassNames(styles.stickyColumnQuaternary, styles.statValue)}>{row.sum || "0"}</td>
                           {showPublicHolidays && <td rowSpan={row.dayRows.length} className={joinClassNames(styles.stickyColumnQuinary, styles.statColumn, styles.statValue)}>{row.holidayDays}</td>}
+                          <td rowSpan={row.dayRows.length} className={styles.statValue}>{row.urlopDays}</td>
                         </>
                       ) : null}
                       {days.map((day, index) => (

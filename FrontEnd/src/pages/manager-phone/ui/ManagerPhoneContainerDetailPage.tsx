@@ -7,6 +7,7 @@ import { useEmployeesListQuery } from "@entities/employees/api/queries";
 import { useShopsListQuery } from "@entities/shops/api/queries";
 import { queryKeys } from "@shared/api/queryKeys";
 import { t } from "@shared/i18n";
+import { graphDateRange, useApprovedUrlopQuery } from "@entities/urlop";
 import { ManagerPhonePage } from "./ManagerPhonePage";
 import { EmployeeIcon, StatisticsIcon } from "@shared/ui/icons";
 import styles from "./ManagerPhonePage.module.css";
@@ -20,6 +21,8 @@ export function ManagerPhoneContainerDetailPage() {
   const employees = useEmployeesListQuery({ refreshKey: location.key });
   const shops = useShopsListQuery({ refreshKey: location.key });
   const graphs = graphsQuery.data ?? [];
+  const urlopRange = graphDateRange(graphs);
+  const urlop = useApprovedUrlopQuery(urlopRange.from, urlopRange.to, undefined, graphs.length > 0);
   const graphIdsKey = graphs.map(item => item.id).sort((a, b) => a - b).join(",");
   const records = useQuery({ queryKey: queryKeys.containers.graphRecords(id ?? 0, graphIdsKey), enabled: id !== null && graphs.length > 0,
     cancelOnUnmount: true, staleTime: 30_000,
@@ -32,9 +35,9 @@ export function ManagerPhoneContainerDetailPage() {
     } });
   const shopsById = new Map((shops.data ?? []).map(item => [item.id, item]));
   const summaries = filterGraphSummaries(buildContainerGraphSummaries(graphs, records.data ?? {}, shopsById), search);
-  const statistics = buildContainerStatistics({ graphs, graphRecordsById: records.data ?? {}, shopsById, employeesById: new Map((employees.data ?? []).map(item => [item.id, item])) });
+  const statistics = buildContainerStatistics({ graphs, graphRecordsById: records.data ?? {}, shopsById, employeesById: new Map((employees.data ?? []).map(item => [item.id, item])), approvedUrlopDays: urlop.data });
   return <ManagerPhonePage backTo="/container" valid={id !== null} missing={!container.data} query={search} onQueryChange={setSearch}
-    queries={[container, graphsQuery, employees, shops, records]} queryKeys={[queryKeys.containers.all, queryKeys.employees.all, queryKeys.shops.all]}>
+    queries={[container, graphsQuery, employees, shops, records, urlop]} queryKeys={[queryKeys.containers.all, queryKeys.employees.all, queryKeys.shops.all, queryKeys.urlop.all]}>
     <section className={styles.card}><h2>{container.data?.name}</h2><p>{container.data?.note}</p><p>{t("Total Employees: {0}", statistics.totalEmployees)} · {t("Total Hours: {0}", statistics.totalHoursText)}</p></section>
     <div className={styles.tiles}>{summaries.map(item => <NavLink className={styles.tile} key={item.graph.id} to={`/container/${id}/graphs/${item.graph.id}`}>
       <strong>{item.graph.name}</strong><span>{item.monthYearLabel} · {item.shopName} · {t(item.graph.publicationStatus === "public" ? "Public" : "Private")}</span>
@@ -48,6 +51,7 @@ export function ManagerPhoneContainerDetailPage() {
         <dl className={styles.metricValues}>
           <div><dt>{t("Work Days")}</dt><dd>{row.workDays}</dd></div>
           <div><dt>{t("Free Days")}</dt><dd>{row.freeDays}</dd></div>
+          <div><dt>{t("Urlop Days")}</dt><dd>{row.urlopDays}</dd></div>
           <div><dt>{t("Hours")}</dt><dd>{row.hoursSum}</dd></div>
         </dl>
         {statistics.shopHeaders.length > 0 && <details><summary>{t("Shops")}</summary>

@@ -3,6 +3,7 @@ import { useEmploymentContractSettingsQuery } from "@entities/employment-contrac
 import { canReserveManualShift } from "@entities/containers/model/manualShiftIntervals";
 import { useLanguageRevision } from "@shared/i18n/useLanguageRevision";
 import { dateTimeFormat, t } from "@shared/i18n";
+import { useGraphApprovedUrlopQuery, approvedKeys } from "@entities/urlop";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { deriveGeneratedVacancies, reconcileGeneratedManualColumns } from "@entities/containers/model/generatedManualShifts";
 import { pinGeneratedColumnsFirst } from "@entities/containers/model/graphColumnOrder";
@@ -936,6 +937,8 @@ export function ContainerGraphEditPage() {
   const cancelManualShiftSwapMutation = useCancelManagerManualShiftSwapMutation();
 
   const [form, setForm] = useState<ContainerGraphFormState>(() => createInitialGraphForm());
+  const urlop = useGraphApprovedUrlopQuery({ shopId: Number(form.shopId), year: Number(form.year) || 2000, month: Number(form.month) || 1 });
+  const urlopCellKeys = approvedKeys(urlop.data ?? [], Number(form.shopId), Number(form.year), Number(form.month));
   const [formErrors, setFormErrors] = useState<ContainerGraphFormErrors>({});
   const [graphEmployeeRows, setGraphEmployeeRows] = useState<Array<{ id: number | null; employeeId: number; minHoursMonth: string; isPriority: boolean }>>([]);
   const [selectedSchedulePresetId, setSelectedSchedulePresetId] = useState<number | null>(null);
@@ -1909,6 +1912,7 @@ export function ContainerGraphEditPage() {
       (!isCreate && (graphQuery.isLoading || graphEmployeesQuery.isLoading || slotsQuery.isLoading || cellStylesQuery.isLoading))
     );
   const hasLoadError =
+    urlop.isError ||
     containerId === null ||
     hasAvailabilityPolicyError ||
     (Boolean(previewAvailabilityGroupId) && (previewMembersQuery.isError || previewSlotsQuery.isError)) ||
@@ -2449,6 +2453,7 @@ export function ContainerGraphEditPage() {
       runWithoutPrompt(() => navigate(`/container?openContainerId=${containerId}`));
     } catch (error) {
       if (error instanceof ApiError) {
+        if (error.status === 409) queryClient.invalidateQueries({ queryKey: queryKeys.urlop.all });
         setFormErrors(currentErrors => ({ ...currentErrors, ...applyGraphApiErrors(error.validationErrors) }));
         setSubmitError(error.message);
         return;
@@ -2551,6 +2556,7 @@ export function ContainerGraphEditPage() {
     } catch (error) {
       if (!isCurrentRequest()) return;
       if (error instanceof ApiError) {
+        if (error.status === 409) queryClient.invalidateQueries({ queryKey: queryKeys.urlop.all });
         setFormErrors(currentErrors => ({ ...currentErrors, ...applyGraphApiErrors(error.validationErrors) }));
         setSubmitError(error.message);
         return;
@@ -2982,6 +2988,7 @@ export function ContainerGraphEditPage() {
 
       {canEdit ? (
         <ContainerGraphEditor
+        urlopCellKeys={urlopCellKeys}
         graph={effectiveGraph}
         isHeaderCollapsed={isHeaderCollapsed}
         compactSize={isCompactMatrix}
@@ -3082,6 +3089,7 @@ export function ContainerGraphEditPage() {
         }}
         onColumnMove={handleColumnMove}
         onCellChange={(employeeId, dayOfMonth, value) => {
+          if (urlopCellKeys.has(getGraphCellKey(employeeId, dayOfMonth))) return;
           const manualColumnId = getManualColumnIdFromEmployeeId(employeeId);
           if (manualColumnId !== null) {
             const currentValue = manualColumns

@@ -11,6 +11,8 @@ namespace DataAccessLayer.Models.DataBaseContext;
 /// </summary>
 public class AppDbContext(DbContextOptions<AppDbContext> options, TimeProvider? timeProvider = null) : DbContext(options)
 {
+    public DbSet<UrlopMonthModel> UrlopMonths => Set<UrlopMonthModel>();
+    public DbSet<UrlopDayModel> UrlopDays => Set<UrlopDayModel>();
     public DbSet<ContainerModel> Containers => Set<ContainerModel>();
     public DbSet<EmployeeModel> Employees => Set<EmployeeModel>();
     public DbSet<EmploymentContractSettingsModel> EmploymentContractSettings => Set<EmploymentContractSettingsModel>();
@@ -120,6 +122,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, TimeProvider? 
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        ConfigureUrlopMonth(modelBuilder);
+        ConfigureUrlopDay(modelBuilder);
         modelBuilder.Entity<EmployeePushSubscriptionModel>(entity =>
         {
             entity.ToTable("employee_push_subscription");
@@ -192,6 +196,50 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, TimeProvider? 
         ConfigureAvailabilityGroupMember(modelBuilder);
         ConfigureAvailabilityGroupDay(modelBuilder);
         ConfigureAvailabilityGroupDayTransfer(modelBuilder);
+    }
+
+    private static void ConfigureUrlopMonth(ModelBuilder modelBuilder)
+    {
+        var entity = modelBuilder.Entity<UrlopMonthModel>();
+        entity.ToTable("urlop_month", table =>
+        {
+            table.HasCheckConstraint("ck_urlop_month_year", "year BETWEEN 1 AND 9999");
+            table.HasCheckConstraint("ck_urlop_month_month", "month BETWEEN 1 AND 12");
+        });
+        entity.HasKey(x => x.Id);
+        entity.Property(x => x.Id).HasColumnName("id");
+        entity.Property(x => x.ShopId).HasColumnName("shop_id");
+        entity.Property(x => x.Year).HasColumnName("year");
+        entity.Property(x => x.Month).HasColumnName("month");
+        entity.Property(x => x.IsOpen).HasColumnName("is_open").HasDefaultValue(false);
+        entity.Property(x => x.Revision).HasColumnName("revision").HasDefaultValue(0);
+        entity.HasIndex(x => new { x.ShopId, x.Year, x.Month }).IsUnique();
+        entity.HasOne<ShopModel>().WithMany().HasForeignKey(x => x.ShopId).OnDelete(DeleteBehavior.Restrict);
+    }
+
+    private static void ConfigureUrlopDay(ModelBuilder modelBuilder)
+    {
+        var entity = modelBuilder.Entity<UrlopDayModel>();
+        entity.ToTable("urlop_day", table => table.HasCheckConstraint("ck_urlop_day_status", "status IN ('pending','approved','rejected')"));
+        entity.HasKey(x => x.Id);
+        entity.Property(x => x.Id).HasColumnName("id");
+        entity.Property(x => x.RequestId).HasColumnName("request_id");
+        entity.Property(x => x.ShopId).HasColumnName("shop_id");
+        entity.Property(x => x.EmployeeId).HasColumnName("employee_id");
+        entity.Property(x => x.Date).HasColumnName("date");
+        entity.Property(x => x.Status).HasColumnName("status").HasMaxLength(16).IsRequired();
+        entity.Property(x => x.CreatedAtUtc).HasColumnName("created_at_utc");
+        entity.Property(x => x.CreatedByManagerId).HasColumnName("created_by_manager_id");
+        entity.Property(x => x.ReviewedAtUtc).HasColumnName("reviewed_at_utc");
+        entity.Property(x => x.ReviewedByManagerId).HasColumnName("reviewed_by_manager_id");
+        entity.HasIndex(x => x.RequestId);
+        entity.HasIndex(x => new { x.ShopId, x.Date });
+        entity.HasIndex(x => new { x.EmployeeId, x.Date });
+        entity.HasIndex(x => new { x.ShopId, x.EmployeeId, x.Date }).IsUnique().HasFilter("status IN ('pending','approved')");
+        entity.HasOne<ShopModel>().WithMany().HasForeignKey(x => x.ShopId).OnDelete(DeleteBehavior.Restrict);
+        entity.HasOne<EmployeeModel>().WithMany().HasForeignKey(x => x.EmployeeId).OnDelete(DeleteBehavior.Restrict);
+        entity.HasOne<ManagerAccountModel>().WithMany().HasForeignKey(x => x.CreatedByManagerId).OnDelete(DeleteBehavior.Restrict);
+        entity.HasOne<ManagerAccountModel>().WithMany().HasForeignKey(x => x.ReviewedByManagerId).OnDelete(DeleteBehavior.Restrict);
     }
 
     private static void ConfigureContainer(ModelBuilder modelBuilder)

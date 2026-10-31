@@ -48,8 +48,8 @@ test("phone sections have reading order, real metrics and a preserved read-only 
   const rows = cards(container);
   expect(rows).toHaveLength(2);
   expect(within(rows[0]).getByText("AK")).toHaveAttribute("aria-hidden", "true");
-  expect(Array.from(rows[0].querySelectorAll("summary dd")).map(node => node.textContent)).toEqual(["1", "30", "8", "0"]);
-  expect(Array.from(rows[1].querySelectorAll("summary dd")).map(node => node.textContent)).toEqual(["1", "30", "6", "0"]);
+  expect(Array.from(rows[0].querySelectorAll("summary dd")).map(node => node.textContent)).toEqual(["1", "30", "0", "8", "0"]);
+  expect(Array.from(rows[1].querySelectorAll("summary dd")).map(node => node.textContent)).toEqual(["1", "30", "0", "6", "0"]);
   const matrix = container.querySelector("[data-phone-matrix-scroll]")!;
   expect(matrix).toHaveAttribute("tabindex", "0");
   expect(within(matrix as HTMLElement).getByText("Anna Kowalska")).toBeInTheDocument();
@@ -134,10 +134,10 @@ test("phone holiday metric follows visibility while preserving original metrics 
   const { container, rerender } = render(<ContainerGraphProfileWorkspace {...props} graph={{ ...graph, month: 5 }} />);
   const summary = cards(container)[0].querySelector("summary")!;
   expect(within(summary).getByText("Holiday Days").nextElementSibling).toHaveTextContent("1");
-  expect(Array.from(summary.querySelectorAll("dd")).map(node => node.textContent)).toEqual(["1", "30", "8", "1"]);
+  expect(Array.from(summary.querySelectorAll("dd")).map(node => node.textContent)).toEqual(["1", "30", "0", "8", "1"]);
   vi.mocked(usePublicHolidayVisibility).mockReturnValue(false);
   rerender(<ContainerGraphProfileWorkspace {...props} graph={{ ...graph, month: 5 }} />);
   expect(within(summary).queryByText("Holiday Days")).not.toBeInTheDocument();
-  expect(Array.from(summary.querySelectorAll("dd")).map(node => node.textContent)).toEqual(["1", "30", "8"]);
+  expect(Array.from(summary.querySelectorAll("dd")).map(node => node.textContent)).toEqual(["1", "30", "0", "8"]);
   expect(cards(container)[0].firstElementChild).toBe(summary);
 });

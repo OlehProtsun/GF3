@@ -21,6 +21,7 @@ async function fixture(page: Page, groups = [structuredClone(group)], expandFirs
     if (path === "/api/auth/session") body = { role: "employee", employeeId: 12, userName: "worker", displayName: "Worker Bee" };
     else if (path === "/api/account-language") body = { language };
     else if (path === "/api/employee-availability") body = groups;
+    else if (path === "/api/employee-urlop") body = { shops: [], months: [] };
     else if (path === "/api/employee-ui-state/availability-time-presets") body = { presets: null };
     else if (/^\/api\/employee-availability\/\d+\/slots$/.test(path)) {
       expect(route.request().method()).toBe("PUT");

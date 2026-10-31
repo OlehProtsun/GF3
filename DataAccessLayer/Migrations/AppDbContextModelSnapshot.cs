@@ -2443,6 +2443,117 @@ namespace DataAccessLayer.Migrations
                     b.ToTable("system_news_read");
                 });
 
+            modelBuilder.Entity("DataAccessLayer.Models.UrlopDayModel", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<int?>("CreatedByManagerId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("created_by_manager_id");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("date");
+
+                    b.Property<int>("EmployeeId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("employee_id");
+
+                    b.Property<Guid>("RequestId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("request_id");
+
+                    b.Property<DateTimeOffset?>("ReviewedAtUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("reviewed_at_utc");
+
+                    b.Property<int?>("ReviewedByManagerId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("reviewed_by_manager_id");
+
+                    b.Property<int>("ShopId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("shop_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("status");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedByManagerId");
+
+                    b.HasIndex("RequestId");
+
+                    b.HasIndex("ReviewedByManagerId");
+
+                    b.HasIndex("EmployeeId", "Date");
+
+                    b.HasIndex("ShopId", "Date");
+
+                    b.HasIndex("ShopId", "EmployeeId", "Date")
+                        .IsUnique()
+                        .HasFilter("status IN ('pending','approved')");
+
+                    b.ToTable("urlop_day", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_urlop_day_status", "status IN ('pending','approved','rejected')");
+                        });
+                });
+
+            modelBuilder.Entity("DataAccessLayer.Models.UrlopMonthModel", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("id");
+
+                    b.Property<bool>("IsOpen")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_open");
+
+                    b.Property<int>("Month")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("month");
+
+                    b.Property<int>("Revision")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(0)
+                        .HasColumnName("revision");
+
+                    b.Property<int>("ShopId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("shop_id");
+
+                    b.Property<int>("Year")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("year");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ShopId", "Year", "Month")
+                        .IsUnique();
+
+                    b.ToTable("urlop_month", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_urlop_month_month", "month BETWEEN 1 AND 12");
+
+                            t.HasCheckConstraint("ck_urlop_month_year", "year BETWEEN 1 AND 9999");
+                        });
+                });
+
             modelBuilder.Entity("DataAccessLayer.Models.WorkflowLogEntryModel", b =>
                 {
                     b.Property<int>("Id")
@@ -3040,6 +3151,40 @@ namespace DataAccessLayer.Migrations
                         .IsRequired();
 
                     b.Navigation("Message");
+                });
+
+            modelBuilder.Entity("DataAccessLayer.Models.UrlopDayModel", b =>
+                {
+                    b.HasOne("DataAccessLayer.Models.ManagerAccountModel", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedByManagerId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("DataAccessLayer.Models.EmployeeModel", null)
+                        .WithMany()
+                        .HasForeignKey("EmployeeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DataAccessLayer.Models.ManagerAccountModel", null)
+                        .WithMany()
+                        .HasForeignKey("ReviewedByManagerId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("DataAccessLayer.Models.ShopModel", null)
+                        .WithMany()
+                        .HasForeignKey("ShopId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("DataAccessLayer.Models.UrlopMonthModel", b =>
+                {
+                    b.HasOne("DataAccessLayer.Models.ShopModel", null)
+                        .WithMany()
+                        .HasForeignKey("ShopId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("DataAccessLayer.Models.AvailabilityGroupMemberModel", b =>

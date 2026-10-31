@@ -14,6 +14,33 @@ namespace GF3.Tests;
 
 public sealed class DatabaseMigrationStartupTests
 {
+    [Fact]
+    public async Task AddUrlop_RollbackAndReapplyPreserveExistingAvailabilityAndSchedule()
+    {
+        await using var database = await GF3.Tests.Infrastructure.SqliteTestDatabase.CreateAsync();
+        await using var db = database.CreateContext();
+        var fixture = await UrlopTestData.SeedAsync(db);
+        db.ScheduleSlots.Add(GF3.Tests.Infrastructure.TestDataFactory.CreateDalSlot(fixture.Schedule, 3, 1, fixture.Employee, "09:00", "17:00"));
+        await db.SaveChangesAsync();
+        var migrator = db.GetService<IMigrator>();
+        await migrator.MigrateAsync("20261029193000_ReservePendingClaimOffer");
+        Assert.Single(await db.ScheduleSlots.ToListAsync());
+        Assert.Single(await db.AvailabilityGroupDays.ToListAsync());
+        await migrator.MigrateAsync();
+        Assert.Empty(await db.UrlopDays.ToListAsync());
+        Assert.Empty(await db.UrlopMonths.ToListAsync());
+        Assert.Single(await db.ScheduleSlots.ToListAsync());
+        Assert.Single(await db.AvailabilityGroupDays.ToListAsync());
+        await UrlopTestData.Service(db).CreateApprovedAsync(fixture.Manager, fixture.Shop, fixture.Employee, 2026, 11, [4], default);
+        db.UrlopDays.Add(new() { RequestId = Guid.NewGuid(), ShopId = fixture.Shop, EmployeeId = fixture.Employee,
+            Date = new(2026, 11, 4), Status = "pending", CreatedAtUtc = new UrlopTestClock().GetUtcNow() });
+        await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync());
+        db.ChangeTracker.Clear();
+        db.UrlopDays.Add(new() { RequestId = Guid.NewGuid(), ShopId = fixture.Shop, EmployeeId = fixture.Employee,
+            Date = new(2026, 11, 4), Status = "rejected", CreatedAtUtc = new UrlopTestClock().GetUtcNow() });
+        await db.SaveChangesAsync();
+        Assert.Equal(2, await db.UrlopDays.CountAsync());
+    }
     private const string PreviousProductionMigration = "20260509101500_AddManagerRecoveryFields";
 
     [Fact]

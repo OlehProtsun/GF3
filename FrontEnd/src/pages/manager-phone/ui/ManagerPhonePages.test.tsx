@@ -183,7 +183,7 @@ test("statistics retain all employee, total and per-shop values in cards", async
  expect(within(cards[0]).getByRole("heading")).toHaveTextContent("Other Worker"); expect(within(cards[1]).getByRole("heading")).toHaveTextContent("TOTAL");
  for (const card of cards) {
   expect(within(card).getByText("Work Days")).toBeInTheDocument(); expect(within(card).getByText("Free Days")).toBeInTheDocument(); expect(within(card).getByText("Hours")).toBeInTheDocument();
-  expect(Array.from(card.querySelectorAll("dl:first-of-type dd")).slice(0, 3).map(node => node.textContent)).toEqual(["1", "29", "16"]);
+  expect(Array.from(card.querySelectorAll("dl:first-of-type dd")).slice(0, 4).map(node => node.textContent)).toEqual(["1", "29", "0", "16"]);
   const details = card.querySelector("details")!; expect(details.open).toBe(false); await userEvent.click(details.querySelector("summary")!); expect(details.open).toBe(true);
   expect(within(details).getByText("Central")).toBeInTheDocument(); expect(within(details).getByText("Second shop")).toBeInTheDocument(); expect(within(details).getAllByText("8")).toHaveLength(2);
  }
@@ -248,10 +248,10 @@ test("phone schedule summary keeps metrics and every split shift in compact sear
  const summary = view.container.querySelector("[data-phone-schedule-summary]")!;
  expect(within(summary as HTMLElement).queryByRole("table")).not.toBeInTheDocument();
  expect(within(summary as HTMLElement).getByRole("heading", { name: "Other Worker" })).toBeInTheDocument();
- const metrics = summary.querySelector("dl")!; expect(Array.from(metrics.querySelectorAll("dd")).map(node => node.textContent)).toEqual(["1", "29", "7", "0"]);
+ const metrics = summary.querySelector("dl")!; expect(Array.from(metrics.querySelectorAll("dd")).map(node => node.textContent)).toEqual(["1", "29", "0", "7", "0"]);
  await userEvent.click(summary.querySelector("summary")!);
  for (const value of ["08:00", "12:00", "13:00", "16:00", "4", "3"]) expect(within(summary as HTMLElement).getByText(value)).toBeInTheDocument();
- expect(summary.querySelectorAll("dl > div > dt")).toHaveLength(34);
+  expect(summary.querySelectorAll("dl > div > dt")).toHaveLength(35);
  const search = screen.getByRole("searchbox", { name: "Search schedule summary by employee name or surname" });
  fireEvent.change(search, { target: { value: "missing" } }); expect(screen.getByRole("status")).toHaveTextContent('No employees found');
  fireEvent.change(search, { target: { value: "worker" } }); expect(view.container.querySelector("[data-phone-schedule-summary] > details")).toBeInTheDocument();

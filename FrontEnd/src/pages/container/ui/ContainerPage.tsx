@@ -1,5 +1,6 @@
 import { useLanguageRevision } from "@shared/i18n/useLanguageRevision";
 import { t } from "@shared/i18n";
+import { graphDateRange, useApprovedUrlopQuery } from "@entities/urlop";
 import { startTransition, useDeferredValue, useEffect, useMemo, useState, type FormEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -199,6 +200,8 @@ export function ContainerPage() {
   );
 
   const graphs = useMemo(() => graphsQuery.data ?? [], [graphsQuery.data]);
+  const urlopRange = graphDateRange(graphs);
+  const urlop = useApprovedUrlopQuery(urlopRange.from, urlopRange.to, undefined, mode === "profile" && graphs.length > 0);
   const sanitizedSelectedGraphIds = useMemo(
     () => sanitizeSelectedGraphIds(selectedGraphIds, graphs),
     [graphs, selectedGraphIds],
@@ -217,13 +220,14 @@ export function ContainerPage() {
   const statistics = useMemo(
     () =>
       buildContainerStatistics({
+        approvedUrlopDays: urlop.data,
         graphs,
         graphRecordsById: graphRecordsState.recordsByGraphId,
         employeesById,
         shopsById,
       }),
   // eslint-disable-next-line react-hooks/exhaustive-deps -- Translation helpers read the current language internally.
-    [employeesById, graphRecordsState.recordsByGraphId, graphs, shopsById, language],
+    [employeesById, graphRecordsState.recordsByGraphId, graphs, shopsById, language, urlop.data],
   );
 
   const isSaving = createMutation.isPending || updateMutation.isPending;
@@ -636,7 +640,7 @@ export function ContainerPage() {
               hasLoadError={Boolean(hasProfileLoadError)}
               isDeleting={deleteMutation.isPending}
               isGraphsLoading={graphsQuery.isLoading || graphRecordsState.isLoading}
-              hasGraphsError={graphsQuery.isError || Boolean(graphsQuery.error) || Boolean(graphRecordsState.error)}
+              hasGraphsError={graphsQuery.isError || Boolean(graphsQuery.error) || Boolean(graphRecordsState.error) || urlop.isError}
               graphSearchQuery={graphSearchQuery}
               isMultiOpenEnabled={isMultiOpenEnabled}
               selectedGraphIds={sanitizedSelectedGraphIds}

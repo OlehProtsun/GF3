@@ -7,6 +7,7 @@ import { useShopsListQuery } from "@entities/shops/api/queries";
 import { queryKeys } from "@shared/api/queryKeys";
 import { ManagerPhonePage } from "./ManagerPhonePage";
 import { t } from "@shared/i18n";
+import { useGraphApprovedUrlopQuery, approvedKeys } from "@entities/urlop";
 
 export function ManagerPhoneGraphPage() {
   const location = useLocation();
@@ -17,6 +18,8 @@ export function ManagerPhoneGraphPage() {
   const container = useContainerByIdQuery(containerId);
   const graphs = useContainerGraphsQuery(containerId, valid);
   const graph = useGraphByIdQuery(containerId, graphId, valid);
+  const urlop = useGraphApprovedUrlopQuery(graph.data);
+  const urlopCellKeys = approvedKeys(urlop.data ?? [], graph.data?.shopId ?? 0, graph.data?.year ?? 2000, graph.data?.month ?? 1);
   const graphEmployees = useGraphEmployeesQuery(containerId, graphId, valid);
   const slots = useGraphSlotsQuery(containerId, graphId, valid);
   const cellStyles = useGraphCellStylesQuery(containerId, graphId, valid);
@@ -26,11 +29,11 @@ export function ManagerPhoneGraphPage() {
   const relatedGraphs = (graphs.data ?? []).filter(item => item.id !== graphId && item.year === graph.data?.year && item.month === graph.data?.month);
   const relatedSlots = useGraphSlotsBatchQuery(containerId, relatedGraphs.map(item => item.id), valid);
   return <ManagerPhonePage title={t("Schedule Profile")} backTo={containerId ? `/container/${containerId}` : "/container"} valid={valid} missing={!graph.data || !container.data}
-    queries={[container, graphs, graph, graphEmployees, slots, cellStyles, employees, shops, groups, relatedSlots]}
+    queries={[container, graphs, graph, graphEmployees, slots, cellStyles, employees, shops, groups, relatedSlots, urlop]}
     queryKeys={[queryKeys.containers.all, queryKeys.employees.all, queryKeys.shops.all, queryKeys.availabilityGroups.all]}>
     <ContainerGraphProfileWorkspace container={container.data} graph={graph.data} shop={(shops.data ?? []).find(item => item.id === graph.data?.shopId)}
       availabilityGroup={(groups.data ?? []).find(item => item.id === graph.data?.availabilityGroupId)} graphEmployees={graphEmployees.data ?? []}
-      slots={slots.data ?? []} cellStyles={cellStyles.data ?? []} relatedGraphs={relatedGraphs} relatedGraphSlotsById={relatedSlots.data ?? {}}
+      slots={slots.data ?? []} urlopCellKeys={urlopCellKeys} cellStyles={cellStyles.data ?? []} relatedGraphs={relatedGraphs} relatedGraphSlotsById={relatedSlots.data ?? {}}
       employeesById={new Map((employees.data ?? []).map(item => [item.id, item]))} compactSize showManagementActions={false}
       isLoading={false} hasLoadError={false} isDeleting={false} onEdit={() => {}} onDelete={() => {}} />
   </ManagerPhonePage>;
