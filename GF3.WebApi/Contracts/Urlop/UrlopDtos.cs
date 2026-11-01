@@ -4,6 +4,7 @@ using BusinessLogicLayer.Contracts.Urlop;
 namespace WebApi.Contracts.Urlop;
 
 public sealed record UrlopShopDto(int Id, string Name);
+public sealed record UrlopShopSummaryDto(int ShopId, int ApprovedRequests, int PendingRequests);
 public sealed record UrlopMonthDto(int ShopId, int Year, int Month, bool IsOpen);
 public sealed record ApprovedUrlopDayDto(int ShopId, int EmployeeId, DateOnly Date, string EmployeeName = "");
 public sealed record UrlopRequestDto(Guid RequestId, int EmployeeId, string EmployeeName, int ShopId,
@@ -25,6 +26,7 @@ public sealed record ReplaceUrlopDaysDto([Required, MinLength(1)] int[] Days);
 
 internal static class UrlopDtoMapping
 {
+    public static UrlopShopSummaryDto ToDto(this UrlopShopSummary x) => new(x.ShopId, x.ApprovedRequests, x.PendingRequests);
     public static UrlopRequestDto ToDto(this UrlopRequest x) => new(x.RequestId, x.EmployeeId, x.EmployeeName, x.ShopId,
         x.Year, x.Month, x.Days, x.Status, x.CreatedAtUtc, x.ReviewedAtUtc, x.CreatedByManagerId, x.ReviewedByManagerId);
     public static ApprovedUrlopDayDto ToDto(this ApprovedUrlopDay x) => new(x.ShopId, x.EmployeeId, x.Date, x.EmployeeName);

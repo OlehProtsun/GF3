@@ -8,6 +8,7 @@ public static class UrlopStatus
 }
 
 public sealed record UrlopShop(int Id, string Name);
+public sealed record UrlopShopSummary(int ShopId, int ApprovedRequests, int PendingRequests);
 public sealed record UrlopMonth(int ShopId, int Year, int Month, bool IsOpen);
 public sealed record ApprovedUrlopDay(int ShopId, int EmployeeId, DateOnly Date, string EmployeeName = "");
 public sealed record UrlopRequest(Guid RequestId, int EmployeeId, string EmployeeName, int ShopId,

@@ -67,6 +67,8 @@ export function OverlaySidebarLayout({ children }: OverlaySidebarLayoutProps) {
   const isSystemManager = isManager && session?.isSystemManager === true;
   const accountPath = isManager ? "/manager-profile" : "/profile";
   const isContainerWideContent = pathname === "/container";
+  const isUrlopListContent = pathname === "/urlop";
+  const isUrlopDetailContent = Boolean(matchPath(pathname, "/urlop/:shopId"));
   const isHomeWideContent = pathname === "/";
   const isDatabaseWideContent = pathname === "/database";
   const isContainerGraphEditorContent =
@@ -77,6 +79,8 @@ export function OverlaySidebarLayout({ children }: OverlaySidebarLayoutProps) {
     Boolean(matchPath(pathname, "/container/:containerId/graphs/:graphId"));
   const isContainerGraphWideContent = isContainerGraphProfileContent || isContainerGraphEditorContent;
   const isWideContent =
+    isUrlopDetailContent ||
+    isUrlopListContent ||
     isHomeWideContent ||
     isContainerWideContent ||
     isDatabaseWideContent ||
@@ -85,6 +89,8 @@ export function OverlaySidebarLayout({ children }: OverlaySidebarLayoutProps) {
     Boolean(matchPath(pathname, "/availability/:availabilityId/edit")) ||
     Boolean(matchPath(pathname, "/availability/:availabilityId"));
   const isWideScrollableContent =
+    isUrlopDetailContent ||
+    isUrlopListContent ||
     isHomeWideContent ||
     isContainerWideContent ||
     isDatabaseWideContent ||

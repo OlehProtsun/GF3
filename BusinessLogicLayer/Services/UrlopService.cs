@@ -10,6 +10,17 @@ namespace BusinessLogicLayer.Services;
 
 public sealed class UrlopService(AppDbContext db, TimeProvider timeProvider) : IUrlopService
 {
+    public async Task<IReadOnlyList<UrlopShopSummary>> GetManagerShopSummariesAsync(CancellationToken ct)
+    {
+        var requests = await db.UrlopDays.AsNoTracking()
+            .Where(x => x.Status == UrlopStatus.Approved || x.Status == UrlopStatus.Pending)
+            .Select(x => new { x.ShopId, x.RequestId, x.Status }).Distinct().ToListAsync(ct);
+        return requests.GroupBy(x => x.ShopId).OrderBy(x => x.Key)
+            .Select(x => new UrlopShopSummary(x.Key,
+                x.Count(r => r.Status == UrlopStatus.Approved),
+                x.Count(r => r.Status == UrlopStatus.Pending))).ToArray();
+    }
+
     public async Task<UrlopEmployeeCalendar> GetEmployeeCalendarAsync(int employeeId, DateOnly currentMonth, CancellationToken ct)
     {
         await EnsureActiveEmployeeAsync(employeeId, ct);

@@ -1,4 +1,5 @@
 export type UrlopStatus = "pending" | "approved" | "rejected";
+export type UrlopShopSummary = { shopId: number; approvedRequests: number; pendingRequests: number };
 export type ApprovedUrlopDay = { shopId: number; employeeId: number; date: string; employeeName?: string };
 export type UrlopRequest = {
   requestId: string; employeeId: number; employeeName: string; shopId: number;

@@ -1,4 +1,14 @@
 {
+  "Choose a shop to manage vacation requests.": "Wybierz sklep, aby zarządzać wnioskami urlopowymi.",
+  "Choose a shop": "Wybierz sklep",
+  "View approved vacations and manage requests for each shop.": "Sprawdź zatwierdzone urlopy i zarządzaj wnioskami w poszczególnych sklepach.",
+  "Search vacation shop": "Szukaj sklepu",
+  "Approved vacations": "Zatwierdzone urlopy",
+  "Pending vacation requests": "Oczekujące wnioski urlopowe",
+  "Open vacation management for {0}": "Zarządzaj urlopami w sklepie {0}",
+  "Vacation counters unavailable.": "Liczniki urlopów są niedostępne.",
+  "Manage vacation requests for the selected shop.": "Zarządzaj wnioskami urlopowymi w wybranym sklepie.",
+  "Loading vacation counters...": "Ładowanie liczników urlopów...",
   "Clear selection": "Wyczyść wybór",
   "Urlop": "Urlop",
   "Urlop Days": "Dni urlopu",
@@ -2278,5 +2288,17 @@
   "Unknown employee": "Nieznany pracownik",
   "Open recipient": "Dowolny uprawniony pracownik",
   "Shift transfer": "Przekazanie zmiany",
-  "Request from {0}": "Wniosek od {0}"
+  "Request from {0}": "Wniosek od {0}",
+  "Monthly vacation schedule": "Miesięczny harmonogram urlopów",
+  "Overview of approved vacations and requests for the selected month.": "Przegląd zatwierdzonych urlopów i wniosków w wybranym miesiącu.",
+  "Shop vacation management": "Zarządzanie urlopami sklepu",
+  "Add vacation": "Dodaj urlop",
+  "{0} employees on vacation": "{0} pracowników na urlopie",
+  "Vacation requests for this month": "Wnioski urlopowe w tym miesiącu",
+  "No pending vacation requests.": "Brak oczekujących wniosków urlopowych.",
+  "+{0} more": "+{0} więcej",
+  "Approved vacations on {0}": "Zatwierdzone urlopy: {0}",
+  "{0} days": "{0} dni",
+  "Overview of approved vacations and requests for this shop.": "Przegląd zatwierdzonych urlopów i wniosków w tym sklepie.",
+  "Pending requests for this month.": "Oczekujące wnioski w tym miesiącu."
 }

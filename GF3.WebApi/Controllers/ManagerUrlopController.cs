@@ -23,6 +23,10 @@ public sealed class ManagerUrlopController(IUrlopService service, IWorkflowLogSe
     public async Task<ActionResult<IReadOnlyList<ApprovedUrlopDayDto>>> Approved(DateOnly from, DateOnly to, int? shopId, CancellationToken ct)
         => Ok((await service.GetApprovedDaysAsync(from, to, shopId, ct)).Select(x => x.ToDto()).ToArray());
 
+    [HttpGet("shop-summaries")]
+    public async Task<ActionResult<IReadOnlyList<UrlopShopSummaryDto>>> ShopSummaries(CancellationToken ct)
+        => Ok((await service.GetManagerShopSummariesAsync(ct)).Select(x => x.ToDto()).ToArray());
+
     [HttpPut("month")]
     public async Task<ActionResult<UrlopMonthDto>> SetMonth(SetUrlopMonthDto body, CancellationToken ct)
     {

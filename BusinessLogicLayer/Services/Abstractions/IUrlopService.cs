@@ -4,6 +4,7 @@ namespace BusinessLogicLayer.Services.Abstractions;
 
 public interface IUrlopService
 {
+    Task<IReadOnlyList<UrlopShopSummary>> GetManagerShopSummariesAsync(CancellationToken ct);
     Task<UrlopEmployeeCalendar> GetEmployeeCalendarAsync(int employeeId, DateOnly currentMonth, CancellationToken ct);
     Task<UrlopManagerMonth> GetManagerMonthAsync(int shopId, int year, int month, CancellationToken ct);
     Task<IReadOnlyList<ApprovedUrlopDay>> GetApprovedDaysAsync(DateOnly from, DateOnly to, int? shopId, CancellationToken ct);

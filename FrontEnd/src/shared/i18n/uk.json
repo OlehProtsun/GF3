@@ -1,4 +1,14 @@
 {
+  "Choose a shop to manage vacation requests.": "Виберіть магазин, щоб керувати заявками на відпустку.",
+  "Choose a shop": "Виберіть магазин",
+  "View approved vacations and manage requests for each shop.": "Переглядайте затверджені відпустки та керуйте заявками для кожного магазину.",
+  "Search vacation shop": "Пошук магазину",
+  "Approved vacations": "Затверджені відпустки",
+  "Pending vacation requests": "Заявки на відпустку, що очікують розгляду",
+  "Open vacation management for {0}": "Керувати відпустками в магазині {0}",
+  "Vacation counters unavailable.": "Лічильники відпусток недоступні.",
+  "Manage vacation requests for the selected shop.": "Керуйте заявками на відпустку у вибраному магазині.",
+  "Loading vacation counters...": "Завантаження лічильників відпусток...",
   "Clear selection": "Очистити вибір",
   "Urlop": "Відпустки",
   "Urlop Days": "Дні відпустки",
@@ -2278,5 +2288,17 @@
   "Unknown employee": "Невідомий працівник",
   "Open recipient": "Будь-який працівник із правом прийняття",
   "Shift transfer": "Передача зміни",
-  "Request from {0}": "Запит від {0}"
+  "Request from {0}": "Запит від {0}",
+  "Monthly vacation schedule": "Місячний графік відпусток",
+  "Overview of approved vacations and requests for the selected month.": "Огляд затверджених відпусток і заявок за вибраний місяць.",
+  "Shop vacation management": "Керування відпустками магазину",
+  "Add vacation": "Додати відпустку",
+  "{0} employees on vacation": "{0} працівників у відпустці",
+  "Vacation requests for this month": "Заявки на відпустку за цей місяць",
+  "No pending vacation requests.": "Немає заявок на відпустку в очікуванні.",
+  "+{0} more": "+{0} ще",
+  "Approved vacations on {0}": "Затверджені відпустки: {0}",
+  "{0} days": "{0} днів",
+  "Overview of approved vacations and requests for this shop.": "Огляд затверджених відпусток і заявок у цьому магазині.",
+  "Pending requests for this month.": "Заявки в очікуванні за цей місяць."
 }

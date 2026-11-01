@@ -17,6 +17,65 @@ public sealed class UrlopWorkflowTests
     private static readonly DateOnly Today = new(2026, 11, 1);
 
     [Fact]
+    public async Task ShopSummariesCountDistinctRequestsAcrossDatesAndStatuses_AndRemainReadOnly()
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        await using var db = database.CreateContext();
+        var f = await UrlopTestData.SeedAsync(db); var service = UrlopTestData.Service(db);
+        Assert.Empty(await service.GetManagerShopSummariesAsync(default));
+        var first = await service.CreateApprovedAsync(f.Manager, f.Shop, f.Employee, 2025, 1, [3, 4, 5], default);
+        Assert.Equal(new UrlopShopSummary(f.Shop, 1, 0), Assert.Single(await service.GetManagerShopSummariesAsync(default)));
+        await service.CreateApprovedAsync(f.Manager, f.Shop, f.Employee, 2027, 2, [6, 7], default);
+        await service.SetMonthOpenAsync(f.Shop, 2026, 11, true, default);
+        var pending = await service.SubmitAsync(f.Employee, f.Shop, 2026, 11, [8, 9, 10], Today, default);
+        var rejected = await service.SubmitAsync(f.Employee, f.Shop, 2026, 11, [11, 12], Today, default);
+        await service.RejectAsync(f.Manager, rejected.RequestId, default);
+        await service.CreateApprovedAsync(f.Manager, f.OtherShop, f.Employee, 2026, 11, [3, 4], default);
+        await service.SetMonthOpenAsync(f.OtherShop, 2026, 11, true, default);
+        var otherPending = await service.SubmitAsync(f.Peer, f.Shop, 2026, 11, [14], Today, default);
+        var expected = new[] { new UrlopShopSummary(f.Shop, 2, 2), new UrlopShopSummary(f.OtherShop, 1, 0) };
+        Assert.Equal(expected, await service.GetManagerShopSummariesAsync(default));
+        await service.ReplaceDaysAsync(f.Manager, first.RequestId, [15, 16], default);
+        Assert.Equal(expected, await service.GetManagerShopSummariesAsync(default));
+        await service.ApproveAsync(f.Manager, pending.RequestId, default);
+        Assert.Equal(new UrlopShopSummary(f.Shop, 3, 1), (await service.GetManagerShopSummariesAsync(default))[0]);
+        await service.DeleteAsync(f.Manager, first.RequestId, default);
+        await service.DeleteAsync(f.Manager, otherPending.RequestId, default);
+        Assert.Equal(new UrlopShopSummary(f.Shop, 2, 0), (await service.GetManagerShopSummariesAsync(default))[0]);
+        db.ChangeTracker.Clear();
+        var rowsBefore = await db.UrlopDays.AsNoTracking().OrderBy(x => x.Id).ToListAsync();
+        await service.GetManagerShopSummariesAsync(default);
+        Assert.Empty(db.ChangeTracker.Entries());
+        var rowsAfter = await db.UrlopDays.AsNoTracking().OrderBy(x => x.Id).ToListAsync();
+        Assert.Equal(JsonSerializer.Serialize(rowsBefore), JsonSerializer.Serialize(rowsAfter));
+    }
+
+    [Fact]
+    public async Task ShopSummariesApiUsesExistingManagerReadAuthorization_AndReturnsTypedCounts()
+    {
+        await using var host = await ManagerWorkspaceTestHost.CreateAsync(new UrlopTestClock());
+        const string path = "/api/manager-urlop/shop-summaries";
+        Assert.Equal(HttpStatusCode.Unauthorized, (await host.Client.GetAsync(path)).StatusCode);
+        await host.Login("employee");
+        Assert.Equal(HttpStatusCode.Forbidden, (await host.Client.GetAsync(path)).StatusCode);
+        await host.Login("manager"); await host.Exchange("pc");
+        Assert.Empty((await host.Client.GetFromJsonAsync<UrlopShopSummaryDto[]>(path))!);
+        await using (var db = host.Database.CreateContext())
+        {
+            var service = UrlopTestData.Service(db);
+            await service.CreateApprovedAsync(1, 1, 1, 2025, 1, [3, 4, 5], default);
+            db.ScheduleEmployees.Add(new() { ScheduleId = 1, EmployeeId = 1 });
+            await db.SaveChangesAsync();
+            await service.SetMonthOpenAsync(1, 2026, 11, true, default);
+            await service.SubmitAsync(1, 1, 2026, 11, [8, 9], Today, default);
+        }
+        Assert.Equal(new UrlopShopSummaryDto(1, 1, 1), Assert.Single((await host.Client.GetFromJsonAsync<UrlopShopSummaryDto[]>(path))!));
+        await host.Exchange("phone");
+        Assert.Equal(HttpStatusCode.OK, (await host.Client.GetAsync(path)).StatusCode);
+        Assert.Equal(new UrlopShopSummaryDto(1, 1, 1), Assert.Single((await host.Client.GetFromJsonAsync<UrlopShopSummaryDto[]>(path))!));
+    }
+
+    [Fact]
     public async Task MissingMonthIsClosed_OpenIsShopScoped_AndClosingPreservesRequests()
     {
         await using var database = await SqliteTestDatabase.CreateAsync();

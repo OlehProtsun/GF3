@@ -1,7 +1,8 @@
 import { request } from "@shared/api/httpClient";
-import type { ApprovedUrlopDay, SubmitUrlop, UrlopEmployeeCalendar, UrlopManagerMonth, UrlopMonth, UrlopRequest } from "../model/types";
+import type { ApprovedUrlopDay, SubmitUrlop, UrlopEmployeeCalendar, UrlopManagerMonth, UrlopMonth, UrlopRequest, UrlopShopSummary } from "../model/types";
 
 export const urlopApi = {
+  managerShopSummaries: (signal?: AbortSignal) => request<UrlopShopSummary[]>("manager-urlop/shop-summaries", { signal }),
   employeeCalendar: (signal?: AbortSignal) => request<UrlopEmployeeCalendar>("employee-urlop", { signal }),
   employeeApproved: (shopId: number, year: number, month: number, signal?: AbortSignal) => request<ApprovedUrlopDay[]>("employee-urlop/approved", { query: { shopId, year, month }, signal }),
   submit: (body: SubmitUrlop) => request<UrlopRequest>("employee-urlop/requests", { method: "POST", body }),

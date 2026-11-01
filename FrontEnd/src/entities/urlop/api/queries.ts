@@ -4,6 +4,10 @@ import { queryKeys } from "@shared/api/queryKeys";
 import { urlopApi } from "./urlopApi";
 import { isoDate, monthDays } from "../model/calendar";
 
+export function useManagerUrlopShopSummariesQuery() {
+  return useQuery({ queryKey: queryKeys.urlop.managerShopSummaries(), queryFn: ({ signal }) => urlopApi.managerShopSummaries(signal) });
+}
+
 export function useEmployeeUrlopCalendarQuery() {
   return useQuery({ queryKey: queryKeys.urlop.employeeCalendar(), queryFn: ({ signal }) => urlopApi.employeeCalendar(signal) });
 }

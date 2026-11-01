@@ -1,6 +1,7 @@
 export const queryKeys = {
   urlop: {
     all: ["urlop"] as const,
+    managerShopSummaries: () => ["urlop", "managerShopSummaries"] as const,
     employeeCalendar: () => ["urlop", "employeeCalendar"] as const,
     employeeApproved: (shopId: number, year: number, month: number) => ["urlop", "employeeApproved", shopId, year, month] as const,
     managerMonth: (shopId: number, year: number, month: number) => ["urlop", "managerMonth", shopId, year, month] as const,

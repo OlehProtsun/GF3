@@ -28,6 +28,7 @@ function lazyPage<TModule>(
 
 const HomePage = lazyPage(() => import("@pages/home"), (module) => module.HomePage);
 const ManagerUrlopPage = lazyPage(() => import("@pages/manager-urlop"), module => module.ManagerUrlopPage);
+const ManagerUrlopListPage = lazyPage(() => import("@pages/manager-urlop"), module => module.ManagerUrlopListPage);
 const EmployeeNotificationsPage = lazyPage(
   () => import("@pages/employee-notifications"),
   (module) => module.EmployeeNotificationsPage,
@@ -92,7 +93,8 @@ const ManagerPhoneLayout = lazy(() => import("@app/layouts/manager-phone-layout"
 const ManagerWorkspaceModePicker = lazyPage(() => import("@features/manager-workspace-mode/ui/ManagerWorkspaceModePicker"), module => module.ManagerWorkspaceModePicker);
 
 const managerRoutes = [
-  { path: "/urlop", element: <ManagerUrlopPage /> },
+  { path: "/urlop", element: <ManagerUrlopListPage /> },
+  { path: "/urlop/:shopId", element: <ManagerUrlopPage /> },
   { path: "/settings", element: <ManagerSettingsPage /> },
   { path: "/shop/new", element: <ShopEditPage /> },
   { path: "/shop/:shopId/edit", element: <ShopEditPage /> },
