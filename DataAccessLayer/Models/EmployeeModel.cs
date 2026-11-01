@@ -10,6 +10,11 @@ namespace DataAccessLayer.Models;
 [Table("employee")]
 public class EmployeeModel
 {
+    [Required]
+    [Column("contract_type")]
+    [MaxLength(16)]
+    public string ContractType { get; set; } = EmploymentContractTypes.Zlecenie;
+
     [Key]
     [Column("id")]
     public int Id { get; set; }

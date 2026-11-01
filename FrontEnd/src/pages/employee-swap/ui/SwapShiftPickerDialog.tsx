@@ -11,10 +11,10 @@ export const swapTime = (minutes: number) => `${String(Math.floor(minutes / 60))
 export const swapShiftDate = (shift: Pick<ShiftSwapReturnCandidate, "year" | "month" | "dayOfMonth">) =>
   `${String(shift.dayOfMonth).padStart(2, "0")}.${String(shift.month).padStart(2, "0")}.${shift.year}`;
 // Rendered as a subview of the wizard's single native dialog.
-export function SwapShiftPickerDialog({ shifts, selection, outgoing, returnMode = false, employeeName,
+export function SwapShiftPickerDialog({ shifts, selection, outgoing, returnMode = false, wholeShiftOnly = false, employeeName,
   loading, hasMore, onLoadMore, onConfirm }: {
   shifts: ShiftSwapReturnCandidate[]; selection?: SwapShiftSelection | null; outgoing?: SwapShiftSelection;
-  returnMode?: boolean; employeeName?: string; loading?: boolean; hasMore?: boolean;
+  returnMode?: boolean; wholeShiftOnly?: boolean; employeeName?: string; loading?: boolean; hasMore?: boolean;
   onLoadMore?: () => void; onConfirm: (selection: SwapShiftSelection) => void; onBack: () => void;
 }) {
   const periodHeadingId = useId();
@@ -25,6 +25,7 @@ export function SwapShiftPickerDialog({ shifts, selection, outgoing, returnMode 
   const allowed = (item: ShiftSwapReturnCandidate, value: SwapPeriod) => {
     const from = swapMinutes(value.fromTime), to = swapMinutes(value.toTime);
     if (from < swapMinutes(item.fromTime) || to > swapMinutes(item.toTime) || from >= to) return false;
+    if ((wholeShiftOnly || item.requiresWholeShift) && (item.durationMinutes !== 480 || value.fromTime !== item.fromTime || value.toTime !== item.toTime)) return false;
     if (!returnMode) return true;
     if (!item.eligibleWindows?.some(window => from >= swapMinutes(window.fromTime) && to <= swapMinutes(window.toTime))) return false;
     // The target must give away any part of this shift that overlaps the incoming source period.
@@ -89,7 +90,7 @@ export function SwapShiftPickerDialog({ shifts, selection, outgoing, returnMode 
       <h3 id={periodHeadingId} data-period-heading>{returnMode ? t("Time to receive") : t("Time to give away")}</h3>
       <div className={styles.modes}>
         <button type="button" aria-pressed={!custom} disabled={!fullAllowed} onClick={() => { if (!shift) return; setCustom(false); setPeriod({ fromTime: shift.fromTime, toTime: shift.toTime }); }}>{t("Full shift")}</button>
-        <button type="button" aria-pressed={custom} disabled={!shift} onClick={() => { setCustom(true); if (returnMode && shift && !valid) setPeriod(suggestedPeriod(shift)); }}>{t("Custom period")}</button>
+        <button type="button" aria-pressed={custom} disabled={!shift || wholeShiftOnly || shift.requiresWholeShift} onClick={() => { setCustom(true); if (returnMode && shift && !valid) setPeriod(suggestedPeriod(shift)); }}>{t("Custom period")}</button>
       </div>
       {custom && shift && period && <div className={styles.controls}><strong className={styles.date}>{swapShiftDate(shift)}</strong>
         {(["fromTime", "toTime"] as const).map(edge => <label key={edge}>

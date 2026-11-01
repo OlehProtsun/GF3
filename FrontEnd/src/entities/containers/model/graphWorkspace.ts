@@ -74,6 +74,7 @@ export type GraphSummaryRow = {
   employee: string;
   workDays: number;
   freeDays: number;
+  urlopDays: number;
   holidayDays: number;
   sum: string;
   days: GraphSummaryDayCell[];
@@ -782,6 +783,7 @@ export function buildGraphSummaryRows(
   graphEmployees: GraphEmployee[],
   employeesById?: Map<number, Employee>,
   slots: GraphSlot[] = [],
+  approvedUrlopKeys: ReadonlySet<string> = new Set(),
 ) {
   const columns = buildGraphMatrixColumns(graphEmployees, employeesById, slots);
   const daysInMonth = getGraphDaysInMonth(graph.year, graph.month);
@@ -803,21 +805,25 @@ export function buildGraphSummaryRows(
       const dayOfMonth = index + 1;
       return buildGraphSummaryDayCells(slotsByCellKey.get(getGraphCellKey(column.employeeId, dayOfMonth)) ?? []);
     });
-    const dayRowCount = Math.max(1, ...dayCells.map(cells => cells.length));
-    const dayRows = Array.from({ length: dayRowCount }, (_, rowIndex) =>
-      dayCells.map(cells => cells[rowIndex] ?? createEmptyGraphSummaryDayCell()),
-    );
     const workDays = dayCells.filter(cells => cells.length > 0).length;
     const holidayDays = dayCells.filter((cells, index) =>
       cells.length > 0 && getPolishPublicHoliday(graph.year, graph.month, index + 1) !== null,
     ).length;
-    const freeDays = Math.max(0, daysInMonth - workDays);
+    const urlopDays = dayCells.filter((_, index) => approvedUrlopKeys.has(getGraphCellKey(column.employeeId, index + 1))).length;
+    const occupiedDays = dayCells.filter((cells, index) => cells.length > 0 || approvedUrlopKeys.has(getGraphCellKey(column.employeeId, index + 1))).length;
+    const freeDays = Math.max(0, daysInMonth - occupiedDays);
+    const dayRowCount = Math.max(1, ...dayCells.map(cells => cells.length));
+    const dayRows = Array.from({ length: dayRowCount }, (_, rowIndex) =>
+      dayCells.map((cells, index) => cells[rowIndex] ?? (rowIndex === 0 && approvedUrlopKeys.has(getGraphCellKey(column.employeeId, index + 1))
+        ? { from: "UR", to: "", hours: "" } : createEmptyGraphSummaryDayCell())),
+    );
 
     return {
       employeeId: column.employeeId,
       employee: column.label,
       workDays,
       freeDays,
+        urlopDays,
       holidayDays,
       sum: formatSummaryMinutes(column.totalMinutes),
       days: dayRows[0],

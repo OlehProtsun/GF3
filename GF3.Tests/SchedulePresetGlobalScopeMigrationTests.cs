@@ -28,8 +28,10 @@ public sealed class SchedulePresetGlobalScopeMigrationTests
             var shop = TestDataFactory.CreateDalShop();
             var employee = TestDataFactory.CreateDalEmployee();
             var group = new AvailabilityGroupModel { Name = "Availability", Year = 2026, Month = 4 };
-            context.AddRange(a, b, shop, employee, group);
+            context.AddRange(a, b, shop, group);
             await context.SaveChangesAsync();
+            await context.Database.ExecuteSqlInterpolatedAsync($"INSERT INTO employee (first_name,last_name,phone,email,is_deleted) VALUES ({employee.FirstName},{employee.LastName},{employee.Phone},{employee.Email},0)");
+            employee.Id = 1;
             SchedulePresetModel Preset(int origin) => new()
             {
                 ContainerId = origin, Name = "Shared name", ScheduleName = "Schedule", ShopId = shop.Id,

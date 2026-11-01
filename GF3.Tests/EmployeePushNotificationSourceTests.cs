@@ -13,6 +13,40 @@ namespace GF3.Tests;
 
 public sealed class EmployeePushNotificationSourceTests
 {
+    [Theory]
+    [InlineData("pl")]
+    [InlineData("uk")]
+    [InlineData("en")]
+    [InlineData("unknown")]
+    public void Messages_AreConciseForEveryEvent_AndPreserveUnicodeAndTimeContext(string language)
+    {
+        var formatter = new EmployeePushMessages(language);
+        var name = string.Concat(Enumerable.Repeat("Łї😀", 30));
+        var prefix = string.Concat(name.EnumerateRunes().Take(24).Select(rune => rune.ToString()));
+        foreach (var kind in Enum.GetValues<EmployeePushMessageKind>())
+        foreach (var closed in new[] { false, true })
+        foreach (var day in new int?[] { 21, null })
+        {
+            var message = formatter.Format(kind, name, 2026, 10,
+                DateTimeOffset.Parse("2026-10-24T21:30:00Z"), closed, day, day is null ? null : "08:00", day is null ? null : "16:00");
+            Assert.InRange(message.Title.EnumerateRunes().Count(), 1, 45);
+            Assert.InRange(message.Body.EnumerateRunes().Count(), 1, 90);
+            Assert.Contains(prefix, message.Body);
+            Assert.DoesNotContain(prefix + "Ł", message.Body);
+            Assert.DoesNotContain("�", message.Body);
+            Assert.DoesNotContain("GF", message.Body);
+            if (kind == EmployeePushMessageKind.Availability && !closed) Assert.Contains("24.10 23:30", message.Body);
+            if (kind is EmployeePushMessageKind.Swap or EmployeePushMessageKind.OpenShift or EmployeePushMessageKind.AcceptedSwap && day is not null)
+            {
+                Assert.Contains("21.10.2026", message.Body);
+                Assert.Contains("08:00–16:00", message.Body);
+            }
+        }
+        Assert.NotEqual(formatter.Format(EmployeePushMessageKind.Availability, "Name", 2026, 10).Title,
+            formatter.Format(EmployeePushMessageKind.Availability, "Name", 2026, 10, closed: true).Title);
+        Assert.DoesNotContain("until", formatter.Format(EmployeePushMessageKind.Availability, "Name", 2026, 10).Body);
+    }
+
     [Fact]
     public async Task PublicRequiresSharedMembership_PrivateRequiresTarget_AndArchivedAcceptanceStaysOwned()
     {
@@ -92,12 +126,12 @@ public sealed class EmployeePushNotificationSourceTests
         var timestamp = scheduleDto.RootElement.GetProperty("publishedAtUtc").GetString();
         var visible = JsonSerializer.Serialize(group.PublishedAtUtc, new JsonSerializerOptions(JsonSerializerDefaults.Web)).Trim('"');
         Assert.Equal(5, candidates.Count);
-        if (language == "uk") Assert.Contains(candidates, x => x.Body.Contains("Ваш робочий графік уже доступний."));
-        Assert.Contains(candidates, x => x.Title == (language == "uk" ? "Опубліковано новий графік" : language == "pl" ? "Opublikowano nowy grafik" : "New schedule published"));
-        Assert.Contains(candidates, x => x.Title == (language == "uk" ? "Опубліковано нову доступність" : language == "pl" ? "Udostępniono nową dostępność" : "New availability published"));
-        Assert.Contains(candidates, x => x.Title == (language == "uk" ? "Доступна заміна зміни" : language == "pl" ? "Dostępna nowa zamiana" : "Shift swap available"));
-        Assert.Contains(candidates, x => x.Title == (language == "uk" ? "Опубліковано вільну зміну" : language == "pl" ? "Opublikowano wolną zmianę" : "Open shift posted"));
-        Assert.Contains(candidates, x => x.Title == (language == "uk" ? "Вашу зміну прийнято" : language == "pl" ? "Twoja zamiana została zaakceptowana" : "Your shift was accepted"));
+        Assert.All(candidates, x => { Assert.True(x.Title.EnumerateRunes().Count() <= 45); Assert.True(x.Body.EnumerateRunes().Count() <= 90); });
+        Assert.Contains(candidates, x => x.Title == (language == "uk" ? "Новий графік" : language == "pl" ? "Nowy grafik" : "New schedule"));
+        Assert.Contains(candidates, x => x.Title == (language == "uk" ? "Подання доступності відкрито" : language == "pl" ? "Dostępność otwarta" : "Availability is open"));
+        Assert.Contains(candidates, x => x.Title == (language == "uk" ? "Доступна заміна зміни" : language == "pl" ? "Dostępna zamiana zmiany" : "Shift swap available"));
+        Assert.Contains(candidates, x => x.Title == (language == "uk" ? "Вільна зміна" : language == "pl" ? "Wolna zmiana" : "Open shift"));
+        Assert.Contains(candidates, x => x.Title == (language == "uk" ? "Зміну прийнято" : language == "pl" ? "Zmiana przyjęta" : "Shift accepted"));
         Assert.Contains(candidates, x => x.NotificationId == $"schedule-public:{schedule.Id}:{timestamp}");
         Assert.Contains(candidates, x => x.NotificationId == $"availability-public:{group.Id}:published:{visible}");
         Assert.Contains(candidates, x => x.NotificationId == $"swap-public:{ordinary.Id}" && x.Url == $"/swap?swapId={ordinary.Id}");
@@ -129,7 +163,7 @@ public sealed class EmployeePushNotificationSourceTests
         db.Add(group); await db.SaveChangesAsync();
         Assert.DoesNotContain(await Source(db).GetCurrentAsync(recipient, Now, default), x => x.Tone == "availability");
         Assert.Contains(await Source(db).GetCurrentAsync(recipient, Now.AddSeconds(30), default), x => x.Tone == "availability");
-        Assert.Contains(await Source(db).GetCurrentAsync(recipient, Now.AddHours(2), default), x => x.Tone == "availability" && x.Body.Contains("Submissions have closed"));
+        Assert.Contains(await Source(db).GetCurrentAsync(recipient, Now.AddHours(2), default), x => x.Tone == "availability" && x.Title == "Availability closed");
         Assert.DoesNotContain(await Source(db).GetCurrentAsync(recipient, Now.AddDays(5).AddSeconds(30), default), x => x.Tone == "availability");
         group.PublicationStatus = AvailabilityPublicationStatus.Private; await db.SaveChangesAsync();
         Assert.DoesNotContain(await Source(db).GetCurrentAsync(recipient, Now.AddMinutes(1), default), x => x.Tone == "availability");

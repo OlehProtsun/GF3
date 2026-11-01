@@ -1,6 +1,9 @@
+import { buildEffectiveManagerAvailabilityCellMap, getAutomaticManagerEmployeeIds } from "@entities/availability-groups/model/automaticAvailability";
+import { useEmploymentContractSettingsQuery } from "@entities/employment-contracts";
 import { canReserveManualShift } from "@entities/containers/model/manualShiftIntervals";
 import { useLanguageRevision } from "@shared/i18n/useLanguageRevision";
 import { dateTimeFormat, t } from "@shared/i18n";
+import { useGraphApprovedUrlopQuery, approvedKeys } from "@entities/urlop";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { deriveGeneratedVacancies, reconcileGeneratedManualColumns } from "@entities/containers/model/generatedManualShifts";
 import { pinGeneratedColumnsFirst } from "@entities/containers/model/graphColumnOrder";
@@ -127,7 +130,7 @@ type EditableScheduleManualColumn = EditableGraphManualColumn;
 type GraphEditorSessionDraft = {
   graphId: number;
   form: ContainerGraphFormState;
-  graphEmployeeRows: Array<{ id: number | null; employeeId: number; minHoursMonth: string }>;
+  graphEmployeeRows: Array<{ id: number | null; employeeId: number; minHoursMonth: string; isPriority: boolean }>;
   selectedSchedulePresetId: number | null;
   selectedEmployeeId: number | null;
   cellMap: Record<string, string>;
@@ -145,7 +148,7 @@ type GraphEditorSessionDraft = {
 
 type GraphEditorUndoSnapshot = {
   form: ContainerGraphFormState;
-  graphEmployeeRows: Array<{ id: number | null; employeeId: number; minHoursMonth: string }>;
+  graphEmployeeRows: Array<{ id: number | null; employeeId: number; minHoursMonth: string; isPriority: boolean }>;
   selectedSchedulePresetId: number | null;
   selectedEmployeeId: number | null;
   cellMap: Record<string, string>;
@@ -348,7 +351,7 @@ function moveScheduleColumnOrder(columnOrder: number[], sourceColumnId: number, 
 }
 
 function sortGraphEmployeeRowsByColumnOrder(
-  rows: Array<{ id: number | null; employeeId: number; minHoursMonth: string }>,
+  rows: Array<{ id: number | null; employeeId: number; minHoursMonth: string; isPriority: boolean }>,
   columnOrder: number[],
 ) {
   const indexByEmployeeId = new Map(
@@ -406,7 +409,7 @@ function cloneGraphEditorSessionDraft(draft: GraphEditorSessionDraft): GraphEdit
   return {
     ...draft,
     form: { ...draft.form },
-    graphEmployeeRows: draft.graphEmployeeRows.map(row => ({ ...row })),
+    graphEmployeeRows: draft.graphEmployeeRows.map(row => ({ ...row, isPriority: row.isPriority ?? false })),
     cellMap: { ...draft.cellMap },
     autoAvailabilityStyleSuppressions: cloneAutoAvailabilityStyleSuppressions(draft.autoAvailabilityStyleSuppressions ?? {}),
     manualColumns: draft.manualColumns.map(column => ({
@@ -424,7 +427,7 @@ function cloneGraphEditorUndoSnapshot(snapshot: GraphEditorUndoSnapshot): GraphE
   return {
     ...snapshot,
     form: { ...snapshot.form },
-    graphEmployeeRows: snapshot.graphEmployeeRows.map(row => ({ ...row })),
+    graphEmployeeRows: snapshot.graphEmployeeRows.map(row => ({ ...row, isPriority: row.isPriority ?? false })),
     cellMap: { ...snapshot.cellMap },
     manualColumns: snapshot.manualColumns.map(column => ({
       ...column,
@@ -481,7 +484,7 @@ function toPayload(
 
 function buildGraphWorkspaceSnapshot(params: {
   form: ContainerGraphFormState;
-  graphEmployeeRows: Array<{ id: number | null; employeeId: number; minHoursMonth: string }>;
+  graphEmployeeRows: Array<{ id: number | null; employeeId: number; minHoursMonth: string; isPriority: boolean }>;
   manualColumns: EditableScheduleManualColumn[];
   pendingManualShiftPublishes?: PendingManualColumnShiftPublication[];
   scheduleColumnOrder: number[];
@@ -508,6 +511,7 @@ function buildGraphWorkspaceSnapshot(params: {
     employeeAssignments: orderedEmployeeRows.map(row => ({
       employeeId: row.employeeId,
       minHoursMonth: row.minHoursMonth.trim(),
+      isPriority: row.isPriority,
     })),
     pendingManualShiftPublishes: (params.pendingManualShiftPublishes ?? [])
       .map(shift => ({
@@ -542,7 +546,7 @@ function buildGraphDraftSnapshot(draft: GraphEditorSessionDraft) {
 }
 
 function createEditableEmployeeRows(
-  graphEmployees: Array<{ id: number; employeeId: number; minHoursMonth?: number | null; displayOrder?: number | null }>,
+  graphEmployees: Array<{ id: number; employeeId: number; minHoursMonth?: number | null; displayOrder?: number | null; isPriority?: boolean }>,
   employeesById: Map<number, { firstName: string; lastName: string }>,
 ) {
   return sortGraphItemsByDisplayOrder(
@@ -551,12 +555,14 @@ function createEditableEmployeeRows(
       employeeId: graphEmployee.employeeId,
       displayOrder: graphEmployee.displayOrder,
       minHoursMonth: graphEmployee.minHoursMonth != null ? String(graphEmployee.minHoursMonth) : "",
+      isPriority: graphEmployee.isPriority ?? false,
       label: getEmployeeFullName(employeesById.get(graphEmployee.employeeId), t("Employee {0}", graphEmployee.employeeId)),
     })),
   ).map(item => ({
       id: item.id,
       employeeId: item.employeeId,
       minHoursMonth: item.minHoursMonth,
+      isPriority: item.isPriority,
     }));
 }
 
@@ -573,7 +579,7 @@ function sortAvailabilityMembersByDisplayOrder(
 }
 
 function buildEmployeeRowsFromAvailabilityMembers(
-  currentRows: Array<{ id: number | null; employeeId: number; minHoursMonth: string }>,
+  currentRows: Array<{ id: number | null; employeeId: number; minHoursMonth: string; isPriority: boolean }>,
   members: Array<{ id: number; employeeId: number; displayOrder: number }>,
 ) {
   const currentRowByEmployeeId = new Map(currentRows.map(row => [row.employeeId, row] as const));
@@ -585,6 +591,7 @@ function buildEmployeeRowsFromAvailabilityMembers(
       id: currentRow?.id ?? null,
       employeeId: member.employeeId,
       minHoursMonth: currentRow?.minHoursMonth ?? "",
+      isPriority: currentRow?.isPriority ?? false,
     };
   });
 }
@@ -608,8 +615,8 @@ function hasPendingBindDraftChanges(bindRows: EditableAvailabilityBind[]) {
 }
 
 function graphEmployeeRowsEqual(
-  left: Array<{ id: number | null; employeeId: number; minHoursMonth: string }>,
-  right: Array<{ id: number | null; employeeId: number; minHoursMonth: string }>,
+  left: Array<{ id: number | null; employeeId: number; minHoursMonth: string; isPriority: boolean }>,
+  right: Array<{ id: number | null; employeeId: number; minHoursMonth: string; isPriority: boolean }>,
 ) {
   return left.length === right.length && left.every((row, index) => {
     const otherRow = right[index];
@@ -618,7 +625,7 @@ function graphEmployeeRowsEqual(
       otherRow &&
       row.id === otherRow.id &&
       row.employeeId === otherRow.employeeId &&
-      row.minHoursMonth === otherRow.minHoursMonth,
+      row.minHoursMonth === otherRow.minHoursMonth && row.isPriority === otherRow.isPriority,
     );
   });
 }
@@ -913,6 +920,7 @@ export function ContainerGraphEditPage() {
   const bindsQuery = useAvailabilityBindsListQuery();
   const fillColorBindsQuery = useManagerGraphFillColorBindsQuery();
   const textColorBindsQuery = useManagerGraphTextColorBindsQuery();
+  const contractSettingsQuery = useEmploymentContractSettingsQuery();
   const employeesQuery = useEmployeesListQuery({ refreshKey: location.key });
   const shopsQuery = useShopsListQuery({ refreshKey: location.key });
   const saveWorkspaceMutation = useSaveGraphWorkspaceMutation();
@@ -929,8 +937,10 @@ export function ContainerGraphEditPage() {
   const cancelManualShiftSwapMutation = useCancelManagerManualShiftSwapMutation();
 
   const [form, setForm] = useState<ContainerGraphFormState>(() => createInitialGraphForm());
+  const urlop = useGraphApprovedUrlopQuery({ shopId: Number(form.shopId), year: Number(form.year) || 2000, month: Number(form.month) || 1 });
+  const urlopCellKeys = approvedKeys(urlop.data ?? [], Number(form.shopId), Number(form.year), Number(form.month));
   const [formErrors, setFormErrors] = useState<ContainerGraphFormErrors>({});
-  const [graphEmployeeRows, setGraphEmployeeRows] = useState<Array<{ id: number | null; employeeId: number; minHoursMonth: string }>>([]);
+  const [graphEmployeeRows, setGraphEmployeeRows] = useState<Array<{ id: number | null; employeeId: number; minHoursMonth: string; isPriority: boolean }>>([]);
   const [selectedSchedulePresetId, setSelectedSchedulePresetId] = useState<number | null>(null);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<number | null>(null);
   const [isCompactMatrix, setIsCompactMatrix] = useState(false);
@@ -972,7 +982,7 @@ export function ContainerGraphEditPage() {
   const generationEditorRef = useRef({ manualColumns, scheduleColumnOrder, pendingManualShiftPublishes, offers: shiftSwapLogQuery.data });
   useLayoutEffect(() => {
     generationSessionRef.current = { containerId, graphId, token: generationSessionRef.current.token + 1 };
-  }, [containerId, graphId]);
+  }, [containerId, graphId, form.availabilityGroupId]);
   useLayoutEffect(() => {
     generationEditorRef.current = { manualColumns, scheduleColumnOrder, pendingManualShiftPublishes, offers: shiftSwapLogQuery.data };
   }, [manualColumns, scheduleColumnOrder, pendingManualShiftPublishes, shiftSwapLogQuery.data]);
@@ -1229,6 +1239,7 @@ export function ContainerGraphEditPage() {
         scheduleId: graphId ?? 0,
         employeeId: row.employeeId,
         minHoursMonth: row.minHoursMonth ? Number(row.minHoursMonth) : null,
+        isPriority: row.isPriority,
         displayOrder: index,
       })),
     [graphId, orderedGraphEmployeeRows],
@@ -1725,8 +1736,15 @@ export function ContainerGraphEditPage() {
     () => buildAvailabilityColumns(previewMembersQuery.data ?? [], employeeNameById),
     [employeeNameById, previewMembersQuery.data],
   );
+  const policyEmployeeIds = useMemo(() => [...new Set([
+    ...(previewMembersQuery.data ?? []).map(member => member.employeeId),
+    ...(scheduleAvailabilityMembersQuery.data ?? []).map(member => member.employeeId),
+  ])], [previewMembersQuery.data, scheduleAvailabilityMembersQuery.data]);
+  const hasUnresolvedPolicyEmployees = Boolean(employeesQuery.data) && policyEmployeeIds.some(id => !employeesQuery.data?.some(employee => employee.id === id));
+  const hasAvailabilityPolicyError = contractSettingsQuery.isError || hasUnresolvedPolicyEmployees;
+  const isAvailabilityPolicyLoading = !hasAvailabilityPolicyError && (!contractSettingsQuery.data || !employeesQuery.data);
   const autoAvailabilityUnavailableCellKeys = useMemo(() => {
-    if (!scheduleAvailabilityGroupId || !scheduleAvailabilityMembersQuery.data || !scheduleAvailabilitySlotsQuery.data) {
+    if (!yearValue || !monthValue || isAvailabilityPolicyLoading || hasAvailabilityPolicyError || !scheduleAvailabilityGroupId || !scheduleAvailabilityMembersQuery.data || !scheduleAvailabilitySlotsQuery.data) {
       return [] as string[];
     }
 
@@ -1736,7 +1754,11 @@ export function ContainerGraphEditPage() {
     }
 
     return Object.entries(
-      buildAvailabilityCellMap(scheduleAvailabilityMembersQuery.data, scheduleAvailabilitySlotsQuery.data),
+      buildEffectiveManagerAvailabilityCellMap(
+        buildAvailabilityCellMap(scheduleAvailabilityMembersQuery.data, scheduleAvailabilitySlotsQuery.data),
+        getAutomaticManagerEmployeeIds(scheduleAvailabilityMembersQuery.data.map(member => member.employeeId), employeesQuery.data ?? [], contractSettingsQuery.data?.automaticWeekdayAvailability === true),
+        yearValue, monthValue,
+      ),
     )
       .filter(([cellKey, value]) => {
         if (value !== AVAILABILITY_NONE_MARK) {
@@ -1758,6 +1780,7 @@ export function ContainerGraphEditPage() {
         return leftCell.dayOfMonth - rightCell.dayOfMonth;
       });
   }, [
+    isAvailabilityPolicyLoading, hasAvailabilityPolicyError, employeesQuery.data, contractSettingsQuery.data, yearValue, monthValue,
     graphEmployeeRows,
     scheduleAvailabilityGroupId,
     scheduleAvailabilityMembersQuery.data,
@@ -1775,16 +1798,20 @@ export function ContainerGraphEditPage() {
     () => new Set(autoAvailabilityUnavailableCellKeys),
     [autoAvailabilityUnavailableCellKeys],
   );
-  const previewCellMap = useMemo<AvailabilityMatrixCellMap>(
-    () => buildAvailabilityCellMap(previewMembersQuery.data ?? [], previewSlotsQuery.data ?? []),
-    [previewMembersQuery.data, previewSlotsQuery.data],
-  );
   const selectedPreviewAvailabilityGroup = useMemo(
     () => matchingAvailabilityGroups.find(group => group.id === previewAvailabilityGroupId) ?? null,
     [matchingAvailabilityGroups, previewAvailabilityGroupId],
   );
   const previewYear = selectedPreviewAvailabilityGroup?.year ?? yearValue ?? new Date().getFullYear();
   const previewMonth = selectedPreviewAvailabilityGroup?.month ?? monthValue ?? 1;
+  const previewCellMap = useMemo<AvailabilityMatrixCellMap>(
+    () => buildEffectiveManagerAvailabilityCellMap(
+      buildAvailabilityCellMap(previewMembersQuery.data ?? [], previewSlotsQuery.data ?? []),
+      getAutomaticManagerEmployeeIds(previewColumns.map(column => column.employeeId), employeesQuery.data ?? [], contractSettingsQuery.data?.automaticWeekdayAvailability === true),
+      previewYear, previewMonth,
+    ),
+    [previewMembersQuery.data, previewSlotsQuery.data, previewColumns, employeesQuery.data, contractSettingsQuery.data, previewYear, previewMonth],
+  );
   const isSaving = saveWorkspaceMutation.isPending || isSessionSaving;
   const {
     dialog: unsavedChangesDialog,
@@ -1833,7 +1860,9 @@ export function ContainerGraphEditPage() {
     }
 
     const availabilityGroupId = Number(form.availabilityGroupId);
-    if (!Number.isInteger(availabilityGroupId) || syncedAvailabilityGroupIdRef.current === availabilityGroupId) {
+    const memberIds = new Set(scheduleAvailabilityMembersQuery.data.map(member => member.employeeId));
+    const sameEmployees = graphEmployeeRows.length === memberIds.size && graphEmployeeRows.every(row => memberIds.has(row.employeeId));
+    if (!Number.isInteger(availabilityGroupId) || syncedAvailabilityGroupIdRef.current === availabilityGroupId && sameEmployees) {
       return;
     }
 
@@ -1845,7 +1874,7 @@ export function ContainerGraphEditPage() {
     setSelectedSchedulePresetId(null);
     setSubmitError(undefined);
     syncedAvailabilityGroupIdRef.current = availabilityGroupId;
-  }, [form.availabilityGroupId, scheduleAvailabilityMembersQuery.data]);
+  }, [form.availabilityGroupId, scheduleAvailabilityMembersQuery.data, graphEmployeeRows]);
 
   useEffect(() => {
     if (autoAvailabilityUnavailableCellKeys.length === 0) {
@@ -1874,6 +1903,8 @@ export function ContainerGraphEditPage() {
   const isLoading =
     containerId !== null &&
     (
+      isAvailabilityPolicyLoading ||
+      (Boolean(previewAvailabilityGroupId) && (previewMembersQuery.isLoading || previewSlotsQuery.isLoading)) ||
       containerQuery.isLoading ||
       shopsQuery.isLoading ||
       employeesQuery.isLoading ||
@@ -1881,7 +1912,10 @@ export function ContainerGraphEditPage() {
       (!isCreate && (graphQuery.isLoading || graphEmployeesQuery.isLoading || slotsQuery.isLoading || cellStylesQuery.isLoading))
     );
   const hasLoadError =
+    urlop.isError ||
     containerId === null ||
+    hasAvailabilityPolicyError ||
+    (Boolean(previewAvailabilityGroupId) && (previewMembersQuery.isError || previewSlotsQuery.isError)) ||
     containerQuery.isError ||
     shopsQuery.isError ||
     employeesQuery.isError ||
@@ -2137,7 +2171,7 @@ export function ContainerGraphEditPage() {
     }
 
     captureUndoSnapshot();
-    setGraphEmployeeRows(current => [...current, { id: null, employeeId: selectedEmployeeId, minHoursMonth: "" }]);
+    setGraphEmployeeRows(current => [...current, { id: null, employeeId: selectedEmployeeId, minHoursMonth: "", isPriority: false }]);
     setScheduleColumnOrder(current => [...current, selectedEmployeeId]);
     setSelectedEmployeeId(null);
   };
@@ -2252,6 +2286,7 @@ export function ContainerGraphEditPage() {
         id: row.id,
         employeeId: row.employeeId,
         minHoursMonth: row.minHoursMonth ? Number(row.minHoursMonth) : null,
+        isPriority: row.isPriority,
       })),
       cellMap: draft.cellMap,
       existingEmployees,
@@ -2290,7 +2325,7 @@ export function ContainerGraphEditPage() {
   };
 
   const handleGenerateValidate = (
-    generationRows: Array<{ id: number | null; employeeId: number; minHoursMonth: string }>,
+    generationRows: Array<{ id: number | null; employeeId: number; minHoursMonth: string; isPriority: boolean }>,
   ) => {
     const nextFormErrors = buildGraphFormErrors(form, shopIdSet, availabilityGroupIdSet);
 
@@ -2360,6 +2395,7 @@ export function ContainerGraphEditPage() {
             id: row.id,
             employeeId: row.employeeId,
             minHoursMonth: row.minHoursMonth ? Number(row.minHoursMonth) : null,
+            isPriority: row.isPriority,
           })),
           cellMap,
           existingEmployees: graphEmployeesQuery.data ?? [],
@@ -2417,6 +2453,7 @@ export function ContainerGraphEditPage() {
       runWithoutPrompt(() => navigate(`/container?openContainerId=${containerId}`));
     } catch (error) {
       if (error instanceof ApiError) {
+        if (error.status === 409) queryClient.invalidateQueries({ queryKey: queryKeys.urlop.all });
         setFormErrors(currentErrors => ({ ...currentErrors, ...applyGraphApiErrors(error.validationErrors) }));
         setSubmitError(error.message);
         return;
@@ -2469,6 +2506,7 @@ export function ContainerGraphEditPage() {
           employees: generationRows.map((row, index) => ({
             employeeId: row.employeeId,
             minHoursMonth: row.minHoursMonth ? Number(row.minHoursMonth) : null,
+            isPriority: row.isPriority,
             displayOrder: index,
           })),
         },
@@ -2518,12 +2556,13 @@ export function ContainerGraphEditPage() {
     } catch (error) {
       if (!isCurrentRequest()) return;
       if (error instanceof ApiError) {
+        if (error.status === 409) queryClient.invalidateQueries({ queryKey: queryKeys.urlop.all });
         setFormErrors(currentErrors => ({ ...currentErrors, ...applyGraphApiErrors(error.validationErrors) }));
         setSubmitError(error.message);
         return;
       }
 
-      setSubmitError(error instanceof Error ? error.message : t("Could not generate this schedule."));
+      setSubmitError(error instanceof Error && !(error instanceof TypeError) ? error.message : t("Could not generate this schedule."));
     }
   };
 
@@ -2949,6 +2988,7 @@ export function ContainerGraphEditPage() {
 
       {canEdit ? (
         <ContainerGraphEditor
+        urlopCellKeys={urlopCellKeys}
         graph={effectiveGraph}
         isHeaderCollapsed={isHeaderCollapsed}
         compactSize={isCompactMatrix}
@@ -3030,6 +3070,14 @@ export function ContainerGraphEditPage() {
         onPublishManualShift={handlePublishManualShift}
         onCancelManualShift={handleCancelManualShift}
         onCancelPendingManualShift={handleCancelPendingManualShift}
+        onEmployeePriorityChange={(employeeId, checked) => {
+          if (graphEmployeeRows.find(row => row.employeeId === employeeId)?.isPriority !== checked) {
+            captureUndoSnapshot(`employee-priority:${employeeId}`);
+          }
+          setGraphEmployeeRows(current => current.map(row => row.employeeId === employeeId ? { ...row, isPriority: checked } : row));
+          setSelectedSchedulePresetId(null);
+          setSubmitError(undefined);
+        }}
         onEmployeeMinHoursChange={(employeeId, value) => {
           if (graphEmployeeRows.find(row => row.employeeId === employeeId)?.minHoursMonth !== value) {
             captureUndoSnapshot(`employee-min-hours:${employeeId}`);
@@ -3041,6 +3089,7 @@ export function ContainerGraphEditPage() {
         }}
         onColumnMove={handleColumnMove}
         onCellChange={(employeeId, dayOfMonth, value) => {
+          if (urlopCellKeys.has(getGraphCellKey(employeeId, dayOfMonth))) return;
           const manualColumnId = getManualColumnIdFromEmployeeId(employeeId);
           if (manualColumnId !== null) {
             const currentValue = manualColumns

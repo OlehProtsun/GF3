@@ -1,9 +1,14 @@
+vi.mock("@entities/employment-contracts/api/employmentContractSettingsApi", () => ({ employmentContractSettingsApi: {
+  get: vi.fn().mockResolvedValue({ restrictSwapsToEightHours:true,requirePickupApproval:true,requireBelowMinimumGiveApproval:true,automaticWeekdayAvailability:true }),
+  update: vi.fn(),
+} }));
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter } from "react-router-dom";
 import { PublicHolidayVisibilityProvider, usePublicHolidayVisibility } from "@app/providers/PublicHolidayVisibilityProvider";
+import { priorityGenerationSettingsApi } from "@entities/priority-generation/api/priorityGenerationSettingsApi";
 import { publicHolidaySettingsApi } from "@entities/public-holidays/api/publicHolidaySettingsApi";
 import { regulationsApi } from "@entities/regulations/api/regulationsApi";
 import type { RegulationDocument } from "@entities/regulations/model/types";
@@ -21,6 +26,10 @@ vi.mock("@entities/public-holidays/api/publicHolidaySettingsApi", () => ({
   publicHolidaySettingsApi: { get: vi.fn(), update: vi.fn() },
 }));
 
+vi.mock("@entities/priority-generation/api/priorityGenerationSettingsApi", () => ({
+  priorityGenerationSettingsApi: { get: vi.fn(), update: vi.fn() },
+}));
+
 function VisibilityProbe() {
   return <output data-testid="visibility">{String(usePublicHolidayVisibility())}</output>;
 }
@@ -33,6 +42,11 @@ function mount(enabled = true) {
 }
 beforeEach(() => {
   setLanguage("en"); auth.session.workspaceMode = "pc";
+  vi.mocked(priorityGenerationSettingsApi.get).mockReset().mockResolvedValue({ shiftHours: 8, weekendsOff: true, respectAvailability: true });
+  vi.mocked(priorityGenerationSettingsApi.update).mockReset().mockImplementation(async settings => {
+    vi.mocked(priorityGenerationSettingsApi.get).mockResolvedValue(settings);
+    return settings;
+  });
   language.language = "en"; language.ready = true;
   language.save.mockReset().mockImplementation(async (value: "en" | "pl" | "uk") => { language.language = value; setLanguage(value); });
   vi.mocked(regulationsApi.pending).mockReset().mockResolvedValue([]);
@@ -89,7 +103,7 @@ describe("ManagerSettingsPage", () => {
   test("phone mode cannot edit either setting", async () => {
     auth.session.workspaceMode = "phone";
     mount();
-    expect(screen.getByRole("switch")).toBeDisabled();
+    expect(screen.getByRole("switch", { name: "Show public holidays" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Language English" })).toBeDisabled();
   });
   test("does not request settings behind required documents and loads after acceptance", async () => {
@@ -97,10 +111,10 @@ describe("ManagerSettingsPage", () => {
     const { client } = mount(false);
     await waitFor(() => expect(regulationsApi.pending).toHaveBeenCalledOnce());
     expect(publicHolidaySettingsApi.get).not.toHaveBeenCalled();
-    expect(screen.getByRole("switch")).toBeDisabled();
+    expect(screen.getByRole("switch", { name: "Show public holidays" })).toBeDisabled();
     vi.mocked(regulationsApi.pending).mockResolvedValue([]);
     await act(async () => client.invalidateQueries({ queryKey: queryKeys.regulations.all }));
-    await waitFor(() => expect(screen.getByRole("switch")).toBeEnabled());
+    await waitFor(() => expect(screen.getByRole("switch", { name: "Show public holidays" })).toBeEnabled());
     expect(publicHolidaySettingsApi.get).toHaveBeenCalledOnce();
   });
   test("uses the shared collapsible page header with Back navigation", async () => {
@@ -130,7 +144,7 @@ describe("ManagerSettingsPage", () => {
   test("failed save keeps the fetched value and reports failure", async () => {
     vi.mocked(publicHolidaySettingsApi.update).mockRejectedValue(new Error("Save failed"));
     mount();
-    const toggle = screen.getByRole("switch");
+    const toggle = screen.getByRole("switch", { name: "Show public holidays" });
     await waitFor(() => expect(toggle).toBeEnabled());
     await userEvent.click(toggle);
     expect(await screen.findByRole("alert")).toHaveTextContent("Save failed");
@@ -140,18 +154,18 @@ describe("ManagerSettingsPage", () => {
     vi.mocked(publicHolidaySettingsApi.get).mockRejectedValue(new Error("Load failed"));
     mount();
     expect(await screen.findByRole("alert")).toHaveTextContent("Load failed");
-    expect(screen.getByRole("switch")).toBeDisabled();
+    expect(screen.getByRole("switch", { name: "Show public holidays" })).toBeDisabled();
     expect(screen.getByTestId("visibility")).toHaveTextContent("true");
     vi.mocked(publicHolidaySettingsApi.get).mockResolvedValue({ showPublicHolidays: false });
     await userEvent.click(screen.getByRole("button", { name: "Retry" }));
-    await waitFor(() => expect(screen.getByRole("switch")).toBeEnabled());
-    expect(screen.getByRole("switch")).not.toBeChecked();
+    await waitFor(() => expect(screen.getByRole("switch", { name: "Show public holidays" })).toBeEnabled());
+    expect(screen.getByRole("switch", { name: "Show public holidays" })).not.toBeChecked();
   });
   test("PC opens the dialog even when OFF, restoring focus and scroll", async () => {
     vi.mocked(publicHolidaySettingsApi.get).mockResolvedValue({ showPublicHolidays: false });
     mount();
-    await waitFor(() => expect(screen.getByRole("switch")).not.toBeChecked());
-    expect(screen.getByRole("switch")).toBeEnabled();
+    await waitFor(() => expect(screen.getByRole("switch", { name: "Show public holidays" })).not.toBeChecked());
+    expect(screen.getByRole("switch", { name: "Show public holidays" })).toBeEnabled();
     const opener = screen.getByRole("button", { name: "View public holidays" });
     await userEvent.click(opener);
     expect(screen.getByRole("dialog")).toBeVisible();
@@ -166,7 +180,7 @@ describe("ManagerSettingsPage", () => {
     vi.spyOn(document, "visibilityState", "get").mockReturnValue("visible");
     vi.useFakeTimers();
     await act(async () => { mount(); });
-    expect(screen.getByRole("switch")).toBeEnabled();
+    expect(screen.getByRole("switch", { name: "Show public holidays" })).toBeEnabled();
     vi.mocked(publicHolidaySettingsApi.get).mockResolvedValue({ showPublicHolidays: false });
     await act(async () => { vi.advanceTimersByTime(60_000); });
     expect(screen.getByTestId("visibility")).toHaveTextContent("false");
@@ -219,4 +233,99 @@ describe("PublicHolidayListDialog", () => {
     view.rerender(<PublicHolidayListDialog open onClose={close} initialYear={2026} />);
     expect(screen.getByRole("dialog", { name: "Public holidays in 2026" })).toBeVisible();
   });
+});
+
+test("priority settings persist only after successful PUT and preserve cached values on failure", async () => {
+  const { client } = mount();
+  const duration = await screen.findByRole("textbox", { name: "Priority shift duration" });
+  await waitFor(() => expect(duration).toBeEnabled());
+  fireEvent.change(duration, { target: { value: "10" } }); fireEvent.blur(duration);
+  await waitFor(() => expect(priorityGenerationSettingsApi.update).toHaveBeenCalledWith({ shiftHours: 10, weekendsOff: true, respectAvailability: true }));
+  await waitFor(() => expect(duration).toHaveValue("10"));
+  vi.mocked(priorityGenerationSettingsApi.update).mockRejectedValueOnce(new Error("Priority save failed"));
+  await userEvent.click(screen.getByRole("switch", { name: "Weekends off for priority employees" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("Priority save failed");
+  expect(screen.getByRole("switch", { name: "Weekends off for priority employees" })).toBeChecked();
+  expect(client.getQueryState(queryKeys.priorityGenerationSettings.current())?.data).toEqual({ shiftHours: 10, weekendsOff: true, respectAvailability: true });
+});
+
+test("priority settings disable writes in phone mode", async () => {
+  auth.session.workspaceMode = "phone";
+  mount();
+  expect(screen.getByRole("textbox", { name: "Priority shift duration" })).toBeDisabled();
+  expect(screen.getByRole("switch", { name: "Weekends off for priority employees" })).toBeDisabled();
+  expect(screen.getByRole("switch", { name: "Respect priority employee availability" })).toBeDisabled();
+  expect(priorityGenerationSettingsApi.update).not.toHaveBeenCalled();
+});
+
+test("priority settings failed load can be retried", async () => {
+  vi.mocked(priorityGenerationSettingsApi.get).mockRejectedValueOnce(new Error("Priority load failed"));
+  mount();
+  expect(await screen.findByRole("alert")).toHaveTextContent("Priority load failed");
+  expect(screen.getByRole("switch", { name: "Respect priority employee availability" })).toBeDisabled();
+  expect(screen.getByRole("switch", { name: "Respect priority employee availability" })).toBeChecked();
+  await userEvent.click(screen.getByRole("button", { name: "Retry" }));
+  await waitFor(() => expect(screen.getByRole("textbox", { name: "Priority shift duration" })).toBeEnabled());
+});
+
+test("availability toggle uses server confirmation, blocks concurrent writes and survives reopening", async () => {
+  let resolve!: (data: { shiftHours: number; weekendsOff: boolean; respectAvailability: boolean }) => void;
+  vi.mocked(priorityGenerationSettingsApi.update).mockImplementationOnce(() => new Promise(done => { resolve = done; }));
+  const view = mount();
+  const toggle = screen.getByRole("switch", { name: "Respect priority employee availability" });
+  expect(toggle).toBeChecked(); expect(toggle).toBeDisabled();
+  await waitFor(() => expect(toggle).toBeEnabled());
+  toggle.focus(); await userEvent.keyboard(" ");
+  expect(toggle).toHaveFocus(); expect(toggle).toBeChecked(); expect(toggle).toBeDisabled();
+  expect(screen.getByRole("switch", { name: "Weekends off for priority employees" })).toBeDisabled();
+  expect(screen.getByRole("textbox", { name: "Priority shift duration" })).toBeDisabled();
+  expect(priorityGenerationSettingsApi.update).toHaveBeenCalledExactlyOnceWith({ shiftHours: 8, weekendsOff: true, respectAvailability: false });
+  const saved = { shiftHours: 8, weekendsOff: true, respectAvailability: false };
+  vi.mocked(priorityGenerationSettingsApi.get).mockResolvedValue(saved);
+  await act(async () => resolve(saved));
+  await waitFor(() => expect(toggle).toBeEnabled()); expect(toggle).not.toBeChecked();
+  view.unmount(); mount();
+  await waitFor(() => expect(screen.getByRole("switch", { name: "Respect priority employee availability" })).not.toBeChecked());
+});
+
+test("duration and weekend saves preserve ignored availability and failed toggle can be retried", async () => {
+  vi.mocked(priorityGenerationSettingsApi.get).mockResolvedValue({ shiftHours: 8, weekendsOff: true, respectAvailability: false });
+  mount();
+  const toggle = screen.getByRole("switch", { name: "Respect priority employee availability" });
+  await waitFor(() => expect(toggle).toBeEnabled());
+  const duration = screen.getByRole("textbox", { name: "Priority shift duration" });
+  fireEvent.change(duration, { target: { value: "10" } }); fireEvent.blur(duration);
+  await waitFor(() => expect(priorityGenerationSettingsApi.update).toHaveBeenLastCalledWith({ shiftHours: 10, weekendsOff: true, respectAvailability: false }));
+  await waitFor(() => expect(toggle).toBeEnabled());
+  await userEvent.click(screen.getByRole("switch", { name: "Weekends off for priority employees" }));
+  await waitFor(() => expect(priorityGenerationSettingsApi.update).toHaveBeenLastCalledWith({ shiftHours: 10, weekendsOff: false, respectAvailability: false }));
+  await waitFor(() => expect(toggle).toBeEnabled());
+  vi.mocked(priorityGenerationSettingsApi.update).mockRejectedValueOnce(new Error("Availability save failed"));
+  await userEvent.click(toggle);
+  expect(await screen.findByRole("alert")).toHaveTextContent("Availability save failed");
+  expect(toggle).not.toBeChecked();
+  await userEvent.click(toggle);
+  await waitFor(() => expect(toggle).toBeChecked());
+});
+
+test.each([
+  ["en", "Respect priority employee availability", "Monday–Friday", "Weekends stay off"],
+  ["pl", "Uwzględniaj dostępność pracowników priorytetowych", "od poniedziałku do piątku", "Weekendy pozostają wolne"],
+  ["uk", "Враховувати доступність пріоритетних працівників", "з понеділка до п’ятниці", "Субота й неділя залишаються вихідними"],
+] as const)("availability setting and precedence are translated in %s", async (locale, label, weekdays, weekends) => {
+  setLanguage(locale); mount();
+  const toggle = screen.getByRole("switch", { name: label });
+  await waitFor(() => expect(toggle).toBeEnabled());
+  expect(toggle).toHaveAccessibleDescription(expect.stringContaining(weekdays));
+  expect(toggle).toHaveAccessibleDescription(expect.stringContaining(weekends));
+});
+
+test("a failed duration save restores the persisted value", async () => {
+  vi.mocked(priorityGenerationSettingsApi.update).mockRejectedValueOnce(new Error("Duration save failed"));
+  mount();
+  await waitFor(() => expect(screen.getByRole("textbox", { name: "Priority shift duration" })).toBeEnabled());
+  fireEvent.change(screen.getByRole("textbox", { name: "Priority shift duration" }), { target: { value: "10" } });
+  fireEvent.blur(screen.getByRole("textbox", { name: "Priority shift duration" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("Duration save failed");
+  expect(screen.getByRole("textbox", { name: "Priority shift duration" })).toHaveValue("8");
 });

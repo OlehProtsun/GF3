@@ -42,6 +42,7 @@ let locationSequence = 0;
 const ROUTER_HISTORY_INDEX_KEY = "__gf3RouterIndex";
 
 const PARAM_ROUTE_PATTERNS = [
+  "/urlop/:shopId",
   "/availability/new",
   "/availability/:availabilityId/edit",
   "/availability/:availabilityId",

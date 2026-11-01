@@ -2,9 +2,10 @@ import { t } from "@shared/i18n";
 import { useMemo } from "react";
 import type { ChangeEvent } from "react";
 import { useSyncedDraft } from "@shared/lib/useSyncedDraft";
-import type { Employee } from "./types";
+import type { Employee, EmploymentContractType } from "./types";
 
 export type EmployeeFormState = {
+  contractType: EmploymentContractType;
   firstName: string;
   lastName: string;
   email: string;
@@ -15,9 +16,10 @@ export type EmployeeFormState = {
 
 export type EmployeeFormErrors = Partial<Record<keyof EmployeeFormState, string>>;
 
-type EmployeeFormSource = Pick<Employee, "firstName" | "lastName" | "email" | "phone" | "username" | "hasLoginAccount">;
+type EmployeeFormSource = Pick<Employee, "firstName" | "lastName" | "email" | "phone" | "username" | "hasLoginAccount" | "contractType">;
 
 const EMPTY_FORM: EmployeeFormState = {
+  contractType: "zlecenie",
   firstName: "",
   lastName: "",
   email: "",
@@ -32,6 +34,7 @@ export function createEmployeeFormState(employee?: EmployeeFormSource | null): E
   }
 
   return {
+    contractType: employee.contractType ?? "zlecenie",
     firstName: employee.firstName,
     lastName: employee.lastName,
     email: employee.email ?? "",
@@ -49,6 +52,8 @@ export function validateEmployeeForm(
   },
 ): EmployeeFormErrors {
   const nextErrors: EmployeeFormErrors = {};
+  if (form.contractType !== "zlecenie" && form.contractType !== "o_prace")
+    nextErrors.contractType = t("Select a valid employment contract type.");
 
   if (!form.firstName.trim()) {
     nextErrors.firstName = t("First name is required");
@@ -96,7 +101,7 @@ export function useEmployeeForm(employee?: EmployeeFormSource | null, isCreate =
   const sourceKey = useMemo(
     () =>
       employee
-        ? `employee:${employee.firstName}:${employee.lastName}:${employee.email ?? ""}:${employee.phone ?? ""}:${employee.username ?? ""}:${employee.hasLoginAccount}`
+        ? `employee:${employee.firstName}:${employee.lastName}:${employee.email ?? ""}:${employee.phone ?? ""}:${employee.username ?? ""}:${employee.hasLoginAccount}:${employee.contractType ?? "zlecenie"}`
         : isCreate
           ? "create"
           : "empty",

@@ -1,4 +1,7 @@
+import type { EmploymentContractType } from "../model/types";
+
 export type EmployeeDto = {
+  contractType?: EmploymentContractType;
   id: number;
   firstName: string;
   lastName: string;
@@ -11,6 +14,7 @@ export type EmployeeDto = {
 };
 
 export type SaveEmployeeDto = {
+  contractType?: EmploymentContractType;
   firstName: string;
   lastName: string;
   phone?: string;

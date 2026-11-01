@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using BusinessLogicLayer.Common;
+using BusinessLogicLayer.Availability;
 using BusinessLogicLayer.Contracts.Enums;
 using BusinessLogicLayer.Contracts.Models;
 using BusinessLogicLayer.Generators;
@@ -33,6 +34,9 @@ public class ContainerService : IContainerService
     private readonly IScheduleCellStyleRepository _cellStyleRepo;
     private readonly IAvailabilityGroupRepository _availabilityGroupRepo;
     private readonly IScheduleGenerator _scheduleGenerator;
+    private readonly IEmploymentContractPolicyService? _contractPolicy;
+    private readonly IUrlopService? _urlop;
+    private readonly DataAccessLayer.Models.DataBaseContext.AppDbContext? _db;
 
     /// <summary>
     /// Graph generation rewrites a whole slot set. The per-graph semaphore makes sure that two
@@ -49,7 +53,10 @@ public class ContainerService : IContainerService
         IScheduleEmployeeRepository employeeRepo,
         IScheduleCellStyleRepository cellStyleRepo,
         IAvailabilityGroupRepository availabilityGroupRepo,
-        IScheduleGenerator scheduleGenerator)
+        IScheduleGenerator scheduleGenerator,
+        IEmploymentContractPolicyService? contractPolicy = null,
+        IUrlopService? urlop = null,
+        DataAccessLayer.Models.DataBaseContext.AppDbContext? db = null)
     {
         _repo = repo;
         _scheduleRepo = scheduleRepo;
@@ -59,6 +66,9 @@ public class ContainerService : IContainerService
         _cellStyleRepo = cellStyleRepo;
         _availabilityGroupRepo = availabilityGroupRepo;
         _scheduleGenerator = scheduleGenerator;
+        _contractPolicy = contractPolicy;
+        _urlop = urlop;
+        _db = db;
     }
 
     public async Task<ContainerModel?> GetAsync(int id, CancellationToken ct = default)
@@ -147,7 +157,11 @@ public class ContainerService : IContainerService
 
     public async Task UpdateGraphAsync(int containerId, int graphId, ScheduleModel model, CancellationToken ct = default)
     {
+        await using var transaction = await BeginAssignmentTransactionAsync(ct);
         var existing = await EnsureGraphOwnershipAsync(containerId, graphId, ct).ConfigureAwait(false);
+
+        if (existing.ShopId != model.ShopId || existing.Year != model.Year || existing.Month != model.Month)
+            await EnsureUrlopAssignmentsAsync(model.ShopId, model.Year, model.Month, await LoadGraphSlotsAsync(graphId, ct), ct);
 
         model.Id = graphId;
         model.ContainerId = containerId;
@@ -155,6 +169,7 @@ public class ContainerService : IContainerService
         updated.AcceptedManualShiftHighlightColor = existing.AcceptedManualShiftHighlightColor;
         updated.AcceptedSwapHighlightColor = existing.AcceptedSwapHighlightColor;
         await _scheduleRepo.UpdateAsync(updated, ct).ConfigureAwait(false);
+        if (transaction is not null) await transaction.CommitAsync(ct);
     }
 
     public async Task<int> UpdateGraphPublicationAsync(
@@ -306,15 +321,18 @@ public class ContainerService : IContainerService
     {
         ArgumentNullException.ThrowIfNull(slots);
 
-        await EnsureGraphOwnershipAsync(containerId, graphId, ct).ConfigureAwait(false);
+        await using var transaction = await BeginAssignmentTransactionAsync(ct);
+        var graph = await EnsureGraphOwnershipAsync(containerId, graphId, ct).ConfigureAwait(false);
 
         var normalizedSlots = NormalizeReplacementSlots(slots, graphId);
+        await EnsureUrlopAssignmentsAsync(graph.ShopId, graph.Year, graph.Month, normalizedSlots, ct);
 
         try
         {
             await _slotRepo
                 .ReplaceForScheduleAsync(graphId, normalizedSlots.Select(slot => slot.ToDal()), overwrite: true, ct)
                 .ConfigureAwait(false);
+            if (transaction is not null) await transaction.CommitAsync(ct);
         }
         catch (DbUpdateException)
         {
@@ -324,20 +342,27 @@ public class ContainerService : IContainerService
 
     public async Task<ScheduleSlotModel> CreateGraphSlotAsync(int containerId, int graphId, ScheduleSlotModel model, CancellationToken ct = default)
     {
-        await EnsureGraphOwnershipAsync(containerId, graphId, ct).ConfigureAwait(false);
+        await using var transaction = await BeginAssignmentTransactionAsync(ct);
+        var graph = await EnsureGraphOwnershipAsync(containerId, graphId, ct).ConfigureAwait(false);
+        await EnsureUrlopAssignmentsAsync(graph.ShopId, graph.Year, graph.Month, [model], ct);
 
         model.ScheduleId = graphId;
-        return await CreateGraphSlotCoreAsync(model, ct).ConfigureAwait(false);
+        var result = await CreateGraphSlotCoreAsync(model, ct).ConfigureAwait(false);
+        if (transaction is not null) await transaction.CommitAsync(ct);
+        return result;
     }
 
     public async Task UpdateGraphSlotAsync(int containerId, int graphId, int slotId, ScheduleSlotModel model, CancellationToken ct = default)
     {
-        await EnsureGraphOwnershipAsync(containerId, graphId, ct).ConfigureAwait(false);
+        await using var transaction = await BeginAssignmentTransactionAsync(ct);
+        var graph = await EnsureGraphOwnershipAsync(containerId, graphId, ct).ConfigureAwait(false);
+        await EnsureUrlopAssignmentsAsync(graph.ShopId, graph.Year, graph.Month, [model], ct);
         await EnsureSlotBelongsToGraphAsync(graphId, slotId, ct).ConfigureAwait(false);
 
         model.Id = slotId;
         model.ScheduleId = graphId;
         await UpdateGraphSlotCoreAsync(model, ct).ConfigureAwait(false);
+        if (transaction is not null) await transaction.CommitAsync(ct);
     }
 
     public async Task DeleteGraphSlotAsync(int containerId, int graphId, int slotId, CancellationToken ct = default)
@@ -520,6 +545,19 @@ public class ContainerService : IContainerService
             availabilities.Add(group.ToContract());
         }
 
+        if (_contractPolicy is not null)
+        {
+            var automaticIds = await _contractPolicy.GetAutomaticAvailabilityEmployeeIdsAsync(
+                employees.Select(x => x.EmployeeId).Distinct().ToArray(), ct).ConfigureAwait(false);
+            if (automaticIds.Count > 0)
+            {
+                foreach (var group in availabilities)
+                foreach (var member in group.Members.Where(x => automaticIds.Contains(x.EmployeeId)))
+                    member.Days = new List<AvailabilityGroupDayModel>();
+                availabilities.Add(EmploymentWeekdayAvailabilityBuilder.Build(schedule.Year, schedule.Month, automaticIds, _contractPolicy));
+            }
+        }
+
         var otherSchedules = await _scheduleRepo
             .GetByMonthWithSlotsAsync(
                 schedule.Year,
@@ -537,6 +575,27 @@ public class ContainerService : IContainerService
             availabilities.Add(savedScheduleConstraint);
         }
 
+        if (_urlop is not null)
+        {
+            var from = new DateOnly(schedule.Year, schedule.Month, 1);
+            var roster = employees.Select(x => x.EmployeeId).ToHashSet();
+            var approved = await _urlop.GetApprovedDaysAsync(from, from.AddDays(DateTime.DaysInMonth(schedule.Year, schedule.Month) - 1), schedule.ShopId, ct);
+            var members = approved.Where(x => roster.Contains(x.EmployeeId)).GroupBy(x => x.EmployeeId)
+                .Select(group => new AvailabilityGroupMemberModel
+                {
+                    EmployeeId = group.Key,
+                    Days = group.Select(x => new AvailabilityGroupDayModel
+                    {
+                        DayOfMonth = x.Date.Day, Kind = AvailabilityKind.NONE, IntervalStr = null
+                    }).ToList()
+                }).ToList();
+            if (members.Count > 0) availabilities.Add(new AvailabilityGroupModel
+            {
+                Id = 0, Name = "Approved vacations", Year = schedule.Year, Month = schedule.Month,
+                IsEmploymentCalendar = true, Members = members
+            });
+        }
+
         return availabilities;
     }
 
@@ -549,7 +608,7 @@ public class ContainerService : IContainerService
         var employeeList = employees.ToList();
         var availabilities = await LoadAvailabilityGroupsAsync(schedule, employeeList, ct).ConfigureAwait(false);
 
-        return (await _scheduleGenerator
+        var slots = (await _scheduleGenerator
             .GenerateAsync(schedule, availabilities, employeeList, progress, ct)
             .ConfigureAwait(false))
             .Select(slot =>
@@ -559,7 +618,16 @@ public class ContainerService : IContainerService
                 return slot;
             })
             .ToList();
+        await EnsureUrlopAssignmentsAsync(schedule.ShopId, schedule.Year, schedule.Month, slots, ct);
+        return slots;
     }
+
+    private Task EnsureUrlopAssignmentsAsync(int shopId, int year, int month, IEnumerable<ScheduleSlotModel> slots, CancellationToken ct)
+        => _urlop?.EnsureAssignmentsAllowedAsync(shopId, year, month,
+            slots.Where(x => x.EmployeeId is > 0).Select(x => (x.EmployeeId!.Value, x.DayOfMonth)), ct) ?? Task.CompletedTask;
+
+    private async Task<Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction?> BeginAssignmentTransactionAsync(CancellationToken ct)
+        => _db is not null && _db.Database.CurrentTransaction is null ? await _db.Database.BeginTransactionAsync(ct) : null;
 
     private async Task<int> ReplaceGeneratedSlotsAsync(
         int graphId,
@@ -567,11 +635,17 @@ public class ContainerService : IContainerService
         bool overwrite,
         CancellationToken ct)
     {
+        await using var transaction = await BeginAssignmentTransactionAsync(ct);
+        var graph = await _scheduleRepo.GetByIdAsync(graphId, ct) ?? throw new KeyNotFoundException("Schedule not found.");
+        var slots = generatedSlots.ToList();
+        await EnsureUrlopAssignmentsAsync(graph.ShopId, graph.Year, graph.Month, slots, ct);
         try
         {
-            return await _slotRepo
-                .ReplaceForScheduleAsync(graphId, generatedSlots.Select(x => x.ToDal()), overwrite, ct)
+            var written = await _slotRepo
+                .ReplaceForScheduleAsync(graphId, slots.Select(x => x.ToDal()), overwrite, ct)
                 .ConfigureAwait(false);
+            if (transaction is not null) await transaction.CommitAsync(ct);
+            return written;
         }
         catch (DbUpdateException)
         {

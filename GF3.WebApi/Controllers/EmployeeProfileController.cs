@@ -88,6 +88,7 @@ public sealed class EmployeeProfileController(
 
     private static EmployeeProfileDto ToApiDto(BusinessLogicLayer.Contracts.Employees.EmployeeProfileDto profile) => new()
     {
+        ContractType = profile.ContractType,
         EmployeeId = profile.EmployeeId,
         Username = profile.Username,
         DisplayName = profile.DisplayName,

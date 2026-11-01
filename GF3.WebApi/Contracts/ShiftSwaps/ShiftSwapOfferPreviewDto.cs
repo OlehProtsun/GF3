@@ -2,6 +2,10 @@ namespace WebApi.Contracts.ShiftSwaps;
 
 public sealed class ShiftSwapOfferPreviewDto
 {
+    public bool RequiresManagerException { get; set; }
+    public string? ManagerExceptionReason { get; set; }
+    public int? MinimumMinutes { get; set; }
+    public int? ProjectedMinutes { get; set; }
     public bool AllowPartialAcceptance { get; set; } = false;
     public string RequestKind { get; set; } = "give";
     public int? TargetEmployeeId { get; set; }

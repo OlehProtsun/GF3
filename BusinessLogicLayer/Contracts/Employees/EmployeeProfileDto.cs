@@ -5,6 +5,7 @@ namespace BusinessLogicLayer.Contracts.Employees;
 /// </summary>
 public sealed class EmployeeProfileDto
 {
+    public string ContractType { get; set; } = DataAccessLayer.Models.EmploymentContractTypes.Zlecenie;
     public int EmployeeId { get; set; }
 
     public string Username { get; set; } = string.Empty;

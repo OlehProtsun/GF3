@@ -9,6 +9,11 @@ using BusinessLogicLayer.Contracts.Enums;
 using BusinessLogicLayer.Contracts.Models;
 using BusinessLogicLayer.Generators;
 
+if (args.FirstOrDefault() is "--deep-audit" or "--deep-audit-control")
+{
+    Environment.ExitCode = args[0] == "--deep-audit" ? await PriorityDeepAudit.RunAsync(args[1..]) : await PriorityDeepAudit.RunControlAsync(args[1..]);
+    return;
+}
 if (args.Any(argument => argument.StartsWith("--", StringComparison.Ordinal)))
 {
     Environment.ExitCode = await SqliteReplaySource.RunAsync(args);

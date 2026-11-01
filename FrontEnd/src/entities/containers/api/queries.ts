@@ -70,6 +70,7 @@ export function useDeleteManagerGraphTextColorBindMutation() {
 }
 
 export type SaveGraphWorkspaceEmployeeAssignment = {
+  isPriority: boolean;
   id: number | null;
   employeeId: number;
   minHoursMonth?: number | null;
@@ -136,6 +137,7 @@ async function syncGraphWorkspace({
         containersApi.createGraphEmployee(containerId, resolvedGraphId as number, {
           employeeId: employee.employeeId,
           minHoursMonth: employee.minHoursMonth ?? null,
+          isPriority: employee.isPriority,
           displayOrder: displayOrderByEmployeeId.get(employee.employeeId) ?? 0,
         }),
       ),
@@ -157,7 +159,7 @@ async function syncGraphWorkspace({
     const minHoursChanged = (existingEmployee.minHoursMonth ?? null) !== (assignment.minHoursMonth ?? null);
     const displayOrderChanged = existingEmployee.displayOrder !== displayOrder;
 
-    if (!minHoursChanged && !displayOrderChanged) {
+    if (!minHoursChanged && !displayOrderChanged && (existingEmployee.isPriority ?? false) === assignment.isPriority) {
       return [];
     }
 
@@ -170,6 +172,7 @@ async function syncGraphWorkspace({
         return containersApi.updateGraphEmployee(containerId, resolvedGraphId as number, existingEmployee.id, {
           employeeId: assignment.employeeId,
           minHoursMonth: assignment.minHoursMonth ?? null,
+          isPriority: assignment.isPriority,
           displayOrder,
         });
       }),

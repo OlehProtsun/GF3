@@ -16,6 +16,264 @@ namespace GF3.Tests;
 public sealed class ShiftCorrectionControllerTests
 {
     [Theory]
+    [InlineData(2026, 2, 28, true)]
+    [InlineData(2028, 2, 29, true)]
+    [InlineData(2026, 4, 30, true)]
+    [InlineData(2026, 12, 31, true)]
+    [InlineData(2026, 2, 29, false)]
+    [InlineData(2026, 4, 31, false)]
+    [InlineData(2026, 12, 0, false)]
+    [InlineData(2026, 12, 32, false)]
+    public async Task DayOff_ValidatesCalendar_AndCreatesOnlyPendingSnapshot(int year, int month, int day, bool valid)
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        await using var db = database.CreateContext();
+        var fixture = await SeedAsync(db);
+        var schedule = await db.Schedules.SingleAsync();
+        schedule.Year = year; schedule.Month = month;
+        await db.SaveChangesAsync();
+        var employee = EmployeeController(db, fixture);
+        var input = new CreateShiftCorrectionRequest { ScheduleId = fixture.ScheduleId, DayOfMonth = day,
+            RequestedFromTime = "08:15", RequestedToTime = "16:45" };
+        if (!valid)
+        {
+            await Assert.ThrowsAsync<ValidationException>(() => employee.Create(input, default));
+            Assert.Empty(await db.ShiftCorrectionRequests.ToListAsync());
+        }
+        else
+        {
+            var dto = Assert.IsType<ShiftCorrectionRequestDto>(Assert.IsType<CreatedAtActionResult>((await employee.Create(input, default)).Result).Value);
+            Assert.True(dto.IsDayOffRequest);
+            Assert.Null(dto.ScheduleSlotId); Assert.Null(dto.OriginalFromTime); Assert.Null(dto.OriginalToTime);
+            Assert.Equal("pending", dto.Status); Assert.Equal(day, dto.DayOfMonth);
+            var stored = await db.ShiftCorrectionRequests.SingleAsync();
+            Assert.Null(stored.OriginalFromTime); Assert.Null(stored.OriginalToTime); Assert.Null(stored.ScheduleSlotId);
+            await Assert.ThrowsAsync<ValidationException>(() => employee.Create(input, default));
+            Assert.Single(await db.ShiftCorrectionRequests.ToListAsync());
+        }
+        Assert.Equal(2, await db.ScheduleSlots.CountAsync());
+        Assert.Null((await db.ScheduleCellStyles.SingleAsync()).BackgroundColorArgb);
+    }
+
+    [Theory]
+    [InlineData("both")]
+    [InlineData("neither")]
+    [InlineData("bad-time")]
+    [InlineData("equal")]
+    [InlineData("reverse")]
+    [InlineData("private")]
+    [InlineData("not-enrolled")]
+    [InlineData("locked")]
+    [InlineData("own-workday")]
+    [InlineData("foreign-workday")]
+    [InlineData("pending-correction")]
+    public async Task DayOff_CreateRejectsIneligibleRequestsWithoutScheduleWrites(string scenario)
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        await using var db = database.CreateContext();
+        var fixture = await SeedAsync(db);
+        var schedule = await db.Schedules.SingleAsync();
+        var locks = new ManagerEditLockService();
+        if (scenario == "private") schedule.PublicationStatus = SchedulePublicationStatus.Private;
+        if (scenario == "not-enrolled") db.ScheduleEmployees.Remove(await db.ScheduleEmployees.SingleAsync());
+        if (scenario == "foreign-workday")
+        {
+            var container = TestDataFactory.CreateDalContainer("Other");
+            var shop = TestDataFactory.CreateDalShop("Other"); db.AddRange(container, shop); await db.SaveChangesAsync();
+            var other = TestDataFactory.CreateDalSchedule(container.Id, shop.Id, year: 2026, month: 8);
+            other.PublicationStatus = SchedulePublicationStatus.Public; db.Add(other); await db.SaveChangesAsync();
+            db.Add(TestDataFactory.CreateDalSlot(other.Id, 13, 1, fixture.EmployeeId, "18:00", "20:00"));
+        }
+        if (scenario == "pending-correction") db.Add(new ShiftCorrectionRequestModel {
+            ScheduleId = fixture.ScheduleId, EmployeeId = fixture.EmployeeId, DayOfMonth = 13,
+            ScheduleSlotId = fixture.MorningSlotId, OriginalFromTime = "08:00", OriginalToTime = "12:00",
+            RequestedFromTime = "08:00", RequestedToTime = "12:30", CreatedAtUtc = DateTimeOffset.UtcNow });
+        await db.SaveChangesAsync();
+        if (scenario == "locked") locks.SetLocks("lock-test", fixture.ManagerId, "Manager",
+            [ManagerEditLockTargets.Schedule(fixture.ContainerId, fixture.ScheduleId)]);
+        var employee = EmployeeController(db, fixture, locks);
+        var beforeSlots = await db.ScheduleSlots.CountAsync();
+        await Assert.ThrowsAsync<ValidationException>(() => employee.Create(new CreateShiftCorrectionRequest {
+            ScheduleId = fixture.ScheduleId, DayOfMonth = scenario == "neither" ? null : scenario == "own-workday" ? 12 : 13,
+            ScheduleSlotId = scenario == "both" ? fixture.MorningSlotId : null,
+            RequestedFromTime = scenario == "bad-time" ? "25:00" : "08:00",
+            RequestedToTime = scenario == "equal" ? "08:00" : scenario == "reverse" ? "07:00" : "16:00",
+        }, default));
+        Assert.Equal(beforeSlots, await db.ScheduleSlots.CountAsync());
+        Assert.Null((await db.ScheduleCellStyles.SingleAsync()).BackgroundColorArgb);
+        Assert.Equal(scenario == "pending-correction" ? 1 : 0, await db.ShiftCorrectionRequests.CountAsync());
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task DayOff_ReviewPreservesOriginAndOnlyApprovalCreatesAssignedSlot(bool reject)
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        await using var db = database.CreateContext();
+        var fixture = await SeedAsync(db);
+        db.Add(TestDataFactory.CreateDalSlot(fixture.ScheduleId, 13, 7, null, "08:00", "16:00"));
+        await db.SaveChangesAsync();
+        var created = await CreateDayOffAsync(db, fixture);
+        var manager = ManagerController(db, fixture);
+        var result = reject ? await manager.Reject(fixture.ContainerId, fixture.ScheduleId, created.Id, default)
+            : await manager.Approve(fixture.ContainerId, fixture.ScheduleId, created.Id,
+                new ApproveShiftCorrectionRequest { HighlightColor = "#DBEAFE" }, default);
+        var dto = Assert.IsType<ShiftCorrectionRequestDto>(Assert.IsType<OkObjectResult>(result.Result).Value);
+        Assert.True(dto.IsDayOffRequest); Assert.Null(dto.OriginalFromTime); Assert.Null(dto.OriginalToTime);
+        Assert.Equal(reject ? "rejected" : "approved", dto.Status);
+        Assert.NotNull(dto.ReviewedAtUtc); Assert.Equal("Ada Manager", dto.ReviewedByManagerName);
+        var stored = await db.ShiftCorrectionRequests.AsNoTracking().SingleAsync();
+        Assert.Equal(fixture.ManagerId, stored.ReviewedByManagerId);
+        if (reject)
+        {
+            Assert.Null(dto.ScheduleSlotId); Assert.Equal(3, await db.ScheduleSlots.CountAsync());
+            Assert.Single(await db.ScheduleCellStyles.ToListAsync());
+        }
+        else
+        {
+            var slot = await db.ScheduleSlots.SingleAsync(item => item.Id == dto.ScheduleSlotId);
+            Assert.Equal(SlotStatus.ASSIGNED, slot.Status); Assert.Equal(8, slot.SlotNo);
+            Assert.Equal(fixture.EmployeeId, slot.EmployeeId); Assert.Equal(("08:00", "16:00"), (slot.FromTime, slot.ToTime));
+            Assert.Equal(4, await db.ScheduleSlots.CountAsync());
+            Assert.Equal(unchecked((int)0xFFDBEAFE), (await db.ScheduleCellStyles.SingleAsync(item => item.DayOfMonth == 13)).BackgroundColorArgb);
+        }
+        await Assert.ThrowsAsync<ValidationException>(() => manager.Approve(fixture.ContainerId, fixture.ScheduleId, created.Id, new(), default));
+        await Assert.ThrowsAsync<ValidationException>(() => manager.Reject(fixture.ContainerId, fixture.ScheduleId, created.Id, default));
+        var listed = Assert.IsAssignableFrom<IEnumerable<ShiftCorrectionRequestDto>>(Assert.IsType<OkObjectResult>((await EmployeeController(db, fixture).GetMine(default)).Result).Value);
+        Assert.True(Assert.Single(listed).IsDayOffRequest);
+    }
+
+    [Theory]
+    [InlineData("own-assignment")]
+    [InlineData("foreign-assignment")]
+    [InlineData("private")]
+    [InlineData("removed")]
+    [InlineData("invalid-day")]
+    public async Task DayOff_ApprovalRevalidatesState_AndRollsBackAllWrites(string scenario)
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        await using var db = database.CreateContext();
+        var fixture = await SeedAsync(db);
+        var created = await CreateDayOffAsync(db, fixture);
+        if (scenario == "own-assignment") db.Add(TestDataFactory.CreateDalSlot(fixture.ScheduleId, 13, 1, fixture.EmployeeId, "19:00", "22:00"));
+        if (scenario == "foreign-assignment")
+        {
+            await AddOtherScheduleAsync(db, fixture, "12:00", 2026, 8);
+            (await db.ScheduleSlots.SingleAsync(slot => slot.ScheduleId != fixture.ScheduleId)).DayOfMonth = 13;
+        }
+        if (scenario == "private") (await db.Schedules.SingleAsync()).PublicationStatus = SchedulePublicationStatus.Private;
+        if (scenario == "removed") db.ScheduleEmployees.Remove(await db.ScheduleEmployees.SingleAsync());
+        if (scenario == "invalid-day")
+        {
+            (await db.ShiftCorrectionRequests.SingleAsync()).DayOfMonth = 31;
+            (await db.Schedules.SingleAsync()).Month = 2;
+        }
+        await db.SaveChangesAsync(); db.ChangeTracker.Clear();
+        var count = await db.ScheduleSlots.CountAsync();
+        await Assert.ThrowsAsync<ValidationException>(() => ManagerController(db, fixture).Approve(fixture.ContainerId, fixture.ScheduleId, created.Id, new(), default));
+        db.ChangeTracker.Clear();
+        Assert.Equal(count, await db.ScheduleSlots.CountAsync());
+        var pending = await db.ShiftCorrectionRequests.SingleAsync();
+        Assert.Equal(ShiftCorrectionStatus.Pending, pending.Status); Assert.Null(pending.ScheduleSlotId); Assert.Null(pending.ReviewedAtUtc);
+        Assert.Single(await db.ScheduleCellStyles.ToListAsync()); Assert.False(await db.ManagerShiftCorrectionSettings.AnyAsync());
+    }
+
+    [Fact]
+    public async Task DayOff_ConcurrentSubmissionsAndReviewsProduceOneRequestAndOneSlot()
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        await using var seed = database.CreateContext();
+        var fixture = await SeedAsync(seed);
+        var ready = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var count = 0;
+        var interceptor = new PendingInsertBarrier(async () => {
+            if (Interlocked.Increment(ref count) == 2) ready.SetResult();
+            await ready.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        });
+        var options = new DbContextOptionsBuilder<DataAccessLayer.Models.DataBaseContext.AppDbContext>()
+            .UseSqlite(database.ConnectionString).AddInterceptors(interceptor).Options;
+        async Task<bool> Submit()
+        {
+            await using var db = new DataAccessLayer.Models.DataBaseContext.AppDbContext(options);
+            var result = await EmployeeController(db, fixture).Create(new() { ScheduleId = fixture.ScheduleId, DayOfMonth = 13,
+                RequestedFromTime = "08:00", RequestedToTime = "16:00" }, default);
+            return result.Result is CreatedAtActionResult;
+        }
+        var submissions = await Task.WhenAll(Submit(), Submit());
+        Assert.Single(submissions, success => success);
+        seed.ChangeTracker.Clear();
+        var request = await seed.ShiftCorrectionRequests.SingleAsync();
+        var secondManager = new ManagerAccountModel
+        {
+            Username = "second-reviewer", DisplayName = "Second reviewer", PasswordHash = "synthetic",
+            PasswordUpdatedAtUtc = DateTimeOffset.UtcNow, CreatedAtUtc = DateTimeOffset.UtcNow, UpdatedAtUtc = DateTimeOffset.UtcNow,
+        };
+        seed.Add(secondManager);
+        await seed.SaveChangesAsync();
+        async Task<bool> Approve(int managerId)
+        {
+            await using var db = database.CreateContext();
+            try { return (await ManagerController(db, fixture with { ManagerId = managerId }).Approve(fixture.ContainerId, fixture.ScheduleId, request.Id, new(), default)).Result is OkObjectResult; }
+            catch (ValidationException) { return false; }
+        }
+        var approvals = await Task.WhenAll(Task.Run(() => Approve(fixture.ManagerId)), Task.Run(() => Approve(secondManager.Id)));
+        Assert.Single(approvals, success => success);
+        Assert.Equal(3, await seed.ScheduleSlots.CountAsync());
+        Assert.Single(await seed.ScheduleSlots.Where(slot => slot.DayOfMonth == 13).ToListAsync());
+        Assert.Single(await seed.ScheduleCellStyles.Where(style => style.DayOfMonth == 13).ToListAsync());
+    }
+
+    [Theory]
+    [InlineData("15:00", true)]
+    [InlineData("18:00", false)]
+    public async Task DayOff_OnlyOverlappingPendingCorrectionsInOtherSchedulesBlockSubmission(string from, bool rejects)
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        await using var db = database.CreateContext();
+        var fixture = await SeedAsync(db);
+        var schedule = await db.Schedules.SingleAsync();
+        var other = TestDataFactory.CreateDalSchedule(fixture.ContainerId, schedule.ShopId, year: 2026, month: 8);
+        other.PublicationStatus = SchedulePublicationStatus.Public;
+        db.Add(other); await db.SaveChangesAsync();
+        db.Add(new ShiftCorrectionRequestModel
+        {
+            ScheduleId = other.Id, EmployeeId = fixture.EmployeeId, DayOfMonth = 13,
+            RequestedFromTime = from, RequestedToTime = "20:00", CreatedAtUtc = DateTimeOffset.UtcNow,
+        });
+        await db.SaveChangesAsync();
+        if (rejects) await Assert.ThrowsAsync<ValidationException>(() => CreateDayOffAsync(db, fixture));
+        else Assert.True((await CreateDayOffAsync(db, fixture)).IsDayOffRequest);
+        Assert.Equal(rejects ? 1 : 2, await db.ShiftCorrectionRequests.CountAsync());
+        Assert.Equal(2, await db.ScheduleSlots.CountAsync());
+    }
+
+    private sealed class PendingInsertBarrier(Func<Task> wait) : Microsoft.EntityFrameworkCore.Diagnostics.SaveChangesInterceptor
+    {
+        public override async ValueTask<Microsoft.EntityFrameworkCore.Diagnostics.InterceptionResult<int>> SavingChangesAsync(
+            Microsoft.EntityFrameworkCore.Diagnostics.DbContextEventData eventData, Microsoft.EntityFrameworkCore.Diagnostics.InterceptionResult<int> result, CancellationToken cancellationToken = default)
+        {
+            if (eventData.Context!.ChangeTracker.Entries<ShiftCorrectionRequestModel>().Any(entry => entry.State == EntityState.Added)) await wait();
+            return result;
+        }
+    }
+
+    private static EmployeeShiftCorrectionsController EmployeeController(DataAccessLayer.Models.DataBaseContext.AppDbContext db, Fixture fixture,
+        ManagerEditLockService? locks = null)
+    {
+        var controller = new EmployeeShiftCorrectionsController(db, locks ?? new(), new NoopWorkflowLogService(), new NoopRealtimeNotifier());
+        SetEmployeeUser(controller, fixture.EmployeeId); return controller;
+    }
+    private static ManagerShiftCorrectionsController ManagerController(DataAccessLayer.Models.DataBaseContext.AppDbContext db, Fixture fixture)
+    {
+        var controller = new ManagerShiftCorrectionsController(db, new NoopWorkflowLogService(), new NoopRealtimeNotifier());
+        SetManagerUser(controller, fixture.ManagerId); return controller;
+    }
+    private static async Task<ShiftCorrectionRequestDto> CreateDayOffAsync(DataAccessLayer.Models.DataBaseContext.AppDbContext db, Fixture fixture)
+        => Assert.IsType<ShiftCorrectionRequestDto>(Assert.IsType<CreatedAtActionResult>((await EmployeeController(db, fixture).Create(new() {
+            ScheduleId = fixture.ScheduleId, DayOfMonth = 13, RequestedFromTime = "08:00", RequestedToTime = "16:00" }, default)).Result).Value);
+
+    [Theory]
     [InlineData("12:00", 2026, 8, true)]
     [InlineData("12:30", 2026, 8, false)]
     [InlineData("12:00", 2026, 9, false)]

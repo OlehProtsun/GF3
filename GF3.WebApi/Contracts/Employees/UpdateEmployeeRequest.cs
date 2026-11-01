@@ -8,6 +8,8 @@ namespace WebApi.Contracts.Employees;
 /// </summary>
 public sealed class UpdateEmployeeRequest
 {
+    public string? ContractType { get; set; }
+
     [Required]
     [MaxLength(100)]
     public string FirstName { get; set; } = string.Empty;

@@ -7,6 +7,8 @@ namespace WebApi.Contracts.EmployeeAvailability;
 /// </summary>
 public sealed class EmployeeAvailabilityGroupDto
 {
+    public bool IsAutomatic { get; set; }
+
     public int Id { get; set; }
 
     public string Name { get; set; } = string.Empty;

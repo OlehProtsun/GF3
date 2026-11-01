@@ -42,7 +42,13 @@ public sealed class ScheduleGenerationScenarioMatrixTests(ITestOutputHelper outp
             1 + seed % 3, (AvailabilityPattern)(seed % 9), seed);
         scenario = ScheduleGenerationScenarioFactory.WithLimits(scenario, 80 + seed % 5 * 40,
             1 + seed % 5, 1 + seed % 3, 2 + seed % 8, seed % 4 * 40);
-        await GenerateAndCheck(scenario);
+        string[]? reference = null;
+        for (var repeat = 0; repeat < 3; repeat++)
+        {
+            var slots = await GenerateAndCheck(scenario);
+            if (reference is not null) Assert.Equal(reference, Normalize(slots));
+            reference = Normalize(slots);
+        }
     }
 
     [Theory]
@@ -153,7 +159,7 @@ public sealed class ScheduleGenerationScenarioMatrixTests(ITestOutputHelper outp
     internal static string[] Normalize(IEnumerable<ScheduleSlotModel> slots) => slots
         .Select(s => $"{s.DayOfMonth:D2}|{s.SlotNo}|{s.EmployeeId}|{s.Status}|{s.FromTime}|{s.ToTime}").Order(StringComparer.Ordinal).ToArray();
 
-    private static GenerationScenario Build(string id, int year, int month, AvailabilityPattern pattern, int count, int staffing, int seed, string mode)
+    internal static GenerationScenario Build(string id, int year, int month, AvailabilityPattern pattern, int count, int staffing, int seed, string mode)
     {
         if (mode == "empty") count = 0;
         if (mode == "one") count = 1;

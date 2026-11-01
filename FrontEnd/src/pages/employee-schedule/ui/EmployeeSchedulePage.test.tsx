@@ -13,6 +13,9 @@ import { PublicHolidayVisibilityProvider } from "@app/providers/PublicHolidayVis
 import { publicHolidaySettingsApi } from "@entities/public-holidays/api/publicHolidaySettingsApi";
 
 beforeEnglishTest(() => setTestLanguage("en"));
+vi.mock("@entities/urlop", async importOriginal => ({ ...await importOriginal<typeof import("@entities/urlop")>(),
+  useEmployeeApprovedUrlopQuery: () => ({ data: [], error: null }),
+}));
 
 const mocks = vi.hoisted(() => ({
   scheduleQuery: vi.fn(),
@@ -647,6 +650,25 @@ describe("EmployeeSchedulePage", () => {
 
 
 describe("schedule selector", () => {
+  test("blocks day-off requests for own assignments across public schedules and related assignments", async () => {
+    const first = { ...schedules[0], relatedScheduleAssignments: [
+      { employeeId: 12, dayOfMonth: 14, scheduleId: 3, scheduleName: "Related" },
+    ] };
+    const second = { ...schedules[1], slots: [{ ...schedules[1].slots[0], dayOfMonth: 15 }] };
+    mocks.scheduleQuery.mockReturnValue({ data: [first, second], isLoading: false, error: null });
+    renderPage();
+    await userEvent.click(screen.getByRole("button", { name: "Request a shift correction" }));
+    const dialog = screen.getByRole("dialog", { name: "Request a shift change" });
+    for (const day of [14, 15]) {
+      await userEvent.click(within(dialog).getAllByRole("tab")[day - 1]);
+      expect(within(dialog).getByText("You already work on this date in another schedule.")).toBeVisible();
+      expect(within(dialog).getByLabelText("New start time")).toBeDisabled();
+      expect(within(dialog).getByRole("button", { name: "Send request" })).toBeDisabled();
+    }
+    await userEvent.click(within(dialog).getAllByRole("tab")[15]);
+    expect(within(dialog).getByLabelText("New start time")).toBeEnabled();
+  });
+
   test("keeps Adjust independent from schedule selection in both view modes", async () => {
     mocks.scheduleQuery.mockReturnValue({ data: schedules, isLoading: false, error: null });
     const user = userEvent.setup();

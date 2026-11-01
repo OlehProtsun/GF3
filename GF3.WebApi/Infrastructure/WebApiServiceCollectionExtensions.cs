@@ -7,6 +7,11 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Cors.Infrastructure;
 using Microsoft.AspNetCore.Mvc.Authorization;
 using Microsoft.AspNetCore.ResponseCompression;
+using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.Mvc;
+using System.Globalization;
+using System.Security.Claims;
+using System.Threading.RateLimiting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -43,6 +48,48 @@ public static class WebApiServiceCollectionExtensions
         services.AddOptions<PushOptions>().Bind(configuration.GetSection("Push"))
             .Validate(options => options.IsValid(), "Push configuration is invalid; check VAPID settings.").ValidateOnStart();
         services.AddSingleton<AuthAttemptLimiter>();
+        services.AddRateLimiter(options =>
+        {
+            options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
+            {
+                if (!context.Request.Path.StartsWithSegments("/api"))
+                    return RateLimitPartition.GetNoLimiter("non-api");
+
+                string? identity = null;
+                if (context.User.Identity?.IsAuthenticated == true)
+                {
+                    if (context.User.IsInRole(AuthRoles.Manager) &&
+                        int.TryParse(context.User.FindFirstValue("manager_id"), out var managerId) && managerId > 0)
+                        identity = $"manager:{managerId}";
+                    else if (context.User.IsInRole(AuthRoles.Employee) &&
+                        int.TryParse(context.User.FindFirstValue("employee_id"), out var employeeId) && employeeId > 0)
+                        identity = $"employee:{employeeId}";
+                }
+                var ip = context.Connection.RemoteIpAddress;
+                if (ip?.IsIPv4MappedToIPv6 == true) ip = ip.MapToIPv4();
+                var key = identity is null ? $"anonymous:{ip?.ToString() ?? "unknown"}" : $"authenticated:{identity}";
+                return RateLimitPartition.GetFixedWindowLimiter(key, _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = identity is null ? 120 : 240,
+                    Window = TimeSpan.FromMinutes(1), QueueLimit = 0, AutoReplenishment = true,
+                });
+            });
+            options.OnRejected = async (context, cancellationToken) =>
+            {
+                var seconds = context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter)
+                    ? Math.Max(1, (int)Math.Ceiling(retryAfter.TotalSeconds)) : 60;
+                var response = context.HttpContext.Response;
+                response.StatusCode = StatusCodes.Status429TooManyRequests;
+                response.Headers.RetryAfter = seconds.ToString(CultureInfo.InvariantCulture);
+                response.Headers.CacheControl = "no-store";
+                await response.WriteAsJsonAsync(new ProblemDetails
+                {
+                    Status = 429, Title = "Too many requests",
+                    Detail = "Too many requests. Please try again later.",
+                }, options: (System.Text.Json.JsonSerializerOptions?)null,
+                    contentType: "application/problem+json", cancellationToken: cancellationToken);
+            };
+        });
         services.AddApiMvc(jwtOptions);
         services.AddApiDocumentation();
         services.AddFrontendDevelopmentCors();
@@ -58,6 +105,8 @@ public static class WebApiServiceCollectionExtensions
         services.AddScoped<IRealtimeNotifier, RealtimeNotifier>();
         services.AddScoped<IWorkflowLogService, WorkflowLogService>();
         services.AddScoped<ScheduleVersionCommitService>();
+        services.AddScoped<WebApi.ShiftSwaps.ShiftSwapExecutionService>();
+        services.AddScoped<WebApi.ShiftSwaps.ContractShiftApprovalService>();
         services.AddScoped<IEmployeePushNotificationSource, EmployeePushNotificationSource>();
         services.AddHttpClient<IEmployeeWebPushSender, EmployeeWebPushSender>(client => client.Timeout = TimeSpan.FromSeconds(30))
             .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });

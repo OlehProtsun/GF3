@@ -21,3 +21,7 @@
     grid-template-columns: 1fr;
   }
 }
+
+.contractSelector { border:0; padding:0; margin:0; display:flex; flex-wrap:wrap; gap:16px; }
+.contractSelector legend { margin-bottom:10px; font-weight:600; }
+.contractSelector label { display:flex; gap:8px; align-items:center; }

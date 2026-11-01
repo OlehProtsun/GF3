@@ -1,3 +1,6 @@
+import { useEmployeeProfileQuery } from "@features/employee-profile/api/queries";
+import { useEmploymentContractSettingsQuery } from "@entities/employment-contracts";
+import { useEmployeeContractApprovalsQuery, useCreateContractClaimMutation, useCreateGiveawayExceptionMutation, useCancelContractApprovalMutation } from "@entities/shift-swap-approvals";
 import { swapMinutes, type SwapPeriod } from "./SwapShiftPickerDialog";
 import { createPortal, flushSync } from "react-dom";
 import { useQueryClient } from "@tanstack/react-query";
@@ -156,6 +159,12 @@ function SwapOfferCard({ swap, isPinned, highlighted, onTogglePin, onViewDetails
             {isOpen && swap.isCreatedByCurrentEmployee ? <EmployeeIcon size={12} /> : (isOpen ? swap.canAccept : swap.status === "accepted") ? <CheckIcon size={13} /> : <WarnIcon size={13} />}
             <span>{availabilityLabel}</span>
           </span>
+          {swap.pickupApprovalPolicyApplies && <span className={`${styles.badge} ${styles.badgeApproval}`} title={t("Manager approval is required when the shift owner or recipient has an employment contract.")}>
+            {t("Manager approval")}
+          </span>}
+          {isOpen && swap.isAwaitingManagerApproval && <span className={`${styles.badge} ${styles.badgeApproval}`}>
+            {t("Awaiting approval")}
+          </span>}
           {swap.allowPartialAcceptance === true && swap.requestKind !== "exchange" && <span className={`${styles.badge} ${styles.badgePartial}`}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
             <span>{t("Partial")}</span>
@@ -210,6 +219,13 @@ export function EmployeeSwapPage() {
   const swapsQuery = useEmployeeShiftSwapsQuery();
   const targetEmployeesQuery = useEmployeeShiftSwapEmployeesQuery();
   const uiStateQuery = useEmployeeUiStateQuery(Boolean(employeeId));
+  const profileQuery = useEmployeeProfileQuery();
+  const contractSettingsQuery = useEmploymentContractSettingsQuery();
+  const approvalsQuery = useEmployeeContractApprovalsQuery();
+  const claimApprovalMutation = useCreateContractClaimMutation();
+  const exceptionMutation = useCreateGiveawayExceptionMutation();
+  const cancelApprovalMutation = useCancelContractApprovalMutation();
+  const restrictToEightHours = profileQuery.data?.contractType === "o_prace" && contractSettingsQuery.data?.restrictSwapsToEightHours === true;
   const createSwapMutation = useCreateEmployeeShiftSwapMutation();
   const acceptSwapMutation = useAcceptEmployeeShiftSwapMutation();
   const cancelSwapMutation = useCancelEmployeeShiftSwapMutation();
@@ -314,7 +330,7 @@ export function EmployeeSwapPage() {
   const pendingUnpinSwap = pendingUnpinSwapId === null
     ? null
     : swaps.find(swap => swap.id === pendingUnpinSwapId) ?? null;
-  const isActionBusy = createSwapMutation.isPending || acceptSwapMutation.isPending || cancelSwapMutation.isPending || isAcceptSubmitting;
+  const isActionBusy = claimApprovalMutation.isPending || exceptionMutation.isPending || cancelApprovalMutation.isPending || createSwapMutation.isPending || acceptSwapMutation.isPending || cancelSwapMutation.isPending || isAcceptSubmitting;
   const loadError = schedulesQuery.error ?? swapsQuery.error ?? targetEmployeesQuery.error ?? uiStateQuery.error;
   const hasSwapSearch = swapSearchQuery.trim().length > 0;
   const handleToggleSwapPin = (swapId: number) => {
@@ -352,7 +368,7 @@ export function EmployeeSwapPage() {
   };
 
   const handleAccept = (swap: ShiftSwap, claimedPeriod?: SwapPeriod) => {
-    if (swap.status !== "open" || !swap.canAccept || isActionBusy || acceptInFlightRef.current) return;
+    if (swap.status !== "open" || !swap.canAccept || swap.isAwaitingManagerApproval || (swap.requiresManagerApproval && !swap.canRequestManagerApproval) || swap.approvalPendingForCurrentEmployee || isActionBusy || acceptInFlightRef.current) return;
     setActionError(null);
     flushSync(() => { closeDetails(); setIsHistoryExpanded(false); });
     setPendingAcceptSwap({ swap, claimedPeriod });
@@ -361,7 +377,7 @@ export function EmployeeSwapPage() {
   const handleConfirmAccept = () => {
     if (!pendingAcceptSwap || isActionBusy || acceptInFlightRef.current) return;
     const currentSwap = swaps.find(swap => swap.id === pendingAcceptSwap.id);
-    if (!currentSwap || currentSwap.status !== "open" || !currentSwap.canAccept) {
+    if (!currentSwap || currentSwap.status !== "open" || !currentSwap.canAccept || currentSwap.isAwaitingManagerApproval || currentSwap.approvalPendingForCurrentEmployee || (currentSwap.requiresManagerApproval && !currentSwap.canRequestManagerApproval)) {
       setPendingAcceptSwap(null);
       setActionError(t("This offer is no longer available. The swap list has been refreshed."));
       void queryClient.invalidateQueries({ queryKey: queryKeys.shiftSwaps.all });
@@ -375,7 +391,8 @@ export function EmployeeSwapPage() {
       setIsAcceptSubmitting(false);
       setPendingAcceptSwap(null);
     };
-    acceptSwapMutation.mutate({ id: currentSwap.id, ...pendingAcceptance?.claimedPeriod }, {
+    const acceptAction = currentSwap.requiresManagerApproval ? claimApprovalMutation : acceptSwapMutation;
+    acceptAction.mutate({ id: currentSwap.id, ...pendingAcceptance?.claimedPeriod }, {
       onSuccess: finish,
       onError: error => {
         finish();
@@ -543,6 +560,20 @@ export function EmployeeSwapPage() {
             </div>
             <button type="button" className={styles.dialogCloseButton} aria-label={t("Close")} onClick={() => setIsHistoryExpanded(false)}><CloseIcon size={20} /></button>
           </div>
+          <section aria-label={t("My approval requests")}>
+            <h3>{t("My approval requests")}</h3>
+            {approvalsQuery.error ? <ErrorBanner dismissible={false}>{getErrorMessage(approvalsQuery.error, t("Could not load approval requests."))}</ErrorBanner> : null}
+            {approvalsQuery.data?.map(item => <article key={item.id}>
+              <strong>{t(item.kind === "claim" ? "Shift pickup approval" : "Monthly minimum exception")}</strong>
+              <p>{item.scheduleName} · {item.dayOfMonth}.{item.month}.{item.year} · {item.fromTime}–{item.toTime}</p>
+              <span>{({ pending: t("Pending"), approved: t("Approved"), rejected: t("Rejected"), cancelled: t("Cancelled"), expired: t("Expired") } as const)[item.status]}</span>
+              {item.failureReason ? <p>{translateServerMessage(item.failureReason)}</p> : null}
+              {item.status === "pending" ? <><p>{t(item.kind === "claim" ? "The offer is reserved while this pickup request awaits manager approval." : "Monthly minimum exception required.")}</p>
+                <button type="button" disabled={cancelApprovalMutation.isPending} onClick={() => cancelApprovalMutation.mutate(item.id, {
+                  onError: error => setActionError(getErrorMessage(error, t("Could not cancel this request."))),
+                })}>{t("Cancel request")}</button></> : null}
+            </article>)}
+          </section>
           <div ref={historyListRef} data-swap-history-scroll role="region" aria-label={t("Swap history")} tabIndex={0} data-motion-list className={[styles.offerList, swapHistory.length >= 5 ? styles.offerListScrollable : ""].filter(Boolean).join(" ")}>
             {swapHistory.length === 0 ? (
               <p className={styles.emptyText}>{t("Accepted and cancelled swaps will appear here.")}</p>
@@ -567,8 +598,15 @@ export function EmployeeSwapPage() {
       {isGiveAwayExpanded && employeeId && <SwapCreateWizard
         returnFocusRef={createOfferTriggerRef}
         schedules={schedules} employees={targetEmployees} employeeId={employeeId} employeeName={session?.displayName ?? ""} swaps={swaps}
-        busy={createSwapMutation.isPending} error={actionError || (loadError ? getErrorMessage(loadError, t("Could not load swap data.")) : null)}
+        requirePickupApproval={contractSettingsQuery.data?.requirePickupApproval}
+        restrictToEightHours={restrictToEightHours}
+        busy={createSwapMutation.isPending || exceptionMutation.isPending} error={actionError || (loadError ? getErrorMessage(loadError, t("Could not load swap data.")) : null)}
         onClose={() => { setIsGiveAwayExpanded(false); createOfferTriggerRef.current?.focus({ preventScroll: true }); }}
+        onRequestException={payload => { setActionError(null); exceptionMutation.mutate(payload, {
+          onSuccess: () => { setIsGiveAwayExpanded(false); createOfferTriggerRef.current?.focus({ preventScroll: true }); },
+          onError: error => { setActionError(getErrorMessage(error, t("Could not request a manager exception.")));
+            void queryClient.invalidateQueries({ queryKey: queryKeys.shiftSwaps.all }); },
+        }); }}
         onSubmit={payload => { setActionError(null); createSwapMutation.mutate(payload, {
           onSuccess: () => { setIsGiveAwayExpanded(false); createOfferTriggerRef.current?.focus({ preventScroll: true }); },
           onError: error => {
@@ -582,8 +620,8 @@ export function EmployeeSwapPage() {
       {createPortal(<ConfirmDialog
         open={pendingAcceptSwap !== null}
         variant="confirm"
-        title={t("Accept this shift?")}
-        message={pendingAcceptSwap?.requestKind === "exchange" ? t(
+        title={t(pendingAcceptSwap?.requiresManagerApproval ? "Request manager approval?" : "Accept this shift?")}
+        message={pendingAcceptSwap?.requiresManagerApproval ? t("Send request to manager? The offer will be reserved until a decision.") : pendingAcceptSwap?.requestKind === "exchange" ? t(
           "Accept exchange: you receive {0} on {1}, {2}–{3}, and give {4} on {5}, {6}–{7}, to {8}? Both schedules update together.",
           pendingAcceptSwap.scheduleName, formatSwapDate(pendingAcceptSwap), pendingAcceptSwap.fromTime, pendingAcceptSwap.toTime,
           pendingAcceptSwap.returnScheduleName ?? "", `${String(pendingAcceptSwap.returnDayOfMonth).padStart(2, "0")}.${String(pendingAcceptSwap.returnMonth).padStart(2, "0")}.${pendingAcceptSwap.returnYear}`,
@@ -596,7 +634,7 @@ export function EmployeeSwapPage() {
           formatSwapDate(pendingAcceptSwap), pendingAcceptance?.claimedPeriod?.fromTime ?? pendingAcceptSwap.fromTime, pendingAcceptance?.claimedPeriod?.toTime ?? pendingAcceptSwap.toTime,
           formatHours(pendingAcceptance?.claimedPeriod ? (swapMinutes(pendingAcceptance.claimedPeriod.toTime) - swapMinutes(pendingAcceptance.claimedPeriod.fromTime)) / 60 : pendingAcceptSwap.shiftHours),
         ) : ""}
-        confirmText={t("Accept shift")}
+        confirmText={t(pendingAcceptSwap?.requiresManagerApproval ? "Request manager approval" : "Accept shift")}
         cancelText={t("Back")}
         confirmDisabled={acceptSwapMutation.isPending || isAcceptSubmitting}
         cancelDisabled={acceptSwapMutation.isPending || isAcceptSubmitting}

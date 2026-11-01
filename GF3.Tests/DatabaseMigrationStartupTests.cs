@@ -14,6 +14,126 @@ namespace GF3.Tests;
 
 public sealed class DatabaseMigrationStartupTests
 {
+    [Fact]
+    public async Task DayOffMigration_PreservesHistoryAndEnforcesBothPendingIndexesAndSnapshotChecks()
+    {
+        await using var database = await GF3.Tests.Infrastructure.SqliteTestDatabase.CreateAsync();
+        await using var db = database.CreateContext();
+        await db.GetService<IMigrator>().MigrateAsync("20261031083410_AddUrlop");
+        var (employee, _, schedule, slot) = await EmployeePushNotificationSourceTests.Seed(db);
+        foreach (var status in new[] { ShiftCorrectionStatus.Pending, ShiftCorrectionStatus.Approved, ShiftCorrectionStatus.Rejected })
+            db.ShiftCorrectionRequests.Add(Correction(status));
+        await db.SaveChangesAsync();
+        db.ChangeTracker.Clear();
+        var workspace = new SqliteDatabaseWorkspace(database.DatabasePath);
+        var result = await DatabaseMigrationStartup.ApplyAsync(db, workspace, true, true, NullLogger.Instance);
+        Assert.Contains("20261101190152_AddDayOffShiftCorrectionRequests", result.AppliedMigrations);
+        Assert.NotNull(result.BackupPath); Assert.True(File.Exists(result.BackupPath));
+        await using (var backup = CreateContext($"Data Source={result.BackupPath};Mode=ReadOnly"))
+        {
+            Assert.Equal(3, await backup.ShiftCorrectionRequests.CountAsync());
+            Assert.DoesNotContain("20261101190152_AddDayOffShiftCorrectionRequests", await backup.Database.GetAppliedMigrationsAsync());
+        }
+        var copyPath = Path.Combine(database.RootPath, "older-copy.db");
+        File.Copy(result.BackupPath!, copyPath);
+        await using (var copy = CreateContext($"Data Source={copyPath}"))
+        {
+            var copied = await DatabaseMigrationStartup.ApplyAsync(copy, new SqliteDatabaseWorkspace(copyPath), true, true, NullLogger.Instance);
+            Assert.NotNull(copied.BackupPath);
+            Assert.Equal(3, await copy.ShiftCorrectionRequests.CountAsync());
+            Assert.Empty(await copy.Database.GetPendingMigrationsAsync());
+        }
+        var history = await db.ShiftCorrectionRequests.AsNoTracking().OrderBy(item => item.Id).ToListAsync();
+        Assert.Equal(3, history.Count);
+        Assert.All(history, item => { Assert.Equal("08:00", item.OriginalFromTime); Assert.Equal("16:00", item.OriginalToTime); Assert.Equal(slot.Id, item.ScheduleSlotId); });
+        await db.GetService<IMigrator>().MigrateAsync("20261031083410_AddUrlop");
+        Assert.Equal(3, await db.ShiftCorrectionRequests.CountAsync());
+        await db.GetService<IMigrator>().MigrateAsync();
+        Assert.Equal(history.Select(item => (item.Id, item.Status, item.OriginalFromTime, item.OriginalToTime)),
+            (await db.ShiftCorrectionRequests.AsNoTracking().OrderBy(item => item.Id).ToListAsync())
+                .Select(item => (item.Id, item.Status, item.OriginalFromTime, item.OriginalToTime)));
+        Assert.False(db.Database.HasPendingModelChanges());
+        async Task RejectInsert(ShiftCorrectionRequestModel request)
+        {
+            db.Add(request); await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync());
+            db.ChangeTracker.Clear();
+        }
+        await RejectInsert(Correction(ShiftCorrectionStatus.Pending));
+        var dayOff = Correction(ShiftCorrectionStatus.Pending);
+        dayOff.DayOfMonth = 2; dayOff.ScheduleSlotId = null; dayOff.OriginalFromTime = null; dayOff.OriginalToTime = null;
+        db.Add(dayOff); await db.SaveChangesAsync();
+        var duplicate = Correction(ShiftCorrectionStatus.Pending);
+        duplicate.DayOfMonth = 2; duplicate.ScheduleSlotId = null; duplicate.OriginalFromTime = null; duplicate.OriginalToTime = null;
+        await RejectInsert(duplicate);
+        foreach (var scenario in new[] { "mixed-from", "mixed-to", "bad-original", "null-slot", "order", "bad-request" })
+        {
+            var invalid = Correction(ShiftCorrectionStatus.Rejected);
+            if (scenario == "mixed-from") invalid.OriginalFromTime = null;
+            if (scenario == "mixed-to") invalid.OriginalToTime = null;
+            if (scenario == "bad-original") invalid.OriginalFromTime = "25:00";
+            if (scenario == "null-slot") invalid.ScheduleSlotId = null;
+            if (scenario == "order") invalid.RequestedFromTime = invalid.RequestedToTime;
+            if (scenario == "bad-request") invalid.RequestedFromTime = "ab:cd";
+            await RejectInsert(invalid);
+        }
+        Assert.Equal(4, await db.ShiftCorrectionRequests.CountAsync());
+        ShiftCorrectionRequestModel Correction(ShiftCorrectionStatus status) => new() {
+            ScheduleId = schedule.Id, EmployeeId = employee, ScheduleSlotId = slot.Id, DayOfMonth = 1,
+            OriginalFromTime = "08:00", OriginalToTime = "16:00", RequestedFromTime = "08:00", RequestedToTime = "16:30",
+            Status = status, CreatedAtUtc = DateTimeOffset.UtcNow,
+        };
+    }
+
+    [Theory]
+    [InlineData(ShiftCorrectionStatus.Pending)]
+    [InlineData(ShiftCorrectionStatus.Approved)]
+    [InlineData(ShiftCorrectionStatus.Rejected)]
+    public async Task DayOffMigration_RollbackRefusesEveryDayOffStatusWithoutLosingHistory(ShiftCorrectionStatus status)
+    {
+        await using var database = await GF3.Tests.Infrastructure.SqliteTestDatabase.CreateAsync();
+        await using var db = database.CreateContext();
+        var (employee, _, schedule, slot) = await EmployeePushNotificationSourceTests.Seed(db);
+        var request = new ShiftCorrectionRequestModel {
+            ScheduleId = schedule.Id, EmployeeId = employee, DayOfMonth = 2,
+            ScheduleSlotId = status == ShiftCorrectionStatus.Approved ? slot.Id : null,
+            RequestedFromTime = "08:00", RequestedToTime = "16:00", Status = status, CreatedAtUtc = DateTimeOffset.UtcNow,
+        };
+        db.Add(request); await db.SaveChangesAsync();
+        var error = await Assert.ThrowsAsync<SqliteException>(() => db.GetService<IMigrator>().MigrateAsync("20261031083410_AddUrlop"));
+        Assert.Contains("Rollback blocked", error.Message);
+        db.ChangeTracker.Clear();
+        var preserved = await db.ShiftCorrectionRequests.SingleAsync();
+        Assert.Equal(status, preserved.Status); Assert.Null(preserved.OriginalFromTime); Assert.Null(preserved.OriginalToTime);
+        Assert.Contains("20261101190152_AddDayOffShiftCorrectionRequests", await db.Database.GetAppliedMigrationsAsync());
+    }
+
+    [Fact]
+    public async Task AddUrlop_RollbackAndReapplyPreserveExistingAvailabilityAndSchedule()
+    {
+        await using var database = await GF3.Tests.Infrastructure.SqliteTestDatabase.CreateAsync();
+        await using var db = database.CreateContext();
+        var fixture = await UrlopTestData.SeedAsync(db);
+        db.ScheduleSlots.Add(GF3.Tests.Infrastructure.TestDataFactory.CreateDalSlot(fixture.Schedule, 3, 1, fixture.Employee, "09:00", "17:00"));
+        await db.SaveChangesAsync();
+        var migrator = db.GetService<IMigrator>();
+        await migrator.MigrateAsync("20261029193000_ReservePendingClaimOffer");
+        Assert.Single(await db.ScheduleSlots.ToListAsync());
+        Assert.Single(await db.AvailabilityGroupDays.ToListAsync());
+        await migrator.MigrateAsync();
+        Assert.Empty(await db.UrlopDays.ToListAsync());
+        Assert.Empty(await db.UrlopMonths.ToListAsync());
+        Assert.Single(await db.ScheduleSlots.ToListAsync());
+        Assert.Single(await db.AvailabilityGroupDays.ToListAsync());
+        await UrlopTestData.Service(db).CreateApprovedAsync(fixture.Manager, fixture.Shop, fixture.Employee, 2026, 11, [4], default);
+        db.UrlopDays.Add(new() { RequestId = Guid.NewGuid(), ShopId = fixture.Shop, EmployeeId = fixture.Employee,
+            Date = new(2026, 11, 4), Status = "pending", CreatedAtUtc = new UrlopTestClock().GetUtcNow() });
+        await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync());
+        db.ChangeTracker.Clear();
+        db.UrlopDays.Add(new() { RequestId = Guid.NewGuid(), ShopId = fixture.Shop, EmployeeId = fixture.Employee,
+            Date = new(2026, 11, 4), Status = "rejected", CreatedAtUtc = new UrlopTestClock().GetUtcNow() });
+        await db.SaveChangesAsync();
+        Assert.Equal(2, await db.UrlopDays.CountAsync());
+    }
     private const string PreviousProductionMigration = "20260509101500_AddManagerRecoveryFields";
 
     [Fact]

@@ -6,6 +6,7 @@ import { ContainerGraphMatrix } from "@entities/containers";
 import {
   AVAILABILITY_ANY_MARK,
   AVAILABILITY_NONE_MARK,
+  getAvailabilityCellKey,
   normalizeAvailabilityCellValue,
   parseAvailabilityCode,
   type AvailabilityMatrixCellMap,
@@ -13,6 +14,10 @@ import {
 } from "@entities/availability-groups/model/editor";
 import { getAvailabilityMemberLastModifiedLabel } from "@entities/availability-groups/model/presentation";
 import { AvailabilityIcon } from "@shared/ui/icons";
+import { useApprovedUrlopQuery, isoDate, monthDays } from "@entities/urlop";
+import { useShopsListQuery } from "@entities/shops";
+import { ErrorBanner } from "@shared/ui/components/ErrorBanner";
+import { getErrorMessage } from "@shared/api/httpClient";
 
 type AvailabilityScheduleMatrixProps = {
   year: number;
@@ -23,6 +28,7 @@ type AvailabilityScheduleMatrixProps = {
   title?: string;
   helperText?: string;
   readOnly?: boolean;
+  readOnlyCellKeys?: ReadonlySet<string>;
   emptyMessage?: string;
   cellErrors?: Record<string, string>;
   className?: string;
@@ -50,6 +56,7 @@ export function AvailabilityScheduleMatrix({
   title = t("Availability Schedule"),
   helperText = t("Use {0} for any shift, {1} for unavailable, a time interval like 08:00 - 16:00, or any text note. Text notes stay visible but are treated as unavailable during schedule generation.", AVAILABILITY_ANY_MARK, AVAILABILITY_NONE_MARK),
   readOnly = false,
+  readOnlyCellKeys,
   emptyMessage,
   cellErrors = {},
   className,
@@ -68,6 +75,14 @@ export function AvailabilityScheduleMatrix({
   onVisualHintClick,
 }: AvailabilityScheduleMatrixProps) {
   const language = useLanguageRevision();
+  const urlop = useApprovedUrlopQuery(isoDate(year, month, 1), isoDate(year, month, monthDays(year, month).length));
+  const shops = useShopsListQuery();
+  const urlopLabels = new Map<string, string>();
+  for (const day of urlop.data ?? []) {
+    const key = getAvailabilityCellKey(day.employeeId, Number(day.date.slice(8, 10)));
+    const name = shops.data?.find(x => x.id === day.shopId)?.name ?? String(day.shopId);
+    urlopLabels.set(key, [urlopLabels.get(key) ?? "UR", name].join(" · "));
+  }
   const graphColumns = useMemo<GraphMatrixColumn[]>(
     () =>
       columns.map(column => ({
@@ -78,10 +93,13 @@ export function AvailabilityScheduleMatrix({
         label: column.label,
         minHoursMonth: null,
         totalMinutes: 0,
-        totalText: getAvailabilityMemberLastModifiedLabel(column.employeeLastModifiedAtUtc),
+        totalText: [
+          getAvailabilityMemberLastModifiedLabel(column.employeeLastModifiedAtUtc),
+          readOnlyCellKeys?.has(getAvailabilityCellKey(column.employeeId, 1)) ? t("Automatic availability (read-only)") : null,
+        ].filter(Boolean).join(" · "),
       })),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- Translation helpers read the current language internally.
-    [columns, language],
+    [columns, readOnlyCellKeys, language],
   );
   const normalizedBindValueByKey = useMemo(() => {
     if (!bindValueByKey || bindValueByKey.size === 0) {
@@ -97,7 +115,10 @@ export function AvailabilityScheduleMatrix({
   }, [bindValueByKey]);
 
   return (
+    <>
+    {urlop.error ? <ErrorBanner>{getErrorMessage(urlop.error)}</ErrorBanner> : null}
     <ContainerGraphMatrix
+      urlopInfoLabels={urlopLabels}
       className={className}
       style={style}
       title={title}
@@ -110,6 +131,7 @@ export function AvailabilityScheduleMatrix({
       visualHintMap={visualHintMap}
       lockVisualHintCells
       readOnly={readOnly}
+      readOnlyCellKeys={readOnlyCellKeys}
       emptyMessage={
         emptyMessage ??
         (readOnly
@@ -136,5 +158,6 @@ export function AvailabilityScheduleMatrix({
       onCellChange={onCellChange}
       onVisualHintCellClick={onVisualHintClick}
     />
+    </>
   );
 }

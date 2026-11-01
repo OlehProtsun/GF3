@@ -11,8 +11,12 @@ namespace DataAccessLayer.Models.DataBaseContext;
 /// </summary>
 public class AppDbContext(DbContextOptions<AppDbContext> options, TimeProvider? timeProvider = null) : DbContext(options)
 {
+    public DbSet<UrlopMonthModel> UrlopMonths => Set<UrlopMonthModel>();
+    public DbSet<UrlopDayModel> UrlopDays => Set<UrlopDayModel>();
     public DbSet<ContainerModel> Containers => Set<ContainerModel>();
     public DbSet<EmployeeModel> Employees => Set<EmployeeModel>();
+    public DbSet<EmploymentContractSettingsModel> EmploymentContractSettings => Set<EmploymentContractSettingsModel>();
+    public DbSet<ContractShiftApprovalRequestModel> ContractShiftApprovalRequests => Set<ContractShiftApprovalRequestModel>();
     public DbSet<EmployeeAccountModel> EmployeeAccounts => Set<EmployeeAccountModel>();
     public DbSet<ManagerAccountModel> ManagerAccounts => Set<ManagerAccountModel>();
     public DbSet<ManagerNoteModel> ManagerNotes => Set<ManagerNoteModel>();
@@ -44,6 +48,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, TimeProvider? 
     public DbSet<WorkflowLogEntryModel> WorkflowLogEntries => Set<WorkflowLogEntryModel>();
     public DbSet<WorkflowLogSettingsModel> WorkflowLogSettings => Set<WorkflowLogSettingsModel>();
     public DbSet<PublicHolidaySettingsModel> PublicHolidaySettings => Set<PublicHolidaySettingsModel>();
+    public DbSet<PriorityGenerationSettingsModel> PriorityGenerationSettings => Set<PriorityGenerationSettingsModel>();
     public DbSet<RegulationDocumentModel> RegulationDocuments => Set<RegulationDocumentModel>();
     public DbSet<RegulationAcceptanceModel> RegulationAcceptances => Set<RegulationAcceptanceModel>();
     public DbSet<BindModel> AvailabilityBinds => Set<BindModel>();
@@ -117,6 +122,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, TimeProvider? 
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        ConfigureUrlopMonth(modelBuilder);
+        ConfigureUrlopDay(modelBuilder);
         modelBuilder.Entity<EmployeePushSubscriptionModel>(entity =>
         {
             entity.ToTable("employee_push_subscription");
@@ -181,6 +188,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, TimeProvider? 
         ConfigureWorkflowLogEntry(modelBuilder);
         ConfigureWorkflowLogSettings(modelBuilder);
         ConfigurePublicHolidaySettings(modelBuilder);
+        ConfigurePriorityGenerationSettings(modelBuilder);
         ConfigureRegulationDocument(modelBuilder);
         ConfigureRegulationAcceptance(modelBuilder);
         ConfigureAvailabilityBind(modelBuilder);
@@ -188,6 +196,50 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, TimeProvider? 
         ConfigureAvailabilityGroupMember(modelBuilder);
         ConfigureAvailabilityGroupDay(modelBuilder);
         ConfigureAvailabilityGroupDayTransfer(modelBuilder);
+    }
+
+    private static void ConfigureUrlopMonth(ModelBuilder modelBuilder)
+    {
+        var entity = modelBuilder.Entity<UrlopMonthModel>();
+        entity.ToTable("urlop_month", table =>
+        {
+            table.HasCheckConstraint("ck_urlop_month_year", "year BETWEEN 1 AND 9999");
+            table.HasCheckConstraint("ck_urlop_month_month", "month BETWEEN 1 AND 12");
+        });
+        entity.HasKey(x => x.Id);
+        entity.Property(x => x.Id).HasColumnName("id");
+        entity.Property(x => x.ShopId).HasColumnName("shop_id");
+        entity.Property(x => x.Year).HasColumnName("year");
+        entity.Property(x => x.Month).HasColumnName("month");
+        entity.Property(x => x.IsOpen).HasColumnName("is_open").HasDefaultValue(false);
+        entity.Property(x => x.Revision).HasColumnName("revision").HasDefaultValue(0);
+        entity.HasIndex(x => new { x.ShopId, x.Year, x.Month }).IsUnique();
+        entity.HasOne<ShopModel>().WithMany().HasForeignKey(x => x.ShopId).OnDelete(DeleteBehavior.Restrict);
+    }
+
+    private static void ConfigureUrlopDay(ModelBuilder modelBuilder)
+    {
+        var entity = modelBuilder.Entity<UrlopDayModel>();
+        entity.ToTable("urlop_day", table => table.HasCheckConstraint("ck_urlop_day_status", "status IN ('pending','approved','rejected')"));
+        entity.HasKey(x => x.Id);
+        entity.Property(x => x.Id).HasColumnName("id");
+        entity.Property(x => x.RequestId).HasColumnName("request_id");
+        entity.Property(x => x.ShopId).HasColumnName("shop_id");
+        entity.Property(x => x.EmployeeId).HasColumnName("employee_id");
+        entity.Property(x => x.Date).HasColumnName("date");
+        entity.Property(x => x.Status).HasColumnName("status").HasMaxLength(16).IsRequired();
+        entity.Property(x => x.CreatedAtUtc).HasColumnName("created_at_utc");
+        entity.Property(x => x.CreatedByManagerId).HasColumnName("created_by_manager_id");
+        entity.Property(x => x.ReviewedAtUtc).HasColumnName("reviewed_at_utc");
+        entity.Property(x => x.ReviewedByManagerId).HasColumnName("reviewed_by_manager_id");
+        entity.HasIndex(x => x.RequestId);
+        entity.HasIndex(x => new { x.ShopId, x.Date });
+        entity.HasIndex(x => new { x.EmployeeId, x.Date });
+        entity.HasIndex(x => new { x.ShopId, x.EmployeeId, x.Date }).IsUnique().HasFilter("status IN ('pending','approved')");
+        entity.HasOne<ShopModel>().WithMany().HasForeignKey(x => x.ShopId).OnDelete(DeleteBehavior.Restrict);
+        entity.HasOne<EmployeeModel>().WithMany().HasForeignKey(x => x.EmployeeId).OnDelete(DeleteBehavior.Restrict);
+        entity.HasOne<ManagerAccountModel>().WithMany().HasForeignKey(x => x.CreatedByManagerId).OnDelete(DeleteBehavior.Restrict);
+        entity.HasOne<ManagerAccountModel>().WithMany().HasForeignKey(x => x.ReviewedByManagerId).OnDelete(DeleteBehavior.Restrict);
     }
 
     private static void ConfigureContainer(ModelBuilder modelBuilder)
@@ -201,8 +253,19 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, TimeProvider? 
 
     private static void ConfigureEmployee(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<EmploymentContractSettingsModel>(entity =>
+        {
+            entity.ToTable(table => table.HasCheckConstraint("ck_employment_contract_settings_singleton", "id = 1"));
+            entity.Property(x => x.RestrictSwapsToEightHours).HasDefaultValue(true);
+            entity.Property(x => x.RequirePickupApproval).HasDefaultValue(true);
+            entity.Property(x => x.RequireBelowMinimumGiveApproval).HasDefaultValue(true);
+            entity.Property(x => x.AutomaticWeekdayAvailability).HasDefaultValue(true);
+            entity.HasData(new EmploymentContractSettingsModel());
+        });
         modelBuilder.Entity<EmployeeModel>(entity =>
         {
+            entity.Property(x => x.ContractType).IsRequired().HasMaxLength(16).HasDefaultValue(EmploymentContractTypes.Zlecenie);
+            entity.ToTable(table => table.HasCheckConstraint("ck_employee_contract_type", "contract_type IN ('zlecenie','o_prace')"));
             entity.Property(property => property.FirstName).IsRequired();
             entity.Property(property => property.LastName).IsRequired();
             entity.Property(property => property.Email).IsRequired(false);
@@ -689,6 +752,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, TimeProvider? 
     {
         modelBuilder.Entity<ScheduleEmployeeModel>(entity =>
         {
+            entity.Property(x => x.IsPriority).IsRequired().HasDefaultValue(false);
             entity.HasOne(scheduleEmployee => scheduleEmployee.Schedule)
                 .WithMany(schedule => schedule.Employees)
                 .HasForeignKey(scheduleEmployee => scheduleEmployee.ScheduleId)
@@ -819,8 +883,35 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, TimeProvider? 
 
     private static void ConfigureShiftSwapRequest(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<ContractShiftApprovalRequestModel>(entity =>
+        {
+            entity.HasOne<EmployeeModel>().WithMany().HasForeignKey(x => x.EmployeeId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<ScheduleModel>().WithMany().HasForeignKey(x => x.ScheduleId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<ManagerAccountModel>().WithMany().HasForeignKey(x => x.ReviewedByManagerId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<ShiftSwapRequestModel>().WithMany().HasForeignKey(x => x.ShiftSwapRequestId).OnDelete(DeleteBehavior.SetNull);
+            entity.HasOne<ShiftSwapRequestModel>().WithMany().HasForeignKey(x => x.ResultingShiftSwapRequestId).OnDelete(DeleteBehavior.SetNull);
+            entity.HasIndex(x => new { x.ScheduleId, x.Status, x.CreatedAtUtc });
+            entity.HasIndex(x => new { x.EmployeeId, x.Status, x.CreatedAtUtc });
+            entity.HasIndex(x => new { x.ShiftSwapRequestId, x.Status });
+            entity.HasIndex(x => x.ShiftSwapRequestId).IsUnique()
+                .HasDatabaseName("ux_contract_approval_one_pending_claim_per_offer")
+                .HasFilter("kind='claim' AND status='pending' AND shift_swap_request_id IS NOT NULL");
+            entity.HasIndex(x => new { x.EmployeeId, x.ShiftSwapRequestId, x.FromTime, x.ToTime }).IsUnique()
+                .HasFilter("kind='claim' AND status='pending'");
+            entity.HasIndex(x => new { x.EmployeeId, x.ScheduleSlotId }).IsUnique()
+                .HasFilter("kind='below_minimum_give' AND status='pending'");
+            entity.ToTable(table =>
+            {
+                table.HasCheckConstraint("ck_contract_approval_kind", "kind IN ('claim','below_minimum_give')");
+                table.HasCheckConstraint("ck_contract_approval_status", "status IN ('pending','approved','rejected','cancelled','expired')");
+                table.HasCheckConstraint("ck_contract_approval_period", "from_time LIKE '__:__' AND to_time LIKE '__:__' AND from_time < to_time");
+                table.HasCheckConstraint("ck_contract_approval_review", "status NOT IN ('approved','rejected') OR (reviewed_by_manager_id IS NOT NULL AND reviewed_at_utc IS NOT NULL)");
+            });
+        });
         modelBuilder.Entity<ShiftSwapRequestModel>(entity =>
         {
+            entity.HasOne<ContractShiftApprovalRequestModel>().WithMany()
+                .HasForeignKey(x => x.ApprovedEmploymentExceptionApprovalId).OnDelete(DeleteBehavior.Restrict);
             entity.Property(request => request.RequestKind).HasConversion<string>().HasDefaultValue(ShiftSwapRequestKind.Give);
             entity.HasIndex(request => new { request.ReturnScheduleId, request.Status })
                 .HasDatabaseName("ix_shift_swap_return_schedule_status");
@@ -926,8 +1017,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, TimeProvider? 
                 .HasForeignKey(request => request.ReviewedByManagerId)
                 .OnDelete(DeleteBehavior.SetNull);
 
-            entity.Property(request => request.OriginalFromTime).IsRequired().HasMaxLength(5);
-            entity.Property(request => request.OriginalToTime).IsRequired().HasMaxLength(5);
+            entity.Property(request => request.OriginalFromTime).IsRequired(false).HasMaxLength(5);
+            entity.Property(request => request.OriginalToTime).IsRequired(false).HasMaxLength(5);
             entity.Property(request => request.RequestedFromTime).IsRequired().HasMaxLength(5);
             entity.Property(request => request.RequestedToTime).IsRequired().HasMaxLength(5);
             entity.Property(request => request.Status)
@@ -938,12 +1029,18 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, TimeProvider? 
             entity.HasIndex(request => new { request.ScheduleSlotId, request.Status })
                 .IsUnique()
                 .HasDatabaseName("ux_shift_correction_pending_slot")
-                .HasFilter("status = 'Pending'");
+                .HasFilter("status = 'Pending' AND schedule_slot_id IS NOT NULL");
+
+            entity.HasIndex(request => new { request.ScheduleId, request.EmployeeId, request.DayOfMonth })
+                .IsUnique()
+                .HasDatabaseName("ux_shift_correction_pending_day_off")
+                .HasFilter("status = 'Pending' AND original_from_time IS NULL");
+            entity.Property(request => request.Status).IsConcurrencyToken();
 
             entity.ToTable(table =>
             {
                 table.HasCheckConstraint("ck_shift_correction_dom", "day_of_month BETWEEN 1 AND 31");
-                table.HasCheckConstraint("ck_shift_correction_time_format", "original_from_time LIKE '__:__' AND original_to_time LIKE '__:__' AND requested_from_time LIKE '__:__' AND requested_to_time LIKE '__:__'");
+                table.HasCheckConstraint("ck_shift_correction_time_format", "((original_from_time IS NULL AND original_to_time IS NULL) OR (original_from_time IS NOT NULL AND original_to_time IS NOT NULL AND schedule_slot_id > 0 AND schedule_slot_id IS NOT NULL AND original_from_time GLOB '[0-2][0-9]:[0-5][0-9]' AND original_from_time < '24:00' AND original_to_time GLOB '[0-2][0-9]:[0-5][0-9]' AND original_to_time < '24:00')) AND requested_from_time GLOB '[0-2][0-9]:[0-5][0-9]' AND requested_from_time < '24:00' AND requested_to_time GLOB '[0-2][0-9]:[0-5][0-9]' AND requested_to_time < '24:00'");
                 table.HasCheckConstraint("ck_shift_correction_requested_order", "requested_from_time < requested_to_time");
             });
         });
@@ -973,6 +1070,22 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, TimeProvider? 
             entity.Property(settings => settings.ShowPublicHolidays).IsRequired().HasDefaultValue(true);
             entity.ToTable(table => table.HasCheckConstraint("ck_public_holiday_settings_singleton", "id = 1"));
             entity.HasData(new PublicHolidaySettingsModel());
+        });
+    }
+
+    private static void ConfigurePriorityGenerationSettings(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<PriorityGenerationSettingsModel>(entity =>
+        {
+            entity.ToTable("priority_generation_settings", table =>
+            {
+                table.HasCheckConstraint("CK_priority_generation_settings_singleton", "id = 1");
+                table.HasCheckConstraint("CK_priority_generation_settings_shift_hours", "shift_hours BETWEEN 1 AND 12");
+            });
+            entity.Property(x => x.ShiftHours).IsRequired().HasDefaultValue(8);
+            entity.Property(x => x.WeekendsOff).IsRequired().HasDefaultValue(true);
+            entity.Property(x => x.RespectAvailability).IsRequired().HasDefaultValue(true);
+            entity.HasData(new PriorityGenerationSettingsModel());
         });
     }
 

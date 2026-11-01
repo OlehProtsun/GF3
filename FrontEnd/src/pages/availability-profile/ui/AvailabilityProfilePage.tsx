@@ -1,3 +1,7 @@
+import { useQueryClient } from "@tanstack/react-query";
+import { queryKeys } from "@shared/api/queryKeys";
+import { buildEffectiveManagerAvailabilityCellMap, getAutomaticManagerEmployeeIds } from "@entities/availability-groups/model/automaticAvailability";
+import { useEmploymentContractSettingsQuery } from "@entities/employment-contracts";
 import { t } from "@shared/i18n";
 import { useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
@@ -36,6 +40,8 @@ export function AvailabilityProfilePage() {
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [activeRelatedHintCellKey, setActiveRelatedHintCellKey] = useState<string | null>(null);
 
+  const queryClient = useQueryClient();
+  const contractSettingsQuery = useEmploymentContractSettingsQuery();
   const groupQuery = useAvailabilityGroupByIdQuery(groupId);
   const itemsQuery = useAvailabilityGroupItemsQuery(groupId);
   const membersQuery = useAvailabilityGroupMembersQuery(groupId);
@@ -97,6 +103,18 @@ export function AvailabilityProfilePage() {
     return {};
   }, [canUseItemsData, canUseNestedData, itemsQuery.data, membersQuery.data, slotsQuery.data]);
 
+  const automaticEmployeeIds = useMemo(
+    () => getAutomaticManagerEmployeeIds(profileEmployeeIds, employeesQuery.data ?? [], contractSettingsQuery.data?.automaticWeekdayAvailability === true),
+    [profileEmployeeIds, employeesQuery.data, contractSettingsQuery.data],
+  );
+  const effectiveCellMap = useMemo(
+    () => groupQuery.data ? buildEffectiveManagerAvailabilityCellMap(cellMap, automaticEmployeeIds, groupQuery.data.year, groupQuery.data.month) : cellMap,
+    [cellMap, automaticEmployeeIds, groupQuery.data],
+  );
+  const hasUnresolvedEmployees = Boolean(employeesQuery.data) && profileEmployeeIds.some(id => !employeesQuery.data?.some(employee => employee.id === id));
+  const hasPolicyError = contractSettingsQuery.isError || employeesQuery.isError || hasUnresolvedEmployees;
+  const isPolicyLoading = !hasPolicyError && (!contractSettingsQuery.data || !employeesQuery.data);
+
   const transferredAwayVisualHintMap = useMemo(
     () => buildAvailabilityTransferHintMap(transferHintsQuery.data ?? []),
     [transferHintsQuery.data],
@@ -107,6 +125,10 @@ export function AvailabilityProfilePage() {
       transferHintsQuery.data ?? [],
     ),
     [transferHintsQuery.data, transferPreviewQuery.data],
+  );
+  const effectiveVisualHintMap = useMemo(
+    () => Object.fromEntries(Object.entries(visualHintMap).filter(([key]) => !automaticEmployeeIds.has(Number(key.split(":")[0])))),
+    [visualHintMap, automaticEmployeeIds],
   );
   const activeTransferredAwayHint = useMemo(() => {
     if (!activeRelatedHintCellKey) {
@@ -207,11 +229,11 @@ export function AvailabilityProfilePage() {
     !(hasMembersError || hasSlotsError) &&
     (membersQuery.isLoading || membersQuery.isFetching || slotsQuery.isLoading || slotsQuery.isFetching);
 
-  const isLoading =
+  const isLoading = isPolicyLoading ||
     isGroupPending ||
     (hasValidId && Boolean(groupQuery.data) && !hasResolvedMatrix && (isItemsPending || isNestedPending));
 
-  const hasLoadError =
+  const hasLoadError = hasPolicyError ||
     !hasValidId ||
     (!isLoading && !groupQuery.data) ||
     (!isLoading && Boolean(groupQuery.data) && !hasResolvedMatrix && hasItemsError && (hasMembersError || hasSlotsError));
@@ -236,11 +258,12 @@ export function AvailabilityProfilePage() {
         backTo="/availability"
       />
 
+      {hasPolicyError ? <button type="button" onClick={() => { void contractSettingsQuery.refetch(); void queryClient.invalidateQueries({ queryKey: queryKeys.employees.all }); }}>{t("Retry")}</button> : null}
       <AvailabilityGroupProfileCard
         group={groupQuery.data}
         columns={columns}
-        cellMap={cellMap}
-        visualHintMap={visualHintMap}
+        cellMap={effectiveCellMap}
+        visualHintMap={effectiveVisualHintMap}
         isLoading={isLoading}
         hasLoadError={hasLoadError}
         isDeleting={deleteMutation.isPending}

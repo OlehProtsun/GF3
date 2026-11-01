@@ -4,6 +4,7 @@ import type { Employee } from "@entities/employees/model/types";
 import type { Shop } from "@entities/shops/model/types";
 import { getGraphVisibleNote } from "./graphNote";
 import type { Graph, GraphEmployee, GraphSlot } from "./types";
+import type { ApprovedUrlopDay } from "@entities/urlop/model/types";
 
 export type ContainerGraphRecords = {
   employees: GraphEmployee[];
@@ -30,6 +31,7 @@ export type ContainerStatisticPivotRow = {
   employee: string;
   workDays: number;
   freeDays: number;
+  urlopDays: number;
   holidayDays: number;
   hoursSum: string;
   hoursByShop: Record<string, string>;
@@ -40,6 +42,7 @@ export type ContainerWorkFreeRow = {
   employee: string;
   workDays: number;
   freeDays: number;
+  urlopDays: number;
 };
 
 export type ContainerStatistics = {
@@ -54,6 +57,7 @@ export type ContainerStatistics = {
 };
 
 type BuildContainerStatisticsParams = {
+  approvedUrlopDays?: ApprovedUrlopDay[];
   graphs: Graph[];
   graphRecordsById: Record<number, ContainerGraphRecords>;
   employeesById?: Map<number, Employee>;
@@ -65,6 +69,7 @@ type EmployeePeriodCalendar = {
   month: number;
   daysInMonth: number;
   workedDays: Set<number>;
+  urlopDays: Set<number>;
 };
 
 export function buildContainerGraphSummaries(
@@ -116,6 +121,7 @@ export function buildContainerGraphSummaries(
 }
 
 export function buildContainerStatistics({
+  approvedUrlopDays = [],
   graphs,
   graphRecordsById,
   employeesById,
@@ -127,6 +133,7 @@ export function buildContainerStatistics({
   const employeeTotalMinutes = new Map<number, number>();
   const employeeWorkDays = new Map<number, number>();
   const employeeFreeDays = new Map<number, number>();
+  const employeeUrlopDays = new Map<number, number>();
   const employeeHolidayDays = new Map<number, number>();
   const employeePeriods = new Map<number, Map<string, EmployeePeriodCalendar>>();
   const shopTotalMinutes = new Map<string, number>();
@@ -141,7 +148,7 @@ export function buildContainerStatistics({
 
     const ensureEmployeePeriod = (employeeId: number) => {
       const periods = employeePeriods.get(employeeId) ?? new Map<string, EmployeePeriodCalendar>();
-      const period = periods.get(periodKey) ?? { year: graph.year, month: graph.month, daysInMonth, workedDays: new Set<number>() };
+      const period = periods.get(periodKey) ?? { year: graph.year, month: graph.month, daysInMonth, workedDays: new Set<number>(), urlopDays: new Set<number>() };
       periods.set(periodKey, period);
       employeePeriods.set(employeeId, periods);
       return period;
@@ -150,6 +157,11 @@ export function buildContainerStatistics({
     if (!shopKeyToName.has(shopKey)) {
       shopKeyToName.set(shopKey, shopName);
     }
+
+    approvedUrlopDays.filter(x => x.shopId === graph.shopId && x.date.slice(0, 7) === periodKey).forEach(x => {
+      ensureEmployeePeriod(x.employeeId).urlopDays.add(Number(x.date.slice(8, 10)));
+      if (!employeeNameById.has(x.employeeId)) employeeNameById.set(x.employeeId, getEmployeeLabel(x.employeeId, employeesById));
+    });
 
     records.employees.forEach(item => {
       if (item.employeeId > 0 && !employeeNameById.has(item.employeeId)) {
@@ -195,11 +207,13 @@ export function buildContainerStatistics({
   employeePeriods.forEach((periods, employeeId) => {
     let workDays = 0;
     let freeDays = 0;
+    let urlopDays = 0;
     let holidayDays = 0;
 
     periods.forEach(period => {
       workDays += period.workedDays.size;
-      freeDays += Math.max(0, period.daysInMonth - period.workedDays.size);
+      urlopDays += period.urlopDays.size;
+      freeDays += Math.max(0, period.daysInMonth - new Set([...period.workedDays, ...period.urlopDays]).size);
       period.workedDays.forEach(dayOfMonth => {
         if (getPolishPublicHoliday(period.year, period.month, dayOfMonth) !== null) {
           holidayDays += 1;
@@ -209,6 +223,7 @@ export function buildContainerStatistics({
 
     employeeWorkDays.set(employeeId, workDays);
     employeeFreeDays.set(employeeId, freeDays);
+    employeeUrlopDays.set(employeeId, urlopDays);
     employeeHolidayDays.set(employeeId, holidayDays);
   });
 
@@ -232,6 +247,7 @@ export function buildContainerStatistics({
       employee: employeeName,
       workDays: employeeWorkDays.get(employeeId) ?? 0,
       freeDays: employeeFreeDays.get(employeeId) ?? 0,
+      urlopDays: employeeUrlopDays.get(employeeId) ?? 0,
       holidayDays: employeeHolidayDays.get(employeeId) ?? 0,
       hoursSum: formatHoursCell(employeeTotalMinutes.get(employeeId) ?? 0),
       hoursByShop,
@@ -248,6 +264,7 @@ export function buildContainerStatistics({
       employee: "TOTAL",
       workDays: [...employeeWorkDays.values()].reduce((sum, value) => sum + value, 0),
       freeDays: [...employeeFreeDays.values()].reduce((sum, value) => sum + value, 0),
+      urlopDays: [...employeeUrlopDays.values()].reduce((sum, value) => sum + value, 0),
       holidayDays: [...employeeHolidayDays.values()].reduce((sum, value) => sum + value, 0),
       hoursSum: formatHoursCell(totalMinutes),
       hoursByShop: totalHoursByShop,
@@ -261,6 +278,7 @@ export function buildContainerStatistics({
     employee: employeeName,
     workDays: employeeWorkDays.get(employeeId) ?? 0,
     freeDays: employeeFreeDays.get(employeeId) ?? 0,
+    urlopDays: employeeUrlopDays.get(employeeId) ?? 0,
   }));
 
   return {

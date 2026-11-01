@@ -45,6 +45,7 @@ public class EmployeeRepository : GenericRepository<EmployeeModel>, IEmployeeRep
     public async Task<bool> UpdateActiveProfileAsync(EmployeeModel employee, CancellationToken ct = default)
         => await _set.Where(value => value.Id == employee.Id && !value.IsDeleted)
             .ExecuteUpdateAsync(setters => setters
+                .SetProperty(value => value.ContractType, employee.ContractType)
                 .SetProperty(value => value.FirstName, employee.FirstName)
                 .SetProperty(value => value.LastName, employee.LastName)
                 .SetProperty(value => value.Phone, employee.Phone)

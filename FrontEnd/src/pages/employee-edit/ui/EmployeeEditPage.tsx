@@ -1,3 +1,4 @@
+import { useAuth } from "@app/providers/AuthProvider";
 import { t } from "@shared/i18n";
 import { useMemo, type FormEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -22,6 +23,7 @@ import styles from "./EmployeeEditPage.module.css";
 
 export function EmployeeEditPage() {
   const navigate = useNavigate();
+  const { session } = useAuth();
   const { employeeId } = useParams<{ employeeId: string }>();
   const isCreate = !employeeId;
   const id = employeeId ? Number(employeeId) : null;
@@ -38,7 +40,7 @@ export function EmployeeEditPage() {
   const editLockMessage = lockedByOtherState
     ? buildManagerEditLockMessage(lockedByOtherState, t("This employee"))
     : null;
-  const canEdit = !editLockMessage && !isCheckingLocks;
+  const canEdit = session?.workspaceMode !== "phone" && !editLockMessage && !isCheckingLocks;
 
   const employeeQuery = useEmployeeByIdQuery(!isCreate && Number.isFinite(id) ? id : null);
   const createMutation = useCreateEmployeeMutation();
@@ -77,7 +79,7 @@ export function EmployeeEditPage() {
 
   const onSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (editLockMessage) return;
+    if (!canEdit) return;
     if (!validate()) return;
 
     if (isCreate) {

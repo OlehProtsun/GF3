@@ -29,6 +29,7 @@ internal static class ModelMapper
 
     internal static EmployeeModel ToContract(this Dal.EmployeeModel model) => new()
     {
+        ContractType = model.ContractType,
         IsDeleted = model.IsDeleted,
         Id = model.Id,
         FirstName = model.FirstName,
@@ -39,6 +40,7 @@ internal static class ModelMapper
 
     internal static Dal.EmployeeModel ToDal(this EmployeeModel model) => new()
     {
+        ContractType = model.ContractType,
         IsDeleted = model.IsDeleted,
         Id = model.Id,
         FirstName = model.FirstName,
@@ -206,6 +208,7 @@ internal static class ModelMapper
     // Schedule employees and slots
     internal static ScheduleEmployeeModel ToContract(this Dal.ScheduleEmployeeModel model) => new()
     {
+        IsPriority = model.IsPriority,
         Id = model.Id,
         ScheduleId = model.ScheduleId,
         EmployeeId = model.EmployeeId,
@@ -216,6 +219,7 @@ internal static class ModelMapper
 
     internal static Dal.ScheduleEmployeeModel ToDal(this ScheduleEmployeeModel model) => new()
     {
+        IsPriority = model.IsPriority,
         Id = model.Id,
         ScheduleId = model.ScheduleId,
         EmployeeId = model.EmployeeId,

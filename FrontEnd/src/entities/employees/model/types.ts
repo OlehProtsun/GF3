@@ -1,4 +1,7 @@
+export type EmploymentContractType = "zlecenie" | "o_prace";
+
 export type Employee = {
+  contractType?: EmploymentContractType;
   id: number;
   firstName: string;
   lastName: string;
@@ -18,6 +21,7 @@ export type EmployeePresenceUpdate = {
 };
 
 export type SaveEmployeeInput = {
+  contractType?: EmploymentContractType;
   firstName: string;
   lastName: string;
   phone?: string;

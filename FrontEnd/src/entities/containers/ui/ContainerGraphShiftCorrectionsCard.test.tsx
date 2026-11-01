@@ -15,7 +15,7 @@ vi.mock("@entities/shift-corrections", () => ({
   useGraphShiftCorrectionsQuery: (containerId: number | null, graphId: number | null) => {
     return mocks.graphQuery(containerId, graphId) ?? ({
     data: [{
-      id: 4, containerId: 2, scheduleId: 9, scheduleSlotId: 21, scheduleName: "August", shopName: "Central",
+      id: 4, containerId: 2, scheduleId: 9, scheduleSlotId: 21, isDayOffRequest: false, scheduleName: "August", shopName: "Central",
       year: 2026, month: 8, dayOfMonth: 12, employeeId: 7, employeeName: "Oleh Protsun",
       originalFromTime: "09:00", originalToTime: "15:30", requestedFromTime: "10:00", requestedToTime: "15:30",
       status: "pending", createdAtUtc: "2026-08-19T18:15:00Z",
@@ -33,6 +33,32 @@ beforeEach(() => Object.values(mocks).forEach(mock => mock.mockReset()));
 
 describe("ContainerGraphShiftCorrectionsCard", () => {
 
+
+  test.each(["pending", "approved", "rejected"])("renders a %s day-off request without fabricated originals or deltas", async status => {
+    mocks.graphQuery.mockReturnValue({ data: [{ id: 4, containerId: 2, scheduleId: 9, scheduleSlotId: status === "approved" ? 25 : null,
+      isDayOffRequest: true, scheduleName: "August", shopName: "Central", year: 2026, month: 8, dayOfMonth: 13,
+      employeeId: 7, employeeName: "Oleh Protsun", originalFromTime: null, originalToTime: null,
+      requestedFromTime: "08:00", requestedToTime: "16:00", status, createdAtUtc: "2026-08-19T18:15:00Z", reviewedByManagerName: "Ada" }],
+      isLoading: false, isError: false });
+    const onApproved = vi.fn();
+    mocks.commit.mockResolvedValue(undefined);
+    mocks.approve.mockImplementation((_input, options) => options.onSuccess());
+    render(<ContainerGraphShiftCorrectionsCard containerId={2} graphId={9} hasUnsavedChanges={false}
+      disabled={false} onApproved={onApproved} />);
+    expect(screen.getByRole("listitem")).toHaveTextContent("13.08.2026 · Day off → 08:00–16:00 · August · Central");
+    await userEvent.click(screen.getByRole("listitem"));
+    expect(screen.getByText("Day off")).toBeVisible();
+    expect(screen.getByText("08:00 – 16:00")).toBeVisible();
+    expect(screen.getByText("Duration +8h")).toBeVisible();
+    expect(screen.getByRole("listitem")).not.toHaveTextContent(/NaN|undefined|null/);
+    if (status === "pending") {
+      await userEvent.click(screen.getByRole("button", { name: "Reject" }));
+      expect(mocks.reject).toHaveBeenCalledWith({ containerId: 2, graphId: 9, id: 4 }, expect.anything());
+      await userEvent.click(screen.getByRole("button", { name: "Approve" }));
+      await waitFor(() => expect(onApproved).toHaveBeenCalledOnce());
+      expect(mocks.commit).toHaveBeenCalledWith(2, 9);
+    } else expect(screen.queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
+  });
 
   test("expands request details in place", async () => {
     const user = userEvent.setup();
@@ -100,7 +126,7 @@ describe("ContainerGraphShiftCorrectionsCard", () => {
   });
 
   test("shows resolved badges, sorts pending first and expands exactly one item", async () => {
-    const base = { containerId: 2, scheduleId: 9, scheduleSlotId: 21, scheduleName: "August", shopName: "Central",
+    const base = { containerId: 2, scheduleId: 9, scheduleSlotId: 21, isDayOffRequest: false, scheduleName: "August", shopName: "Central",
       year: 2026, month: 8, dayOfMonth: 12, employeeId: 7, employeeName: "Oleh Protsun",
       originalFromTime: "09:00", originalToTime: "15:30", requestedFromTime: "10:00", requestedToTime: "15:30",
       createdAtUtc: "2026-08-19T18:15:00Z", reviewedByManagerName: "Ada" };
@@ -189,7 +215,7 @@ test("allows approval and rejection for persisted graphs", async () => {
 });
 
 const historyRequest = {
-  id: 4, containerId: 2, scheduleId: 9, scheduleSlotId: 21, scheduleName: "August", shopName: "Central",
+  id: 4, containerId: 2, scheduleId: 9, scheduleSlotId: 21, isDayOffRequest: false, scheduleName: "August", shopName: "Central",
   year: 2026, month: 8, dayOfMonth: 12, employeeId: 7, employeeName: "Oleh Protsun",
   originalFromTime: "09:00", originalToTime: "15:30", requestedFromTime: "10:00", requestedToTime: "15:30",
   status: "pending", createdAtUtc: "2026-08-19T18:15:00Z", reviewedByManagerName: "Ada",

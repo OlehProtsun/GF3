@@ -62,6 +62,7 @@ public sealed class FacadeAndControllerRouteTests
         await facade.UpdateAsync(new SaveEmployeeRequest
         {
             Id = 5,
+            ContractType = DataAccessLayer.Models.EmploymentContractTypes.Zlecenie,
             FirstName = "Updated",
             LastName = "Person",
             Phone = "999",

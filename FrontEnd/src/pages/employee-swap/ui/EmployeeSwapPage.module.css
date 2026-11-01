@@ -1590,3 +1590,8 @@
   .offersSection .searchResultText { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
   .offersSection > .offerList { mask-image: none; -webkit-mask-image: none; }
 }
+
+.badgeApproval {
+  background: #eef0f7;
+  color: #586580;
+}

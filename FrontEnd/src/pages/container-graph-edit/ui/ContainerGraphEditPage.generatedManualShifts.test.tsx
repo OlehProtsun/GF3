@@ -3,19 +3,27 @@ import { beforeEach, expect, test, vi } from "vitest";
 import type { ComponentProps } from "react";
 import type { ContainerGraphEditor } from "@entities/containers/ui/ContainerGraphEditor";
 import type { Graph, GraphSlot, GraphCellStyle } from "@entities/containers/model/types";
+import type { Employee } from "@entities/employees/model/types";
+import type { AvailabilitySlot } from "@entities/availability-groups/model/types";
 import type { ShiftSwap } from "@entities/shift-swaps/model/types";
 import { buildGraphNoteContent, parseGraphNoteContent } from "@entities/containers/model/graphNote";
-import { setLanguage } from "@shared/i18n";
+import { setLanguage, t } from "@shared/i18n";
+import { ApiError, RequestCanceledError } from "@shared/api/httpClient";
 import { QueryClient } from "@tanstack/react-query";
 import { ContainerGraphEditPage } from "./ContainerGraphEditPage";
 
 type EditorProps = ComponentProps<typeof ContainerGraphEditor>;
+vi.mock("@entities/urlop", async importOriginal => ({ ...await importOriginal<typeof import("@entities/urlop")>(),
+  useGraphApprovedUrlopQuery: () => ({ data: [], error: null, isError: false }),
+}));
 const mocks = vi.hoisted(() => ({
   params: { containerId: "1", graphId: "1" as string | undefined },
   location: { key: "test", pathname: "/container/1/graphs/1/edit", search: "?openGraphIds=1,2" },
   graphs: [] as Graph[], slots: [] as GraphSlot[], offers: [] as ShiftSwap[], styles: [] as GraphCellStyle[],
   graphEmployees: [{ id: 1, scheduleId: 1, employeeId: 1, displayOrder: 0 }],
-  employees: [{ id: 1, firstName: "Ada", lastName: "Lovelace", hasLoginAccount: true, isOnline: false }],
+  employees: [{ id: 1, firstName: "Ada", lastName: "Lovelace", hasLoginAccount: true, isOnline: false }] as Employee[],
+  contractSettings: { data: { automaticWeekdayAvailability: false } as { automaticWeekdayAvailability: boolean } | undefined, isError: false },
+  availabilitySlots: [] as AvailabilitySlot[],
   shops: [{ id: 1, name: "Shop" }], groups: [{ id: 1, name: "Availability", year: 2026, month: 2 }],
   members: [{ id: 1, employeeId: 1, displayOrder: 0 }], empty: [],
   container: { id: 1, name: "Container" },
@@ -63,11 +71,12 @@ vi.mock("@entities/containers", async importOriginal => {
     },
   };
 });
+vi.mock("@entities/employment-contracts", () => ({ useEmploymentContractSettingsQuery: () => mocks.contractSettings }));
 vi.mock("@entities/employees/api/queries", () => ({ useEmployeesListQuery: () => ({ data: mocks.employees }) }));
 vi.mock("@entities/shops/api/queries", () => ({ useShopsListQuery: () => ({ data: mocks.shops }) }));
 vi.mock("@entities/availability-groups", async importOriginal => ({ ...await importOriginal<object>(),
   useAvailabilityGroupsListQuery: () => ({ data: mocks.groups }), useAvailabilityGroupMembersQuery: () => ({ data: mocks.members }),
-  useAvailabilityGroupSlotsQuery: () => ({ data: mocks.empty }),
+  useAvailabilityGroupSlotsQuery: () => ({ data: mocks.availabilitySlots }),
 }));
 vi.mock("@entities/availability-binds", async importOriginal => ({ ...await importOriginal<object>(),
   useAvailabilityBindsListQuery: () => ({ data: mocks.empty }),
@@ -86,6 +95,12 @@ const preview = () => Array.from({ length: 28 }, (_, i): GraphSlot[] => ([{
 }, { id: i + 100, scheduleId: 1, dayOfMonth: i + 1, slotNo: 1, employeeId: 1, status: 1, fromTime: "12:00", toTime: "16:00" }])).flat();
 beforeEach(() => {
   setLanguage("en"); vi.clearAllMocks();
+  mocks.contractSettings = { data: { automaticWeekdayAvailability: false }, isError: false };
+  mocks.employees = [{ id: 1, firstName: "Ada", lastName: "Lovelace", contractType: "zlecenie", hasLoginAccount: true, isOnline: false }];
+  mocks.availabilitySlots = [];
+  mocks.graphEmployees = [{ id: 1, scheduleId: 1, employeeId: 1, displayOrder: 0 }];
+  mocks.members = [{ id: 1, employeeId: 1, displayOrder: 0 }];
+  mocks.groups = [{ id: 1, name: "Availability", year: 2026, month: 2 }];
   mocks.params = { containerId: "1", graphId: "1" };
   mocks.graphs = [{ ...graph }, { ...graph, id: 2, name: "Graph two" }];
   mocks.slots = []; mocks.offers = []; mocks.styles = []; mocks.editor = null; mocks.queryClient = new QueryClient();
@@ -244,4 +259,95 @@ test("persisted manual demand requires cancellation before destructive edits", (
   expect(columns()[0].cells["1"]).toBe("09:00-21:00");
   expect(mocks.editor!.manualShiftPublishError).toBe("Cancel open manual offers before changing their demand.");
   act(()=>mocks.editor!.onDeleteManualColumn(7));expect(columns()).toHaveLength(1);
+});
+
+test("priority follows employee IDs through unsaved preview, undo, open graphs and save", async () => {
+  const view = render(<ContainerGraphEditPage />);
+  expect(mocks.editor!.graphEmployeeRows[0].isPriority).toBe(false);
+  act(() => mocks.editor!.onEmployeePriorityChange(1, true));
+  expect(mocks.editor!.hasUnsavedChanges).toBe(true);
+  await generate();
+  expect(mocks.generate.mock.calls.at(-1)![0].payload.employees[0].isPriority).toBe(true);
+  expect(mocks.save).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("tab", { name: "Graph two" }));
+  mocks.params = { containerId: "1", graphId: "2" }; view.rerender(<ContainerGraphEditPage />);
+  expect(mocks.editor!.graphEmployeeRows[0].isPriority).toBe(false);
+  fireEvent.click(screen.getByRole("tab", { name: "Graph one" }));
+  mocks.params = { containerId: "1", graphId: "1" }; view.rerender(<ContainerGraphEditPage />);
+  expect(mocks.editor!.graphEmployeeRows[0].isPriority).toBe(true);
+  act(() => mocks.editor!.onEmployeePriorityChange(1, false));
+  fireEvent.click(screen.getByText("Undo"));
+  expect(mocks.editor!.graphEmployeeRows[0].isPriority).toBe(true);
+  fireEvent.click(screen.getByText("Save editor")); fireEvent.click(screen.getByText("Confirm save"));
+  await waitFor(() => expect(mocks.save).toHaveBeenCalled());
+  expect(mocks.save.mock.calls.at(-1)![0].employeeAssignments[0].isPriority).toBe(true);
+});
+
+test("removing an availability member drops the flag instead of transferring it", () => {
+  const view = render(<ContainerGraphEditPage />);
+  act(() => mocks.editor!.onEmployeePriorityChange(1, true));
+  mocks.members = [{ id: 2, employeeId: 2, displayOrder: 0 }];
+  view.rerender(<ContainerGraphEditPage />);
+  expect(mocks.editor!.graphEmployeeRows).toEqual([{ id: null, employeeId: 2, minHoursMonth: "", isPriority: false }]);
+});
+
+test.each(["success", "error"])("ignores stale %s after selecting different availability", async outcome => {
+  let callbacks: { onSuccess: (value: { slots: GraphSlot[] }) => void; onError: (error: Error) => void };
+  mocks.generate.mockImplementation((_variables, value) => { callbacks = value; });
+  mocks.groups.push({ id: 2, name: "Other", year: 2026, month: 2 });
+  render(<ContainerGraphEditPage />);
+  act(() => mocks.editor!.onEmployeePriorityChange(1, true));
+  await generate();
+  act(() => mocks.editor!.onFieldChange("availabilityGroupId")("2"));
+  await act(async () => outcome === "success" ? callbacks.onSuccess({ slots: preview() }) : callbacks.onError(new Error("Obsolete availability")));
+  expect(columns()).toEqual([]);
+  expect(screen.getByTestId("errors")).toBeEmptyDOMElement();
+  expect(mocks.editor!.graphEmployeeRows[0].isPriority).toBe(true);
+});
+
+test.each(["en", "pl", "uk"] as const)("priority survives error feedback and retry in %s", async language => {
+  setLanguage(language);
+  render(<ContainerGraphEditPage />);
+  act(() => mocks.editor!.onEmployeePriorityChange(1, true));
+  const message = t("Could not generate this schedule.");
+  const errors: Error[] = [400, 404, 500].map(status => new ApiError({ status, message }));
+  errors.push(new TypeError("Failed to fetch"), new RequestCanceledError());
+  for (const error of errors) {
+    mocks.generate.mockImplementationOnce((_variables, callbacks) => callbacks.onError(error));
+    await generate();
+    await waitFor(() => expect(screen.getByTestId("errors")).toHaveTextContent(error instanceof TypeError ? message : error.message));
+    expect(mocks.editor!.graphEmployeeRows[0].isPriority).toBe(true);
+    expect(mocks.editor!.isGenerating).toBe(false);
+  }
+  await generate();
+  await waitFor(() => expect(columns()).toHaveLength(1));
+  expect(screen.getByTestId("errors")).toBeEmptyDOMElement();
+  expect(mocks.generate.mock.calls.at(-1)![0].payload.employees[0].isPriority).toBe(true);
+});
+
+
+test("availability preview overlays the same calendar as profiles and red hints follow effective weekends", () => {
+  mocks.employees[0].contractType = "o_prace";
+  mocks.contractSettings.data = { automaticWeekdayAvailability: true };
+  mocks.availabilitySlots = [{ id: 90, availabilityGroupMemberId: 1, dayOfMonth: 2, kind: 1, intervalStr: null }];
+  const view = render(<ContainerGraphEditPage />);
+  expect(mocks.editor!.previewCellMap["1:2"]).toBe("+");
+  expect(mocks.editor!.previewCellMap["1:1"]).toBe("-");
+  expect(mocks.editor!.previewCellMap["1:28"]).toBe("-");
+  expect(mocks.editor!.styleMap["1:2"]).toBeUndefined();
+  expect(mocks.editor!.styleMap["1:1"]).toBeDefined();
+  expect(mocks.availabilitySlots).toHaveLength(1);
+  mocks.contractSettings.data = { automaticWeekdayAvailability: false };
+  view.rerender(<ContainerGraphEditPage />);
+  expect(mocks.editor!.previewCellMap).toEqual({ "1:2": "-" });
+  expect(mocks.editor!.styleMap["1:2"]).toBeDefined();
+});
+
+test("graph availability policy loading and errors block preview presentation", () => {
+  mocks.contractSettings.data = undefined;
+  const view = render(<ContainerGraphEditPage />);
+  expect(mocks.editor!.isLoading).toBe(true);
+  mocks.contractSettings.isError = true;
+  view.rerender(<ContainerGraphEditPage />);
+  expect(mocks.editor!.hasLoadError).toBe(true);
 });

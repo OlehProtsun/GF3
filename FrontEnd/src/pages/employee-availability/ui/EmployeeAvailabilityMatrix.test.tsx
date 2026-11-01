@@ -2,8 +2,9 @@ import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { setLanguage } from "@shared/i18n";
 import { EmployeeAvailabilityMatrix } from "./EmployeeAvailabilityMatrix";
-import { buildDraftFromAvailability } from "../model/employeeAvailabilityMatrix";
+import { buildDraftFromAvailability, buildSaveSlots } from "../model/employeeAvailabilityMatrix";
 import type { EmployeeAvailabilityGroup } from "@entities/employee-availability";
+import type { UrlopEmployeeCalendar, UrlopRequest } from "@entities/urlop";
 import styles from "./EmployeeAvailabilityPage.module.css";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { PublicHolidayVisibilityProvider } from "@app/providers/PublicHolidayVisibilityProvider";
@@ -27,6 +28,57 @@ function setup(canEdit = true, g = group) {
 beforeEach(() => { setLanguage("en"); vi.stubGlobal("PointerEvent", TestPointerEvent); vi.useFakeTimers(); });
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 describe("EmployeeAvailabilityMatrix", () => {
+  test.each([true, false])("approved UR colors entire own/team cells, preserving raw values and permissions (editable: %s)", canEdit => {
+    const v = setup(canEdit);
+    const draft = { ...v.props.ownDraft, 1: { available: true, intervalStr: null }, 4: { available: true, intervalStr: null }, 5: { available: true, intervalStr: null } };
+    const request = (status: "pending" | "rejected", day: number): UrlopRequest => ({ requestId: status, employeeId: 12, employeeName: "Own Person", shopId: 1,
+      year: 2026, month: 5, days: [day], status, createdAtUtc: "2026-05-01T10:00:00Z", reviewedAtUtc: null, createdByManagerId: null, reviewedByManagerId: null });
+    const calendar: UrlopEmployeeCalendar = { shops: [{ id: 1, name: "A" }], months: [{ shopId: 1, year: 2026, month: 5, isOpen: true,
+      requests: [request("pending", 5), request("rejected", 6)],
+      approved: [12, 3].flatMap(employeeId => [1, 2, 4].map(day => ({ shopId: 1, employeeId, date: `2026-05-0${day}` }))) }] };
+    const props = { ...v.props, ownDraft: draft, urlopCalendar: calendar };
+    v.rerender(<EmployeeAvailabilityMatrix {...props} />);
+    for (const day of [1, 2, 4]) {
+      const own = v.cell(day);
+      expect(own).toHaveTextContent("UR"); expect(own).toHaveClass(styles.unavailable);
+      expect(own.closest("td")).toHaveClass(styles.unavailable);
+      const peer = within(own.closest("tr")!).getAllByText("UR")[1];
+      expect(peer).toHaveClass(styles.unavailable); expect(peer.closest("td")).toHaveClass(styles.unavailable);
+      expect(own.disabled).toBe(!canEdit);
+    }
+    expect(v.container.querySelector('[data-availability-day="1"] th')).toHaveClass(styles.holidayDay);
+    expect(v.container.querySelector('[data-availability-day="1"] th')).toHaveAttribute("title", "Labour Day");
+    expect(v.cell(2).closest("tr")).toHaveClass(styles.weekend);
+    expect(v.cell(5)).toHaveTextContent("+"); expect(v.cell(5)).toHaveClass(styles.wholeDay);
+    expect(v.cell(6)).toHaveTextContent("−"); expect(v.cell(6)).toHaveClass(styles.unavailable);
+    expect(v.cell(5).closest("td")).not.toHaveClass(styles.unavailable);
+    expect(v.cell(6).closest("td")).not.toHaveClass(styles.unavailable);
+    fireEvent.click(v.cell(4));
+    if (canEdit) expect(v.edit).toHaveBeenCalledExactlyOnceWith([4]);
+    else expect(v.edit).not.toHaveBeenCalled();
+    const before = buildSaveSlots(group, draft);
+    v.rerender(<EmployeeAvailabilityMatrix {...props} group={{ ...group, month: 6 }} />);
+    expect(screen.queryByText("UR")).toBeNull(); expect(v.cell(1)).toHaveClass(styles.wholeDay);
+    expect(v.cell(1).closest("td")).not.toHaveClass(styles.unavailable);
+    v.rerender(<EmployeeAvailabilityMatrix {...props} />);
+    expect(v.cell(1)).toHaveTextContent("UR");
+    v.rerender(<EmployeeAvailabilityMatrix {...props} urlopCalendar={{ ...calendar, months: calendar.months.map(month => ({ ...month, approved: [] })) }} />);
+    expect(screen.queryByText("UR")).toBeNull();
+    expect(v.cell(1)).toHaveTextContent("+"); expect(v.cell(1)).toHaveClass(styles.wholeDay);
+    expect(v.cell(1).closest("td")).not.toHaveClass(styles.unavailable);
+    expect(screen.getByText("10:00 - 14:00")).toHaveClass(styles.timeValue);
+    expect(buildSaveSlots(group, draft)).toEqual(before);
+  });
+  test("UR wins over raw availability with shop tooltip and cannot enter the save payload", () => {
+    const { props, rerender, cell } = setup();
+    const draft = { ...props.ownDraft, 1: { available: true, intervalStr: null } };
+    const before = buildSaveSlots(group, draft);
+    rerender(<EmployeeAvailabilityMatrix {...props} ownDraft={draft} urlopCalendar={{ shops: [{ id: 1, name: "A" }, { id: 2, name: "B" }],
+      months: [1, 2].map(shopId => ({ shopId, year: 2026, month: 5, isOpen: false, requests: [], approved: [{ shopId, employeeId: 12, date: "2026-05-01" }] })) }} />);
+    expect(cell(1)).toHaveTextContent("UR"); expect(cell(1)).toHaveAttribute("title", "UR (A, B)");
+    expect(buildSaveSlots(group, draft)).toEqual(before);
+    expect(JSON.stringify(before)).not.toContain("UR");
+  });
   test("OFF removes holiday labels and titles but keeps weekends and editing", async () => {
     vi.spyOn(publicHolidaySettingsApi, "get").mockResolvedValue({ showPublicHolidays: false });
     const edit = vi.fn();

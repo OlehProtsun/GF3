@@ -9,6 +9,7 @@ export type EmployeeAvailabilityMember = {
 };
 
 export type EmployeeAvailabilityGroup = {
+  isAutomatic?: boolean;
   id: number;
   name: string;
   year: number;

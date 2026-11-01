@@ -26,6 +26,7 @@ public static class Extensions
     {
         serviceCollection.AddScoped<IContainerService, ContainerService>();
         serviceCollection.AddScoped<IEmployeeService, EmployeeService>();
+        serviceCollection.AddScoped<IEmploymentContractPolicyService, EmploymentContractPolicyService>();
         serviceCollection.AddScoped<IEmployeeAccountService, EmployeeAccountService>();
         serviceCollection.AddScoped<IEmployeeProfileService, EmployeeProfileService>();
         serviceCollection.AddScoped<IManagerAccountService, ManagerAccountService>();
@@ -39,6 +40,7 @@ public static class Extensions
         serviceCollection.AddScoped<IScheduleSlotService, ScheduleSlotService>();
         serviceCollection.AddScoped<IBindService, BindService>();
         serviceCollection.AddScoped<IAvailabilityGroupService, AvailabilityGroupService>();
+        serviceCollection.AddScoped<IUrlopService, UrlopService>();
         serviceCollection.AddScoped<IAvailabilityGroupTransferService, AvailabilityGroupTransferService>();
         serviceCollection.AddScoped<IShopFacade, ShopFacade>();
         serviceCollection.AddScoped<IEmployeeFacade, EmployeeFacade>();
@@ -50,7 +52,9 @@ public static class Extensions
         serviceCollection.AddSingleton<IExcelTemplateLocator, ExcelTemplateLocator>();
         serviceCollection.AddScoped<ISqliteAdminFacade, SqliteAdminFacade>();
         serviceCollection.AddScoped<IAdminDbService, AdminDbService>();
-        serviceCollection.AddTransient<IScheduleGenerator, ScheduleGenerator>();
+        serviceCollection.AddTransient<ScheduleGenerator>();
+        serviceCollection.AddTransient<PriorityScheduleGenerator>();
+        serviceCollection.AddTransient<IScheduleGenerator, PriorityAwareScheduleGenerator>();
         serviceCollection.AddSingleton<IPasswordHasher, PasswordHasher>();
 
         return serviceCollection;

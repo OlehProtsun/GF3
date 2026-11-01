@@ -8,7 +8,10 @@ public sealed class CreateShiftCorrectionRequest
     public int ScheduleId { get; init; }
 
     [Range(1, int.MaxValue)]
-    public int ScheduleSlotId { get; init; }
+    public int? ScheduleSlotId { get; init; }
+
+    [Range(1, 31)]
+    public int? DayOfMonth { get; init; }
 
     [Required]
     public string RequestedFromTime { get; init; } = string.Empty;

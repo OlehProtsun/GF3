@@ -67,6 +67,8 @@ export function OverlaySidebarLayout({ children }: OverlaySidebarLayoutProps) {
   const isSystemManager = isManager && session?.isSystemManager === true;
   const accountPath = isManager ? "/manager-profile" : "/profile";
   const isContainerWideContent = pathname === "/container";
+  const isUrlopListContent = pathname === "/urlop";
+  const isUrlopDetailContent = Boolean(matchPath(pathname, "/urlop/:shopId"));
   const isHomeWideContent = pathname === "/";
   const isDatabaseWideContent = pathname === "/database";
   const isContainerGraphEditorContent =
@@ -77,6 +79,8 @@ export function OverlaySidebarLayout({ children }: OverlaySidebarLayoutProps) {
     Boolean(matchPath(pathname, "/container/:containerId/graphs/:graphId"));
   const isContainerGraphWideContent = isContainerGraphProfileContent || isContainerGraphEditorContent;
   const isWideContent =
+    isUrlopDetailContent ||
+    isUrlopListContent ||
     isHomeWideContent ||
     isContainerWideContent ||
     isDatabaseWideContent ||
@@ -85,6 +89,8 @@ export function OverlaySidebarLayout({ children }: OverlaySidebarLayoutProps) {
     Boolean(matchPath(pathname, "/availability/:availabilityId/edit")) ||
     Boolean(matchPath(pathname, "/availability/:availabilityId"));
   const isWideScrollableContent =
+    isUrlopDetailContent ||
+    isUrlopListContent ||
     isHomeWideContent ||
     isContainerWideContent ||
     isDatabaseWideContent ||
@@ -108,6 +114,7 @@ export function OverlaySidebarLayout({ children }: OverlaySidebarLayoutProps) {
         { label: t("Employee"), to: "/employee", icon: <EmployeeIcon size={22} /> },
         { label: t("Shop"), to: "/shop", icon: <ShopIcon size={28} style={{ transform: "scaleY(-1)" }} /> },
         { label: t("Availability"), to: "/availability", icon: <AvailabilityIcon size={22} /> },
+        { label: t("Urlop"), to: "/urlop", icon: <AvailabilityIcon size={22} /> },
         { label: t("Container"), to: "/container", icon: <ContainerIcon size={25} /> },
         ...(isSystemManager ? [{ label: t("Information"), to: "/information", icon: <InfoIcon size={26} /> }] : []),
         { label: t("Message"), to: "/communications", icon: <NoteIcon size={24} /> },

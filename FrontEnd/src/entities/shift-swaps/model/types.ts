@@ -13,6 +13,11 @@ export type ShiftSwapScheduleSnapshot = {
 };
 
 export type ShiftSwap = {
+  isAwaitingManagerApproval?: boolean;
+  pickupApprovalPolicyApplies?: boolean;
+  requiresManagerApproval?: boolean;
+  canRequestManagerApproval?: boolean;
+  approvalPendingForCurrentEmployee?: boolean;
   allowPartialAcceptance: boolean;
   canAcceptFull: boolean;
   eligibleClaimWindows: Array<{ fromTime: string; toTime: string }>;
@@ -73,6 +78,7 @@ export type ShiftSwap = {
 };
 
 export type ShiftSwapEmployee = {
+  requiresWholeEightHourShifts?: boolean;
   id: number;
   firstName: string;
   lastName: string;
@@ -99,6 +105,7 @@ export type SwapWizardRequest = CreateShiftSwapInput & (
 );
 
 export type ShiftSwapReturnCandidate = {
+  requiresWholeShift?: boolean;
   scheduleId: number; scheduleName: string; shopName: string;
   year: number; month: number; dayOfMonth: number; slotId: number;
   fromTime: string; toTime: string; durationMinutes: number;
@@ -118,6 +125,10 @@ export type ShiftSwapPreviewMonthStats = {
   workDaysBefore: number; workDaysAfter: number; freeDaysBefore: number; freeDaysAfter: number;
 };
 export type ShiftSwapOfferPreview = {
+  requiresManagerException?: boolean;
+  managerExceptionReason?: string | null;
+  minimumMinutes?: number | null;
+  projectedMinutes?: number | null;
   allowPartialAcceptance: boolean;
   requestKind: "give" | "exchange"; targetEmployeeId?: number | null; targetEmployeeName: string;
   source: ShiftSwapReturnCandidate; return?: ShiftSwapReturnCandidate | null;

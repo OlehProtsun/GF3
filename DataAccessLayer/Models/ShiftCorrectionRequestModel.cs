@@ -20,7 +20,7 @@ public sealed class ShiftCorrectionRequestModel
     public ScheduleModel Schedule { get; set; } = null!;
 
     [Column("schedule_slot_id")]
-    public int ScheduleSlotId { get; set; }
+    public int? ScheduleSlotId { get; set; }
 
     [Column("day_of_month")]
     public int DayOfMonth { get; set; }
@@ -31,10 +31,10 @@ public sealed class ShiftCorrectionRequestModel
     public EmployeeModel Employee { get; set; } = null!;
 
     [Column("original_from_time")]
-    public string OriginalFromTime { get; set; } = string.Empty;
+    public string? OriginalFromTime { get; set; }
 
     [Column("original_to_time")]
-    public string OriginalToTime { get; set; } = string.Empty;
+    public string? OriginalToTime { get; set; }
 
     [Column("requested_from_time")]
     public string RequestedFromTime { get; set; } = string.Empty;

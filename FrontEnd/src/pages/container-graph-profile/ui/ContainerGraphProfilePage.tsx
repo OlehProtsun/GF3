@@ -1,4 +1,5 @@
 import { t } from "@shared/i18n";
+import { useGraphApprovedUrlopQuery, approvedKeys } from "@entities/urlop";
 import { useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAvailabilityGroupsListQuery } from "@entities/availability-groups";
@@ -98,6 +99,8 @@ export function ContainerGraphProfilePage() {
   );
 
   const graph = graphQuery.data ?? null;
+  const urlop = useGraphApprovedUrlopQuery(graph);
+  const urlopCellKeys = approvedKeys(urlop.data ?? [], graph?.shopId ?? 0, graph?.year ?? 2000, graph?.month ?? 1);
   const hasExplicitSession = useMemo(
     () => new URLSearchParams(location.search).has("openGraphIds"),
     [location.search],
@@ -178,6 +181,7 @@ export function ContainerGraphProfilePage() {
     );
 
   const hasLoadError =
+    urlop.isError ||
     !hasValidId ||
     (!isLoading &&
       (
@@ -306,6 +310,7 @@ export function ContainerGraphProfilePage() {
         {exportError ? <ErrorBanner className={styles.banner}>{exportError}</ErrorBanner> : null}
 
         <ContainerGraphProfileWorkspace
+          urlopCellKeys={urlopCellKeys}
           container={containerQuery.data}
           graph={graph}
           shop={shop}

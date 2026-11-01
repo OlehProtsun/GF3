@@ -15,6 +15,7 @@ type EmployeeShiftCorrectionDialogProps = {
   schedule: EmployeeSchedule | null;
   employeeId: number | null;
   existingRequests: ShiftCorrectionRequest[];
+  unavailableDays?: ReadonlySet<number>;
   isSending: boolean;
   errorMessage?: string | null;
   onCancel: () => void;
@@ -57,6 +58,7 @@ export function EmployeeShiftCorrectionDialog({
   schedule,
   employeeId,
   existingRequests,
+  unavailableDays,
   isSending,
   errorMessage,
   onCancel,
@@ -68,6 +70,8 @@ export function EmployeeShiftCorrectionDialog({
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [boundary, setBoundary] = useState<Boundary | null>(null);
   const [adjustmentMinutes, setAdjustmentMinutes] = useState(0);
+  const [dayOffFrom, setDayOffFrom] = useState("");
+  const [dayOffTo, setDayOffTo] = useState("");
 
   const slotsByDay = useMemo(() => {
     const map = new Map<number, EmployeeScheduleSlot[]>();
@@ -80,7 +84,9 @@ export function EmployeeShiftCorrectionDialog({
     return map;
   }, [employeeId, schedule]);
 
-  const days = useMemo(() => [...slotsByDay.keys()].sort((left, right) => left - right), [slotsByDay]);
+  const days = useMemo(() => schedule ? Array.from(
+    { length: new Date(Date.UTC(schedule.year, schedule.month, 0)).getUTCDate() }, (_, index) => index + 1,
+  ) : [], [schedule]);
   const selectedSlots = selectedDay === null ? [] : slotsByDay.get(selectedDay) ?? [];
   const selectedSlot = boundary ? selectedSlots.find(slot => slot.id === boundary.slotId) ?? null : null;
   const pendingSlotIds = useMemo(
@@ -90,10 +96,17 @@ export function EmployeeShiftCorrectionDialog({
 
   useEffect(() => {
     if (!open) return;
-    setSelectedDay(days[0] ?? null);
+    setSelectedDay([...slotsByDay.keys()].sort((a, b) => a - b)[0] ?? days[0] ?? null);
     setBoundary(null);
     setAdjustmentMinutes(0);
-  }, [days, open, schedule?.id]);
+    setDayOffFrom("");
+    setDayOffTo("");
+  }, [days, open, schedule?.id, slotsByDay]);
+
+  useEffect(() => {
+    if (open) dialogRef.current?.querySelector('[role="tab"][aria-selected="true"]')
+      ?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
+  }, [open, selectedDay]);
 
   useEffect(() => {
     if (!open) return;
@@ -119,7 +132,14 @@ export function EmployeeShiftCorrectionDialog({
       && requestedFromMinutes < toMinutes(slot.toTime)
       && requestedToMinutes > toMinutes(slot.fromTime))
     : false;
-  const isValid = Boolean(selectedSlot && boundary && adjustmentMinutes !== 0
+  const isDayOff = selectedSlots.length === 0;
+  const dayOffPending = existingRequests.some(request => request.status === "pending" &&
+    request.employeeId === employeeId && request.year === schedule.year && request.month === schedule.month &&
+    request.dayOfMonth === selectedDay);
+  const dayUnavailable = selectedDay === null || unavailableDays?.has(selectedDay);
+  const dayOffValid = /^([01]\d|2[0-3]):[0-5]\d$/.test(dayOffFrom) &&
+    /^([01]\d|2[0-3]):[0-5]\d$/.test(dayOffTo) && dayOffFrom < dayOffTo;
+  const isValid = isDayOff ? dayOffValid && !dayOffPending && !dayUnavailable : Boolean(selectedSlot && boundary && adjustmentMinutes !== 0
     && requestedFromMinutes < requestedToMinutes && !overlaps && !pendingSlotIds.has(selectedSlot.id));
 
   const selectBoundary = (slotId: number, edge: Boundary["edge"]) => {
@@ -152,7 +172,7 @@ export function EmployeeShiftCorrectionDialog({
           <div className={styles.titleBlock}>
             <span className={styles.eyebrow}><ScheduleIcon size={16} />  {t("Correction request")}</span>
             <h2 id={titleId}>{t("Request a shift change")}</h2>
-            <p>{schedule.name}  {t("· Change the start or end time of one shift.")}</p>
+            <p>{schedule.name}  {t("· Adjust a shift or request one on a day off.")}</p>
           </div>
           <button type="button" className={styles.closeButton} aria-label={t("Close shift correction dialog")} onClick={onCancel}>
             <CloseIcon size={18} />
@@ -163,15 +183,15 @@ export function EmployeeShiftCorrectionDialog({
         <section className={styles.stepSection}>
           <div className={styles.stepHeader}>
             <span className={styles.stepNumber}>1</span>
-            <div><strong>{t("Choose a workday")}</strong><small>{t("Only days with your shifts are shown.")}</small></div>
+            <div><strong>{t("Choose a day")}</strong><small>{t("Select a shift or a day off.")}</small></div>
           </div>
-          <div className={styles.dayList} role="tablist" aria-label={t("Working days")}>
+          <div className={styles.dayList} role="tablist" aria-label={t("Schedule days")}>
             {days.map(day => {
               const weekday = weekdayFormatter.format(new Date(Date.UTC(schedule.year, schedule.month - 1, day))).replace(".", "");
               return (
                 <button key={day} type="button" role="tab" aria-selected={day === selectedDay}
                   className={day === selectedDay ? styles.dayActive : ""}
-                  onClick={() => { setSelectedDay(day); setBoundary(null); setAdjustmentMinutes(0); }}>
+                  onClick={() => { setSelectedDay(day); setBoundary(null); setAdjustmentMinutes(0); setDayOffFrom(""); setDayOffTo(""); }}>
                   <span>{weekday}</span><strong>{day}</strong>
                 </button>
               );
@@ -179,6 +199,25 @@ export function EmployeeShiftCorrectionDialog({
           </div>
         </section>
 
+        {isDayOff ? (
+          <section className={styles.stepSection}>
+            <div className={styles.stepHeader}>
+              <span className={styles.stepNumber}>2</span>
+              <div><strong>{t("Day off")}</strong><small>{t("Request a shift on this day")}</small></div>
+            </div>
+            <div className={`${styles.timeEditor} ${styles.dayOffEditor}`}>
+              <label><span>{t("New start time")}</span><input type="time" step="60" value={dayOffFrom}
+                disabled={dayOffPending || dayUnavailable || isSending} onChange={event => setDayOffFrom(event.target.value)} /></label>
+              <label><span>{t("New end time")}</span><input type="time" step="60" value={dayOffTo}
+                disabled={dayOffPending || dayUnavailable || isSending} onChange={event => setDayOffTo(event.target.value)} /></label>
+            </div>
+            {dayOffPending ? <p className={styles.hint}>{t("Pending approval")}</p> : dayUnavailable ? (
+              <p className={styles.validation}>{t("You already work on this date in another schedule.")}</p>
+            ) : null}
+            {dayOffValid ? <p className={styles.movement}>{t("Day off")} → {dayOffFrom}–{dayOffTo}</p> : null}
+            {dayOffFrom && dayOffTo && !dayOffValid ? <p className={styles.validation}>{t("The shift end must be after its start.")}</p> : null}
+          </section>
+        ) : <>
         <section className={styles.stepSection} aria-label={t("Choose shift and time")}>
           <div className={styles.stepHeader}>
             <span className={styles.stepNumber}>2</span>
@@ -242,15 +281,20 @@ export function EmployeeShiftCorrectionDialog({
               {requestedFromMinutes >= requestedToMinutes ? <p className={styles.validation}>{t("The shift end must be after its start.")}</p> : null}
             </>
           ) : <p className={styles.hint}>{t("Select a Start or End time above to continue.")}</p>}
-          {errorMessage ? <p className={styles.validation}>{errorMessage}</p> : null}
         </section>
+        </>}
+        {errorMessage ? <p className={styles.validation}>{errorMessage}</p> : null}
 
         </div>
         <footer className={styles.footer}>
           <IosButton label={t("Cancel")} variant="secondary" size="compact" onClick={onCancel} />
           <IosButton label={isSending ? t("Sending...") : t("Send request")} size="compact" icon={<CheckIcon size={15} />}
             disabled={!isValid || isSending}
-            onClick={() => selectedSlot && onSubmit({ scheduleId: schedule.id, scheduleSlotId: selectedSlot.id, requestedFromTime: requestedFrom, requestedToTime: requestedTo })} />
+            onClick={() => {
+              if (!isValid || isSending) return;
+              if (isDayOff && selectedDay !== null) onSubmit({ scheduleId: schedule.id, dayOfMonth: selectedDay, requestedFromTime: dayOffFrom, requestedToTime: dayOffTo });
+              else if (selectedSlot) onSubmit({ scheduleId: schedule.id, scheduleSlotId: selectedSlot.id, requestedFromTime: requestedFrom, requestedToTime: requestedTo });
+            }} />
         </footer>
       </div>
     </dialog>, document.body

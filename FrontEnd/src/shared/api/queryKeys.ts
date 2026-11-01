@@ -1,4 +1,16 @@
 export const queryKeys = {
+  urlop: {
+    all: ["urlop"] as const,
+    managerShopSummaries: () => ["urlop", "managerShopSummaries"] as const,
+    employeeCalendar: () => ["urlop", "employeeCalendar"] as const,
+    employeeApproved: (shopId: number, year: number, month: number) => ["urlop", "employeeApproved", shopId, year, month] as const,
+    managerMonth: (shopId: number, year: number, month: number) => ["urlop", "managerMonth", shopId, year, month] as const,
+    approved: (from: string, to: string, shopId?: number) => ["urlop", "approved", from, to, shopId ?? null] as const,
+  },
+  employmentContracts: { settings: () => ["employmentContracts", "settings"] as const },
+  priorityGenerationSettings: {
+    current: () => ["priorityGenerationSettings", "current"] as const,
+  },
   publicHolidaySettings: {
     current: () => ["publicHolidaySettings", "current"] as const,
   },
@@ -41,6 +53,8 @@ export const queryKeys = {
     list: () => ["employeeSchedules", "list"] as const,
   },
   shiftSwaps: {
+    employeeApprovals: () => ["shiftSwaps", "employeeApprovals"] as const,
+    graphApprovals: (containerId: number, graphId: number) => ["shiftSwaps", "graphApprovals", containerId, graphId] as const,
     candidates: (params: object | null) => ["shiftSwaps", "returnCandidates", params] as const,
     preview: (payload: object | null) => ["shiftSwaps", "preview", payload] as const,
     all: ["shiftSwaps"] as const,

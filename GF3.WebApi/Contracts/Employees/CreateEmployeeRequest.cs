@@ -9,6 +9,8 @@ namespace WebApi.Contracts.Employees;
 /// </summary>
 public sealed class CreateEmployeeRequest
 {
+    public string? ContractType { get; set; }
+
     [Required]
     [MaxLength(100)]
     public string FirstName { get; set; } = string.Empty;

@@ -20,7 +20,8 @@ public sealed class GraphVersionsController(
     IWorkflowLogService workflowLogService,
     IRealtimeNotifier realtimeNotifier,
     ScheduleVersionCommitService versionCommitService,
-    IManagerEditLockService? editLockService = null) : ControllerBase
+    IManagerEditLockService? editLockService = null,
+    BusinessLogicLayer.Services.Abstractions.IUrlopService? urlopService = null) : ControllerBase
 {
     [HttpGet]
     [ProducesResponseType(typeof(GraphVersionTreeDto), StatusCodes.Status200OK)]
@@ -119,6 +120,9 @@ public sealed class GraphVersionsController(
         }
 
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+        var urlop = urlopService ?? new BusinessLogicLayer.Services.UrlopService(db, TimeProvider.System);
+        await urlop.EnsureAssignmentsAllowedAsync(snapshot.ShopId, snapshot.Year, snapshot.Month,
+            snapshot.Slots.Where(x => x.EmployeeId is > 0).Select(x => (x.EmployeeId!.Value, x.DayOfMonth)), cancellationToken);
         await ShiftSwapArchive.PreserveCompletedAsync(db, graphId, cancellationToken).ConfigureAwait(false);
         await db.ScheduleCellStyles.Where(style => style.ScheduleId == graphId).ExecuteDeleteAsync(cancellationToken).ConfigureAwait(false);
         await db.ScheduleSlots.Where(slot => slot.ScheduleId == graphId).ExecuteDeleteAsync(cancellationToken).ConfigureAwait(false);

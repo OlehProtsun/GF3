@@ -16,9 +16,12 @@ const auth = vi.hoisted(() => ({
 vi.mock("@app/providers/AuthProvider", () => ({ useAuth: () => auth }));
 vi.mock("@app/layouts/overlay-sidebar-layout", () => ({ OverlaySidebarLayout: ({ children }: PropsWithChildren) => <>{children}</> }));
 vi.mock("@app/layouts/employee-workspace-layout", () => ({ EmployeeWorkspaceLayout: ({ children }: PropsWithChildren) => <>{children}</> }));
+vi.mock("@app/layouts/manager-phone-layout", () => ({ ManagerPhoneLayout: ({ children }: PropsWithChildren) => <>{children}</> }));
 vi.mock("./PageTransition", () => ({ PageTransition: ({ children }: PropsWithChildren) => <>{children}</> }));
 vi.mock("@entities/regulations/ui/RegulationAcceptanceGate", () => ({ RegulationAcceptanceGate: () => null }));
 vi.mock("@pages/home", () => ({ HomePage: () => { return <div>HomePage</div>; } }));
+vi.mock("@pages/manager-phone", () => ({ ManagerPhoneHomePage: () => <div>ManagerPhoneHomePage</div> }));
+vi.mock("@pages/manager-urlop", () => ({ ManagerUrlopPage: () => <div>ManagerUrlopPage</div>, ManagerUrlopListPage: () => <div>ManagerUrlopListPage</div> }));
 vi.mock("@pages/employee-notifications", () => ({ EmployeeNotificationsPage: () => { return <div>EmployeeNotificationsPage</div>; } }));
 vi.mock("@pages/employee-availability", () => ({ EmployeeAvailabilityPage: () => { return <div>EmployeeAvailabilityPage</div>; } }));
 vi.mock("@pages/employee-schedule", () => ({ EmployeeSchedulePage: () => { return <div>EmployeeSchedulePage</div>; } }));
@@ -53,6 +56,31 @@ function mount(path: string) {
 }
 
 describe("AppRouter system access", () => {
+  it.each([["/urlop", "ManagerUrlopListPage"], ["/urlop/1", "ManagerUrlopPage"]])("Urlop route %s is available in manager PC mode", async (path, page) => {
+    auth.session = { ...manager(), workspaceMode: "pc" };
+    mount(path);
+    expect(await screen.findByText(page)).toBeInTheDocument();
+    expect(window.location.pathname).toBe(path);
+  });
+  it.each(["/urlop", "/urlop/1"])("employees cannot enter %s", async path => {
+    auth.session = employee; mount(path);
+    await screen.findByText("EmployeeNotificationsPage");
+    expect(screen.queryByText("ManagerUrlopPage")).toBeNull();
+    expect(screen.queryByText("ManagerUrlopListPage")).toBeNull();
+  });
+  it.each(["/urlop", "/urlop/1"])("anonymous users cannot enter %s", async path => {
+    auth.status = "unauthenticated"; auth.session = null; mount(path);
+    await screen.findByText("LoginPage");
+    expect(screen.queryByText("ManagerUrlopPage")).toBeNull();
+    expect(screen.queryByText("ManagerUrlopListPage")).toBeNull();
+  });
+  it.each(["/urlop", "/urlop/1"])("manager phone cannot enter %s", async path => {
+    auth.session = { ...manager(), workspaceMode: "phone" }; mount(path);
+    await screen.findByText("ManagerPhoneHomePage");
+    expect(window.location.pathname).toBe("/");
+    expect(screen.queryByText("ManagerUrlopPage")).toBeNull();
+    expect(screen.queryByText("ManagerUrlopListPage")).toBeNull();
+  });
   it("preserves a swap link through login", async () => {
     auth.status = "unauthenticated";
     auth.session = null;

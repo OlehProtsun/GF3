@@ -1,6 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, test, vi } from "vitest";
+import { ApiError } from "@shared/api/httpClient";
 import {
   MutationCache,
   QueryCache,
@@ -128,6 +129,14 @@ describe("react-query shim", () => {
 
     expect(client.getQueryState<string>(["profile", 1]).updatedAt).toBe(0);
     expect(events).toContain('invalidate:["profile",1]');
+  });
+
+  test("QueryClient does not automatically retry a throttled request", async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: 3 } } });
+    const error = new ApiError({ status: 429, message: "Too many requests. Please try again later." });
+    const query = vi.fn().mockRejectedValue(error);
+    await expect(client.fetchQuery(["throttled"], query)).rejects.toBe(error);
+    expect(query).toHaveBeenCalledOnce();
   });
 
   test("QueryClient dedupes in-flight fetches and aborts canceled queries", async () => {

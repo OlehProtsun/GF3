@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Security.Cryptography;
 using BusinessLogicLayer.Contracts.Enums;
 using BusinessLogicLayer.Contracts.Models;
 using BusinessLogicLayer.Generators;
@@ -10,31 +11,74 @@ using Microsoft.EntityFrameworkCore;
 
 internal sealed record ReplayInput(ScheduleModel Schedule, IReadOnlyList<ScheduleEmployeeModel> Employees,
     IReadOnlyList<AvailabilityGroupModel> Groups, IReadOnlyList<ScheduleSlotModel> ExternalSlots,
-    IReadOnlyList<ScheduleSlotModel> BaselineSlots);
+    IReadOnlyList<ScheduleSlotModel> BaselineSlots, int? PriorityShiftHours = null, bool PriorityWeekendsOff = true,
+    bool PriorityRespectAvailability = true);
 
 internal sealed class ReplayInputException(string code) : Exception(code);
 
-internal sealed class SqliteReplaySource : IAsyncDisposable
+internal sealed partial class SqliteReplaySource : IAsyncDisposable
 {
-    internal const string PinnedCommit = "30dcaf549f5ddb59eeb2a57f27b64220bb658cc3";
+    internal const string PinnedCommit = "603735907c2ccf2c5931c98d956166e1f080a421";
     private readonly SqliteConnection connection;
     private readonly AppDbContext context;
     private readonly ContainerService service;
-    private readonly TimedGenerator generator = new();
+    private readonly TimedGenerator generator;
+    private readonly string engine;
+    private readonly string variant;
+    private readonly string priorityAvailability;
+    private readonly DirectoryInfo? snapshotDirectory;
 
-    private SqliteReplaySource(string path)
+    private SqliteReplaySource(string path, string engine, string variant, DirectoryInfo? snapshotDirectory, string priorityAvailability)
     {
-        connection = new(new SqliteConnectionStringBuilder { DataSource = path, Mode = SqliteOpenMode.ReadOnly, Pooling = false }.ToString());
+        this.snapshotDirectory = snapshotDirectory;
+        this.engine = engine;
+        this.variant = variant;
+        this.priorityAvailability = priorityAvailability;
+        connection = new(new SqliteConnectionStringBuilder { DataSource = new Uri(path).AbsoluteUri + "?immutable=1", Mode = SqliteOpenMode.ReadOnly, Pooling = false }.ToString());
         context = new(new DbContextOptionsBuilder<AppDbContext>().UseSqlite(connection)
             .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking).Options);
+        var legacy = new ScheduleGenerator();
+        generator = new(engine != "app" ? legacy : priorityAvailability == "stored"
+            ? new PriorityAwareScheduleGenerator(legacy, new(legacy), context)
+            : new PolicyOverrideGenerator(legacy, new(legacy), context, priorityAvailability == "on"));
         service = new(new ContainerRepository(context), new ScheduleRepository(context), new SchedulePresetRepository(context),
             new ScheduleSlotRepository(context), new ScheduleEmployeeRepository(context), new ScheduleCellStyleRepository(context),
             new AvailabilityGroupRepository(context), generator);
     }
 
-    internal static async Task<SqliteReplaySource> OpenAsync(string path, CancellationToken ct)
+    internal static async Task<SqliteReplaySource> OpenAsync(string path, CancellationToken ct, string engine = "legacy", string variant = "stored",
+        string priorityAvailability = "stored")
     {
-        var source = new SqliteReplaySource(path);
+        DirectoryInfo? snapshot = null;
+        // Immutable SQLite ignores WAL. Recover only a fingerprint-verified private file copy;
+        // SQLite never opens the original WAL database or writes its shared-memory read marks.
+        if (File.Exists(path + "-wal") && new FileInfo(path + "-wal").Length > 0)
+        {
+            var before = await FingerprintAsync(path, ct);
+            snapshot = Directory.CreateTempSubdirectory("GF3.ReplaySnapshot-");
+            try
+            {
+                var copy = Path.Combine(snapshot.FullName, "snapshot.db");
+                foreach (var suffix in new[] { "", "-wal" })
+                {
+                    ct.ThrowIfCancellationRequested();
+                    File.Copy(path + suffix, copy + suffix);
+                }
+                if (await FingerprintAsync(path, ct) != before) throw new ReplayInputException("source-changed-during-snapshot");
+                await using (var recovery = new SqliteConnection(new SqliteConnectionStringBuilder {
+                    DataSource = copy, Mode = SqliteOpenMode.ReadWrite, Pooling = false }.ToString()))
+                {
+                    await recovery.OpenAsync(ct);
+                    await using var checkpoint = recovery.CreateCommand();
+                    checkpoint.CommandText = "PRAGMA wal_checkpoint(TRUNCATE)";
+                    await using var reader = await checkpoint.ExecuteReaderAsync(ct);
+                    if (!await reader.ReadAsync(ct) || reader.GetInt32(0) != 0) throw new ReplayInputException("private-snapshot-checkpoint-failed");
+                }
+                path = copy;
+            }
+            catch { DeleteSnapshot(snapshot); throw; }
+        }
+        var source = new SqliteReplaySource(path, engine, variant, snapshot, priorityAvailability);
         try
         {
             await source.connection.OpenAsync(ct);
@@ -78,7 +122,13 @@ internal sealed class SqliteReplaySource : IAsyncDisposable
     {
         var owner = await context.Schedules.AsNoTracking().Where(s => s.Id == graphId).Select(s => s.ContainerId).SingleAsync(ct);
         var schedule = (await service.GetGraphByIdAsync(owner, graphId, ct))!;
-        var employees = (await service.GetGraphEmployeesAsync(owner, graphId, ct))!;
+        var storedEmployees = (await service.GetGraphEmployeesAsync(owner, graphId, ct))!;
+        var prioritySelection = storedEmployees.Select(e => e.EmployeeId).Distinct().Order()
+            .Take(variant == "first" ? 1 : variant == "first-two" ? 2 : 0).ToHashSet();
+        var employees = storedEmployees.Select(e => new ScheduleEmployeeModel { Id = e.Id, ScheduleId = e.ScheduleId,
+                EmployeeId = e.EmployeeId, DisplayOrder = e.DisplayOrder, MinHoursMonth = e.MinHoursMonth,
+                IsPriority = variant switch { "none" => false, "first" or "first-two" => prioritySelection.Contains(e.EmployeeId),
+                    "all" => true, _ => e.IsPriority } }).ToArray();
         if (schedule.Year is < 1900 or > 9999 || schedule.Month is < 1 or > 12 || schedule.PeoplePerShift <= 0
             || !ReplayChecks.Range(schedule.Shift1Time, out _, out _)
             || !string.IsNullOrWhiteSpace(schedule.Shift2Time) && !ReplayChecks.Range(schedule.Shift2Time, out _, out _)
@@ -119,7 +169,10 @@ internal sealed class SqliteReplaySource : IAsyncDisposable
             || s.Status == SlotStatus.UNFURNISHED && s.EmployeeId.HasValue
             || !ReplayChecks.Time(s.FromTime, out var from) || !ReplayChecks.Time(s.ToTime, out var to) || to <= from))
             throw new ReplayInputException("invalid-saved-commitment");
-        return new(schedule, employees, groups, external, (await service.GetGraphSlotsAsync(owner, graphId, ct))!);
+        var settings = engine == "app" ? await context.PriorityGenerationSettings.AsNoTracking().SingleOrDefaultAsync(s => s.Id == 1, ct) : null;
+        return new(schedule, employees, groups, external, (await service.GetGraphSlotsAsync(owner, graphId, ct))!,
+            engine == "app" ? settings?.ShiftHours ?? 8 : null, settings?.WeekendsOff ?? true,
+            priorityAvailability == "stored" ? settings?.RespectAvailability ?? true : priorityAvailability == "on");
     }
 
     internal async Task<(IReadOnlyList<ScheduleSlotModel> Slots, double Milliseconds, double PreviewMilliseconds)> PreviewAsync(ReplayInput input, CancellationToken ct)
@@ -131,15 +184,39 @@ internal sealed class SqliteReplaySource : IAsyncDisposable
         return (result.Slots.ToArray(), generator.Milliseconds, watch.Elapsed.TotalMilliseconds);
     }
 
-    private sealed class TimedGenerator : IScheduleGenerator
+    private sealed class TimedGenerator(IScheduleGenerator selected) : IScheduleGenerator
     {
         public double Milliseconds { get; private set; }
+        public int ReorientationEvaluations { get; private set; }
+        public int ReorientationTrials { get; private set; }
+        public int AcceptedAnchorChanges { get; private set; }
         public async Task<IList<ScheduleSlotModel>> GenerateAsync(ScheduleModel schedule, IEnumerable<AvailabilityGroupModel> availabilities,
             IEnumerable<ScheduleEmployeeModel> employees, IProgress<int>? progress = null, CancellationToken ct = default)
         {
             var watch = Stopwatch.StartNew();
-            try { return await new ScheduleGenerator().GenerateAsync(schedule, availabilities, employees, progress, ct); }
-            finally { Milliseconds = watch.Elapsed.TotalMilliseconds; }
+            using var activity = new Activity("GF3.OfflineReplay.Generation").Start();
+            try { return await selected.GenerateAsync(schedule, availabilities, employees, progress, ct); }
+            finally
+            {
+                Milliseconds = watch.Elapsed.TotalMilliseconds;
+                ReorientationEvaluations = activity.GetTagItem("gf3.priority.reorientation.evaluations") as int? ?? 0;
+                ReorientationTrials = activity.GetTagItem("gf3.priority.reorientation.trials") as int? ?? 0;
+                AcceptedAnchorChanges = activity.GetTagItem("gf3.priority.reorientation.accepted") as int? ?? 0;
+            }
+        }
+    }
+
+    private sealed class PolicyOverrideGenerator(ScheduleGenerator legacy, PriorityScheduleGenerator priority,
+        AppDbContext db, bool respectAvailability) : IScheduleGenerator
+    {
+        public async Task<IList<ScheduleSlotModel>> GenerateAsync(ScheduleModel schedule, IEnumerable<AvailabilityGroupModel> availabilities,
+            IEnumerable<ScheduleEmployeeModel> employees, IProgress<int>? progress = null, CancellationToken ct = default)
+        {
+            var roster = employees.ToList();
+            if (!roster.Any(e => e.IsPriority)) return await legacy.GenerateAsync(schedule, availabilities, roster, progress, ct);
+            var settings = await db.PriorityGenerationSettings.AsNoTracking().SingleOrDefaultAsync(s => s.Id == 1, ct);
+            return await priority.GenerateAsync(schedule, availabilities.ToList(), roster, settings?.ShiftHours ?? 8,
+                settings?.WeekendsOff ?? true, progress, ct, respectAvailability);
         }
     }
 
@@ -147,13 +224,23 @@ internal sealed class SqliteReplaySource : IAsyncDisposable
     {
         await context.DisposeAsync();
         await connection.DisposeAsync();
+        if (snapshotDirectory is not null) DeleteSnapshot(snapshotDirectory);
+    }
+
+    private static void DeleteSnapshot(DirectoryInfo snapshot)
+    {
+        var temporaryRoot = Path.TrimEndingDirectorySeparator(Path.GetFullPath(Path.GetTempPath())) + Path.DirectorySeparatorChar;
+        var target = Path.GetFullPath(snapshot.FullName);
+        if (!target.StartsWith(temporaryRoot, StringComparison.OrdinalIgnoreCase) || !snapshot.Name.StartsWith("GF3.ReplaySnapshot-", StringComparison.Ordinal)
+            || (snapshot.Attributes & FileAttributes.ReparsePoint) != 0) throw new ReplayInputException("unsafe-snapshot-cleanup-refused");
+        snapshot.Delete(true);
     }
 
     internal static async Task<int> RunAsync(string[] args)
     {
         if (args.SequenceEqual(new[] { "--help" }))
         {
-            Console.WriteLine("Offline read-only replay: --db <absolute-local-SQLite-file> (--all-graphs | --graph <positive-id>) [--repeat <1..10; default 3>] --output <existing-absolute-directory-outside-repository-and-source-directory>. Reports contain aggregate pseudonymous cases only. No schema setup or source writes. Existing four positional HTTP arguments remain supported.");
+            Console.WriteLine("Offline read-only replay: --db <absolute-local-SQLite-file> (--all-graphs | --graph <positive-id>) [--repeat <1..10; default 3>] [--engine legacy|app; default legacy] [--variant stored|none|first|first-two|all; default stored; non-stored requires app] [--priority-availability stored|on|off; default stored; overrides require app] --output <existing-absolute-directory-outside-repository-and-source-directory>. Reports contain aggregate pseudonymous cases only. No schema setup or source writes. Existing four positional HTTP arguments remain supported.");
             return 0;
         }
         try
@@ -165,11 +252,19 @@ internal sealed class SqliteReplaySource : IAsyncDisposable
             try
             {
                 var total = Stopwatch.StartNew();
+                var fingerprint = await FingerprintAsync(options.Database, canceled.Token);
                 List<int> ids;
-                await using (var source = await OpenAsync(options.Database, canceled.Token)) ids = await source.GraphIdsAsync(options.Graph, canceled.Token);
+                string quickCheck;
+                await using (var source = await OpenAsync(options.Database, canceled.Token, options.Engine, options.Variant, options.PriorityAvailability))
+                {
+                    quickCheck = await source.QuickCheckAsync(canceled.Token);
+                    ids = await source.GraphIdsAsync(null, canceled.Token);
+                    if (options.Graph.HasValue && !ids.Contains(options.Graph.Value)) throw new ReplayInputException("selected-graph-not-found");
+                }
                 var reports = new List<ReplayCase>();
                 foreach (var (id, index) in ids.Select((id, index) => (id, index)))
                 {
+                    if (options.Graph.HasValue && options.Graph != id) continue;
                     var caseId = $"case-{index + 1:000}";
                     try
                     {
@@ -178,16 +273,19 @@ internal sealed class SqliteReplaySource : IAsyncDisposable
                         for (var repeat = 0; repeat < options.Repeat; repeat++)
                         {
                             canceled.Token.ThrowIfCancellationRequested();
-                            await using var source = await OpenAsync(options.Database, canceled.Token);
+                            await using var source = await OpenAsync(options.Database, canceled.Token, options.Engine, options.Variant, options.PriorityAvailability);
                             var input = await source.LoadAsync(id, canceled.Token);
                             using var bounded = CancellationTokenSource.CreateLinkedTokenSource(canceled.Token);
                             bounded.CancelAfter(TimeSpan.FromMinutes(2));
                             var generated = await source.PreviewAsync(input, bounded.Token);
                             var check = ReplayChecks.Check(input, generated.Slots);
                             var normalized = ReplayChecks.Normalize(generated.Slots);
-                            report ??= ReplayCase.Create(caseId, input, check, generated.Slots.ToArray());
+                            report ??= ReplayCase.Create(caseId, input, check, generated.Slots.ToArray(), options.Engine, options.Variant);
                             report.DurationsMilliseconds.Add(generated.Milliseconds);
                             report.PreviewMilliseconds.Add(generated.PreviewMilliseconds);
+                            report.ReorientationEvaluations.Add(source.generator.ReorientationEvaluations);
+                            report.ReorientationTrials.Add(source.generator.ReorientationTrials);
+                            report.AcceptedAnchorChanges.Add(source.generator.AcceptedAnchorChanges);
                             report.RepeatStable &= baseline is null || baseline.SequenceEqual(normalized);
                             report.HardViolations = report.HardViolations.Concat(check.Violations).GroupBy(p => p.Key)
                                 .ToDictionary(g => g.Key, g => g.Max(p => p.Value));
@@ -195,11 +293,17 @@ internal sealed class SqliteReplaySource : IAsyncDisposable
                         }
                         reports.Add(report!);
                     }
-                    catch (ReplayInputException exception) { reports.Add(ReplayCase.Skipped(caseId, exception.Message)); }
-                    catch (OperationCanceledException) when (!canceled.IsCancellationRequested) { reports.Add(ReplayCase.Skipped(caseId, "generation-time-limit")); }
+                    catch (ReplayInputException exception) { reports.Add(ReplayCase.Skipped(caseId, exception.Message, options.Engine, options.Variant)); }
+                    catch (OperationCanceledException) when (!canceled.IsCancellationRequested) { reports.Add(ReplayCase.Skipped(caseId, "generation-time-limit", options.Engine, options.Variant)); }
+                    catch (Exception exception) when (exception is not OperationCanceledException)
+                    { reports.Add(ReplayCase.Skipped(caseId, "generation-runtime-error", options.Engine, options.Variant)); }
                 }
                 total.Stop();
-                await ReplayReportWriter.WriteAsync(options.Output, reports, total.Elapsed.TotalMilliseconds, canceled.Token);
+                await using (var source = await OpenAsync(options.Database, canceled.Token, options.Engine, options.Variant, options.PriorityAvailability))
+                    if (await source.QuickCheckAsync(canceled.Token) != quickCheck) throw new ReplayInputException("source-integrity-changed");
+                if (await FingerprintAsync(options.Database, canceled.Token) != fingerprint) throw new ReplayInputException("source-fingerprint-changed");
+                await ReplayReportWriter.WriteAsync(options.Output, reports, total.Elapsed.TotalMilliseconds, canceled.Token,
+                    options.Engine, options.Variant, fingerprint, quickCheck, options.PriorityAvailability);
                 Console.WriteLine($"Read-only replay finished: cases={reports.Count}, failures={reports.Count(r => r.Failed)}; schema=compatible.");
                 return reports.Any(r => r.Failed) ? 1 : 0;
             }
@@ -214,7 +318,28 @@ internal sealed class SqliteReplaySource : IAsyncDisposable
         }
     }
 
-    private sealed record ReplayOptions(string Database, int? Graph, int Repeat, string Output);
+    private async Task<string> QuickCheckAsync(CancellationToken ct)
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText = "PRAGMA quick_check";
+        var result = Convert.ToString(await command.ExecuteScalarAsync(ct));
+        if (result != "ok") throw new ReplayInputException("source-integrity-check-failed");
+        return result;
+    }
+
+    private static async Task<string> FingerprintAsync(string path, CancellationToken ct)
+    {
+        var parts = new List<string>();
+        foreach (var suffix in new[] { "", "-wal", "-shm" })
+        {
+            if (!File.Exists(path + suffix)) { parts.Add("absent"); continue; }
+            await using var file = new FileStream(path + suffix, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            parts.Add($"{file.Length}:{Convert.ToHexString(await SHA256.HashDataAsync(file, ct))}");
+        }
+        return string.Join(";", parts);
+    }
+
+    private sealed record ReplayOptions(string Database, int? Graph, int Repeat, string Output, string Engine, string Variant, string PriorityAvailability);
 
     private static ReplayOptions Parse(string[] args)
     {
@@ -226,7 +351,7 @@ internal sealed class SqliteReplaySource : IAsyncDisposable
             {
                 if (!values.TryAdd(flag, "true")) throw new ReplayInputException("duplicate-flag");
             }
-            else if (flag is "--db" or "--graph" or "--repeat" or "--output")
+            else if (flag is "--db" or "--graph" or "--repeat" or "--output" or "--engine" or "--variant" or "--priority-availability")
             {
                 if (++index >= args.Length || args[index].StartsWith("--", StringComparison.Ordinal) || !values.TryAdd(flag, args[index]))
                     throw new ReplayInputException("missing-value-or-duplicate-flag");
@@ -244,6 +369,13 @@ internal sealed class SqliteReplaySource : IAsyncDisposable
         var repeat = 3;
         if (values.TryGetValue("--repeat", out var repetitions) && (!int.TryParse(repetitions, out repeat) || repeat < 1 || repeat > 10))
             throw new ReplayInputException("repeat-must-be-1-to-10");
+        var engine = values.GetValueOrDefault("--engine", "legacy");
+        var variant = values.GetValueOrDefault("--variant", "stored");
+        var priorityAvailability = values.GetValueOrDefault("--priority-availability", "stored");
+        if (priorityAvailability is not ("stored" or "on" or "off") || engine != "app" && priorityAvailability != "stored")
+            throw new ReplayInputException("invalid-priority-availability-combination");
+        if (engine is not ("legacy" or "app") || variant is not ("stored" or "none" or "first" or "first-two" or "all")
+            || engine == "legacy" && variant != "stored") throw new ReplayInputException("invalid-engine-or-variant-combination");
         database = LocalPath(database, false);
         output = LocalPath(output, true);
         foreach (var start in new[] { AppContext.BaseDirectory, Directory.GetCurrentDirectory(), output })
@@ -253,7 +385,7 @@ internal sealed class SqliteReplaySource : IAsyncDisposable
                     throw new ReplayInputException("output-must-be-outside-repository");
         var sourceDirectory = Path.GetDirectoryName(database)!;
         if (Within(output, sourceDirectory) || Within(sourceDirectory, output)) throw new ReplayInputException("output-must-be-separate-from-source-directory");
-        return new(database, graph, repeat, output);
+        return new(database, graph, repeat, output, engine, variant, priorityAvailability);
     }
 
     private static string LocalPath(string path, bool directory)

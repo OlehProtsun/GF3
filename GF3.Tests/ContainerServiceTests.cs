@@ -428,13 +428,18 @@ public sealed class ContainerServiceTests
         Assert.Equal(30, style.TextColorArgb);
     }
 
-    [Fact]
-    public async Task RealGeneration_PreviewDryRunOverwriteAndFailure_PreserveDatabaseContracts()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RealGeneration_PreviewDryRunOverwriteAndFailure_PreserveDatabaseContracts(bool priority)
     {
         await using var database = await SqliteTestDatabase.CreateAsync();
         var (containerId, graphId, employeeId) = await SeedGenerationAsync(database);
         await using var context = database.CreateContext();
-        var service = CreateService(context, new ScheduleGenerator());
+        if (priority) await context.ScheduleEmployees.Where(e => e.ScheduleId == graphId).ExecuteUpdateAsync(s => s.SetProperty(e => e.IsPriority, true));
+        var legacy = new ScheduleGenerator();
+        IScheduleGenerator engine = priority ? new PriorityAwareScheduleGenerator(legacy, new(legacy), context) : legacy;
+        var service = CreateService(context, engine);
         var graph = (await service.GetGraphByIdAsync(containerId, graphId))!;
         var employees = (await service.GetGraphEmployeesAsync(containerId, graphId))!;
         var before = await GenerationSnapshotAsync(database);
@@ -467,12 +472,125 @@ public sealed class ContainerServiceTests
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => failingService.GenerateGraphAsync(containerId, graphId, true, false, null, canceled.Token));
         Assert.Equal(persisted, await GenerationSnapshotAsync(database));
         using var during = new CancellationTokenSource();
-        var real = CreateService(fresh, new ScheduleGenerator());
+        var freshLegacy = new ScheduleGenerator();
+        var real = CreateService(fresh, priority ? new PriorityAwareScheduleGenerator(freshLegacy, new(freshLegacy), fresh) : freshLegacy);
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => real.GenerateGraphAsync(containerId, graphId, true, false,
             new CancelGenerationProgress(during), during.Token));
         Assert.Equal(persisted, await GenerationSnapshotAsync(database));
         var afterFailure = await real.GenerateGraphAsync(containerId, graphId, true, false, null);
         Assert.Equal(0, afterFailure.WrittenSlotsCount);
+    }
+
+    [Theory]
+    [InlineData(1, false, 0)] [InlineData(1, true, 1)]
+    [InlineData(6, false, 2)] [InlineData(6, true, 3)]
+    [InlineData(8, false, 3)] [InlineData(8, true, 0)]
+    [InlineData(10, false, 1)] [InlineData(10, true, 2)]
+    [InlineData(12, false, 2)] [InlineData(12, true, 3)] [InlineData(0, true, 2)]
+    public async Task FreshPreviewSaveReopenAndDeleteRecreateAgree(int hours, bool weekendsOff, int priorityCount)
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        var (containerId, obsoleteId, employeeId) = await SeedGenerationAsync(database);
+        await using var context = database.CreateContext();
+        if (hours == 0) await context.PriorityGenerationSettings.ExecuteDeleteAsync();
+        else await context.PriorityGenerationSettings.ExecuteUpdateAsync(s => s.SetProperty(x => x.ShiftHours, hours).SetProperty(x => x.WeekendsOff, weekendsOff));
+        var group = await context.AvailabilityGroups.Include(g => g.Members).SingleAsync();
+        for (var index = 0; index < 2; index++)
+        {
+            var added = TestDataFactory.CreateDalEmployee($"Synthetic{index}", phone: null, email: null);
+            context.Employees.Add(added);
+            await context.SaveChangesAsync();
+            group.Members.Add(new() { EmployeeId = added.Id });
+        }
+        await context.SaveChangesAsync();
+        var legacy = new ScheduleGenerator();
+        var service = CreateService(context, new PriorityAwareScheduleGenerator(legacy, new(legacy), context));
+        var graph = (await service.GetGraphByIdAsync(containerId, obsoleteId))!;
+        await service.GenerateGraphAsync(containerId, obsoleteId, true, false, null);
+        await service.DeleteGraphAsync(containerId, obsoleteId);
+        graph.Id = 0; graph.Name = "Fresh synthetic";
+        graph.Shift1Time = "09:00 - 15:00"; graph.Shift2Time = "15:00 - 22:00"; graph.MaxHoursPerEmpMonth = 80;
+        var employees = group.Members.OrderBy(m => m.EmployeeId).Select((member, index) => new ScheduleEmployeeModel {
+            EmployeeId = member.EmployeeId, DisplayOrder = index, MinHoursMonth = 180, IsPriority = index < priorityCount }).ToArray();
+        var before = await GenerationSnapshotAsync(database);
+        var preview = await service.GenerateGraphPreviewAsync(containerId, graph, employees, null);
+        Assert.Equal(before, await GenerationSnapshotAsync(database));
+        Assert.Equal(0, preview.WrittenSlotsCount);
+        var groupModel = new AvailabilityGroupModel { Id = group.Id, Year = 2026, Month = 2,
+            Members = [new() { EmployeeId = employeeId, Days = [new() { DayOfMonth = 1, Kind = AvailabilityKind.NONE }] }] };
+        var check = ScheduleGenerationOracle.Check(new("fresh", graph, employees, [groupModel]), preview.Slots.ToArray(), hours == 0 ? 8 : hours, weekendsOff);
+        Assert.Empty(check.HardViolations);
+        Assert.True(check.Metrics.TotalMinHourDeficitMinutes > 0);
+        Assert.Contains(preview.Slots, s => s.Status == SlotStatus.UNFURNISHED);
+        var created = await service.CreateGraphAsync(containerId, graph);
+        foreach (var employee in employees) await service.AddGraphEmployeeAsync(containerId, created.Id, employee);
+        context.ChangeTracker.Clear();
+        var reopened = (await service.GetGraphEmployeesAsync(containerId, created.Id))!;
+        Assert.Equal(employees.Select(e => e.IsPriority), reopened.OrderBy(e => e.DisplayOrder).Select(e => e.IsPriority));
+        var saved = await service.GenerateGraphAsync(containerId, created.Id, true, false, null);
+        Assert.Equal(ScheduleGenerationScenarioMatrixTests.Normalize(preview.Slots), ScheduleGenerationScenarioMatrixTests.Normalize(saved.Slots));
+        var persisted = await GenerationSnapshotAsync(database);
+        var repeat = await service.GenerateGraphAsync(containerId, created.Id, true, false, null);
+        Assert.Equal(0, repeat.WrittenSlotsCount);
+        Assert.Equal(persisted, await GenerationSnapshotAsync(database));
+        await service.DeleteGraphAsync(containerId, created.Id);
+        graph.Id = 0;
+        var recreatedPreview = await service.GenerateGraphPreviewAsync(containerId, graph, employees, null);
+        Assert.Equal(ScheduleGenerationScenarioMatrixTests.Normalize(preview.Slots), ScheduleGenerationScenarioMatrixTests.Normalize(recreatedPreview.Slots));
+        var recreated = await service.CreateGraphAsync(containerId, graph);
+        foreach (var employee in employees) await service.AddGraphEmployeeAsync(containerId, recreated.Id, employee);
+        var regenerated = await service.GenerateGraphAsync(containerId, recreated.Id, true, false, null);
+        Assert.Equal(ScheduleGenerationScenarioMatrixTests.Normalize(preview.Slots), ScheduleGenerationScenarioMatrixTests.Normalize(regenerated.Slots));
+    }
+
+    [Fact]
+    public async Task GlobalAvailabilityPolicyAppliesToFreshPreviewSaveReloadAndRegeneration()
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        var (containerId, graphId, employeeId) = await SeedGenerationAsync(database);
+        await using var context = database.CreateContext();
+        var member = await context.AvailabilityGroupMembers.Include(m => m.Days).SingleAsync();
+        foreach (var day in Enumerable.Range(2, 27)) member.Days.Add(new() { DayOfMonth = day, Kind = DalEnums.AvailabilityKind.NONE });
+        await context.PriorityGenerationSettings.ExecuteUpdateAsync(s => s.SetProperty(x => x.RespectAvailability, false).SetProperty(x => x.WeekendsOff, false));
+        var original = await context.Schedules.SingleAsync();
+        var external = TestDataFactory.CreateDalSchedule(containerId, original.ShopId, year: 2026, month: 2);
+        external.Name = "Saved commitments synthetic";
+        context.Schedules.Add(external); await context.SaveChangesAsync();
+        context.ScheduleSlots.Add(TestDataFactory.CreateDalSlot(external.Id, 2, 1, employeeId, "09:00", "17:00"));
+        await context.SaveChangesAsync();
+        var externalBefore = await context.ScheduleSlots.Where(s => s.ScheduleId == external.Id)
+            .Select(s => new { s.Id, s.EmployeeId, s.DayOfMonth, s.FromTime, s.ToTime }).ToArrayAsync();
+        var legacy = new ScheduleGenerator();
+        var service = CreateService(context, new PriorityAwareScheduleGenerator(legacy, new(legacy), context));
+        var graph = (await service.GetGraphByIdAsync(containerId, graphId))!;
+        graph.Id = 0; graph.Name = "New policy synthetic";
+        graph.Shift1Time = "09:00 - 15:00"; graph.Shift2Time = "15:00 - 21:00"; graph.MaxHoursPerEmpMonth = 8;
+        var roster = new[] { new ScheduleEmployeeModel { EmployeeId = employeeId, IsPriority = true, MinHoursMonth = 8 } };
+        var beforePreview = await GenerationSnapshotAsync(database);
+        var preview = await service.GenerateGraphPreviewAsync(containerId, graph, roster, null);
+        Assert.Equal(0, preview.WrittenSlotsCount);
+        Assert.Equal(beforePreview, await GenerationSnapshotAsync(database));
+        var assigned = Assert.Single(preview.Slots, s => s.EmployeeId.HasValue);
+        Assert.NotEqual(2, assigned.DayOfMonth);
+        Assert.DoesNotContain(new DateOnly(2026, 2, assigned.DayOfMonth).DayOfWeek, new[] { DayOfWeek.Saturday, DayOfWeek.Sunday });
+        var created = await service.CreateGraphAsync(containerId, graph);
+        await service.AddGraphEmployeeAsync(containerId, created.Id, roster[0]);
+        await service.ReplaceGraphSlotsAsync(containerId, created.Id, preview.Slots);
+        context.ChangeTracker.Clear();
+        Assert.Single((await service.GetGraphEmployeesAsync(containerId, created.Id))!);
+        var reloaded = (await service.GetGraphSlotsAsync(containerId, created.Id))!;
+        Assert.Equal(ScheduleGenerationScenarioMatrixTests.Normalize(preview.Slots), ScheduleGenerationScenarioMatrixTests.Normalize(reloaded));
+        var regenerated = await service.GenerateGraphAsync(containerId, created.Id, true, false, null);
+        Assert.Equal(ScheduleGenerationScenarioMatrixTests.Normalize(preview.Slots), ScheduleGenerationScenarioMatrixTests.Normalize(regenerated.Slots));
+        await context.PriorityGenerationSettings.ExecuteUpdateAsync(s => s.SetProperty(x => x.RespectAvailability, true));
+        var restricted = await service.GenerateGraphAsync(containerId, created.Id, true, false, null);
+        Assert.DoesNotContain(restricted.Slots, s => s.EmployeeId.HasValue);
+        await service.DeleteGraphAsync(containerId, created.Id);
+        graph.Id = 0;
+        Assert.DoesNotContain((await service.GenerateGraphPreviewAsync(containerId, graph, roster, null)).Slots, s => s.EmployeeId.HasValue);
+        Assert.True((await context.PriorityGenerationSettings.AsNoTracking().SingleAsync()).RespectAvailability);
+        Assert.Equal(externalBefore, await context.ScheduleSlots.Where(s => s.ScheduleId == external.Id)
+            .Select(s => new { s.Id, s.EmployeeId, s.DayOfMonth, s.FromTime, s.ToTime }).ToArrayAsync());
     }
 
     [Fact]
@@ -560,6 +678,11 @@ public sealed class ContainerServiceTests
         var (containerId, graphId, employeeId) = await SeedGenerationAsync(database);
         var repository = new DirectoryInfo(AppContext.BaseDirectory);
         while (repository is not null && !File.Exists(Path.Combine(repository.FullName, "GF3.sln"))) repository = repository.Parent;
+        if (repository is null)
+        {
+            repository = new DirectoryInfo(Directory.GetCurrentDirectory());
+            while (repository is not null && !File.Exists(Path.Combine(repository.FullName, "GF3.sln"))) repository = repository.Parent;
+        }
         Assert.NotNull(repository);
         var project = Path.Combine(repository.FullName, "tools", "AlgorithmStressHarness", "AlgorithmStressHarness.csproj");
         var build = await RunReplayProcessAsync(repository.FullName, "build", project, "--disable-build-servers", "-m:1", "-p:UseSharedCompilation=false", "-p:OutputPath=bin/ReplayVerification/");
@@ -571,6 +694,7 @@ public sealed class ContainerServiceTests
         {
             var before = await GenerationSnapshotAsync(database);
             var hash = await HashDatabaseFileAsync(database.DatabasePath);
+            Assert.True(File.Exists(database.DatabasePath + "-wal") && new FileInfo(database.DatabasePath + "-wal").Length > 0);
             var replay = await RunReplayProcessAsync(repository.FullName, dll, "--db", database.DatabasePath, "--graph", graphId.ToString(), "--output", output);
             Assert.True(replay.Code == 0, replay.Output);
             Assert.Equal(before, await GenerationSnapshotAsync(database));
@@ -601,6 +725,50 @@ public sealed class ContainerServiceTests
             Assert.Equal(expected.Metrics.CoverageGapMinutes, generated.GetProperty("CoverageGapMinutes").GetInt32());
             Assert.Equal(expected.Metrics.TotalAssignedMinutes, generated.GetProperty("TotalAssignedMinutes").GetInt32());
             Assert.Equal(expected.Metrics.TotalMinHourDeficitMinutes, generated.GetProperty("TotalMinHourDeficitMinutes").GetInt32());
+            await context.ScheduleEmployees.Where(e => e.ScheduleId == graphId).ExecuteUpdateAsync(s => s.SetProperty(e => e.IsPriority, true));
+            await context.PriorityGenerationSettings.ExecuteDeleteAsync();
+            var selectedGroupId = await context.Schedules.Where(s => s.Id == graphId).Select(s => s.AvailabilityGroupId).SingleAsync();
+            var selectedMember = await context.AvailabilityGroupMembers.SingleAsync(m => m.AvailabilityGroupId == selectedGroupId);
+            context.AvailabilityGroupDays.Add(new() { AvailabilityGroupMemberId = selectedMember.Id, DayOfMonth = 2,
+                Kind = DalEnums.AvailabilityKind.INT, IntervalStr = "09:00 - 15:00" });
+            await context.SaveChangesAsync();
+            var appBefore = await GenerationSnapshotAsync(database);
+            var appHash = await HashDatabaseFileAsync(database.DatabasePath);
+            foreach (var variant in new[] { "stored", "none", "first", "first-two", "all" })
+            foreach (var policy in new[] { "stored", "on", "off" })
+            {
+                var appReplay = await RunReplayProcessAsync(repository.FullName, dll, "--db", database.DatabasePath,
+                    "--graph", graphId.ToString(), "--engine", "app", "--variant", variant, "--priority-availability", policy, "--output", output);
+                Assert.True(appReplay.Code == 0, appReplay.Output);
+                using var app = System.Text.Json.JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(output, "summary.json")));
+                Assert.Equal("app", app.RootElement.GetProperty("Engine").GetString());
+                Assert.True(app.RootElement.GetProperty("FingerprintUnchanged").GetBoolean());
+                Assert.Equal("ok", app.RootElement.GetProperty("QuickCheckAfter").GetString());
+                var appCase = app.RootElement.GetProperty("Cases")[0];
+                Assert.Equal(variant, appCase.GetProperty("Variant").GetString());
+                Assert.Equal(variant == "none" ? 0 : 1, appCase.GetProperty("PriorityCount").GetInt32());
+                Assert.Equal(8, appCase.GetProperty("PriorityShiftHours").GetInt32());
+                Assert.Equal(policy != "off", appCase.GetProperty("PriorityRespectAvailability").GetBoolean());
+                Assert.Equal(policy, app.RootElement.GetProperty("PriorityAvailability").GetString());
+                Assert.All(appCase.GetProperty("ReorientationEvaluations").EnumerateArray(), value => Assert.InRange(value.GetInt32(), 0, 20_000));
+                Assert.Empty(appCase.GetProperty("HardViolations").EnumerateObject());
+                Assert.True(appCase.GetProperty("RepeatStable").GetBoolean());
+                Assert.Equal(appBefore, await GenerationSnapshotAsync(database));
+                Assert.Equal(appHash, await HashDatabaseFileAsync(database.DatabasePath));
+            }
+            foreach (var (engine, variant) in new[] { ("legacy", "all"), ("unknown", "stored"), ("app", "unknown") })
+            {
+                var invalidVariant = await RunReplayProcessAsync(repository.FullName, dll, "--db", database.DatabasePath,
+                    "--all-graphs", "--engine", engine, "--variant", variant, "--output", output);
+                Assert.Equal(2, invalidVariant.Code);
+            }
+            foreach (var (engine, policy) in new[] { ("legacy", "off"), ("legacy", "on"), ("app", "unknown") })
+            {
+                var invalidPolicy = await RunReplayProcessAsync(repository.FullName, dll, "--db", database.DatabasePath,
+                    "--all-graphs", "--engine", engine, "--priority-availability", policy, "--output", output);
+                Assert.Equal(2, invalidPolicy.Code);
+                Assert.DoesNotContain(database.DatabasePath, invalidPolicy.Output);
+            }
             foreach (var file in new[] { "summary.json", "cases.csv", "failures.json" })
             {
                 var text = await File.ReadAllTextAsync(Path.Combine(output, file));
@@ -626,7 +794,18 @@ public sealed class ContainerServiceTests
             var schema = await RunReplayProcessAsync(repository.FullName, dll, "--db", unsupported, "--all-graphs", "--output", output);
             Assert.NotEqual(0, schema.Code);
             Assert.Equal(0, new FileInfo(unsupported).Length);
-            Assert.Equal(before, await GenerationSnapshotAsync(database));
+            Assert.Equal(appBefore, await GenerationSnapshotAsync(database));
+            await context.Database.OpenConnectionAsync();
+            await context.Database.ExecuteSqlRawAsync("PRAGMA foreign_keys=OFF");
+            await context.Database.ExecuteSqlInterpolatedAsync($"UPDATE schedule SET availability_group_id={int.MaxValue} WHERE id={graphId}");
+            var missingBefore = await GenerationSnapshotAsync(database);
+            var missingGroup = await RunReplayProcessAsync(repository.FullName, dll, "--db", database.DatabasePath,
+                "--graph", graphId.ToString(), "--engine", "app", "--output", output);
+            Assert.Equal(1, missingGroup.Code);
+            Assert.Contains("missing-selected-availability", await File.ReadAllTextAsync(Path.Combine(output, "failures.json")));
+            Assert.Equal(missingBefore, await GenerationSnapshotAsync(database));
+            await context.Database.ExecuteSqlInterpolatedAsync($"UPDATE schedule SET availability_group_id={selectedGroupId} WHERE id={graphId}");
+            await context.Database.ExecuteSqlRawAsync("PRAGMA foreign_keys=ON");
         }
         finally
         {

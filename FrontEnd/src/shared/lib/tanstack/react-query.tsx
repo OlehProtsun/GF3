@@ -10,7 +10,7 @@ import {
   useSyncExternalStore,
 } from "react";
 import type { PropsWithChildren } from "react";
-import { isRequestCanceledError } from "@shared/api/httpClient";
+import { ApiError, isRequestCanceledError } from "@shared/api/httpClient";
 
 type QueryKey = readonly unknown[];
 type QueryFilters = { queryKey?: QueryKey };
@@ -95,7 +95,7 @@ async function runWithRetry<TData>(queryFn: () => Promise<TData>, retry: number)
     try {
       return await queryFn();
     } catch (error) {
-      if (isRequestCanceledError(error) || attempt >= retry) {
+      if (isRequestCanceledError(error) || (error instanceof ApiError && error.status === 429) || attempt >= retry) {
         throw error;
       }
 

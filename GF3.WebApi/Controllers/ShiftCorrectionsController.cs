@@ -8,6 +8,7 @@ using DataAccessLayer.Models.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Data.Sqlite;
 using WebApi.Auth;
 using WebApi.Contracts.ShiftCorrections;
 using WebApi.Realtime;
@@ -66,30 +67,42 @@ public sealed class EmployeeShiftCorrectionsController(
             throw new ValidationException("This schedule is being edited by a manager. Try again after the manager saves changes.");
         }
 
-        var slot = schedule.Slots.SingleOrDefault(item => item.Id == request.ScheduleSlotId)
-            ?? throw ValidationException.ForField(nameof(request.ScheduleSlotId), "Shift was not found in this schedule.");
-        if (slot.EmployeeId != employeeId)
+        if ((request.ScheduleSlotId is null) == (request.DayOfMonth is null) || request.ScheduleSlotId is <= 0)
         {
-            throw ValidationException.ForField(nameof(request.ScheduleSlotId), "You can only correct your own assigned shift.");
+            throw new ValidationException("Choose either an assigned shift or a day off.");
         }
 
         var requestedFromTime = ShiftCorrectionRules.NormalizeTime(request.RequestedFromTime, nameof(request.RequestedFromTime));
         var requestedToTime = ShiftCorrectionRules.NormalizeTime(request.RequestedToTime, nameof(request.RequestedToTime));
         ShiftCorrectionRules.ValidatePeriod(requestedFromTime, requestedToTime);
 
-        if (slot.FromTime == requestedFromTime && slot.ToTime == requestedToTime)
+        ScheduleSlotModel? slot = null;
+        int day;
+        if (request.ScheduleSlotId is { } slotId)
         {
-            throw new ValidationException("Change at least one boundary before sending the request.");
+            slot = schedule.Slots.SingleOrDefault(item => item.Id == slotId)
+                ?? throw ValidationException.ForField(nameof(request.ScheduleSlotId), "Shift was not found in this schedule.");
+            if (slot.EmployeeId != employeeId)
+                throw ValidationException.ForField(nameof(request.ScheduleSlotId), "You can only correct your own assigned shift.");
+            if (slot.FromTime == requestedFromTime && slot.ToTime == requestedToTime)
+                throw new ValidationException("Change at least one boundary before sending the request.");
+            day = slot.DayOfMonth;
+        }
+        else
+        {
+            day = request.DayOfMonth!.Value;
+            await ShiftCorrectionRules.ValidateDayOffAsync(db, schedule, employeeId, day,
+                requestedFromTime, requestedToTime, cancellationToken).ConfigureAwait(false);
         }
 
         await ShiftCorrectionRules.ValidateEmployeeOverlapAsync(
-            db, schedule, slot, requestedFromTime, requestedToTime, cancellationToken).ConfigureAwait(false);
+            db, schedule, employeeId, day, slot?.Id, requestedFromTime, requestedToTime, cancellationToken).ConfigureAwait(false);
 
-        var hasPendingRequest = await db.ShiftCorrectionRequests
+        var hasPendingRequest = slot is not null && await db.ShiftCorrectionRequests
             .AnyAsync(item =>
                 (item.ScheduleSlotId == slot.Id ||
-                    (item.ScheduleId == schedule.Id && item.EmployeeId == slot.EmployeeId &&
-                     item.DayOfMonth == slot.DayOfMonth && item.OriginalFromTime == slot.FromTime &&
+                    (item.ScheduleId == schedule.Id && item.EmployeeId == employeeId &&
+                     item.DayOfMonth == day && item.OriginalFromTime == slot.FromTime &&
                      item.OriginalToTime == slot.ToTime)) &&
                 item.Status == ShiftCorrectionStatus.Pending,
                 cancellationToken)
@@ -102,22 +115,29 @@ public sealed class EmployeeShiftCorrectionsController(
         var model = new ShiftCorrectionRequestModel
         {
             ScheduleId = schedule.Id,
-            ScheduleSlotId = slot.Id,
-            DayOfMonth = slot.DayOfMonth,
+            ScheduleSlotId = slot?.Id,
+            DayOfMonth = day,
             EmployeeId = employeeId,
-            OriginalFromTime = slot.FromTime,
-            OriginalToTime = slot.ToTime,
+            OriginalFromTime = slot?.FromTime,
+            OriginalToTime = slot?.ToTime,
             RequestedFromTime = requestedFromTime,
             RequestedToTime = requestedToTime,
             Status = ShiftCorrectionStatus.Pending,
             CreatedAtUtc = DateTimeOffset.UtcNow,
         };
         db.ShiftCorrectionRequests.Add(model);
-        await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (DbUpdateException error) when (ShiftCorrectionRules.IsPendingDuplicate(error))
+        {
+            return Conflict(new ProblemDetails { Status = 409, Title = "A correction request is already pending." });
+        }
 
         await PostCommitActions.RunAsync(HttpContext, () => workflowLogService.LogAsync(
             User,
-            $"Requested a shift correction in schedule \"{schedule.Name}\" for {schedule.Year}-{schedule.Month:00}-{slot.DayOfMonth:00}: {slot.FromTime}-{slot.ToTime} to {requestedFromTime}-{requestedToTime}.",
+            $"Requested a shift correction in schedule \"{schedule.Name}\" for {schedule.Year}-{schedule.Month:00}-{day:00}: {(slot is null ? "day off" : $"{slot.FromTime}-{slot.ToTime}")} to {requestedFromTime}-{requestedToTime}.",
             cancellationToken)).ConfigureAwait(false);
         await PostCommitActions.RunAsync(HttpContext, () => realtimeNotifier.NotifyShiftSwapsChangedAsync(
             schedule.ContainerId,
@@ -218,6 +238,20 @@ public sealed class ManagerShiftCorrectionsController(
         [FromBody] ApproveShiftCorrectionRequest request,
         CancellationToken cancellationToken)
     {
+        try
+        {
+            return await ApproveCore(containerId, graphId, id, request, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception error) when (ShiftCorrectionRules.IsReviewConflict(error))
+        {
+            db.ChangeTracker.Clear();
+            return Conflict(new ProblemDetails { Status = 409, Title = "The schedule or request changed. Refresh and try again." });
+        }
+    }
+
+    private async Task<ActionResult<ShiftCorrectionRequestDto>> ApproveCore(
+        int containerId, int graphId, int id, ApproveShiftCorrectionRequest request, CancellationToken cancellationToken)
+    {
         if (CreateEditLockConflictResult(containerId, graphId) is { } conflict)
         {
             return conflict;
@@ -234,50 +268,84 @@ public sealed class ManagerShiftCorrectionsController(
             ?? throw new KeyNotFoundException($"Shift correction with id {id} was not found.");
         EnsurePending(correction);
 
-        var slot = await db.ScheduleSlots
-            .SingleOrDefaultAsync(item => item.Id == correction.ScheduleSlotId && item.ScheduleId == graphId, cancellationToken)
-            .ConfigureAwait(false);
-        if (slot is null)
+        var isDayOff = correction.OriginalFromTime is null && correction.OriginalToTime is null;
+        ScheduleSlotModel slot;
+        if (isDayOff)
         {
-            var candidates = await db.ScheduleSlots
-                .Where(item => item.ScheduleId == correction.ScheduleId &&
-                    item.EmployeeId == correction.EmployeeId && item.DayOfMonth == correction.DayOfMonth &&
-                    item.FromTime == correction.OriginalFromTime && item.ToTime == correction.OriginalToTime)
-                .Take(2).ToListAsync(cancellationToken).ConfigureAwait(false);
-            if (candidates.Count == 0)
-            {
-                throw new ValidationException("The original shift no longer exists. Reject this request and ask the employee to submit a new one.");
-            }
-            if (candidates.Count > 1)
-            {
-                throw new ValidationException("The original shift cannot be uniquely identified. Reject this request and ask the employee to submit a new one.");
-            }
-            slot = candidates[0];
-        }
-        if (slot.EmployeeId != correction.EmployeeId ||
-            slot.DayOfMonth != correction.DayOfMonth ||
-            slot.FromTime != correction.OriginalFromTime ||
-            slot.ToTime != correction.OriginalToTime)
-        {
-            throw new ValidationException("The original shift changed after this request was sent. Reject it and ask the employee to submit a new one.");
-        }
+            if (correction.Schedule.PublicationStatus != SchedulePublicationStatus.Public ||
+                !await db.ScheduleEmployees.AnyAsync(item => item.ScheduleId == graphId &&
+                    item.EmployeeId == correction.EmployeeId, cancellationToken).ConfigureAwait(false))
+                throw new ValidationException("Published schedule was not found for this employee.");
 
-        var otherSlots = await db.ScheduleSlots
-            .Where(item => item.ScheduleId == graphId)
-            .ToListAsync(cancellationToken)
-            .ConfigureAwait(false);
-        await ShiftCorrectionRules.ValidateEmployeeOverlapAsync(
-            db, correction.Schedule, slot, correction.RequestedFromTime,
-            correction.RequestedToTime, cancellationToken).ConfigureAwait(false);
-        var collidesWithSlotNumber = otherSlots.Any(item =>
-            item.Id != slot.Id &&
-            item.DayOfMonth == slot.DayOfMonth &&
-            item.SlotNo == slot.SlotNo &&
-            item.FromTime == correction.RequestedFromTime &&
-            item.ToTime == correction.RequestedToTime);
-        if (collidesWithSlotNumber)
+            await ShiftCorrectionRules.ValidateDayOffAsync(db, correction.Schedule, correction.EmployeeId,
+                correction.DayOfMonth, correction.RequestedFromTime, correction.RequestedToTime,
+                cancellationToken, correction.Id).ConfigureAwait(false);
+            ShiftCorrectionRules.ValidatePeriod(
+                ShiftCorrectionRules.NormalizeTime(correction.RequestedFromTime, nameof(correction.RequestedFromTime)),
+                ShiftCorrectionRules.NormalizeTime(correction.RequestedToTime, nameof(correction.RequestedToTime)));
+            await ShiftCorrectionRules.ValidateEmployeeOverlapAsync(db, correction.Schedule, correction.EmployeeId,
+                correction.DayOfMonth, null, correction.RequestedFromTime, correction.RequestedToTime,
+                cancellationToken).ConfigureAwait(false);
+            var lastSlotNo = await db.ScheduleSlots.Where(item => item.ScheduleId == graphId &&
+                    item.DayOfMonth == correction.DayOfMonth).MaxAsync(item => (int?)item.SlotNo, cancellationToken)
+                .ConfigureAwait(false) ?? 0;
+            slot = new ScheduleSlotModel
+            {
+                ScheduleId = graphId, DayOfMonth = correction.DayOfMonth, EmployeeId = correction.EmployeeId,
+                FromTime = correction.RequestedFromTime, ToTime = correction.RequestedToTime,
+                Status = SlotStatus.ASSIGNED, SlotNo = lastSlotNo + 1,
+            };
+            db.ScheduleSlots.Add(slot);
+            await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        }
+        else
         {
-            throw new ValidationException("The requested time conflicts with another shift position in this schedule.");
+            var originalSlot = await db.ScheduleSlots
+                .SingleOrDefaultAsync(item => item.Id == correction.ScheduleSlotId && item.ScheduleId == graphId, cancellationToken)
+                .ConfigureAwait(false);
+            if (originalSlot is null)
+            {
+                var candidates = await db.ScheduleSlots
+                    .Where(item => item.ScheduleId == correction.ScheduleId &&
+                        item.EmployeeId == correction.EmployeeId && item.DayOfMonth == correction.DayOfMonth &&
+                        item.FromTime == correction.OriginalFromTime && item.ToTime == correction.OriginalToTime)
+                    .Take(2).ToListAsync(cancellationToken).ConfigureAwait(false);
+                if (candidates.Count == 0)
+                {
+                    throw new ValidationException("The original shift no longer exists. Reject this request and ask the employee to submit a new one.");
+                }
+                if (candidates.Count > 1)
+                {
+                    throw new ValidationException("The original shift cannot be uniquely identified. Reject this request and ask the employee to submit a new one.");
+                }
+                originalSlot = candidates[0];
+            }
+            slot = originalSlot;
+            if (slot.EmployeeId != correction.EmployeeId ||
+                slot.DayOfMonth != correction.DayOfMonth ||
+                slot.FromTime != correction.OriginalFromTime ||
+                slot.ToTime != correction.OriginalToTime)
+            {
+                throw new ValidationException("The original shift changed after this request was sent. Reject it and ask the employee to submit a new one.");
+            }
+
+            var otherSlots = await db.ScheduleSlots
+                .Where(item => item.ScheduleId == graphId)
+                .ToListAsync(cancellationToken)
+                .ConfigureAwait(false);
+            await ShiftCorrectionRules.ValidateEmployeeOverlapAsync(
+                db, correction.Schedule, correction.EmployeeId, correction.DayOfMonth, slot.Id, correction.RequestedFromTime,
+                correction.RequestedToTime, cancellationToken).ConfigureAwait(false);
+            var collidesWithSlotNumber = otherSlots.Any(item =>
+                item.Id != slot.Id &&
+                item.DayOfMonth == slot.DayOfMonth &&
+                item.SlotNo == slot.SlotNo &&
+                item.FromTime == correction.RequestedFromTime &&
+                item.ToTime == correction.RequestedToTime);
+            if (collidesWithSlotNumber)
+            {
+                throw new ValidationException("The requested time conflicts with another shift position in this schedule.");
+            }
         }
 
         var managerId = GetRequiredManagerId();
@@ -333,6 +401,20 @@ public sealed class ManagerShiftCorrectionsController(
         int graphId,
         int id,
         CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await RejectCore(containerId, graphId, id, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception error) when (ShiftCorrectionRules.IsReviewConflict(error))
+        {
+            db.ChangeTracker.Clear();
+            return Conflict(new ProblemDetails { Status = 409, Title = "The request changed. Refresh and try again." });
+        }
+    }
+
+    private async Task<ActionResult<ShiftCorrectionRequestDto>> RejectCore(
+        int containerId, int graphId, int id, CancellationToken cancellationToken)
     {
         if (CreateEditLockConflictResult(containerId, graphId) is { } conflict)
         {
@@ -426,6 +508,7 @@ internal static class ShiftCorrectionRules
         ContainerId = model.Schedule.ContainerId,
         ScheduleId = model.ScheduleId,
         ScheduleSlotId = model.ScheduleSlotId,
+        IsDayOffRequest = model.OriginalFromTime is null && model.OriginalToTime is null,
         ScheduleName = model.Schedule.Name,
         ShopName = model.Schedule.Shop?.Name ?? string.Empty,
         Year = model.Schedule.Year,
@@ -464,15 +547,17 @@ internal static class ShiftCorrectionRules
     internal static async Task ValidateEmployeeOverlapAsync(
         AppDbContext db,
         ScheduleModel schedule,
-        ScheduleSlotModel correctedSlot,
+        int employeeId,
+        int dayOfMonth,
+        int? excludedSlotId,
         string fromTime,
         string toTime,
         CancellationToken cancellationToken)
     {
         var slots = await db.ScheduleSlots.AsNoTracking()
-            .Where(slot => slot.Id != correctedSlot.Id &&
-                slot.EmployeeId == correctedSlot.EmployeeId &&
-                slot.DayOfMonth == correctedSlot.DayOfMonth &&
+            .Where(slot => (excludedSlotId == null || slot.Id != excludedSlotId) &&
+                slot.EmployeeId == employeeId &&
+                slot.DayOfMonth == dayOfMonth &&
                 slot.Schedule.Year == schedule.Year && slot.Schedule.Month == schedule.Month &&
                 (slot.ScheduleId == schedule.Id || slot.Schedule.PublicationStatus == SchedulePublicationStatus.Public))
             .ToListAsync(cancellationToken).ConfigureAwait(false);
@@ -484,6 +569,44 @@ internal static class ShiftCorrectionRules
             throw new ValidationException("The corrected shift cannot overlap another period on the same day.");
         }
     }
+
+    internal static async Task ValidateDayOffAsync(AppDbContext db, ScheduleModel schedule, int employeeId,
+        int day, string fromTime, string toTime, CancellationToken cancellationToken, int? excludedRequestId = null)
+    {
+        if (day < 1 || day > DateTime.DaysInMonth(schedule.Year, schedule.Month))
+            throw ValidationException.ForField("DayOfMonth", "Choose a valid day of this month.");
+
+        if (await db.ScheduleSlots.AnyAsync(slot => slot.EmployeeId == employeeId && slot.DayOfMonth == day &&
+                slot.Schedule.Year == schedule.Year && slot.Schedule.Month == schedule.Month &&
+                slot.Schedule.PublicationStatus == SchedulePublicationStatus.Public, cancellationToken).ConfigureAwait(false))
+            throw new ValidationException("This date is not a day off. You already have an assigned shift.");
+
+        var pending = await db.ShiftCorrectionRequests.AsNoTracking().Where(item => item.EmployeeId == employeeId &&
+                item.DayOfMonth == day && item.Status == ShiftCorrectionStatus.Pending &&
+                (excludedRequestId == null || item.Id != excludedRequestId) &&
+                item.Schedule.Year == schedule.Year && item.Schedule.Month == schedule.Month &&
+                (item.ScheduleId == schedule.Id || item.Schedule.PublicationStatus == SchedulePublicationStatus.Public))
+            .ToListAsync(cancellationToken).ConfigureAwait(false);
+        if (pending.Any(item =>
+                (item.ScheduleId == schedule.Id && item.OriginalFromTime is null) ||
+                (string.CompareOrdinal(item.RequestedFromTime, toTime) < 0 &&
+                 string.CompareOrdinal(fromTime, item.RequestedToTime) < 0)))
+            throw new ValidationException("This day already has a pending correction request.");
+    }
+
+    internal static bool IsPendingDuplicate(DbUpdateException error)
+        => error.InnerException is SqliteException { SqliteExtendedErrorCode: 2067 } sqlite &&
+           sqlite.Message.Contains("shift_correction_request.", StringComparison.Ordinal);
+
+    internal static bool IsReviewConflict(Exception error)
+        => error is DbUpdateConcurrencyException ||
+           error is SqliteException { SqliteErrorCode: 5 or 6 } ||
+           error is DbUpdateException { InnerException: SqliteException { SqliteErrorCode: 5 or 6 } } ||
+           error is DbUpdateException { InnerException: SqliteException { SqliteExtendedErrorCode: 2067 } sqlite } &&
+           (sqlite.Message.Contains("schedule_slot.", StringComparison.Ordinal) ||
+            sqlite.Message.Contains("schedule_cell_style.", StringComparison.Ordinal) ||
+            sqlite.Message.Contains("manager_shift_correction_setting.", StringComparison.Ordinal) ||
+            sqlite.Message.Contains("shift_correction_request.", StringComparison.Ordinal));
 
     internal static string NormalizeColor(string? value, string fieldName)
     {

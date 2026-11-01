@@ -2,7 +2,7 @@ import { useLanguageRevision } from "@shared/i18n/useLanguageRevision";
 import { usePublicHolidayVisibility } from "@app/providers/PublicHolidayVisibilityProvider";
 import { getPolishPublicHoliday, type PolishPublicHoliday } from "@shared/lib/polishPublicHolidays";
 import { t } from "@shared/i18n";
-import { memo, useEffect, useId, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { getManualShiftCellPreview } from "../model/manualShiftIntervals";
 import type { CSSProperties, ClipboardEvent, DragEvent, FocusEvent, KeyboardEvent, MouseEvent, ReactNode } from "react";
@@ -40,6 +40,8 @@ export type ContainerGraphMatrixEditMode = "deferred" | "inline";
 export type ContainerGraphMatrixEmptyCellVariant = "neutral" | "danger";
 
 type ContainerGraphMatrixProps = {
+  urlopCellKeys?: ReadonlySet<string>;
+  urlopInfoLabels?: ReadonlyMap<string, string>;
   graph: Pick<Graph, "year" | "month"> & Partial<Pick<Graph, "shift1Time" | "shift2Time">>;
   columns: GraphMatrixColumn[];
   cellMap: GraphMatrixCellMap;
@@ -52,6 +54,7 @@ type ContainerGraphMatrixProps = {
   title?: ReactNode;
   helperText?: string;
   readOnly?: boolean;
+  readOnlyCellKeys?: ReadonlySet<string>;
   highlightReadOnlyEmpty?: boolean;
   emptyMessage?: string;
   className?: string;
@@ -131,6 +134,9 @@ type MatrixColumnResizeSession = {
 type MatrixEditorSelectionBehavior = "select-all" | "caret-end";
 
 type MatrixValueCellProps = {
+  activeManualPreviewCellKey: string | null;
+  onManualPreviewActivate: (cellKey: string) => void;
+  onManualPreviewDeactivate: (cellKey: string) => void;
   isManualColumn: boolean;
   cellKey: string;
   employeeId: number;
@@ -138,6 +144,7 @@ type MatrixValueCellProps = {
   columnLabel: string;
   value: string;
   visualHint?: string;
+  urlopLabel?: string;
   mutedSuffix?: string;
   lockVisualHint?: boolean;
   error?: string;
@@ -387,7 +394,39 @@ const MatrixDayCell = memo(function MatrixDayCell({
   );
 });
 
+function getManualPreviewPosition(rect: DOMRect, count: number, viewportWidth: number, viewportHeight: number) {
+  const VIEWPORT_GUTTER = 8;
+  const TRIGGER_GAP = 8;
+  const PREFERRED_WIDTH = 220;
+  const MAX_HEIGHT = 320;
+  const width = Math.min(PREFERRED_WIDTH, Math.max(1, viewportWidth - 2 * VIEWPORT_GUTTER));
+  const viewportCap = Math.max(1, viewportHeight - 2 * VIEWPORT_GUTTER);
+  const estimatedHeight = Math.min(MAX_HEIGHT, count * 28 + 18);
+  const rightRoom = viewportWidth - rect.right - TRIGGER_GAP - VIEWPORT_GUTTER;
+  const leftRoom = rect.left - TRIGGER_GAP - VIEWPORT_GUTTER;
+  const clamp = (value: number, size: number, viewport: number) =>
+    Math.max(Math.min(VIEWPORT_GUTTER, Math.max(0, viewport - size)), Math.min(value, viewport - VIEWPORT_GUTTER - size));
+  let left: number;
+  let top: number;
+  let maxHeight = Math.min(MAX_HEIGHT, viewportCap);
+  if (rightRoom >= width || leftRoom >= width) {
+    left = rightRoom >= width ? rect.right + TRIGGER_GAP : rect.left - TRIGGER_GAP - width;
+    top = rect.top + rect.height / 2 - Math.min(estimatedHeight, maxHeight) / 2;
+  } else {
+    const below = viewportHeight - rect.bottom - TRIGGER_GAP - VIEWPORT_GUTTER;
+    const above = rect.top - TRIGGER_GAP - VIEWPORT_GUTTER;
+    const preferBelow = below >= estimatedHeight || below >= above;
+    maxHeight = Math.max(1, Math.min(MAX_HEIGHT, viewportCap, preferBelow ? below : above));
+    left = rect.left;
+    top = preferBelow ? rect.bottom + TRIGGER_GAP : rect.top - TRIGGER_GAP - Math.min(estimatedHeight, maxHeight);
+  }
+  return { left: clamp(left, width, viewportWidth), top: clamp(top, Math.min(estimatedHeight, maxHeight), viewportHeight), width, maxHeight };
+}
+
 const MatrixValueCell = memo(function MatrixValueCell({
+  activeManualPreviewCellKey,
+  onManualPreviewActivate,
+  onManualPreviewDeactivate,
   isManualColumn,
   cellKey,
   employeeId,
@@ -395,6 +434,7 @@ const MatrixValueCell = memo(function MatrixValueCell({
   columnLabel,
   value,
   visualHint,
+  urlopLabel,
   mutedSuffix,
   lockVisualHint,
   error,
@@ -436,13 +476,13 @@ const MatrixValueCell = memo(function MatrixValueCell({
     : renderedValue;
   const isTextValue = parseGraphCellContent(rawRenderedPrefix).kind === "text";
   const renderedPrefix = formatGraphCellValueForDisplay(rawRenderedPrefix);
-  const renderedContent = trimmedMutedSuffix ? (
+  const renderedContent = urlopLabel ? <span className={styles.urlopBadge} title={urlopLabel}>UR</span> : trimmedMutedSuffix ? (
     <>
       {renderedPrefix ? renderedPrefix + ",\u00a0" : null}
       <span className={styles.mutedSuffix}>{trimmedMutedSuffix}</span>
     </>
   ) : renderedPrefix;
-  const cellTitle = error ?? (hasVisualHint ? t("Also works in: {0}", trimmedVisualHint) : value);
+  const cellTitle = error ?? urlopLabel ?? (hasVisualHint ? t("Also works in: {0}", trimmedVisualHint) : value);
   const interactiveCellTitle =
     hasVisualHint && onVisualHintClick
       ? t("{0}. Click for details.", cellTitle)
@@ -453,45 +493,50 @@ const MatrixValueCell = memo(function MatrixValueCell({
   const moreRef = useRef<HTMLButtonElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
   const closeTimer = useRef<number | null>(null);
+  const hoverOpenTimer = useRef<number | null>(null);
   const tooltipId = useId();
   const [popup, setPopup] = useState<{ value: string; mode: "hover" | "click"; left: number; top: number; width: number; maxHeight: number } | null>(null);
-  const popupOpen = Boolean(popup && popup.value === value && preview);
-  const cancelClose = () => {
+  const popupOpen = Boolean(popup && popup.value === value && preview && activeManualPreviewCellKey === cellKey);
+  const cancelClose = useCallback(() => {
     if (closeTimer.current !== null) window.clearTimeout(closeTimer.current);
     closeTimer.current = null;
-  };
-  const closePopup = () => { cancelClose(); setPopup(null); };
+  }, []);
+  const cancelPendingHoverOpen = useCallback(() => {
+    if (hoverOpenTimer.current !== null) window.clearTimeout(hoverOpenTimer.current);
+    hoverOpenTimer.current = null;
+  }, []);
+  const closePopup = useCallback(() => {
+    cancelPendingHoverOpen();
+    cancelClose();
+    setPopup(null);
+    onManualPreviewDeactivate(cellKey);
+  }, [cancelPendingHoverOpen, cancelClose, onManualPreviewDeactivate, cellKey]);
   const scheduleClose = () => {
     cancelClose();
-    closeTimer.current = window.setTimeout(() => setPopup(null), 150);
+    closeTimer.current = window.setTimeout(closePopup, 150);
   };
   const openPopup = (mode: "hover" | "click" = "hover") => {
     cancelClose();
     const trigger = moreRef.current;
     if (!trigger?.isConnected || !preview) return closePopup();
     const rect = trigger.getBoundingClientRect();
-    if (!rect.width || !rect.height || !Number.isFinite(rect.left + rect.top)) return closePopup();
-    const width = Math.min(220, window.innerWidth - 16);
-    const below = window.innerHeight - rect.bottom - 14;
-    const above = rect.top - 14;
-    const preferBelow = below >= Math.min(320, preview.remaining.length * 28 + 16) || below >= above;
-    const maxHeight = Math.max(1, Math.min(320, preferBelow ? below : above));
-    const height = Math.min(maxHeight, preview.remaining.length * 28 + 16);
-    setPopup({ value, mode, width, maxHeight,
-      left: Math.max(8, Math.min(rect.left, window.innerWidth - width - 8)),
-      top: preferBelow ? rect.bottom + 6 : Math.max(8, rect.top - height - 6),
-    });
+    if (rect.width <= 0 || rect.height <= 0 ||
+      ![rect.left, rect.top, rect.right, rect.bottom, rect.width, rect.height, window.innerWidth, window.innerHeight].every(Number.isFinite)) return closePopup();
+    setPopup({ value, mode, ...getManualPreviewPosition(rect, preview.remaining.length, window.innerWidth, window.innerHeight) });
+    onManualPreviewActivate(cellKey);
   };
   useEffect(() => {
     if (!popupOpen) return;
-    const close = () => setPopup(null);
+    const close = closePopup;
     const outside = (event: globalThis.PointerEvent) => {
       if (!moreRef.current?.contains(event.target as Node) && !tooltipRef.current?.contains(event.target as Node)) close();
     };
     const scroll = (event: Event) => {
       if (!(event.target instanceof Node) || !tooltipRef.current?.contains(event.target)) close();
     };
-    const escape = (event: globalThis.KeyboardEvent) => { if (event.key === "Escape") close(); };
+    const escape = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape") { event.stopPropagation(); close(); }
+    };
     document.addEventListener("pointerdown", outside);
     document.addEventListener("keydown", escape);
     window.addEventListener("scroll", scroll, true);
@@ -502,13 +547,20 @@ const MatrixValueCell = memo(function MatrixValueCell({
       window.removeEventListener("scroll", scroll, true);
       window.removeEventListener("resize", close);
     };
-  }, [popupOpen]);
+  }, [popupOpen, closePopup]);
+  useEffect(() => {
+    if (activeManualPreviewCellKey !== null && activeManualPreviewCellKey !== cellKey) cancelPendingHoverOpen();
+  }, [activeManualPreviewCellKey, cellKey, cancelPendingHoverOpen]);
+  const previewEligible = Boolean(preview);
+  useEffect(() => {
+    closePopup();
+  }, [value, isEditing, previewEligible, closePopup]);
   useEffect(() => () => {
-    if (closeTimer.current !== null) window.clearTimeout(closeTimer.current);
-    setPopup(null);
-  }, [value, isEditing]);
+    cancelPendingHoverOpen();
+    cancelClose();
+  }, [cancelPendingHoverOpen, cancelClose]);
   const isSelectionOnlyReadOnlyCell = readOnly && selectionEnabled;
-  const isDangerEmpty = isEmpty && emptyCellVariant === "danger";
+  const isDangerEmpty = (isEmpty || Boolean(urlopLabel)) && emptyCellVariant === "danger";
   const isInteractiveVisualHint = hasVisualHint && Boolean(onVisualHintClick);
   const clearVisualHintClickTimeout = () => {
     if (visualHintClickTimeoutRef.current !== null) {
@@ -587,6 +639,7 @@ const MatrixValueCell = memo(function MatrixValueCell({
     <td
       className={joinClassNames(
         styles.matrixCell,
+        urlopLabel && isInlineEditing && styles.urlopInfoCell,
         isEmpty && styles.emptyCell,
         isDangerEmpty && styles.emptyCellDanger,
         isDangerEmpty && isWeekend && styles.emptyCellDangerWeekend,
@@ -605,6 +658,7 @@ const MatrixValueCell = memo(function MatrixValueCell({
       data-cell-key={interactionEnabled ? cellKey : undefined}
     >
       <div className={styles.cellSurface}>
+        {urlopLabel && isInlineEditing ? <span className={styles.urlopBadge} title={urlopLabel}>UR</span> : null}
         {preview ? (
           <div className={styles.manualShiftValue}>
             {readOnly && !isSelectionOnlyReadOnlyCell ? (
@@ -620,11 +674,25 @@ const MatrixValueCell = memo(function MatrixValueCell({
             <button type="button" ref={moreRef} className={styles.manualShiftMoreButton}
               aria-label={`${t("More")}: ${t("Shifts")}`} aria-expanded={popupOpen}
               aria-controls={popupOpen ? tooltipId : undefined}
-              onPointerEnter={event => { if (event.pointerType === "mouse") { if (popupOpen) cancelClose(); else openPopup(); } }}
-              onPointerLeave={event => { if (event.pointerType === "mouse") scheduleClose(); }}
+              onPointerEnter={event => {
+                if (event.pointerType !== "mouse") return;
+                cancelClose();
+                if (popupOpen) return;
+                cancelPendingHoverOpen();
+                hoverOpenTimer.current = window.setTimeout(() => {
+                  hoverOpenTimer.current = null;
+                  openPopup("hover");
+                }, 160);
+              }}
+              onPointerLeave={event => {
+                if (event.pointerType === "mouse") { cancelPendingHoverOpen(); scheduleClose(); }
+              }}
               onPointerDown={event => event.stopPropagation()} onMouseDown={event => event.stopPropagation()}
               onDoubleClick={event => event.stopPropagation()}
-              onClick={event => { event.stopPropagation(); if (popupOpen && popup?.mode === "click") closePopup(); else openPopup("click"); }}
+              onClick={event => {
+                event.stopPropagation(); cancelPendingHoverOpen(); cancelClose();
+                if (popupOpen && popup?.mode === "click") closePopup(); else openPopup("click");
+              }}
               onKeyDown={event => { event.stopPropagation(); if (event.key === "Escape") closePopup(); }}
               onKeyUp={event => event.stopPropagation()}>
               {t("More")}
@@ -755,6 +823,9 @@ export function ContainerGraphMatrix({
   title = t("Schedule Matrix"),
   helperText,
   readOnly = false,
+  readOnlyCellKeys,
+  urlopCellKeys,
+  urlopInfoLabels,
   highlightReadOnlyEmpty = false,
   emptyMessage,
   className,
@@ -801,6 +872,11 @@ export function ContainerGraphMatrix({
   const language = useLanguageRevision();
   const showPublicHolidays = usePublicHolidayVisibility();
   const [editingCellKey, setEditingCellKey] = useState<string | null>(null);
+  const [activeManualPreviewCellKey, setActiveManualPreviewCellKey] = useState<string | null>(null);
+  const activateManualPreview = useCallback((cellKey: string) => setActiveManualPreviewCellKey(cellKey), []);
+  const deactivateManualPreview = useCallback((cellKey: string) => {
+    setActiveManualPreviewCellKey(current => current === cellKey ? null : current);
+  }, []);
   const [editingValue, setEditingValue] = useState(GRAPH_EMPTY_MARK);
   const [editingSelectionBehavior, setEditingSelectionBehavior] = useState<MatrixEditorSelectionBehavior>("select-all");
   const [draftSelectedCellKeys, setDraftSelectedCellKeys] = useState<string[] | null>(null);
@@ -1215,9 +1291,12 @@ export function ContainerGraphMatrix({
     });
   };
 
+  const isEffectiveCellReadOnly = (cellKey: string) => readOnly || Boolean(readOnlyCellKeys?.has(cellKey)) || Boolean(urlopCellKeys?.has(cellKey));
+
   const commitCellValue = (employeeId: number, dayOfMonth: number, value: string) => {
-    const nextValue = normalizeCellValueRef.current?.(employeeId, value) ?? value;
     const cellKey = getGraphCellKey(employeeId, dayOfMonth);
+    if (isEffectiveCellReadOnly(cellKey)) return;
+    const nextValue = normalizeCellValueRef.current?.(employeeId, value) ?? value;
     const currentValue = cellMapRef.current[cellKey] ?? GRAPH_EMPTY_MARK;
 
     if (nextValue !== currentValue) {
@@ -1261,6 +1340,7 @@ export function ContainerGraphMatrix({
       selectionBehavior?: MatrixEditorSelectionBehavior;
     },
   ) => {
+    if (isEffectiveCellReadOnly(cellKey)) return;
     flushEditingCell();
     editingCellKeyRef.current = cellKey;
     const currentValue = cellMapRef.current[cellKey] ?? GRAPH_EMPTY_MARK;
@@ -1274,7 +1354,7 @@ export function ContainerGraphMatrix({
     target: Extract<MatrixSelectionTarget, { type: "cell" }>,
     isEditorTarget: boolean,
   ) => {
-    if (readOnly || !onCellChangeRef.current || !bindValueByKey || bindValueByKey.size === 0) {
+    if (isEffectiveCellReadOnly(target.cellKey) || !onCellChangeRef.current || !bindValueByKey || bindValueByKey.size === 0) {
       return false;
     }
 
@@ -1860,7 +1940,8 @@ export function ContainerGraphMatrix({
                         const cellValue = cellMap[cellKey] ?? GRAPH_EMPTY_MARK;
                         const visualHint = visualHintMap[cellKey];
                         const visualHintDetail = visualHintDetailMap[cellKey];
-                        const error = cellErrors[cellKey];
+                        const vacation = column.kind !== "manual" && Boolean(urlopCellKeys?.has(cellKey));
+                        const error = cellErrors[cellKey] ?? (vacation && parseGraphCellContent(cellValue).kind === "intervals" ? t("Conflict with scheduled shift.") : undefined);
                         const isEmpty = cellValue.trim() === GRAPH_EMPTY_MARK;
                         const isSelected = selectedCellKeySet.has(cellKey);
                         const isEditing = editingCellKey === cellKey;
@@ -1868,6 +1949,9 @@ export function ContainerGraphMatrix({
 
                         return (
                           <MatrixValueCell
+                            activeManualPreviewCellKey={activeManualPreviewCellKey}
+                            onManualPreviewActivate={activateManualPreview}
+                            onManualPreviewDeactivate={deactivateManualPreview}
                             isManualColumn={column.kind === "manual"}
                             key={`${cellKey}:${error && !isEditing ? validationSignal : 0}`}
                             cellKey={cellKey}
@@ -1875,6 +1959,7 @@ export function ContainerGraphMatrix({
                             dayOfMonth={day.dayOfMonth}
                             columnLabel={column.label}
                             value={cellValue}
+                            urlopLabel={urlopInfoLabels?.get(cellKey) ?? (vacation && isEmpty ? t("Urlop") : undefined)}
                             visualHint={visualHint}
                             mutedSuffix={mutedSuffixMap[cellKey]}
                             lockVisualHint={lockVisualHintCells}
@@ -1883,7 +1968,7 @@ export function ContainerGraphMatrix({
                             isSelected={isSelected}
                             hasRowGuide={partiallySelectedDaySet.has(day.dayOfMonth)}
                             isEditing={isEditing}
-                            readOnly={readOnly}
+                            readOnly={isEffectiveCellReadOnly(cellKey)}
                             isWeekend={day.isWeekend}
                             editMode={effectiveEditMode}
                             emptyCellVariant={emptyCellVariant}
@@ -1899,7 +1984,7 @@ export function ContainerGraphMatrix({
                             }}
                             onEditorValueChange={setEditingValue}
                             onEditorBlur={isEditing ? flushEditingCell : NOOP}
-                            onInlineValueChange={nextValue => onCellChange?.(column.employeeId, day.dayOfMonth, nextValue)}
+                            onInlineValueChange={nextValue => { if (!isEffectiveCellReadOnly(cellKey)) onCellChange?.(column.employeeId, day.dayOfMonth, nextValue); }}
                             onInlineValueCommit={nextValue => commitCellValue(column.employeeId, day.dayOfMonth, nextValue)}
                             onVisualHintClick={onVisualHintCellClick
                               ? () => onVisualHintCellClick(column.employeeId, day.dayOfMonth)

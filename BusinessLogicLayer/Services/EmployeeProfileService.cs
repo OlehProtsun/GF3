@@ -112,6 +112,7 @@ public sealed class EmployeeProfileService : IEmployeeProfileService
 
     private static EmployeeProfileDto MapToProfile(EmployeeModel employee, EmployeeAccountModel account) => new()
     {
+        ContractType = employee.ContractType,
         EmployeeId = employee.Id,
         Username = account.Username,
         DisplayName = BuildDisplayName(employee, account.Username),

@@ -118,7 +118,7 @@ public sealed class EmployeeWebPushDispatchTests
         Assert.All(sender.Messages, x =>
         {
             Assert.Equal(occurrence, x.Candidate.OccurredAtUtc);
-            Assert.Contains("Submissions have closed", x.Candidate.Body);
+            Assert.Equal("Availability closed", x.Candidate.Title);
         });
         using var restarted = Worker(provider, clock); await restarted.ScanAsync(default);
         Assert.Equal(2, sender.Calls);
@@ -152,17 +152,17 @@ public sealed class EmployeeWebPushDispatchTests
         Assert.Equal(3, sender.Calls);
         Assert.All(sender.Messages.Where(x => x.EmployeeId == first), x =>
         {
-            Assert.Equal("Udostępniono nową dostępność", x.Candidate.Title);
+            Assert.Equal("Dostępność otwarta", x.Candidate.Title);
             Assert.Contains("listopad", x.Candidate.Body);
-            Assert.Contains("15:00 +02:00", x.Candidate.Body); // Warsaw, independently of server/browser locale.
-            Assert.Contains("User name stays unchanged", x.Candidate.Body);
+            Assert.Contains("19.10 15:00", x.Candidate.Body); // Warsaw, independently of server/browser locale.
+            Assert.Contains("User name stays unchange", x.Candidate.Body);
         });
-        Assert.Equal("New availability published", Assert.Single(sender.Messages, x => x.EmployeeId == second.Id).Candidate.Title);
+        Assert.Equal("Availability is open", Assert.Single(sender.Messages, x => x.EmployeeId == second.Id).Candidate.Title);
         await db.EmployeeAccounts.Where(x => x.EmployeeId == first).ExecuteUpdateAsync(x => x.SetProperty(a => a.Language, "en"));
         sender.Send = null; sender.Messages.Clear(); clock.Now = clock.Now.AddMinutes(2);
         await worker.ScanAsync(default); await worker.ScanAsync(default);
         Assert.Equal(3, sender.Messages.Count);
-        Assert.All(sender.Messages, x => { Assert.Equal("New availability published", x.Candidate.Title); Assert.Contains("November", x.Candidate.Body); });
+        Assert.All(sender.Messages, x => { Assert.Equal("Availability is open", x.Candidate.Title); Assert.Contains("November", x.Candidate.Body); });
         Assert.Equal(3, await db.EmployeePushSubscriptions.CountAsync());
         Assert.All(await db.EmployeePushDeliveries.ToListAsync(), x => Assert.Equal("sent", x.Outcome));
     }

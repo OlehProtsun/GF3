@@ -1,3 +1,4 @@
+import { ContainerGraphContractApprovalsCard } from "./ContainerGraphContractApprovalsCard";
 import { dateTimeFormat, numberFormat, t } from "@shared/i18n";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { Employee } from "@entities/employees/model/types";
@@ -78,6 +79,7 @@ export type EditableGraphEmployeeRow = {
   id: number | null;
   employeeId: number;
   minHoursMonth: string;
+  isPriority: boolean;
 };
 
 export type EditableGraphBindRow = {
@@ -106,6 +108,7 @@ type ToolbarActionButtonProps = {
 };
 
 type ContainerGraphEditorProps = {
+  urlopCellKeys?: ReadonlySet<string>;
   graph?: Graph | null;
   isHeaderCollapsed?: boolean;
   compactSize?: boolean;
@@ -184,6 +187,7 @@ type ContainerGraphEditorProps = {
   onPublishManualShift: (input: ManualColumnShiftPublicationInput) => void;
   onCancelManualShift: (shiftId: number) => void;
   onCancelPendingManualShift: (clientId: string) => void;
+  onEmployeePriorityChange: (employeeId: number, checked: boolean) => void;
   onEmployeeMinHoursChange: (employeeId: number, value: string) => void;
   onColumnMove: (employeeId: number, targetEmployeeId: number) => void;
   onCellChange: (employeeId: number, dayOfMonth: number, value: string) => void;
@@ -358,6 +362,7 @@ function PreviewLayoutButton({ mode, active, onClick }: PreviewLayoutButtonProps
 }
 
 export function ContainerGraphEditor({
+  urlopCellKeys,
   graph,
   isHeaderCollapsed = false,
   compactSize = false,
@@ -437,6 +442,7 @@ export function ContainerGraphEditor({
   onCancelManualShift,
   onCancelPendingManualShift,
   onEmployeeMinHoursChange,
+  onEmployeePriorityChange,
   onColumnMove,
   onCellChange,
   onSelectedCellKeysChange,
@@ -468,6 +474,7 @@ export function ContainerGraphEditor({
     manualColumns: true,
   });
   const [pendingCorrectionCount, setPendingCorrectionCount] = useState(0);
+  const [pendingContractCount, setPendingContractCount] = useState(0);
   const [swapHighlightColor, setSwapHighlightColor] = useState("#BBF7D0");
   const [isSwapColorDialogOpen, setIsSwapColorDialogOpen] = useState(false);
   const [swapColorError, setSwapColorError] = useState<string | null>(null);
@@ -773,6 +780,7 @@ export function ContainerGraphEditor({
                   )}
                   onFieldChange={onFieldChange}
                   onEmployeeMinHoursChange={onEmployeeMinHoursChange}
+                  onEmployeePriorityChange={onEmployeePriorityChange}
                 />
 
                 <div className={styles.detailsActions}>
@@ -880,6 +888,7 @@ export function ContainerGraphEditor({
             <AvailabilitySidebarSection
               label={t("Publication")}
               preserveCollapsedOnMobile
+              attention={pendingContractCount > 0}
               collapsed={collapsedSections.publication}
               collapsedIcon={<EyeIcon size={18} />}
               collapsedOffset={allSectionsCollapsed ? "flush" : "default"}
@@ -887,7 +896,7 @@ export function ContainerGraphEditor({
             >
               <CardSection
                 className={styles.sidebarCard}
-                title={t("Publication")}
+                title={`${t("Publication")}${pendingContractCount > 0 ? ` (${pendingContractCount})` : ""}`}
                 icon={<EyeIcon size={18} />}
                 headerRightSlot={renderCollapseButton(t("Publication"), "publication")}
               >
@@ -945,6 +954,9 @@ export function ContainerGraphEditor({
                     </div>
                   </div>
 
+                  <ContainerGraphContractApprovalsCard containerId={graph?.containerId ?? null} graphId={persistedGraphId}
+                    disabled={isSaving || isGenerating} hasUnsavedChanges={Boolean(hasUnsavedChanges)} onApproved={onVersionCheckoutComplete}
+                    onPendingCountChange={setPendingContractCount} />
                   <div className={styles.publicationLog}>
                     <div className={styles.publicationLogHeader}>
                       <span>{t("Swap log")}</span>
@@ -1121,6 +1133,7 @@ export function ContainerGraphEditor({
                     compactSize && styles.matrixCardCompact,
                   )}
                   style={scheduleMatrixCardStyle}
+                    urlopCellKeys={urlopCellKeys}
                   compactSize={compactSize}
                   helperText=""
                   graph={{

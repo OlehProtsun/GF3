@@ -652,7 +652,7 @@
   overflow: auto;
   padding: 8px;
   border: 1px solid rgba(148, 163, 184, 0.35);
-  border-radius: 10px;
+  border-radius: 14px;
   background: rgba(255, 255, 255, 0.98);
   box-shadow: 0 8px 24px rgba(15, 23, 42, 0.16);
   color: #1e293b;
@@ -900,3 +900,8 @@
 .tablePhoneViewport .visualHintShell { position: relative; min-height: var(--matrix-cell-min-height); flex-wrap: wrap; gap: 2px; }
 .tablePhoneViewport .visualHintButton, .tablePhoneViewport .visualHintCurrentValue { white-space: normal; overflow-wrap: anywhere; overflow: visible; }
 @media (max-width: 350px) { .cardPhoneViewport.cardWithStaffing { --matrix-day-column-width: 88px; } }
+.urlopBadge { display: inline-block; color: #11604a; background: #e3f3ed; border-radius: 7px; padding: 3px 8px; font-weight: 700; }
+.emptyCellDanger .urlopBadge { color: inherit; background: transparent; }
+.urlopInfoCell .urlopBadge { position: absolute; left: 50%; transform: translateX(-50%); pointer-events: none; z-index: 1; }
+.urlopInfoCell input:not(:focus) { color: transparent; }
+.urlopInfoCell:focus-within .urlopBadge { display: none; }

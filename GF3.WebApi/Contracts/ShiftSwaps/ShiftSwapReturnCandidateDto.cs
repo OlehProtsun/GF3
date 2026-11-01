@@ -2,6 +2,7 @@ namespace WebApi.Contracts.ShiftSwaps;
 
 public sealed class ShiftSwapReturnCandidateDto
 {
+    public bool RequiresWholeShift { get; set; }
     public int ScheduleId { get; set; }
     public string ScheduleName { get; set; } = string.Empty;
     public string ShopName { get; set; } = string.Empty;
