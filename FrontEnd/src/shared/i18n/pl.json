@@ -2305,5 +2305,19 @@
   "Conflicting dates: {0}": "Konfliktujące daty: {0}",
   "Change or remove the conflicting shift in the work schedule, then try again.": "Zmień lub usuń kolidującą zmianę w grafiku, a następnie spróbuj ponownie.",
   "The schedule conflict could not be resolved. Check the employee's work schedule and try again.": "Nie udało się ustalić dat konfliktu. Sprawdź grafik pracownika i spróbuj ponownie.",
-  "1 day": "1 dzień"
+  "1 day": "1 dzień",
+  "Choose a day": "Wybierz dzień",
+  "Select a shift or a day off.": "Wybierz zmianę lub dzień wolny.",
+  "· Adjust a shift or request one on a day off.": "· Zmień godziny lub poproś o zmianę w dzień wolny.",
+  "Request a shift on this day": "Poproś o zmianę w tym dniu",
+  "You already work on this date in another schedule.": "W tym dniu pracujesz już w innym grafiku.",
+  "Too many requests. Please try again later.": "Zbyt wiele żądań. Spróbuj ponownie później.",
+  "Choose either an assigned shift or a day off.": "Wybierz przypisaną zmianę lub dzień wolny.",
+  "Choose a valid day of this month.": "Wybierz prawidłowy dzień tego miesiąca.",
+  "This date is not a day off. You already have an assigned shift.": "To nie jest dzień wolny. Masz już przypisaną zmianę.",
+  "This day already has a pending correction request.": "Ten dzień ma już oczekujący wniosek o korektę.",
+  "Published schedule was not found for this employee.": "Nie znaleziono opublikowanego grafiku dla tego pracownika.",
+  "A correction request is already pending.": "Wniosek o korektę już oczekuje na rozpatrzenie.",
+  "The schedule or request changed. Refresh and try again.": "Grafik lub wniosek uległ zmianie. Odśwież i spróbuj ponownie.",
+  "The request changed. Refresh and try again.": "Wniosek uległ zmianie. Odśwież i spróbuj ponownie."
 }

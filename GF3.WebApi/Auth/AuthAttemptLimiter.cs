@@ -11,7 +11,60 @@ public sealed class AuthAttemptLimiter(TimeProvider clock)
 {
     private readonly object gate = new();
     private readonly Dictionary<string, (int Count, DateTimeOffset ResetAt)> attempts = new();
+    private readonly Dictionary<string, (int Count, DateTimeOffset ResetAt)> loginFailures = new();
     private const int MaximumKeys = 10_000;
+
+    internal bool IsLoginLocked(string hashedAccountKey, out int retryAfterSeconds)
+    {
+        lock (gate)
+        {
+            var now = clock.GetUtcNow();
+            if (loginFailures.TryGetValue(hashedAccountKey, out var entry) && entry.ResetAt > now)
+            {
+                retryAfterSeconds = Math.Max(1, (int)Math.Ceiling((entry.ResetAt - now).TotalSeconds));
+                return entry.Count >= 5;
+            }
+            loginFailures.Remove(hashedAccountKey);
+            if (loginFailures.Count >= MaximumKeys)
+            {
+                foreach (var expired in loginFailures.Where(item => item.Value.ResetAt <= now).Select(item => item.Key).ToArray())
+                    loginFailures.Remove(expired);
+                if (loginFailures.Count >= MaximumKeys)
+                {
+                    retryAfterSeconds = Math.Max(1, (int)Math.Ceiling((loginFailures.Min(item => item.Value.ResetAt) - now).TotalSeconds));
+                    return true;
+                }
+            }
+            // Reserve capacity before credential verification so parallel new accounts fail closed.
+            loginFailures[hashedAccountKey] = (0, now.AddMinutes(15));
+            retryAfterSeconds = 0;
+            return false;
+        }
+    }
+
+    internal void RecordLoginFailure(string hashedAccountKey)
+    {
+        lock (gate)
+        {
+            var now = clock.GetUtcNow();
+            if (!loginFailures.TryGetValue(hashedAccountKey, out var entry) || entry.ResetAt <= now || entry.Count == 0)
+            {
+                if (!loginFailures.ContainsKey(hashedAccountKey) && loginFailures.Count >= MaximumKeys)
+                {
+                    foreach (var expired in loginFailures.Where(item => item.Value.ResetAt <= now).Select(item => item.Key).ToArray())
+                        loginFailures.Remove(expired);
+                    if (loginFailures.Count >= MaximumKeys) return;
+                }
+                entry = (0, now.AddMinutes(15));
+            }
+            loginFailures[hashedAccountKey] = (Math.Min(5, entry.Count + 1), entry.ResetAt);
+        }
+    }
+
+    internal void ClearLoginFailures(string hashedAccountKey)
+    {
+        lock (gate) loginFailures.Remove(hashedAccountKey);
+    }
 
     public bool TryAcquire(string key, int limit, TimeSpan window, out int retryAfterSeconds)
     {
@@ -62,9 +115,11 @@ public sealed class AuthAttemptFilter(AuthAttemptLimiter limiter, string operati
         var ip = context.HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
         var accountLimit = operation == "login" ? 10 : operation == "reset-code" ? 3 : 5;
         if (!limiter.TryAcquire($"ip:{operation}:{ip}", 100, TimeSpan.FromMinutes(1), out var retryAfter) ||
-            !limiter.TryAcquire($"account:{operation}:{identity}", accountLimit, TimeSpan.FromMinutes(15), out retryAfter))
+            !limiter.TryAcquire($"account:{operation}:{identity}", accountLimit, TimeSpan.FromMinutes(15), out retryAfter) ||
+            (operation == "login" && limiter.IsLoginLocked(identity, out retryAfter)))
         {
             context.HttpContext.Response.Headers.RetryAfter = retryAfter.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            context.HttpContext.Response.Headers.CacheControl = "no-store";
             context.Result = new ObjectResult(new ProblemDetails
             {
                 Status = StatusCodes.Status429TooManyRequests,
@@ -74,6 +129,12 @@ public sealed class AuthAttemptFilter(AuthAttemptLimiter limiter, string operati
             return;
         }
 
-        await next().ConfigureAwait(false);
+        var executed = await next().ConfigureAwait(false);
+        if (operation == "login" && context.Controller is WebApi.Controllers.AuthController &&
+            executed.Exception is null && !executed.Canceled)
+        {
+            if (executed.Result is UnauthorizedObjectResult) limiter.RecordLoginFailure(identity);
+            else if (executed.Result is OkObjectResult) limiter.ClearLoginFailures(identity);
+        }
     }
 }

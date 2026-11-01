@@ -6,7 +6,7 @@ async function correctionFixture(page: Page, language: string) {
     publicationStatus: "public", peoplePerShift: 1, shift1Time: "15:00 - 22:00", shift2Time: "08:00 - 14:00",
     maxHoursPerEmpMonth: 160, maxConsecutiveDays: 5, maxConsecutiveFull: 3, maxFullPerMonth: 10 };
   const requests = Array.from({ length: 25 }, (_, index) => ({
-    id: index + 1, containerId: 1, scheduleId: 3, scheduleSlotId: 1,
+    id: index + 1, containerId: 1, scheduleId: 3, scheduleSlotId: 1, isDayOffRequest: false,
     employeeId: 2, employeeName: index === 0 ? "Oleh Protsun" : index === 1 ? "Oleh Protsun With A Very Long Surname" : `Employee ${index}`,
     scheduleName: index === 1 ? "Long schedule name with multiple words" : "F35", shopName: "Central",
     year: 2026, month: 10, dayOfMonth: 21, originalFromTime: "15:00", originalToTime: "22:00",
@@ -119,5 +119,77 @@ for (const language of ["en", "pl", "uk"] as const) {
       await page.mouse.wheel(0, 180);
       await expect.poll(() => list.evaluate(element => element.scrollTop)).toBeGreaterThan(0);
     }
+  });
+}
+
+for (const [width, language] of [[320, "en"], [375, "pl"], [390, "uk"]] as const) {
+  test(`employee requests a day-off shift at ${width}px in ${language}`, async ({ page, isMobile }, info) => {
+    test.setTimeout(60_000);
+    await page.setViewportSize({ width, height: 812 });
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.addInitScript(() => localStorage.setItem("gf3.auth.access-token", "day-off-fixture"));
+    const requests: Record<string, unknown>[] = [];
+    let submitted: unknown;
+    await page.route("**/api/**", async route => {
+      const path = new URL(route.request().url()).pathname;
+      let body: unknown = [];
+      if (path === "/api/auth/session") body = { role: "employee", employeeId: 12, userName: "worker", displayName: "Worker" };
+      else if (path === "/api/account-language") body = { language };
+      else if (path === "/api/public-holiday-settings") body = { showPublicHolidays: true };
+      else if (path === "/api/employee-ui-state") body = { scheduleColumnOrders: {}, readNotificationIds: [] };
+      else if (path === "/api/employee-schedules") body = [{
+        id: 10, containerId: 2, containerName: "Team", shopId: 4, shopName: "Central", name: "August", year: 2026, month: 8,
+        publicationStatus: "public", employees: [{ id: 1, employeeId: 12, firstName: "Test", lastName: "Worker", displayOrder: 0 }],
+        slots: [
+          { id: 100, dayOfMonth: 12, slotNo: 1, employeeId: 12, fromTime: "08:00", toTime: "12:00", status: "ASSIGNED" },
+          { id: 101, dayOfMonth: 12, slotNo: 2, employeeId: 12, fromTime: "15:00", toTime: "19:00", status: "ASSIGNED" },
+        ], relatedScheduleAssignments: [{ employeeId: 12, dayOfMonth: 14, scheduleId: 11, scheduleName: "Other shop" }],
+      }];
+      else if (path === "/api/employee-shift-corrections") {
+        if (route.request().method() === "POST") {
+          submitted = route.request().postDataJSON();
+          requests.push({ ...(submitted as object), id: 1, containerId: 2, employeeId: 12, year: 2026, month: 8,
+            scheduleSlotId: null, originalFromTime: null, originalToTime: null, isDayOffRequest: true, status: "pending" });
+          return route.fulfill({ status: 201, json: requests[0] });
+        }
+        body = requests;
+      }
+      else if (path.includes("negotiate")) return route.fulfill({ status: 503 });
+      await route.fulfill({ json: body });
+    });
+    await page.goto("/schedule");
+    const adjust = page.getByRole("button", { name: language === "en" ? "Request a shift correction" : language === "pl" ? "Poproś o korektę zmiany" : "Запросити коригування зміни" });
+    await adjust.click();
+    const dialog = page.getByRole("dialog");
+    const dates = dialog.getByRole("tab");
+    await expect(dates).toHaveCount(31);
+    await expect(dates.nth(11)).toHaveAttribute("aria-selected", "true");
+    await expect(dialog.getByText("08:00 – 12:00", { exact: true })).toBeVisible();
+    await expect(dialog.getByText("15:00 – 19:00", { exact: true })).toBeVisible();
+    const selectDay = async (index: number) => {
+      await dates.nth(index).scrollIntoViewIfNeeded();
+      if (isMobile) await dates.nth(index).tap();
+      else { await dates.nth(index).focus(); await page.keyboard.press("Enter"); }
+    };
+    await selectDay(13);
+    await expect(dialog.locator('input[type="time"]').first()).toBeDisabled();
+    await selectDay(12);
+    const inputs = dialog.locator('input[type="time"]');
+    await expect(inputs).toHaveCount(2);
+    await expect(inputs.first()).toHaveValue(""); await expect(inputs.last()).toHaveValue("");
+    const send = dialog.getByRole("button").last();
+    await expect(send).toBeDisabled();
+    await inputs.first().fill("08:15"); await expect(send).toBeDisabled();
+    await inputs.last().fill("16:45"); await expect(send).toBeEnabled();
+    expect(await dialog.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+    const surface = dialog.locator('div').first();
+    expect(await surface.evaluate(element => { const rect = element.getBoundingClientRect(); return element.scrollWidth <= element.clientWidth && rect.left >= 0 && rect.right <= innerWidth; })).toBe(true);
+    await dialog.screenshot({ path: info.outputPath(`day-off-${width}-${language}.png`) });
+    await send.click();
+    await expect(dialog).toHaveCount(0);
+    expect(submitted).toEqual({ scheduleId: 10, dayOfMonth: 13, requestedFromTime: "08:15", requestedToTime: "16:45" });
+    await adjust.click(); await selectDay(12);
+    await expect(dialog.locator('input[type="time"]').first()).toBeDisabled();
+    await expect(dialog.getByRole("button").last()).toBeDisabled();
   });
 }

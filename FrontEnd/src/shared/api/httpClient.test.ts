@@ -1,3 +1,4 @@
+import { setLanguage, t } from "@shared/i18n";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import {
   ApiError,
@@ -32,6 +33,23 @@ afterEach(() => {
 });
 
 describe("httpClient", () => {
+  test.each(["en", "pl", "uk"] as const)("normalizes JSON, HTML and empty 429 responses in %s without retries or logout", async language => {
+    setLanguage(language);
+    const revoked = vi.fn(); const unsubscribe = subscribeUnauthorized(revoked);
+    setAuthAccessToken("current-token");
+    try {
+      for (const body of ["json", "html", "empty"]) {
+        const response = body === "json" ? Response.json({ title: "Too many attempts", errors: { username: ["private text"] } }, { status: 429 })
+          : new Response(body === "html" ? "<h1>nginx 429</h1>" : "", { status: 429, headers: { "content-type": "text/html" } });
+        const fetchMock = mockFetch(response);
+        await expect(request("profile")).rejects.toMatchObject({ status: 429, message: t("Too many requests. Please try again later.") });
+        expect(fetchMock).toHaveBeenCalledOnce();
+      }
+      expect(revoked).not.toHaveBeenCalled();
+      expect(getAuthAccessToken()).toBe("current-token");
+    } finally { unsubscribe(); setLanguage("en"); }
+  });
+
   test.each([200, 401])("discards a late JSON body (%s) without revoking the new session", async (status) => {
     let finish!: (value: unknown) => void;
     const response = Response.json({}, { status });

@@ -245,6 +245,7 @@ function getFirstValidationErrorMessage(validationErrors?: ValidationErrors): st
 }
 
 function toApiError(status: number, payload: unknown): ApiError {
+  if (status === 429) return new ApiError({ status, message: t("Too many requests. Please try again later.") });
   const problem = (payload ?? {}) as ProblemDetailsResponse;
   const validationErrors = normalizeValidationErrors(problem.errors);
   const textPayload = typeof payload === "string" ? payload.trim() : "";

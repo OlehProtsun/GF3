@@ -42,6 +42,7 @@ static void ConfigureCommonMiddleware(WebApplication app)
     }
 
     app.UseAuthentication();
+    app.UseRateLimiter();
     app.UseAuthorization();
 
     app.UseWhen(

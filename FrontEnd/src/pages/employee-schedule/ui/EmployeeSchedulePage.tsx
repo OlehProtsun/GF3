@@ -739,6 +739,18 @@ export function EmployeeSchedulePage() {
   const displayName = session?.displayName?.trim() || session?.userName || t("Employee");
   const currentEmployeeId = session?.employeeId && session.employeeId > 0 ? session.employeeId : null;
   const fallbackMatrixEmployeeId = currentEmployeeId ?? 1;
+  const correctionUnavailableDays = useMemo(() => {
+    const days = new Set<number>();
+    if (!selectedSchedule) return days;
+    schedules.filter(schedule => schedule.publicationStatus === "public" &&
+      schedule.year === selectedSchedule.year && schedule.month === selectedSchedule.month).forEach(schedule => {
+      schedule.slots.filter(slot => isCurrentEmployeeSlot(slot, currentEmployeeId))
+        .forEach(slot => days.add(slot.dayOfMonth));
+      schedule.relatedScheduleAssignments?.filter(assignment => assignment.employeeId === currentEmployeeId)
+        .forEach(assignment => days.add(assignment.dayOfMonth));
+    });
+    return days;
+  }, [currentEmployeeId, schedules, selectedSchedule]);
   const dailyScheduleDays = useMemo(() => {
     if (!selectedSchedule) {
       return [];
@@ -1172,6 +1184,7 @@ export function EmployeeSchedulePage() {
         schedule={selectedSchedule}
         employeeId={currentEmployeeId}
         existingRequests={shiftCorrectionsQuery.data ?? []}
+        unavailableDays={correctionUnavailableDays}
         isSending={createShiftCorrectionMutation.isPending}
         errorMessage={shiftCorrectionError}
         onCancel={() => { setIsShiftCorrectionDialogOpen(false); setShiftCorrectionError(null); }}

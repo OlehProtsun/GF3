@@ -80,6 +80,7 @@ internal sealed class ManagerWorkspaceTestHost(SqliteTestDatabase database, WebA
             await db.SaveChangesAsync();
         }
         app.UseAuthentication();
+        app.UseRateLimiter();
         app.UseAuthorization();
         app.UseWhen(c => c.Request.Path.StartsWithSegments("/api"), branch =>
         {
@@ -93,6 +94,8 @@ internal sealed class ManagerWorkspaceTestHost(SqliteTestDatabase database, WebA
         app.MapHub<EmployeePresenceHub>(EmployeePresenceHub.RoutePattern);
         app.MapMethods("/api/guard-write", ["POST", "PUT", "PATCH", "DELETE"], () => "written").RequireAuthorization();
         app.MapGet("/api/guard-business", () => "ok").RequireAuthorization();
+        app.MapGet("/api/rate-probe", () => "ok");
+        app.MapGet("/rate-probe", () => "ok");
         await app.StartAsync();
         return new ManagerWorkspaceTestHost(database, app, new HttpClient { BaseAddress = new Uri(app.Urls.Single()) });
     }

@@ -91,6 +91,7 @@
 }
 
 .stepSection {
+  min-width: 0;
   display: grid;
   gap: 11px;
   padding: 14px;
@@ -146,6 +147,7 @@
 }
 
 .dayList button {
+  flex-shrink: 0;
   min-width: 50px;
   height: 48px;
   display: grid;
@@ -307,6 +309,7 @@
 }
 
 .timeEditor input {
+  min-width: 0;
   width: 100%;
   min-height: 42px;
   box-sizing: border-box;
@@ -327,6 +330,16 @@
   font-size: 0.72rem;
   font-weight: 850;
   text-align: center;
+}
+
+.dayOffEditor {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.timeEditor.dayOffEditor label {
+  min-width: 0;
+  grid-column: auto;
+  grid-row: auto;
 }
 
 .comparison {
@@ -431,6 +444,15 @@
 
   .footer :global(button) {
     justify-content: center;
+    padding-inline: 10px;
+    gap: 5px;
+  }
+
+  .footer :global(button) > span[title] {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    line-height: 1.2;
   }
 }
 

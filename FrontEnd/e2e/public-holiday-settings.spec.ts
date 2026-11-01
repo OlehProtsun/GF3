@@ -226,10 +226,12 @@ test("PC global toggle updates employee availability and schedule matrix, daily 
   await expect(employee.getByRole("tab", { name: /Friday 1, working day.*Labour Day/ })).toHaveCSS("background-color", "rgb(255, 247, 214)");
   for (const name of [/Friday 1, working day.*Labour Day/, /Sunday 3, day off.*Constitution Day/]) {
     const tab = employee.getByRole("tab", { name });
-    await expect(tab).toHaveCSS("background-color", "rgb(255, 247, 214)");
+    if (name.source.includes("day off")) await expect(tab).toHaveCSS("background-image", /linear-gradient.*50%/);
+    else await expect(tab).toHaveCSS("background-color", "rgb(255, 247, 214)");
     await tab.click();
     await expect(tab).toHaveAttribute("aria-selected", "true");
-    await expect(tab).toHaveCSS("background-color", "rgb(255, 247, 214)");
+    if (name.source.includes("day off")) await expect(tab).toHaveCSS("background-image", /linear-gradient.*50%/);
+    else await expect(tab).toHaveCSS("background-color", "rgb(255, 247, 214)");
     await expect(tab).toHaveCSS("border-top-color", "rgb(124, 58, 237)");
   }
   await toggle.click();

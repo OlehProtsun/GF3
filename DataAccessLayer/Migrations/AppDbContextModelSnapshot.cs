@@ -1931,13 +1931,11 @@ namespace DataAccessLayer.Migrations
                         .HasColumnName("employee_id");
 
                     b.Property<string>("OriginalFromTime")
-                        .IsRequired()
                         .HasMaxLength(5)
                         .HasColumnType("TEXT")
                         .HasColumnName("original_from_time");
 
                     b.Property<string>("OriginalToTime")
-                        .IsRequired()
                         .HasMaxLength(5)
                         .HasColumnType("TEXT")
                         .HasColumnName("original_to_time");
@@ -1966,11 +1964,12 @@ namespace DataAccessLayer.Migrations
                         .HasColumnType("INTEGER")
                         .HasColumnName("schedule_id");
 
-                    b.Property<int>("ScheduleSlotId")
+                    b.Property<int?>("ScheduleSlotId")
                         .HasColumnType("INTEGER")
                         .HasColumnName("schedule_slot_id");
 
                     b.Property<string>("Status")
+                        .IsConcurrencyToken()
                         .IsRequired()
                         .ValueGeneratedOnAdd()
                         .HasColumnType("TEXT")
@@ -1984,7 +1983,12 @@ namespace DataAccessLayer.Migrations
                     b.HasIndex("ScheduleSlotId", "Status")
                         .IsUnique()
                         .HasDatabaseName("ux_shift_correction_pending_slot")
-                        .HasFilter("status = 'Pending'");
+                        .HasFilter("status = 'Pending' AND schedule_slot_id IS NOT NULL");
+
+                    b.HasIndex("ScheduleId", "EmployeeId", "DayOfMonth")
+                        .IsUnique()
+                        .HasDatabaseName("ux_shift_correction_pending_day_off")
+                        .HasFilter("status = 'Pending' AND original_from_time IS NULL");
 
                     b.HasIndex(new[] { "EmployeeId", "Status" }, "ix_shift_correction_employee_status");
 
@@ -1996,7 +2000,7 @@ namespace DataAccessLayer.Migrations
 
                             t.HasCheckConstraint("ck_shift_correction_requested_order", "requested_from_time < requested_to_time");
 
-                            t.HasCheckConstraint("ck_shift_correction_time_format", "original_from_time LIKE '__:__' AND original_to_time LIKE '__:__' AND requested_from_time LIKE '__:__' AND requested_to_time LIKE '__:__'");
+                            t.HasCheckConstraint("ck_shift_correction_time_format", "((original_from_time IS NULL AND original_to_time IS NULL) OR (original_from_time IS NOT NULL AND original_to_time IS NOT NULL AND schedule_slot_id > 0 AND schedule_slot_id IS NOT NULL AND original_from_time GLOB '[0-2][0-9]:[0-5][0-9]' AND original_from_time < '24:00' AND original_to_time GLOB '[0-2][0-9]:[0-5][0-9]' AND original_to_time < '24:00')) AND requested_from_time GLOB '[0-2][0-9]:[0-5][0-9]' AND requested_from_time < '24:00' AND requested_to_time GLOB '[0-2][0-9]:[0-5][0-9]' AND requested_to_time < '24:00'");
                         });
                 });
 

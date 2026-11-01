@@ -133,7 +133,8 @@ export function ContainerGraphShiftCorrectionsCard({
   };
 
   const isBusy = !hasPersistedGraph || disabled || approveMutation.isPending || rejectMutation.isPending;
-  const originalDuration = selected ? toMinutes(selected.originalToTime) - toMinutes(selected.originalFromTime) : 0;
+  const originalDuration = selected && !selected.isDayOffRequest && selected.originalToTime && selected.originalFromTime
+    ? toMinutes(selected.originalToTime) - toMinutes(selected.originalFromTime) : 0;
   const requestedDuration = selected ? toMinutes(selected.requestedToTime) - toMinutes(selected.requestedFromTime) : 0;
   const selectedDetails = selected ? (
     <article key={selected.id} className={styles.details} role="listitem">
@@ -153,13 +154,15 @@ export function ContainerGraphShiftCorrectionsCard({
         <div><dt><span className={styles.metadataIcon}><GroupIcon size={16} /></span>{t("Schedule")}</dt><dd>{selected.scheduleName} · {selected.shopName}</dd></div>
       </dl>
       <div className={styles.comparison}>
-        <div><span>{t("Current shift")}</span><strong>{selected.originalFromTime} – {selected.originalToTime}</strong></div>
+        <div><span>{t("Current shift")}</span><strong>{selected.isDayOffRequest ? t("Day off") : `${selected.originalFromTime} – ${selected.originalToTime}`}</strong></div>
         <span className={styles.comparisonArrow} aria-hidden="true"><ArrowRightIcon size={17} /></span>
         <div><span>{t("Requested shift")}</span><strong>{selected.requestedFromTime} – {selected.requestedToTime}</strong></div>
       </div>
       <div className={styles.deltaRow}>
-        <span className={selected.requestedFromTime === selected.originalFromTime ? styles.deltaNeutral : styles.deltaStart}><ClockIcon size={15} />{t("Start")} {formatDelta(toMinutes(selected.requestedFromTime) - toMinutes(selected.originalFromTime))}</span>
-        <span className={styles.deltaNeutral}><LockIcon size={15} />{t("End")} {formatDelta(toMinutes(selected.requestedToTime) - toMinutes(selected.originalToTime))}</span>
+        {!selected.isDayOffRequest && selected.originalFromTime && selected.originalToTime ? <>
+          <span className={selected.requestedFromTime === selected.originalFromTime ? styles.deltaNeutral : styles.deltaStart}><ClockIcon size={15} />{t("Start")} {formatDelta(toMinutes(selected.requestedFromTime) - toMinutes(selected.originalFromTime))}</span>
+          <span className={styles.deltaNeutral}><LockIcon size={15} />{t("End")} {formatDelta(toMinutes(selected.requestedToTime) - toMinutes(selected.originalToTime))}</span>
+        </> : null}
         <strong className={requestedDuration === originalDuration ? styles.deltaNeutral : styles.deltaDuration}><StatisticsIcon size={15} />{t("Duration")} {formatDelta(requestedDuration - originalDuration)}</strong>
       </div>
       {selected.status === "pending" ? (
@@ -215,7 +218,9 @@ export function ContainerGraphShiftCorrectionsCard({
               <span className={styles.avatar} aria-hidden="true">{initials(request.employeeName)}</span>
               <span className={styles.requestCopy}>
                 <strong>{request.employeeName}</strong>
-                <small>{t("Day")} {request.dayOfMonth} · {request.originalFromTime}–{request.originalToTime}</small>
+                <small>{request.isDayOffRequest
+                  ? `${String(request.dayOfMonth).padStart(2, "0")}.${String(request.month).padStart(2, "0")}.${request.year} · ${t("Day off")} → ${request.requestedFromTime}–${request.requestedToTime} · ${request.scheduleName} · ${request.shopName}`
+                  : `${t("Day")} ${request.dayOfMonth} · ${request.originalFromTime}–${request.originalToTime}`}</small>
               </span>
               <em className={`${styles.status} ${styles[`status${request.status}`]}`}>{statusIcon(request.status)}{statusLabel(request.status)}</em>
               <span className={styles.chevron} aria-hidden="true"><ChevronRightIcon size={15} /></span>

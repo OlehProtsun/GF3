@@ -20,6 +20,91 @@ namespace GF3.Tests;
 public sealed class ReviewSecurityTests
 {
     [Fact]
+    public async Task FailedLogin_FifthFailureLocksNormalizedAccount_AndClockReleasesIt()
+    {
+        var clock = new TestClock();
+        await using var host = await ManagerWorkspaceTestHost.CreateAsync(clock);
+        async Task<System.Net.Http.HttpResponseMessage> Login(string name, string password)
+            => await System.Net.Http.Json.HttpClientJsonExtensions.PostAsJsonAsync(host.Client, "/api/auth/login", new { username = name, password });
+        string? generic = null;
+        for (var i = 0; i < 5; i++)
+        {
+            var response = await Login(i % 2 == 0 ? " MANAGER " : "manager", "000000");
+            Assert.Equal(System.Net.HttpStatusCode.Unauthorized, response.StatusCode);
+            using var problem = System.Text.Json.JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+            var detail = problem.RootElement.GetProperty("detail").GetString();
+            generic ??= detail; Assert.Equal(generic, detail);
+        }
+        var blocked = await Login("manager", "123456");
+        Assert.Equal(System.Net.HttpStatusCode.TooManyRequests, blocked.StatusCode);
+        Assert.Equal(TimeSpan.FromMinutes(15), blocked.Headers.RetryAfter!.Delta);
+        (await Login("system", "123456")).EnsureSuccessStatusCode();
+        clock.Now += TimeSpan.FromMinutes(15);
+        (await Login("manager", "123456")).EnsureSuccessStatusCode();
+    }
+
+    [Fact]
+    public async Task FailedLogin_SuccessClearsFailures_ButKeepsTenAttemptCeiling()
+    {
+        var clock = new TestClock();
+        var limiter = new AuthAttemptLimiter(clock);
+        for (var i = 0; i < 4; i++) Assert.Equal(401, await FilterLogin(limiter, "Worker", 401));
+        Assert.Equal(200, await FilterLogin(limiter, "worker", 200));
+        for (var i = 0; i < 4; i++) Assert.Equal(401, await FilterLogin(limiter, " worker ", 401));
+        Assert.Equal(200, await FilterLogin(limiter, "WORKER", 200));
+        Assert.Equal(429, await FilterLogin(limiter, "worker", 200));
+        clock.Now += TimeSpan.FromMinutes(15);
+        Assert.Equal(200, await FilterLogin(limiter, "worker", 200));
+    }
+
+    [Fact]
+    public async Task FailedLogin_DoesNotCountValidationInfrastructureOrCanceledResults()
+    {
+        var limiter = new AuthAttemptLimiter(new TestClock());
+        Assert.Equal(400, await FilterLogin(limiter, "worker", 400));
+        Assert.Equal(500, await FilterLogin(limiter, "worker", 500));
+        Assert.Equal(401, await FilterLogin(limiter, "worker", 401, canceled: true));
+        Assert.Equal(401, await FilterLogin(limiter, "worker", 401, exception: true));
+        for (var i = 0; i < 4; i++) Assert.Equal(401, await FilterLogin(limiter, "worker", 401));
+        Assert.Equal(200, await FilterLogin(limiter, "worker", 200));
+    }
+
+    [Fact]
+    public void FailedLogin_ConcurrentFailuresAreAtomic_AndCapacityFailsClosed()
+    {
+        var clock = new TestClock();
+        var limiter = new AuthAttemptLimiter(clock);
+        Parallel.For(0, 5, _ => limiter.RecordLoginFailure(AccountKey("worker")));
+        Assert.True(limiter.IsLoginLocked(AccountKey("worker"), out var retry)); Assert.Equal(900, retry);
+        Assert.False(limiter.IsLoginLocked(AccountKey("other"), out _));
+        limiter.ClearLoginFailures(AccountKey("worker"));
+        Assert.False(limiter.IsLoginLocked(AccountKey("worker"), out _));
+        for (var i = 0; i < 9_998; i++) Assert.False(limiter.IsLoginLocked(AccountKey($"capacity-{i}"), out _));
+        Assert.True(limiter.IsLoginLocked(AccountKey("overflow"), out retry)); Assert.Equal(900, retry);
+        clock.Now += TimeSpan.FromMinutes(15);
+        Assert.False(limiter.IsLoginLocked(AccountKey("overflow"), out _));
+    }
+
+    private static string AccountKey(string account) => Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+        System.Text.Encoding.UTF8.GetBytes(account.Trim().ToUpperInvariant())));
+
+    private static async Task<int> FilterLogin(AuthAttemptLimiter limiter, string username, int status, bool canceled = false, bool exception = false)
+    {
+        var http = new DefaultHttpContext();
+        http.Connection.RemoteIpAddress = System.Net.IPAddress.Loopback;
+        var action = new Microsoft.AspNetCore.Mvc.ActionContext(http, new(), new(), new());
+        var controller = new WebApi.Controllers.AuthController(null!, null!, null!);
+        var context = new Microsoft.AspNetCore.Mvc.Filters.ActionExecutingContext(action, [],
+            new Dictionary<string, object?> { ["request"] = new WebApi.Contracts.Auth.LoginRequest { Username = username, Password = "000000" } }, controller);
+        var result = status == 401 ? (Microsoft.AspNetCore.Mvc.IActionResult)new Microsoft.AspNetCore.Mvc.UnauthorizedObjectResult(new object())
+            : status == 200 ? new Microsoft.AspNetCore.Mvc.OkObjectResult(new object()) : new Microsoft.AspNetCore.Mvc.ObjectResult(new object()) { StatusCode = status };
+        await new AuthAttemptFilter(limiter, "login").OnActionExecutionAsync(context, () => Task.FromResult(
+            new Microsoft.AspNetCore.Mvc.Filters.ActionExecutedContext(action, [], controller) { Result = result,
+                Canceled = canceled, Exception = exception ? new InvalidOperationException("synthetic infrastructure error") : null }));
+        return context.Result is Microsoft.AspNetCore.Mvc.ObjectResult blocked ? blocked.StatusCode!.Value : status;
+    }
+
+    [Fact]
     public async Task PasswordReset_ReturnsSuccessAfterLogFailure_AndConsumesCodeOnce()
     {
         await using var database = await SqliteTestDatabase.CreateAsync();

@@ -2305,5 +2305,19 @@
   "Conflicting dates: {0}": "Дати конфлікту: {0}",
   "Change or remove the conflicting shift in the work schedule, then try again.": "Змініть або видаліть відповідну зміну в робочому графіку та спробуйте ще раз.",
   "The schedule conflict could not be resolved. Check the employee's work schedule and try again.": "Не вдалося визначити дати конфлікту. Перевірте робочий графік працівника та спробуйте ще раз.",
-  "1 day": "1 день"
+  "1 day": "1 день",
+  "Choose a day": "Оберіть день",
+  "Select a shift or a day off.": "Оберіть зміну або вихідний.",
+  "· Adjust a shift or request one on a day off.": "· Змініть години або подайте запит на зміну у вихідний.",
+  "Request a shift on this day": "Подати запит на зміну в цей день",
+  "You already work on this date in another schedule.": "У цей день ви вже працюєте в іншому графіку.",
+  "Too many requests. Please try again later.": "Забагато запитів. Спробуйте пізніше.",
+  "Choose either an assigned shift or a day off.": "Оберіть призначену зміну або вихідний.",
+  "Choose a valid day of this month.": "Оберіть дійсний день цього місяця.",
+  "This date is not a day off. You already have an assigned shift.": "Це не вихідний. Ви вже маєте призначену зміну.",
+  "This day already has a pending correction request.": "На цей день уже є запит на коригування, що очікує розгляду.",
+  "Published schedule was not found for this employee.": "Не знайдено опублікованого графіка для цього працівника.",
+  "A correction request is already pending.": "Запит на коригування вже очікує розгляду.",
+  "The schedule or request changed. Refresh and try again.": "Графік або запит змінився. Оновіть і спробуйте ще раз.",
+  "The request changed. Refresh and try again.": "Запит змінився. Оновіть і спробуйте ще раз."
 }

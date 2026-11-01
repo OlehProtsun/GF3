@@ -1017,8 +1017,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, TimeProvider? 
                 .HasForeignKey(request => request.ReviewedByManagerId)
                 .OnDelete(DeleteBehavior.SetNull);
 
-            entity.Property(request => request.OriginalFromTime).IsRequired().HasMaxLength(5);
-            entity.Property(request => request.OriginalToTime).IsRequired().HasMaxLength(5);
+            entity.Property(request => request.OriginalFromTime).IsRequired(false).HasMaxLength(5);
+            entity.Property(request => request.OriginalToTime).IsRequired(false).HasMaxLength(5);
             entity.Property(request => request.RequestedFromTime).IsRequired().HasMaxLength(5);
             entity.Property(request => request.RequestedToTime).IsRequired().HasMaxLength(5);
             entity.Property(request => request.Status)
@@ -1029,12 +1029,18 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, TimeProvider? 
             entity.HasIndex(request => new { request.ScheduleSlotId, request.Status })
                 .IsUnique()
                 .HasDatabaseName("ux_shift_correction_pending_slot")
-                .HasFilter("status = 'Pending'");
+                .HasFilter("status = 'Pending' AND schedule_slot_id IS NOT NULL");
+
+            entity.HasIndex(request => new { request.ScheduleId, request.EmployeeId, request.DayOfMonth })
+                .IsUnique()
+                .HasDatabaseName("ux_shift_correction_pending_day_off")
+                .HasFilter("status = 'Pending' AND original_from_time IS NULL");
+            entity.Property(request => request.Status).IsConcurrencyToken();
 
             entity.ToTable(table =>
             {
                 table.HasCheckConstraint("ck_shift_correction_dom", "day_of_month BETWEEN 1 AND 31");
-                table.HasCheckConstraint("ck_shift_correction_time_format", "original_from_time LIKE '__:__' AND original_to_time LIKE '__:__' AND requested_from_time LIKE '__:__' AND requested_to_time LIKE '__:__'");
+                table.HasCheckConstraint("ck_shift_correction_time_format", "((original_from_time IS NULL AND original_to_time IS NULL) OR (original_from_time IS NOT NULL AND original_to_time IS NOT NULL AND schedule_slot_id > 0 AND schedule_slot_id IS NOT NULL AND original_from_time GLOB '[0-2][0-9]:[0-5][0-9]' AND original_from_time < '24:00' AND original_to_time GLOB '[0-2][0-9]:[0-5][0-9]' AND original_to_time < '24:00')) AND requested_from_time GLOB '[0-2][0-9]:[0-5][0-9]' AND requested_from_time < '24:00' AND requested_to_time GLOB '[0-2][0-9]:[0-5][0-9]' AND requested_to_time < '24:00'");
                 table.HasCheckConstraint("ck_shift_correction_requested_order", "requested_from_time < requested_to_time");
             });
         });
