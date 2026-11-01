@@ -2,9 +2,9 @@
   min-width: 0;
   padding: 24px;
   border: 1px solid var(--urlop-border, #e7ebf4);
-  border-radius: 28px;
+  border-radius: 22px;
   background: rgba(255, 255, 255, .94);
-  box-shadow: var(--urlop-shadow, 0 12px 36px #28386b06), inset 0 1px 0 #fff;
+  box-shadow: 0 3px 12px #28386b04, inset 0 1px 0 #fff;
 }
 
 .header {
@@ -127,3 +127,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) { .day { transition: none; } }
+
+.loading { height: 20px; color: #697791; font-size: 12px; }
+.day, .placeholder { height: 96px; }
+.day:disabled { cursor: default; }
+@media (max-width: 640px) { .day, .placeholder { height: 86px; } }

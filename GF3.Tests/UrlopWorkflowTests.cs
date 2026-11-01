@@ -189,6 +189,80 @@ public sealed class UrlopWorkflowTests
         Assert.Single(await db.ScheduleSlots.ToListAsync());
     }
 
+    [Theory]
+    [InlineData("unassigned")][InlineData("otherEmployee")][InlineData("otherShop")]
+    [InlineData("otherMonth")][InlineData("otherYear")]
+    public async Task StoredAssignmentsOnlyBlockMatchingEmployeeShopAndPeriod(string scenario)
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync(); await using var db = database.CreateContext();
+        var f = await UrlopTestData.SeedAsync(db); var service = UrlopTestData.Service(db);
+        var original = await db.Schedules.FindAsync(f.Schedule);
+        var schedule = TestDataFactory.CreateDalSchedule(original!.ContainerId, scenario == "otherShop" ? f.OtherShop : f.Shop,
+            year: scenario == "otherYear" ? 2025 : 2026, month: scenario == "otherMonth" ? 10 : 11);
+        db.Schedules.Add(schedule); await db.SaveChangesAsync();
+        db.ScheduleSlots.Add(TestDataFactory.CreateDalSlot(schedule.Id, 4, 1,
+            scenario == "unassigned" ? null : scenario == "otherEmployee" ? f.Peer : f.Employee, "09:00", "17:00"));
+        await db.SaveChangesAsync();
+        var created = await service.CreateApprovedAsync(f.Manager, f.Shop, f.Employee, 2026, 11, [4, 5], default);
+        Assert.Equal(UrlopStatus.Approved, created.Status); Assert.Equal([4, 5], created.Days);
+        Assert.Single(await db.ScheduleSlots.ToListAsync());
+    }
+
+    [Theory]
+    [InlineData("create")][InlineData("approve")][InlineData("replace")]
+    public async Task MultipleStoredShiftsHaveUniqueSortedDiagnostics_AndAllFailuresAreAtomic(string operation)
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync(); await using var db = database.CreateContext();
+        var f = await UrlopTestData.SeedAsync(db); var service = UrlopTestData.Service(db);
+        var original = await db.Schedules.FindAsync(f.Schedule);
+        var second = TestDataFactory.CreateDalSchedule(original!.ContainerId, f.Shop, year: 2026, month: 11);
+        db.Schedules.Add(second); await db.SaveChangesAsync();
+        db.ScheduleSlots.AddRange(TestDataFactory.CreateDalSlot(second.Id, 8, 1, f.Employee, "09:00", "17:00"),
+            TestDataFactory.CreateDalSlot(f.Schedule, 4, 1, f.Employee, "09:00", "12:00"),
+            TestDataFactory.CreateDalSlot(f.Schedule, 4, 2, f.Employee, "13:00", "17:00"),
+            TestDataFactory.CreateDalSlot(second.Id, 4, 1, f.Employee, "09:00", "17:00"));
+        await db.SaveChangesAsync();
+        await service.SetMonthOpenAsync(f.Shop, 2026, 11, true, default);
+        var approved = await service.CreateApprovedAsync(f.Manager, f.Shop, f.Employee, 2026, 11, [6], default);
+        var pending = operation == "approve" ? await service.SubmitAsync(f.Employee, f.Shop, 2026, 11, [3, 4, 8], Today, default) : null;
+        var before = JsonSerializer.Serialize(await db.UrlopDays.AsNoTracking().OrderBy(x => x.Id).ToListAsync());
+        var error = await Assert.ThrowsAsync<UrlopConflictException>(async () => {
+            if (operation == "create") await service.CreateApprovedAsync(f.Manager, f.Shop, f.Employee, 2026, 11, [4, 8, 9], default);
+            else if (operation == "approve") await service.ApproveAsync(f.Manager, pending!.RequestId, default);
+            else await service.ReplaceDaysAsync(f.Manager, approved.RequestId, [4, 8, 9], default);
+        });
+        Assert.Equal("urlop_shift_conflict", error.Code);
+        Assert.Equal([new DateOnly(2026, 11, 4), new DateOnly(2026, 11, 8)], error.ConflictingDates);
+        Assert.Equal([f.Schedule, second.Id], error.ScheduleIds);
+        Assert.Equal(before, JsonSerializer.Serialize(await db.UrlopDays.AsNoTracking().OrderBy(x => x.Id).ToListAsync()));
+        if (pending is not null)
+        {
+            await service.RejectAsync(f.Manager, pending.RequestId, default);
+            Assert.All(await db.UrlopDays.Where(x => x.RequestId == pending.RequestId).ToListAsync(), x => Assert.Equal(UrlopStatus.Rejected, x.Status));
+        }
+        Assert.Equal(4, await db.ScheduleSlots.CountAsync());
+    }
+
+    [Fact]
+    public async Task ShiftConflictHttpContractKeepsIsoDatesAndNumericScheduleIds()
+    {
+        await using var host = await ManagerWorkspaceTestHost.CreateAsync(new UrlopTestClock());
+        await using (var db = host.Database.CreateContext())
+        {
+            var schedule = await db.Schedules.SingleAsync(); schedule.Month = 11;
+            db.ScheduleSlots.Add(TestDataFactory.CreateDalSlot(schedule.Id, 13, 1, 1, "09:00", "17:00"));
+            await db.SaveChangesAsync();
+        }
+        await host.Login("manager"); await host.Exchange("pc");
+        var response = await host.Client.PostAsJsonAsync("/api/manager-urlop/requests", new { shopId = 1, employeeId = 1, year = 2026, month = 11, days = new[] { 12, 13 } });
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("urlop_shift_conflict", body.GetProperty("code").GetString());
+        Assert.Equal("2026-11-13", Assert.Single(body.GetProperty("conflictingDates").EnumerateArray()).GetString());
+        Assert.Equal(1, Assert.Single(body.GetProperty("scheduleIds").EnumerateArray()).GetInt32());
+        await using var check = host.Database.CreateContext(); Assert.Empty(await check.UrlopDays.ToListAsync());
+    }
+
     [Fact]
     public async Task HttpAuthorizationClaimsPhoneModeAndHistoricalReadAreEnforced()
     {

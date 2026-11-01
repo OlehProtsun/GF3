@@ -2300,5 +2300,10 @@
   "Approved vacations on {0}": "Затверджені відпустки: {0}",
   "{0} days": "{0} днів",
   "Overview of approved vacations and requests for this shop.": "Огляд затверджених відпусток і заявок у цьому магазині.",
-  "Pending requests for this month.": "Заявки в очікуванні за цей місяць."
+  "Pending requests for this month.": "Заявки в очікуванні за цей місяць.",
+  "Vacation cannot be approved because the employee has a scheduled shift.": "Неможливо затвердити відпустку, оскільки працівник уже має заплановану зміну.",
+  "Conflicting dates: {0}": "Дати конфлікту: {0}",
+  "Change or remove the conflicting shift in the work schedule, then try again.": "Змініть або видаліть відповідну зміну в робочому графіку та спробуйте ще раз.",
+  "The schedule conflict could not be resolved. Check the employee's work schedule and try again.": "Не вдалося визначити дати конфлікту. Перевірте робочий графік працівника та спробуйте ще раз.",
+  "1 day": "1 день"
 }

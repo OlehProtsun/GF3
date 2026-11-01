@@ -22,6 +22,7 @@ describe("per-cell read-only availability", () => {
       bindValueByKey={new Map([["F4", "09:00 - 17:00"]])} />);
     const vacation = screen.getByRole("button", { name: "Ada day 1", exact: true });
     expect(vacation).toHaveTextContent("UR");
+    expect(vacation.closest("td")).not.toHaveClass(styles.emptyCellDanger);
     fireEvent.doubleClick(vacation); fireEvent.keyDown(vacation, { key: "F4" });
     fireEvent.paste(vacation, { clipboardData: { getData: () => "09:00 - 17:00" } });
     expect(changed).not.toHaveBeenCalled();

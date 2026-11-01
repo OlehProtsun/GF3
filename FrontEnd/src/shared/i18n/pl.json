@@ -2300,5 +2300,10 @@
   "Approved vacations on {0}": "Zatwierdzone urlopy: {0}",
   "{0} days": "{0} dni",
   "Overview of approved vacations and requests for this shop.": "Przegląd zatwierdzonych urlopów i wniosków w tym sklepie.",
-  "Pending requests for this month.": "Oczekujące wnioski w tym miesiącu."
+  "Pending requests for this month.": "Oczekujące wnioski w tym miesiącu.",
+  "Vacation cannot be approved because the employee has a scheduled shift.": "Nie można zatwierdzić urlopu, ponieważ pracownik ma już zaplanowaną zmianę.",
+  "Conflicting dates: {0}": "Konfliktujące daty: {0}",
+  "Change or remove the conflicting shift in the work schedule, then try again.": "Zmień lub usuń kolidującą zmianę w grafiku, a następnie spróbuj ponownie.",
+  "The schedule conflict could not be resolved. Check the employee's work schedule and try again.": "Nie udało się ustalić dat konfliktu. Sprawdź grafik pracownika i spróbuj ponownie.",
+  "1 day": "1 dzień"
 }

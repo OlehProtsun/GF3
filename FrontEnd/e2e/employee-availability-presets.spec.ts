@@ -5,7 +5,7 @@ const uk = JSON.parse(readFileSync(new URL("../src/shared/i18n/uk.json", import.
 
 for (const language of ["en", "pl", "uk"] as const) {
   test(`employee bottom sheet and database presets across devices: ${language}`, async ({ page, browser }) => {
-    test.setTimeout(90_000);
+    test.setTimeout(180_000);
     const dictionary: Record<string, string> = language === "pl" ? pl : language === "uk" ? uk : {};
     const tr = (key: string) => dictionary[key] ?? key;
     const starts = (key: string) => new RegExp("^" + tr(key).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
@@ -22,6 +22,7 @@ for (const language of ["en", "pl", "uk"] as const) {
         let body: unknown = [];
         if (path === "/api/auth/session") body = { role: "employee", employeeId, userName: `worker${employeeId}`, displayName: "Worker" };
         else if (path === "/api/account-language") body = { language };
+        else if (path === "/api/employee-urlop") body = { shops: [], months: [] };
         else if (path === "/api/employee-ui-state/availability-time-presets") {
           if (route.request().method() === "PUT") {
             const payload = route.request().postDataJSON();

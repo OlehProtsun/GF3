@@ -12,7 +12,7 @@ test("distinct pending request count, default filter, truthful nonconsecutive da
   render(<ManagerUrlopRequestsPanel requests={[pending, pending, request("2", "approved"), request("3", "rejected")]} isOpen={false} busy={false} readOnly={false} {...callbacks()} />);
   expect(screen.getByLabelText("Pending: 1")).toHaveTextContent("1");
   expect(screen.getAllByRole("article")).toHaveLength(1);
-  expect(screen.getByText("3 Nov 2026, 5 Nov 2026, 7 Nov 2026")).toBeInTheDocument();
+  expect(screen.getByText("3, 5, 7 November 2026")).toBeInTheDocument();
   expect(screen.getByText(/3 days/)).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "All", exact: true }));
   const cards = screen.getAllByRole("article");
@@ -51,4 +51,17 @@ test("empty filters and unique day count", () => {
   expect(screen.getByText("No vacation requests.")).toBeInTheDocument();
   rerender(<ManagerUrlopRequestsPanel requests={[request("1", "approved", [3,3,5])]} isOpen={false} busy={false} readOnly={false} {...callbacks()} />);
   expect(screen.getByText(/2 days/)).toBeInTheDocument();
+});
+
+test("compact ranges, visible status text and loading retain filter state", () => {
+  const { rerender } = render(<ManagerUrlopRequestsPanel requests={[request("1", "pending", [8, 1, 2, 5, 7, 8])]} isOpen={false} busy={false} readOnly={false} {...callbacks()} />);
+  expect(screen.getByRole("article")).toHaveTextContent("1–2, 5, 7–8 November 2026");
+  expect(screen.getByRole("article").querySelector('[data-urlop-status="pending"]')).toHaveTextContent("Pending");
+  expect(screen.getByRole("article")).toHaveTextContent("5 days");
+  expect(screen.getByRole("button", { name: "Approve", exact: true })).toHaveTextContent("Approve");
+  fireEvent.click(screen.getByRole("button", { name: "All", exact: true }));
+  rerender(<ManagerUrlopRequestsPanel requests={[]} loading isOpen={false} busy={false} readOnly={false} {...callbacks()} />);
+  expect(screen.getByRole("region", { name: "Vacation requests" })).toHaveAttribute("aria-busy", "true");
+  expect(screen.getByRole("button", { name: "All", exact: true })).toHaveAttribute("aria-pressed", "true");
+  expect(screen.getByRole("button", { name: "Open requests" })).toBeDisabled();
 });

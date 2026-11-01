@@ -1,16 +1,15 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { isoDate, monthDays, monthStartOffset, warsawToday, type ApprovedUrlopDay } from "@entities/urlop";
 import { dateTimeFormat, t } from "@shared/i18n";
 import { GroupIcon } from "@shared/ui/icons";
 import styles from "./ManagerUrlopOverviewCalendar.module.css";
 
-type Props = { year: number; month: number; approvedDays: readonly ApprovedUrlopDay[] };
+type Props = { year: number; month: number; approvedDays: readonly ApprovedUrlopDay[]; loading?: boolean };
 
-export function ManagerUrlopOverviewCalendar({ year, month, approvedDays }: Props) {
+export function ManagerUrlopOverviewCalendar({ year, month, approvedDays, loading = false }: Props) {
   const [expandedDate, setExpandedDate] = useState<string | null>(null);
   const period = isoDate(year, month, 1).slice(0, 7);
-  const [shownPeriod, setShownPeriod] = useState(period);
-  if (shownPeriod !== period) { setShownPeriod(period); setExpandedDate(null); }
+  useEffect(() => { setExpandedDate(null); }, [period]);
   const days = monthDays(year, month);
   const byDate = new Map<string, Map<number, ApprovedUrlopDay>>();
   for (const entry of approvedDays) {
@@ -31,8 +30,9 @@ export function ManagerUrlopOverviewCalendar({ year, month, approvedDays }: Prop
   const previousMonth = new Date(`${isoDate(year, month, 1)}T12:00:00Z`);
   previousMonth.setUTCDate(0);
   const today = warsawToday();
-  return <section className={styles.card} aria-label={t("Vacation calendar")} onKeyDown={event => { if (event.key === "Escape") { setExpandedDate(null); if (expanded) document.getElementById(`vacation-${expanded}`)?.focus(); } }}>
+  return <section className={styles.card} aria-label={t("Vacation calendar")} aria-busy={loading} onKeyDown={event => { if (event.key === "Escape") { setExpandedDate(null); if (expanded) document.getElementById(`vacation-${expanded}`)?.focus(); } }}>
     <header className={styles.header}><h2>{dateTimeFormat("en-GB", { month: "long", year: "numeric" }).format(new Date(`${isoDate(year, month, 1)}T12:00:00`))}</h2><span className={styles.count}><GroupIcon size={16} aria-hidden="true" />{t("{0} employees on vacation", count)}</span></header>
+    <div className={styles.loading} role="status">{loading ? t("Loading") : ""}</div>
     <div className={styles.scroll}>
       <div className={styles.grid}>
         {Array.from({ length: 7 }, (_, i) => <span className={styles.weekday} key={`weekday-${i}`}>{dateTimeFormat("en-GB", { weekday: "short" }).format(new Date(2026, 0, 5 + i))}</span>)}
@@ -40,11 +40,11 @@ export function ManagerUrlopOverviewCalendar({ year, month, approvedDays }: Prop
         {days.map(day => {
           const date = isoDate(year, month, day);
           const entries = [...(byDate.get(date)?.values() ?? [])].sort((a, b) => a.employeeId - b.employeeId);
-          return <button id={`vacation-${date}`} className={styles.day} type="button" key={date} aria-current={date === today ? "date" : undefined} aria-label={`${date}${entries.length ? ` UR: ${entries.map(name).join(", ")}` : ""}`} aria-expanded={expanded === date} onClick={() => setExpandedDate(expanded === date ? null : date)}>
+          return <button id={`vacation-${date}`} className={styles.day} disabled={loading} type="button" key={date} aria-current={date === today ? "date" : undefined} aria-label={`${date}${entries.length ? ` UR: ${entries.map(name).join(", ")}` : ""}`} aria-expanded={expanded === date} onClick={() => setExpandedDate(expanded === date ? null : date)}>
             <strong>{day}</strong>{entries.slice(0, 2).map(entry => chip(entry))}{entries.length > 2 ? <small aria-label={t("+{0} more", entries.length - 2)}>+{entries.length - 2}</small> : null}
           </button>;
         })}
-        {Array.from({ length: (7 - (offset + days.length) % 7) % 7 }, (_, i) => <span aria-hidden="true" className={styles.placeholder} key={`after-${i}`}>{i + 1}</span>)}
+        {Array.from({ length: 42 - offset - days.length }, (_, i) => <span aria-hidden="true" className={styles.placeholder} key={`after-${i}`}>{i + 1}</span>)}
       </div>
     </div>
     {expanded ? <div className={styles.details} role="region" aria-label={t("Approved vacations on {0}", expanded)}><div className={styles.header}><strong>{t("Approved vacations on {0}", expanded)}</strong><button type="button" onClick={() => { setExpandedDate(null); document.getElementById(`vacation-${expanded}`)?.focus(); }}>{t("Close")}</button></div>{[...(byDate.get(expanded)?.values() ?? [])].map(entry => chip(entry, true))}</div> : null}

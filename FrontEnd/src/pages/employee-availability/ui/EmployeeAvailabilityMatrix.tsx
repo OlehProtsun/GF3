@@ -155,8 +155,8 @@ export function EmployeeAvailabilityMatrix(props: Props) {
           const shops = vacationShopNames(props.urlopCalendar?.months.flatMap(x => x.approved) ?? [], props.urlopCalendar?.shops ?? [], member.employeeId, isoDate(group.year, group.month, day));
           const display = shops.length ? "UR" : value === "-" ? "−" : value;
           const title = shops.length ? `UR (${shops.join(", ")})` : display;
-          const valueClass = shops.length ? styles.urlopCell : value === "+" ? styles.wholeDay : value === "-" ? styles.unavailable : styles.timeValue;
-          return <td key={member.employeeId} className={[own ? styles.ownColumn : "", own && selectedDays.includes(day) ? styles.selectedCell : ""].join(" ")}>
+          const valueClass = shops.length || value === "-" ? styles.unavailable : value === "+" ? styles.wholeDay : styles.timeValue;
+          return <td key={member.employeeId} className={[own ? styles.ownColumn : "", shops.length ? styles.unavailable : "", own && selectedDays.includes(day) ? styles.selectedCell : ""].join(" ")}>
             {own ? <button type="button" data-own-availability-cell={day} className={`${styles.ownCell} ${valueClass}`} disabled={!enabled}
               title={title} aria-label={t("{0} {1}, your availability: {2}", day, getAvailabilityMonthLabel(group.month), title)}
               onContextMenu={event => { if (enabled) event.preventDefault(); }}

@@ -12,7 +12,7 @@ test("October 2026 has Monday-first offsets and 31 read-only dates", () => {
   const grid = container.querySelector('[class*="grid"]')!;
   expect(grid.children[10]).toHaveAccessibleName("2026-10-01");
   expect(grid.children[40]).toHaveAccessibleName("2026-10-31");
-  expect(grid.children).toHaveLength(42);
+  expect(grid.children).toHaveLength(49);
   expect(screen.getByText("0 employees on vacation")).toBeInTheDocument();
   expect(screen.queryByRole("combobox")).toBeNull();
   expect(screen.getByRole("button", { name: "2026-10-01" })).not.toHaveAttribute("aria-pressed");
@@ -72,4 +72,16 @@ test("today is highlighted and neighbor-month placeholders show muted dates", ()
     expect(grid.children[9]).toHaveTextContent("30");
     expect(grid.children[41]).toHaveTextContent("1");
   } finally { vi.useRealTimers(); }
+});
+
+test.each([[2026, 2], [2028, 2], [2026, 8], [2026, 11]])("six weeks stay mounted for %i/%i and loading disables dates", (year, month) => {
+  const { container, rerender } = render(<ManagerUrlopOverviewCalendar year={year} month={month} approvedDays={[]} />);
+  const calendar = screen.getByRole("region", { name: "Vacation calendar" });
+  expect(container.querySelector('[class*="grid"]')!.children).toHaveLength(49);
+  rerender(<ManagerUrlopOverviewCalendar year={year} month={month === 12 ? 1 : month + 1} approvedDays={[]} loading />);
+  expect(screen.getByRole("region", { name: "Vacation calendar" })).toBe(calendar);
+  expect(calendar).toHaveAttribute("aria-busy", "true");
+  expect(screen.getByRole("status")).toHaveTextContent("Loading");
+  for (const button of screen.getAllByRole("button")) expect(button).toBeDisabled();
+  expect(container.querySelector('[class*="grid"]')!.children).toHaveLength(49);
 });

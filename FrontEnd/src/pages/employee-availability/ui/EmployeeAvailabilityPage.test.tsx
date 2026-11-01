@@ -137,6 +137,47 @@ beforeEach(() => {
 });
 
 describe("EmployeeAvailabilityPage", () => {
+  test("one workspace contains both panels; keyboard tabs retain expanded availability and its draft", async () => {
+    mocks.availabilityQuery.mockReturnValue({ data: [openAvailability], isLoading: false });
+    const user = userEvent.setup();
+    renderPage();
+    const availability = screen.getByRole("tab", { name: "Availability", exact: true });
+    const urlop = screen.getByRole("tab", { name: "Urlop", exact: true });
+    const workspace = screen.getByRole("region", { name: "Availability", exact: true });
+    expect(within(workspace).getByRole("tablist")).toContainElement(availability);
+    expect(within(workspace).getByRole("heading", { name: "Public windows", level: 1 })).toBeVisible();
+    fireEvent.click(getDayButton(1));
+    fireEvent.click(screen.getByRole("radio", { name: /Available \(whole day\)/ }));
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Save", exact: true }));
+    expect(getDayButton(1)).toHaveTextContent("+");
+    availability.focus();
+    await user.keyboard("{ArrowRight}");
+    expect(urlop).toHaveFocus(); expect(urlop).toHaveAttribute("aria-selected", "true");
+    expect(urlop).toHaveAttribute("tabindex", "0"); expect(availability).toHaveAttribute("tabindex", "-1");
+    expect(within(workspace).getByRole("heading", { name: "Urlop", level: 1 })).toBeVisible();
+    expect(screen.getByText("Vacation panel")).toBeVisible();
+    expect(document.getElementById("availability-panel")).not.toBeVisible();
+    await user.keyboard("{Home}");
+    expect(availability).toHaveFocus(); expect(getGroupToggle()).toHaveAttribute("aria-expanded", "true");
+    expect(getDayButton(1)).toHaveTextContent("+");
+    await user.keyboard("{ArrowLeft}"); expect(urlop).toHaveFocus();
+    await user.keyboard("{ArrowRight}"); expect(availability).toHaveFocus();
+    await user.keyboard("{End}"); expect(urlop).toHaveFocus();
+    expect(mocks.mutate).not.toHaveBeenCalled();
+    expect(window.location.pathname).toBe("/availability");
+  });
+
+  test.each(["en", "pl", "uk"] as const)("workspace tabs and automatic badge retain %s labels", language => {
+    setTestLanguage(language);
+    mocks.availabilityQuery.mockReturnValue({ data: [{ ...openAvailability, isAutomatic: true, canSubmit: false }], isLoading: false });
+    renderPage(false);
+    const tabs = screen.getAllByRole("tab");
+    expect(tabs).toHaveLength(2);
+    expect(tabs[0]).toHaveAccessibleName(language === "pl" ? "Dyspozycyjność" : language === "uk" ? "Доступність" : "Availability");
+    expect(tabs[1]).toHaveAccessibleName(language === "uk" ? "Відпустки" : "Urlop");
+    expect(tabs[0].querySelector('svg[aria-hidden="true"]')).toBeInTheDocument();
+    expect(screen.getByText(language === "pl" ? "Automatyczna" : language === "uk" ? "Автоматична" : "Automatic")).toBeVisible();
+  });
   function submittedGroup(kind = AVAILABILITY_KIND_NONE, id = 5): EmployeeAvailabilityGroup {
     return { ...openAvailability, id, name: id === 5 ? "May Availability" : "Another group", employeeLastModifiedAtUtc: "2026-05-01T10:00:00Z",
       slots: Array.from({ length: 31 }, (_, i) => ({ id: i + 1, availabilityGroupMemberId: 50, dayOfMonth: i + 1, kind, intervalStr: null })) };
@@ -225,12 +266,12 @@ describe("EmployeeAvailabilityPage", () => {
     expect(within(juneCard).getByText("Team availability")).toBeInTheDocument();
     expect(within(juneCard).getByRole("button", { name: "Save availability" })).toBeInTheDocument();
     expect(within(juneCard).getByRole("button", { name: "Clear", exact: true })).toBeInTheDocument();
-    expect(view.container.querySelector("section")).toBe(juneCard);
+    expect(view.container.querySelector("section[aria-labelledby^='employee-availability-toggle-']")).toBe(juneCard);
     expect(getGroupToggle()).toHaveAttribute("aria-expanded", "false");
     await user.click(getGroupToggle());
     expect(screen.getAllByRole("table")).toHaveLength(1);
     expect(getGroupToggle("June")).toHaveAttribute("aria-expanded", "false");
-    expect(view.container.querySelector("section")).toBe(getGroupToggle().closest("section"));
+    expect(view.container.querySelector("section[aria-labelledby^='employee-availability-toggle-']")).toBe(getGroupToggle().closest("section"));
     getGroupToggle().focus(); await user.keyboard("{Enter}");
     expect(getGroupToggle()).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByRole("table")).not.toBeInTheDocument();

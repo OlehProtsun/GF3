@@ -1,4 +1,5 @@
 import { dateTimeFormat, t } from "@shared/i18n";
+import { useLanguageRevision } from "@shared/i18n/useLanguageRevision";
 import { useEffect, useMemo, useState, useRef, useCallback, type MouseEvent } from "react";
 import { useAuth } from "@app/providers/AuthProvider";
 import {
@@ -26,7 +27,7 @@ import {
 import { getErrorMessage } from "@shared/api/httpClient";
 import { ErrorBanner } from "@shared/ui/components/ErrorBanner";
 import { IosButton } from "@shared/ui/components/IosButton";
-import { AccountSettingsIcon, AvailabilityIcon, CheckIcon, ChevronRightIcon, CloseIcon, EyeIcon, SaveIcon } from "@shared/ui/icons";
+import { AccountSettingsIcon, AvailabilityIcon, CheckIcon, ChevronRightIcon, CloseIcon, EyeIcon, SaveIcon, ScheduleIcon } from "@shared/ui/icons";
 import { parseFlexibleTimeRange } from "@shared/lib/timeRange";
 import { useSyncedDraft } from "@shared/lib/useSyncedDraft";
 import { useUnsavedChangesPrompt } from "@shared/lib/useUnsavedChangesPrompt";
@@ -337,6 +338,7 @@ function AvailabilitySelectionSheet({ open, editingDays, dateLabel, day, storage
 }
 
 export function EmployeeAvailabilityPage() {
+  useLanguageRevision();
   const [tab, setTab] = useState<"availability" | "urlop">("availability");
   const urlopCalendar = useEmployeeUrlopCalendarQuery();
   const { session } = useAuth();
@@ -531,12 +533,20 @@ export function EmployeeAvailabilityPage() {
 
   return (
     <div className={workspaceStyles.page}>
-      <div className={styles.urlopTabs} role="tablist" aria-label={t("Availability")}>
-        <button type="button" role="tab" id="availability-tab" aria-controls="availability-panel" aria-selected={tab === "availability"} onClick={() => setTab("availability")}>{t("Availability")}</button>
-        <button type="button" role="tab" id="urlop-tab" aria-controls="urlop-panel" aria-selected={tab === "urlop"} onClick={() => setTab("urlop")}>{t("Urlop")}</button>
+      <section className={styles.workspace} aria-label={t("Availability")}>
+      <div className={styles.urlopTabs} role="tablist" aria-label={t("Availability")} data-active-tab={tab} onKeyDown={event => {
+        const tabs = [...event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]')];
+        const index = tabs.indexOf(document.activeElement as HTMLButtonElement);
+        const next = event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1
+          : event.key === "ArrowRight" ? (index + 1) % tabs.length : event.key === "ArrowLeft" ? (index + tabs.length - 1) % tabs.length : null;
+        if (next === null) return;
+        event.preventDefault(); tabs[next].click(); tabs[next].focus({ preventScroll: true });
+      }}>
+        <button type="button" role="tab" id="availability-tab" aria-controls="availability-panel" aria-selected={tab === "availability"} tabIndex={tab === "availability" ? 0 : -1} onClick={() => setTab("availability")}><AvailabilityIcon size={18} aria-hidden="true" /><span>{t("Availability")}</span></button>
+        <button type="button" role="tab" id="urlop-tab" aria-controls="urlop-panel" aria-selected={tab === "urlop"} tabIndex={tab === "urlop" ? 0 : -1} onClick={() => setTab("urlop")}><ScheduleIcon size={18} aria-hidden="true" /><span>{t("Urlop")}</span></button>
       </div>
-      <div role="tabpanel" id="urlop-panel" aria-labelledby="urlop-tab" hidden={tab !== "urlop"}><EmployeeUrlopPanel /></div>
-      <div role="tabpanel" id="availability-panel" aria-labelledby="availability-tab" hidden={tab !== "availability"}>
+      <div className={styles.tabPanel} role="tabpanel" id="urlop-panel" aria-labelledby="urlop-tab" hidden={tab !== "urlop"} tabIndex={0}><h1 className={styles.pageTitle}>{t("Urlop")}</h1><EmployeeUrlopPanel /></div>
+      <div className={styles.tabPanel} role="tabpanel" id="availability-panel" aria-labelledby="availability-tab" hidden={tab !== "availability"} tabIndex={0}>
       <h1 className={styles.pageTitle}>{t("Public windows")}</h1>
       {queryErrorMessage ? <ErrorBanner dismissible={false}>{queryErrorMessage}</ErrorBanner> : null}
       {saveErrorMessage ? <ErrorBanner>{saveErrorMessage}</ErrorBanner> : null}
@@ -560,14 +570,14 @@ export function EmployeeAvailabilityPage() {
       ) : null}
 
       {availabilityQuery.isLoading ? (
-        <section className={workspaceStyles.panel} data-employee-motion>
+        <section className={styles.statePanel} data-employee-motion role="status">
           <span className={workspaceStyles.panelEyebrow}>{t("Loading")}</span>
           <p className={workspaceStyles.panelText}>{t("Checking public availability windows.")}</p>
         </section>
       ) : null}
 
       {!availabilityQuery.isLoading && groups.length === 0 ? (
-        <section className={workspaceStyles.panel} data-employee-motion>
+        <section className={styles.statePanel} data-employee-motion>
           <span className={workspaceStyles.panelEyebrow}>{t("No active windows")}</span>
           <h2 className={workspaceStyles.panelTitle}>{t("Nothing is public for your account yet.")}</h2>
           <p className={workspaceStyles.panelText}>
@@ -591,7 +601,7 @@ export function EmployeeAvailabilityPage() {
                     <span className={styles.cardName} title={group.name}>{group.name}</span>
                     <span className={styles.cardMonth}>{getAvailabilityGroupPeriodLabel(group)}</span>
                   </span>
-                  <span className={joinClassNames(styles.statusPill, isAvailabilityOpen(group) && styles.statusPillOpen, group.isEditLocked && styles.statusPillLocked)}>
+                  <span className={joinClassNames(styles.statusPill, isAvailabilityOpen(group) && styles.statusPillOpen, group.isEditLocked && styles.statusPillLocked, group.isAutomatic && styles.statusPillAutomatic)}>
                     {getAvailabilityStatusLabel(group)}
                   </span>
                   <ChevronRightIcon size={16} className={styles.cardChevron} aria-hidden="true" />
@@ -684,6 +694,7 @@ export function EmployeeAvailabilityPage() {
       ) : null}
 
       </div>
+      </section>
       {unsavedChangesDialog}
     </div>
   );

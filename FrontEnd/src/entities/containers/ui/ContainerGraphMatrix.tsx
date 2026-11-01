@@ -560,7 +560,7 @@ const MatrixValueCell = memo(function MatrixValueCell({
     cancelClose();
   }, [cancelPendingHoverOpen, cancelClose]);
   const isSelectionOnlyReadOnlyCell = readOnly && selectionEnabled;
-  const isDangerEmpty = isEmpty && emptyCellVariant === "danger";
+  const isDangerEmpty = (isEmpty || Boolean(urlopLabel)) && emptyCellVariant === "danger";
   const isInteractiveVisualHint = hasVisualHint && Boolean(onVisualHintClick);
   const clearVisualHintClickTimeout = () => {
     if (visualHintClickTimeoutRef.current !== null) {
