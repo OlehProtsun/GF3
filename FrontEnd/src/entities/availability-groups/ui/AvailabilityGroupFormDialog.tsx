@@ -1,3 +1,4 @@
+import { t } from "@shared/i18n";
 import { useEffect, useMemo } from "react";
 import type { KeyboardEvent } from "react";
 import type { SaveAvailabilityGroupDto } from "@entities/availability-groups/api/dto";
@@ -44,15 +45,15 @@ function validateFormState(formState: FormState) {
   const month = Number(formState.month);
 
   if (!trimmedName) {
-    errors.name = "Name is required.";
+    errors.name = t("Name is required.");
   }
 
   if (!Number.isInteger(year) || year < 1 || year > 9999) {
-    errors.year = "Year must be between 1 and 9999.";
+    errors.year = t("Year must be between 1 and 9999.");
   }
 
   if (!Number.isInteger(month) || month < 1 || month > 12) {
-    errors.month = "Month must be between 1 and 12.";
+    errors.month = t("Month must be between 1 and 12.");
   }
 
   return { errors, payload: { name: trimmedName, year, month } };
@@ -110,8 +111,8 @@ export function AvailabilityGroupFormDialog({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isSubmitting, onCancel, open]);
 
-  const title = mode === "create" ? "Create Availability Group" : "Edit Availability Group";
-  const saveLabel = isSubmitting ? "Saving..." : mode === "create" ? "Create Group" : "Save Changes";
+  const title = mode === "create" ? t("Create Availability Group") : t("Edit Availability Group");
+  const saveLabel = isSubmitting ? t("Saving...") : mode === "create" ? t("Create Group") : t("Save Changes");
   const describedById = useMemo(() => `${mode}-availability-group-dialog-description`, [mode]);
 
   if (!open) {
@@ -146,12 +147,12 @@ export function AvailabilityGroupFormDialog({
         <div className={styles.header}>
           <div>
             <h3 id="availability-group-dialog-title">{title}</h3>
-            <p id={describedById}>Define the group name and the target month for the availability schedule.</p>
+            <p id={describedById}>{t("Define the group name and the target month for the availability schedule.")}</p>
           </div>
         </div>
 
         <div className={styles.formBody}>
-          <LabeledField id="availability-group-name" label="Group Name" error={errors.name}>
+          <LabeledField id="availability-group-name" label={t("Group Name")} error={errors.name}>
             <TextInput
               id="availability-group-name"
               value={formState.name}
@@ -159,13 +160,13 @@ export function AvailabilityGroupFormDialog({
                 formState: { ...current.formState, name: event.target.value },
                 errors: clearFieldError(current.errors, "name"),
               }))}
-              placeholder="For example: Main Team"
+              placeholder={t("For example: Main Team")}
               aria-invalid={errors.name ? true : undefined}
             />
           </LabeledField>
 
           <div className={styles.splitRow}>
-            <LabeledField id="availability-group-month" label="Month" error={errors.month}>
+            <LabeledField id="availability-group-month" label={t("Month")} error={errors.month}>
               <select
                 id="availability-group-month"
                 className={styles.select}
@@ -184,7 +185,7 @@ export function AvailabilityGroupFormDialog({
               </select>
             </LabeledField>
 
-            <LabeledField id="availability-group-year" label="Year" error={errors.year}>
+            <LabeledField id="availability-group-year" label={t("Year")} error={errors.year}>
               <TextInput
                 id="availability-group-year"
                 type="number"
@@ -214,7 +215,7 @@ export function AvailabilityGroupFormDialog({
         </div>
 
         <div className={styles.footer}>
-          <IosButton label="Cancel" variant="secondary" onClick={onCancel} disabled={isSubmitting} />
+          <IosButton label={t("Cancel")} variant="secondary" onClick={onCancel} disabled={isSubmitting} />
           <IosButton label={saveLabel} onClick={submit} disabled={isSubmitting} />
         </div>
       </div>

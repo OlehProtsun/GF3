@@ -1,3 +1,4 @@
+import { t } from "@shared/i18n";
 import { useEffect, useState } from "react";
 import type { KeyboardEvent } from "react";
 import styles from "./NumberStepperInput.module.css";
@@ -114,7 +115,7 @@ export function NumberStepperInput({
         className={styles.stepButton}
         onClick={() => applyStep(-1)}
         disabled={disabled || !canDecrement}
-        aria-label={`Decrease ${ariaLabel}`}
+        aria-label={t("Decrease {0}", ariaLabel)}
       >
         -
       </button>
@@ -138,7 +139,7 @@ export function NumberStepperInput({
         className={styles.stepButton}
         onClick={() => applyStep(1)}
         disabled={disabled || !canIncrement}
-        aria-label={`Increase ${ariaLabel}`}
+        aria-label={t("Increase {0}", ariaLabel)}
       >
         +
       </button>

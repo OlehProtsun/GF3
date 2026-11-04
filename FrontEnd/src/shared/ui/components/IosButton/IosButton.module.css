@@ -12,6 +12,9 @@
   --ios-button-radius: 999px;
 
   display: inline-flex;
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
   align-items: center;
   justify-content: center;
   gap: var(--ios-button-gap);
@@ -62,6 +65,7 @@
 }
 
 .icon {
+  flex-shrink: 0;
   width: 18px;
   height: 18px;
   display: inline-flex;
@@ -76,6 +80,13 @@
 
 .primary {
   --btn-bg: #2563eb;
+}
+
+.label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .secondary {

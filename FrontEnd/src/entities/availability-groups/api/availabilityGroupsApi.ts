@@ -1,5 +1,10 @@
 import { request } from "@shared/api/httpClient";
 import type {
+  AvailabilityTransferHint,
+  AvailabilityTransferResult,
+  AvailabilityTransferSource,
+} from "@entities/availability-groups/model/transfer";
+import type {
   AvailabilityGroupDto,
   AvailabilityGroupItemDto,
   AvailabilityGroupMemberDto,
@@ -32,4 +37,32 @@ export const availabilityGroupsApi = {
   updateSlot: (groupId: number, slotId: number, payload: SaveAvailabilitySlotDto) =>
     request<void>(`${endpoint}/${groupId}/slots/${slotId}`, { method: "PUT", body: payload }),
   removeSlot: (groupId: number, slotId: number) => request<void>(`${endpoint}/${groupId}/slots/${slotId}`, { method: "DELETE" }),
+
+  transferSources: (groupId: number, memberId: number, signal?: AbortSignal) =>
+    request<AvailabilityTransferSource[]>(endpoint + "/" + groupId + "/members/" + memberId + "/transfer-sources", { signal }),
+  transferPreview: (
+    employeeIds: number[],
+    year: number,
+    month: number,
+    targetGroupId: number | null,
+    signal?: AbortSignal,
+  ) => request<AvailabilityTransferSource[]>(endpoint + "/transfer-preview", {
+    signal,
+    query: {
+      employeeIds: [...new Set(employeeIds)].sort((left, right) => left - right).join(","),
+      year,
+      month,
+      targetGroupId,
+    },
+  }),
+  transferHints: (groupId: number, signal?: AbortSignal) =>
+    request<AvailabilityTransferHint[]>(endpoint + "/" + groupId + "/transfer-hints", { signal }),
+  transferDays: (
+    groupId: number,
+    memberId: number,
+    payload: { sourceGroupId: number; dayOfMonths: number[] },
+  ) => request<AvailabilityTransferResult>(
+    endpoint + "/" + groupId + "/members/" + memberId + "/transfer-days",
+    { method: "POST", body: payload },
+  ),
 };

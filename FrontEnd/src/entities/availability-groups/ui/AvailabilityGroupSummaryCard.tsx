@@ -1,3 +1,4 @@
+import { t } from "@shared/i18n";
 import type { AvailabilityGroup, AvailabilityGroupMember, AvailabilitySlot } from "@entities/availability-groups/model/types";
 import {
   getAvailabilityGroupPeriodLabel,
@@ -37,30 +38,30 @@ export function AvailabilityGroupSummaryCard({
   const memberNames = getAvailabilityMemberNames(members, employeeNameById);
   const topKind =
     slots.length === 0
-      ? "No slots yet"
+      ? t("No slots yet")
       : slotSummary.interval > 0
         ? getAvailabilityKindLabel("Preferred")
         : slotSummary.any > 0
           ? getAvailabilityKindLabel("Available")
           : slotSummary.none > 0
             ? getAvailabilityKindLabel("Unavailable")
-            : "Mixed coverage";
+            : t("Mixed coverage");
 
   return (
     <CardSection
       className={styles.card}
-      title="Availability Summary"
+      title={t("Availability Summary")}
       icon={<AvailabilityIcon size={18} />}
       headerRightSlot={group ? <span className={styles.headerBadge}>ID {group.id}</span> : null}
     >
       <div className={styles.layout}>
-        {isLoading ? <p className={styles.stateText}>Loading selected availability group...</p> : null}
-        {hasLoadError ? <ErrorBanner>Could not load selected availability group.</ErrorBanner> : null}
+        {isLoading ? <p className={styles.stateText}>{t("Loading selected availability group...")}</p> : null}
+        {hasLoadError ? <ErrorBanner>{t("Could not load selected availability group.")}</ErrorBanner> : null}
 
         {!group && !isLoading && !hasLoadError ? (
           <div className={styles.emptyState}>
-            <h3>Select an availability group</h3>
-            <p>Choose a record from the list to inspect its period, members and slot coverage.</p>
+            <h3>{t("Select an availability group")}</h3>
+            <p>{t("Choose a record from the list to inspect its period, members and slot coverage.")}</p>
           </div>
         ) : null}
 
@@ -76,17 +77,17 @@ export function AvailabilityGroupSummaryCard({
             </div>
 
             <DetailList className={styles.detailList} columns={3}>
-              <DetailItem label="Members" value={String(members.length)} className={styles.detailItem} valueClassName={styles.detailValue} />
-              <DetailItem label="Slots" value={String(slots.length)} className={styles.detailItem} valueClassName={styles.detailValue} />
-              <DetailItem label="Custom" value={String(slotSummary.interval)} className={styles.detailItem} valueClassName={styles.detailValue} />
-              <DetailItem label="Any Shift" value={String(slotSummary.any)} className={styles.detailItem} valueClassName={styles.detailValue} />
-              <DetailItem label="Unavailable" value={String(slotSummary.none)} className={styles.detailItem} valueClassName={styles.detailValue} />
-              <DetailItem label="Period" value={getAvailabilityGroupPeriodLabel(group, "compact")} className={styles.detailItem} valueClassName={styles.detailValue} />
+              <DetailItem label={t("Members")} value={String(members.length)} className={styles.detailItem} valueClassName={styles.detailValue} />
+              <DetailItem label={t("Slots")} value={String(slots.length)} className={styles.detailItem} valueClassName={styles.detailValue} />
+              <DetailItem label={t("Custom")} value={String(slotSummary.interval)} className={styles.detailItem} valueClassName={styles.detailValue} />
+              <DetailItem label={t("Any Shift")} value={String(slotSummary.any)} className={styles.detailItem} valueClassName={styles.detailValue} />
+              <DetailItem label={t("Unavailable")} value={String(slotSummary.none)} className={styles.detailItem} valueClassName={styles.detailValue} />
+              <DetailItem label={t("Period")} value={getAvailabilityGroupPeriodLabel(group, "compact")} className={styles.detailItem} valueClassName={styles.detailValue} />
             </DetailList>
 
             <div className={styles.membersBlock}>
               <div className={styles.membersHeader}>
-                <span>Assigned employees</span>
+                <span>{t("Assigned employees")}</span>
                 <span>{memberNames.length}</span>
               </div>
 
@@ -99,14 +100,14 @@ export function AvailabilityGroupSummaryCard({
                   ))}
                 </div>
               ) : (
-                <p className={styles.memberEmpty}>No employees assigned to this group yet.</p>
+                <p className={styles.memberEmpty}>{t("No employees assigned to this group yet.")}</p>
               )}
             </div>
 
             <div className={styles.actions}>
-              <IosButton label="Edit Group" onClick={onEditGroup} />
+              <IosButton label={t("Edit Group")} onClick={onEditGroup} />
               <IosButton
-                label="Delete Group"
+                label={t("Delete Group")}
                 variant="secondary"
                 customColor="#ef4444"
                 customBorderColor="#ef4444"

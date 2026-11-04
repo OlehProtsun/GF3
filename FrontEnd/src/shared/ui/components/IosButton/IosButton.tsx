@@ -36,9 +36,15 @@ export function IosButton({
   } as CSSProperties;
 
   return (
-    <button type={type} className={classes} onClick={onClick} disabled={disabled} style={style}>
+    <button type={type} className={classes} onClick={onClick} disabled={disabled} style={{
+      ...style,
+      paddingTop: "24.8px",
+      paddingBottom: "24.8px",
+      paddingLeft: "-31.4px",
+      paddingRight: "-31.4px"
+    }}>
       {icon ? <span className={styles.icon}>{icon}</span> : null}
-      <span>{label}</span>
+      <span className={styles.label} title={label}>{label}</span>
     </button>
   );
 }

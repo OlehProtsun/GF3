@@ -11,30 +11,41 @@ public static class EmployeeMapper
     public static WebApi.Contracts.Employees.EmployeeDto ToApiDto(this BusinessLogicLayer.Contracts.Employees.EmployeeDto dto) => new()
     {
         Id = dto.Id,
+        ContractType = dto.ContractType,
         FirstName = dto.FirstName,
         LastName = dto.LastName,
         Phone = dto.Phone,
         Email = dto.Email,
+        Username = dto.Username,
+        HasLoginAccount = dto.HasLoginAccount,
+        IsOnline = dto.IsOnline,
+        LastLoginAtUtc = dto.LastLoginAtUtc,
     };
 
     public static SaveEmployeeRequest ToSaveRequest(this CreateEmployeeRequest request)
-        => MapSaveRequest(request.FirstName, request.LastName, request.Phone, request.Email);
+        => MapSaveRequest(request.FirstName, request.LastName, request.Phone, request.Email, request.Username, request.Password, request.ContractType);
 
     public static SaveEmployeeRequest ToSaveRequest(this UpdateEmployeeRequest request, int id)
-        => MapSaveRequest(request.FirstName, request.LastName, request.Phone, request.Email, id);
+        => MapSaveRequest(request.FirstName, request.LastName, request.Phone, request.Email, request.Username, request.Password, request.ContractType, id);
 
     private static SaveEmployeeRequest MapSaveRequest(
         string firstName,
         string lastName,
         string? phone,
         string? email,
+        string? username,
+        string? password,
+        string? contractType,
         int id = 0)
         => new()
         {
             Id = id,
+            ContractType = contractType,
             FirstName = firstName,
             LastName = lastName,
             Phone = phone,
             Email = email,
+            Username = username,
+            Password = password,
         };
 }

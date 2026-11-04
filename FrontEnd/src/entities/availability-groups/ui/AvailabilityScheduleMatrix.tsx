@@ -1,36 +1,50 @@
+import { useLanguageRevision } from "@shared/i18n/useLanguageRevision";
+import { t } from "@shared/i18n";
 import { useMemo, type CSSProperties, type ReactNode } from "react";
 import type { GraphMatrixColumn } from "@entities/containers";
 import { ContainerGraphMatrix } from "@entities/containers";
 import {
   AVAILABILITY_ANY_MARK,
   AVAILABILITY_NONE_MARK,
+  getAvailabilityCellKey,
   normalizeAvailabilityCellValue,
   parseAvailabilityCode,
   type AvailabilityMatrixCellMap,
   type AvailabilityMatrixColumn,
 } from "@entities/availability-groups/model/editor";
+import { getAvailabilityMemberLastModifiedLabel } from "@entities/availability-groups/model/presentation";
 import { AvailabilityIcon } from "@shared/ui/icons";
+import { useApprovedUrlopQuery, isoDate, monthDays } from "@entities/urlop";
+import { useShopsListQuery } from "@entities/shops";
+import { ErrorBanner } from "@shared/ui/components/ErrorBanner";
+import { getErrorMessage } from "@shared/api/httpClient";
 
 type AvailabilityScheduleMatrixProps = {
   year: number;
   month: number;
   columns: AvailabilityMatrixColumn[];
   cellMap: AvailabilityMatrixCellMap;
+  visualHintMap?: AvailabilityMatrixCellMap;
   title?: string;
   helperText?: string;
   readOnly?: boolean;
+  readOnlyCellKeys?: ReadonlySet<string>;
   emptyMessage?: string;
   cellErrors?: Record<string, string>;
   className?: string;
+  titleClassName?: string;
   style?: CSSProperties;
   compactSize?: boolean;
+  mobileReadOnlyViewport?: boolean;
   headerCenterSlot?: ReactNode;
   headerRightSlot?: ReactNode;
   bindValueByKey?: ReadonlyMap<string, string>;
   selectedCellKeys?: string[];
+  enableSelectionWhenReadOnly?: boolean;
   onColumnMove?: (employeeId: number, targetEmployeeId: number) => void;
   onSelectedCellKeysChange?: (keys: string[]) => void;
   onCellChange?: (employeeId: number, dayOfMonth: number, value: string) => void;
+  onVisualHintClick?: (employeeId: number, dayOfMonth: number) => void;
 };
 
 export function AvailabilityScheduleMatrix({
@@ -38,22 +52,37 @@ export function AvailabilityScheduleMatrix({
   month,
   columns,
   cellMap,
-  title = "Availability Schedule",
-  helperText = `Use ${AVAILABILITY_ANY_MARK} for any shift, ${AVAILABILITY_NONE_MARK} for unavailable, a time interval like 08:00 - 16:00, or any text note. Text notes stay visible but are treated as unavailable during schedule generation.`,
+  visualHintMap,
+  title = t("Availability Schedule"),
+  helperText = t("Use {0} for any shift, {1} for unavailable, a time interval like 08:00 - 16:00, or any text note. Text notes stay visible but are treated as unavailable during schedule generation.", AVAILABILITY_ANY_MARK, AVAILABILITY_NONE_MARK),
   readOnly = false,
+  readOnlyCellKeys,
   emptyMessage,
   cellErrors = {},
   className,
+  titleClassName,
   style,
   compactSize = false,
+  mobileReadOnlyViewport = false,
   headerCenterSlot,
   headerRightSlot,
   bindValueByKey,
   selectedCellKeys,
+  enableSelectionWhenReadOnly,
   onColumnMove,
   onSelectedCellKeysChange,
   onCellChange,
+  onVisualHintClick,
 }: AvailabilityScheduleMatrixProps) {
+  const language = useLanguageRevision();
+  const urlop = useApprovedUrlopQuery(isoDate(year, month, 1), isoDate(year, month, monthDays(year, month).length));
+  const shops = useShopsListQuery();
+  const urlopLabels = new Map<string, string>();
+  for (const day of urlop.data ?? []) {
+    const key = getAvailabilityCellKey(day.employeeId, Number(day.date.slice(8, 10)));
+    const name = shops.data?.find(x => x.id === day.shopId)?.name ?? String(day.shopId);
+    urlopLabels.set(key, [urlopLabels.get(key) ?? "UR", name].join(" · "));
+  }
   const graphColumns = useMemo<GraphMatrixColumn[]>(
     () =>
       columns.map(column => ({
@@ -64,9 +93,13 @@ export function AvailabilityScheduleMatrix({
         label: column.label,
         minHoursMonth: null,
         totalMinutes: 0,
-        totalText: "",
+        totalText: [
+          getAvailabilityMemberLastModifiedLabel(column.employeeLastModifiedAtUtc),
+          readOnlyCellKeys?.has(getAvailabilityCellKey(column.employeeId, 1)) ? t("Automatic availability (read-only)") : null,
+        ].filter(Boolean).join(" · "),
       })),
-    [columns],
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Translation helpers read the current language internally.
+    [columns, readOnlyCellKeys, language],
   );
   const normalizedBindValueByKey = useMemo(() => {
     if (!bindValueByKey || bindValueByKey.size === 0) {
@@ -82,24 +115,35 @@ export function AvailabilityScheduleMatrix({
   }, [bindValueByKey]);
 
   return (
+    <>
+    {urlop.error ? <ErrorBanner>{getErrorMessage(urlop.error)}</ErrorBanner> : null}
     <ContainerGraphMatrix
+      urlopInfoLabels={urlopLabels}
       className={className}
       style={style}
       title={title}
+      titleClassName={titleClassName}
       icon={<AvailabilityIcon size={18} />}
       helperText={helperText}
       graph={{ year, month }}
       columns={graphColumns}
       cellMap={cellMap}
+      visualHintMap={visualHintMap}
+      lockVisualHintCells
       readOnly={readOnly}
+      readOnlyCellKeys={readOnlyCellKeys}
       emptyMessage={
         emptyMessage ??
         (readOnly
-          ? "No employees are assigned to this availability group yet."
-          : "Add at least one employee to start filling the schedule.")
+          ? t("No employees are assigned to this availability group yet.")
+          : t("Add at least one employee to start filling the schedule."))
       }
       compactSize={compactSize}
-      preserveShellHeightOnCompact
+      mobileReadOnlyViewport={mobileReadOnlyViewport}
+      maxAutoColumnWidth={mobileReadOnlyViewport ? 156 : undefined}
+      stretchColumns={!mobileReadOnlyViewport}
+      allowColumnResize={!mobileReadOnlyViewport}
+      preserveShellHeightOnCompact={!mobileReadOnlyViewport}
       editMode="inline"
       emptyCellVariant="danger"
       cellErrors={cellErrors}
@@ -107,10 +151,13 @@ export function AvailabilityScheduleMatrix({
       headerRightSlot={headerRightSlot}
       bindValueByKey={normalizedBindValueByKey}
       selectedCellKeys={selectedCellKeys}
+      enableSelectionWhenReadOnly={enableSelectionWhenReadOnly}
       normalizeCellValue={(_, value) => normalizeAvailabilityCellValue(value)}
       onColumnMove={onColumnMove}
       onSelectedCellKeysChange={onSelectedCellKeysChange}
       onCellChange={onCellChange}
+      onVisualHintCellClick={onVisualHintClick}
     />
+    </>
   );
 }

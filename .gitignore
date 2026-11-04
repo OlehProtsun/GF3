@@ -362,18 +362,54 @@ MigrationBackup/
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
 
-# Local workspace and tooling temp files
+# Project-local runtime and tool caches
+.appdata/
+.codex/
 .codex-temp/
-.codex_tmp_*.xlsx
 .dotnet/
 .dotnet-cli/
+.dotnet-home/
+.localappdata/
+.nuget/
 .edge-test-profile/
 scratch/
-tmp-edge-profile/
-tmp-edge-profile-graph-new/
+tmp/
+tmp-*/
+
+# Generated project knowledge graph
+graphify-out/
+
+# Local secrets and machine-specific configuration
+.env
+.env.*
+!.env.example
+*.local.json
+appsettings.Local.json
+**/appsettings.Local.json
+**/appsettings.*.local.json
+*.pfx
+
+# Frontend generated output
 FrontEnd/dist/
+FrontEnd/vite-dev*.log
+
+# Test and coverage output
+TestResults/
+TestResultsCoverage/
+coverage/
+coverage-final.json
+
+# Local inspection captures
+.codex_tmp_*.xlsx
 edge-*.html
 edge-*.png
 tmp-inspect-*.html
 tmp-inspect-*.png
 tmp-schedule-profile.png
+
+# Local SQLite data
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3

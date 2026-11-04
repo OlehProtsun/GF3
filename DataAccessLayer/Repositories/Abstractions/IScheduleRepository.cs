@@ -1,4 +1,5 @@
 using DataAccessLayer.Models;
+using DataAccessLayer.Models.Enums;
 
 namespace DataAccessLayer.Repositories.Abstractions;
 
@@ -16,6 +17,31 @@ public interface IScheduleRepository : IBaseRepository<ScheduleModel>
     /// Returns schedules that belong to one container, optionally filtered by a search term.
     /// </summary>
     Task<List<ScheduleModel>> GetByContainerAsync(int containerId, string? value = null, CancellationToken ct = default);
+
+    /// <summary>
+    /// Updates publication settings for every schedule in one container atomically.
+    /// </summary>
+    Task<int> UpdatePublicationByContainerAsync(
+        int containerId,
+        SchedulePublicationStatus publicationStatus,
+        bool? allowSwap,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns public schedules assigned to one employee.
+    /// </summary>
+    Task<List<ScheduleModel>> GetPublishedForEmployeeAsync(int employeeId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns every other saved schedule in the requested month together with its concrete slots.
+    /// Generation uses this read model to keep one employee from receiving overlapping work in
+    /// separate schedules.
+    /// </summary>
+    Task<List<ScheduleModel>> GetByMonthWithSlotsAsync(
+        int year,
+        int month,
+        int? excludeScheduleId = null,
+        CancellationToken ct = default);
 
     /// <summary>
     /// Returns a schedule together with the related data required by edit/export flows.

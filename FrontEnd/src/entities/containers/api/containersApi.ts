@@ -5,17 +5,23 @@ import type {
   GenerateGraphPreviewRequestDto,
   GenerateGraphResponseDto,
   GraphCellStyleDto,
+  ManagerGraphFillColorBindDto,
+  ManagerGraphTextColorBindDto,
   GraphDto,
   GraphEmployeeDto,
   GraphSlotDto,
+  GraphVersionTreeDto,
   SaveContainerDto,
   SaveGraphDto,
   SaveGraphEmployeeDto,
   ReplaceGraphSlotsDto,
   SaveSchedulePresetDto,
+  SaveManagerGraphFillColorBindDto,
+  SaveManagerGraphTextColorBindDto,
   SaveGraphSlotDto,
   SchedulePresetDto,
   UpsertGraphCellStyleDto,
+  UpdateGraphsPublicationDto,
 } from "./dto";
 
 const endpoint = "containers";
@@ -32,7 +38,17 @@ export const containersApi = {
   createGraph: (containerId: number, payload: SaveGraphDto) => request<GraphDto>(`${endpoint}/${containerId}/graphs`, { method: "POST", body: payload }),
   updateGraph: (containerId: number, graphId: number, payload: SaveGraphDto) =>
     request<void>(`${endpoint}/${containerId}/graphs/${graphId}`, { method: "PUT", body: payload }),
+  updateGraphsPublication: (containerId: number, payload: UpdateGraphsPublicationDto) =>
+    request<void>(`${endpoint}/${containerId}/graphs/publication`, { method: "PUT", body: payload }),
   removeGraph: (containerId: number, graphId: number) => request<void>(`${endpoint}/${containerId}/graphs/${graphId}`, { method: "DELETE" }),
+  listGraphVersions: (containerId: number, graphId: number, signal?: AbortSignal) =>
+    request<GraphVersionTreeDto>(`${endpoint}/${containerId}/graphs/${graphId}/versions`, { signal }),
+  commitGraphVersion: (containerId: number, graphId: number) =>
+    request<GraphVersionTreeDto>(`${endpoint}/${containerId}/graphs/${graphId}/versions`, { method: "POST" }),
+  checkoutGraphVersion: (containerId: number, graphId: number, versionId: number) =>
+    request<GraphVersionTreeDto>(`${endpoint}/${containerId}/graphs/${graphId}/versions/${versionId}/checkout`, { method: "POST" }),
+  removeGraphVersion: (containerId: number, graphId: number, versionId: number) =>
+    request<void>(`${endpoint}/${containerId}/graphs/${graphId}/versions/${versionId}`, { method: "DELETE" }),
   listSchedulePresets: (containerId: number, signal?: AbortSignal) =>
     request<SchedulePresetDto[]>(`${endpoint}/${containerId}/schedule-presets`, { signal }),
   createSchedulePreset: (containerId: number, payload: SaveSchedulePresetDto) =>
@@ -68,4 +84,26 @@ export const containersApi = {
     request<GraphCellStyleDto>(`${endpoint}/${containerId}/graphs/${graphId}/cell-styles`, { method: "PUT", body: payload }),
   removeGraphCellStyle: (containerId: number, graphId: number, styleId: number) =>
     request<void>(`${endpoint}/${containerId}/graphs/${graphId}/cell-styles/${styleId}`, { method: "DELETE" }),
+};
+
+const managerGraphFillColorBindsEndpoint = "manager-graph-fill-color-binds";
+
+export const managerGraphFillColorBindsApi = {
+  list: (signal?: AbortSignal) =>
+    request<ManagerGraphFillColorBindDto[]>(managerGraphFillColorBindsEndpoint, { signal }),
+  upsert: (payload: SaveManagerGraphFillColorBindDto) =>
+    request<ManagerGraphFillColorBindDto>(managerGraphFillColorBindsEndpoint, { method: "PUT", body: payload }),
+  remove: (id: number) =>
+    request<void>(`${managerGraphFillColorBindsEndpoint}/${id}`, { method: "DELETE" }),
+};
+
+const managerGraphTextColorBindsEndpoint = "manager-graph-text-color-binds";
+
+export const managerGraphTextColorBindsApi = {
+  list: (signal?: AbortSignal) =>
+    request<ManagerGraphTextColorBindDto[]>(managerGraphTextColorBindsEndpoint, { signal }),
+  upsert: (payload: SaveManagerGraphTextColorBindDto) =>
+    request<ManagerGraphTextColorBindDto>(managerGraphTextColorBindsEndpoint, { method: "PUT", body: payload }),
+  remove: (id: number) =>
+    request<void>(`${managerGraphTextColorBindsEndpoint}/${id}`, { method: "DELETE" }),
 };

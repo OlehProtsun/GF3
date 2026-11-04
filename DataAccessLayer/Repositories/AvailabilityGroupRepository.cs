@@ -1,5 +1,6 @@
 using DataAccessLayer.Models;
 using DataAccessLayer.Models.DataBaseContext;
+using DataAccessLayer.Models.Enums;
 using DataAccessLayer.Repositories.Abstractions;
 using Microsoft.EntityFrameworkCore;
 
@@ -49,12 +50,44 @@ public class AvailabilityGroupRepository : GenericRepository<AvailabilityGroupMo
     public async Task<AvailabilityGroupModel?> GetFullByIdAsync(int id, CancellationToken ct = default)
         => await _set
             .AsNoTracking()
+            .AsSplitQuery()
             .Include(group => group.Members)
                 .ThenInclude(member => member.Employee)
             .Include(group => group.Members)
                 .ThenInclude(member => member.Days)
             .SingleOrDefaultAsync(group => group.Id == id, ct)
             .ConfigureAwait(false);
+
+    /// <inheritdoc />
+    public async Task<List<AvailabilityGroupModel>> GetPublishedForEmployeeAsync(int employeeId, DateTimeOffset nowUtc, CancellationToken ct = default)
+    {
+        var groups = await CreatePublishedEmployeeQuery(employeeId)
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+
+        return groups
+            .Where(group => HasStartedVisibility(group, nowUtc))
+            .OrderBy(group => IsClosedForSubmission(group, nowUtc))
+            .ThenBy(group => group.VisibleToUtc)
+            .ThenBy(group => group.Year)
+            .ThenBy(group => group.Month)
+            .ThenBy(group => group.Name)
+            .ToList();
+    }
+
+    /// <inheritdoc />
+    public async Task<AvailabilityGroupModel?> GetPublishedForEmployeeByIdAsync(
+        int id,
+        int employeeId,
+        DateTimeOffset nowUtc,
+        CancellationToken ct = default)
+    {
+        var group = await CreatePublishedEmployeeQuery(employeeId)
+            .SingleOrDefaultAsync(group => group.Id == id, ct)
+            .ConfigureAwait(false);
+
+        return group is not null && HasStartedVisibility(group, nowUtc) ? group : null;
+    }
 
     /// <inheritdoc />
     public Task<bool> ExistsByNameAsync(string name, int year, int month, int? excludeId = null, CancellationToken ct = default)
@@ -74,6 +107,30 @@ public class AvailabilityGroupRepository : GenericRepository<AvailabilityGroupMo
             .AsNoTracking()
             .Include(group => group.Members)
                 .ThenInclude(member => member.Employee);
+
+    private IQueryable<AvailabilityGroupModel> CreatePublishedEmployeeQuery(int employeeId)
+        => _set
+            .AsNoTracking()
+            .AsSplitQuery()
+            .Include(group => group.Members)
+                .ThenInclude(member => member.Employee)
+            .Include(group => group.Members)
+                .ThenInclude(member => member.Days)
+            .Where(group =>
+                group.PublicationStatus == AvailabilityPublicationStatus.Public &&
+                group.Members.Any(member => member.EmployeeId == employeeId));
+
+    private static bool HasStartedVisibility(AvailabilityGroupModel group, DateTimeOffset nowUtc)
+    {
+        var normalizedNowUtc = nowUtc.ToUniversalTime();
+        return !group.VisibleFromUtc.HasValue || group.VisibleFromUtc.Value <= normalizedNowUtc;
+    }
+
+    private static bool IsClosedForSubmission(AvailabilityGroupModel group, DateTimeOffset nowUtc)
+    {
+        var normalizedNowUtc = nowUtc.ToUniversalTime();
+        return group.VisibleToUtc.HasValue && group.VisibleToUtc.Value < normalizedNowUtc;
+    }
 
     private static string NormalizeSearchValue(string? value)
         => (value ?? string.Empty).Trim().ToLower();

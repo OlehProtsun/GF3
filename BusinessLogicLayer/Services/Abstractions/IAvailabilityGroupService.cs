@@ -1,3 +1,4 @@
+using BusinessLogicLayer.Contracts.Availability;
 using BusinessLogicLayer.Contracts.Models;
 
 namespace BusinessLogicLayer.Services.Abstractions;
@@ -25,6 +26,26 @@ public interface IAvailabilityGroupService : IBaseService<AvailabilityGroupModel
     /// </summary>
     Task<(AvailabilityGroupModel group, List<AvailabilityGroupMemberModel> members, List<AvailabilityGroupDayModel> days)>
         LoadFullAsync(int groupId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns published availability groups currently visible to one employee.
+    /// </summary>
+    Task<List<EmployeeAvailabilityModel>> GetPublishedForEmployeeAsync(int employeeId, DateTimeOffset nowUtc, CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns one currently visible published availability group for one employee.
+    /// </summary>
+    Task<EmployeeAvailabilityModel> GetPublishedForEmployeeByIdAsync(int employeeId, int groupId, DateTimeOffset nowUtc, CancellationToken ct = default);
+
+    /// <summary>
+    /// Replaces the current employee's day entries for a published availability group and stamps their modification time.
+    /// </summary>
+    Task<EmployeeAvailabilityModel> SaveEmployeeAvailabilityAsync(
+        int employeeId,
+        int groupId,
+        IList<AvailabilityGroupDayModel> days,
+        DateTimeOffset nowUtc,
+        CancellationToken ct = default);
 
     /// <summary>
     /// Returns all members of the specified availability group.

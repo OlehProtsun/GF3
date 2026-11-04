@@ -1,7 +1,10 @@
-﻿import type { Employee } from "@entities/employees/model/types";
+import { dateTimeFormat, t } from "@shared/i18n";
+import { getPolishPublicHoliday } from "@shared/lib/polishPublicHolidays";
+import type { Employee } from "@entities/employees/model/types";
 import type { Shop } from "@entities/shops/model/types";
 import { getGraphVisibleNote } from "./graphNote";
 import type { Graph, GraphEmployee, GraphSlot } from "./types";
+import type { ApprovedUrlopDay } from "@entities/urlop/model/types";
 
 export type ContainerGraphRecords = {
   employees: GraphEmployee[];
@@ -28,6 +31,8 @@ export type ContainerStatisticPivotRow = {
   employee: string;
   workDays: number;
   freeDays: number;
+  urlopDays: number;
+  holidayDays: number;
   hoursSum: string;
   hoursByShop: Record<string, string>;
   isTotal?: boolean;
@@ -37,6 +42,7 @@ export type ContainerWorkFreeRow = {
   employee: string;
   workDays: number;
   freeDays: number;
+  urlopDays: number;
 };
 
 export type ContainerStatistics = {
@@ -51,10 +57,19 @@ export type ContainerStatistics = {
 };
 
 type BuildContainerStatisticsParams = {
+  approvedUrlopDays?: ApprovedUrlopDay[];
   graphs: Graph[];
   graphRecordsById: Record<number, ContainerGraphRecords>;
   employeesById?: Map<number, Employee>;
   shopsById?: Map<number, Shop>;
+};
+
+type EmployeePeriodCalendar = {
+  year: number;
+  month: number;
+  daysInMonth: number;
+  workedDays: Set<number>;
+  urlopDays: Set<number>;
 };
 
 export function buildContainerGraphSummaries(
@@ -98,14 +113,15 @@ export function buildContainerGraphSummaries(
         assignedHoursText: formatHoursMinutes(totalMinutes),
         assignedSlotCount,
         coverageDays: workedDays.size,
-        shopName: shopsById?.get(graph.shopId)?.name?.trim() || `Shop ${graph.shopId}`,
+        shopName: shopsById?.get(graph.shopId)?.name?.trim() || t("Shop {0}", graph.shopId),
         monthYearLabel: formatGraphMonthYear(graph.year, graph.month),
-        availabilityLabel: graph.availabilityGroupId ? `Group ${graph.availabilityGroupId}` : "None",
+        availabilityLabel: graph.availabilityGroupId ? t("Group {0}", graph.availabilityGroupId) : t("None"),
       };
     });
 }
 
 export function buildContainerStatistics({
+  approvedUrlopDays = [],
   graphs,
   graphRecordsById,
   employeesById,
@@ -117,23 +133,43 @@ export function buildContainerStatistics({
   const employeeTotalMinutes = new Map<number, number>();
   const employeeWorkDays = new Map<number, number>();
   const employeeFreeDays = new Map<number, number>();
+  const employeeUrlopDays = new Map<number, number>();
+  const employeeHolidayDays = new Map<number, number>();
+  const employeePeriods = new Map<number, Map<string, EmployeePeriodCalendar>>();
   const shopTotalMinutes = new Map<string, number>();
   let totalMinutes = 0;
 
   graphs.forEach(graph => {
     const records = graphRecordsById[graph.id] ?? { employees: [], slots: [] };
     const shopKey = String(graph.shopId);
-    const shopName = shopsById?.get(graph.shopId)?.name?.trim() || `Shop ${graph.shopId}`;
+    const shopName = shopsById?.get(graph.shopId)?.name?.trim() || t("Shop {0}", graph.shopId);
     const daysInMonth = new Date(graph.year, graph.month, 0).getDate();
-    const workedDaysByEmployee = new Map<number, Set<number>>();
+    const periodKey = `${graph.year}-${String(graph.month).padStart(2, "0")}`;
+
+    const ensureEmployeePeriod = (employeeId: number) => {
+      const periods = employeePeriods.get(employeeId) ?? new Map<string, EmployeePeriodCalendar>();
+      const period = periods.get(periodKey) ?? { year: graph.year, month: graph.month, daysInMonth, workedDays: new Set<number>(), urlopDays: new Set<number>() };
+      periods.set(periodKey, period);
+      employeePeriods.set(employeeId, periods);
+      return period;
+    };
 
     if (!shopKeyToName.has(shopKey)) {
       shopKeyToName.set(shopKey, shopName);
     }
 
+    approvedUrlopDays.filter(x => x.shopId === graph.shopId && x.date.slice(0, 7) === periodKey).forEach(x => {
+      ensureEmployeePeriod(x.employeeId).urlopDays.add(Number(x.date.slice(8, 10)));
+      if (!employeeNameById.has(x.employeeId)) employeeNameById.set(x.employeeId, getEmployeeLabel(x.employeeId, employeesById));
+    });
+
     records.employees.forEach(item => {
       if (item.employeeId > 0 && !employeeNameById.has(item.employeeId)) {
         employeeNameById.set(item.employeeId, getEmployeeLabel(item.employeeId, employeesById));
+      }
+
+      if (item.employeeId > 0) {
+        ensureEmployeePeriod(item.employeeId);
       }
     });
 
@@ -160,18 +196,35 @@ export function buildContainerStatistics({
 
       shopTotalMinutes.set(shopKey, (shopTotalMinutes.get(shopKey) ?? 0) + durationMinutes);
 
-      const workedDays = workedDaysByEmployee.get(slot.employeeId) ?? new Set<number>();
-      workedDays.add(slot.dayOfMonth);
-      workedDaysByEmployee.set(slot.employeeId, workedDays);
+      const period = ensureEmployeePeriod(slot.employeeId);
+      if (slot.dayOfMonth >= 1 && slot.dayOfMonth <= period.daysInMonth) {
+        period.workedDays.add(slot.dayOfMonth);
+      }
     });
 
-    workedDaysByEmployee.forEach((days, employeeId) => {
-      const workDays = days.size;
-      const freeDays = Math.max(0, daysInMonth - workDays);
+  });
 
-      employeeWorkDays.set(employeeId, (employeeWorkDays.get(employeeId) ?? 0) + workDays);
-      employeeFreeDays.set(employeeId, (employeeFreeDays.get(employeeId) ?? 0) + freeDays);
+  employeePeriods.forEach((periods, employeeId) => {
+    let workDays = 0;
+    let freeDays = 0;
+    let urlopDays = 0;
+    let holidayDays = 0;
+
+    periods.forEach(period => {
+      workDays += period.workedDays.size;
+      urlopDays += period.urlopDays.size;
+      freeDays += Math.max(0, period.daysInMonth - new Set([...period.workedDays, ...period.urlopDays]).size);
+      period.workedDays.forEach(dayOfMonth => {
+        if (getPolishPublicHoliday(period.year, period.month, dayOfMonth) !== null) {
+          holidayDays += 1;
+        }
+      });
     });
+
+    employeeWorkDays.set(employeeId, workDays);
+    employeeFreeDays.set(employeeId, freeDays);
+    employeeUrlopDays.set(employeeId, urlopDays);
+    employeeHolidayDays.set(employeeId, holidayDays);
   });
 
   const shopHeaders = [...shopKeyToName.entries()]
@@ -194,6 +247,8 @@ export function buildContainerStatistics({
       employee: employeeName,
       workDays: employeeWorkDays.get(employeeId) ?? 0,
       freeDays: employeeFreeDays.get(employeeId) ?? 0,
+      urlopDays: employeeUrlopDays.get(employeeId) ?? 0,
+      holidayDays: employeeHolidayDays.get(employeeId) ?? 0,
       hoursSum: formatHoursCell(employeeTotalMinutes.get(employeeId) ?? 0),
       hoursByShop,
     };
@@ -209,6 +264,8 @@ export function buildContainerStatistics({
       employee: "TOTAL",
       workDays: [...employeeWorkDays.values()].reduce((sum, value) => sum + value, 0),
       freeDays: [...employeeFreeDays.values()].reduce((sum, value) => sum + value, 0),
+      urlopDays: [...employeeUrlopDays.values()].reduce((sum, value) => sum + value, 0),
+      holidayDays: [...employeeHolidayDays.values()].reduce((sum, value) => sum + value, 0),
       hoursSum: formatHoursCell(totalMinutes),
       hoursByShop: totalHoursByShop,
       isTotal: true,
@@ -221,6 +278,7 @@ export function buildContainerStatistics({
     employee: employeeName,
     workDays: employeeWorkDays.get(employeeId) ?? 0,
     freeDays: employeeFreeDays.get(employeeId) ?? 0,
+    urlopDays: employeeUrlopDays.get(employeeId) ?? 0,
   }));
 
   return {
@@ -276,7 +334,7 @@ export function formatHoursMinutes(totalMinutes: number) {
   const hours = Math.floor(safeMinutes / 60);
   const minutes = safeMinutes % 60;
 
-  return `${hours}h ${minutes}m`;
+  return t("{0}h {1}m", hours, minutes);
 }
 
 export function formatHoursCell(totalMinutes: number) {
@@ -288,7 +346,7 @@ export function formatHoursCell(totalMinutes: number) {
   const hours = Math.floor(safeMinutes / 60);
   const minutes = safeMinutes % 60;
 
-  return minutes === 0 ? `${hours}` : `${hours}h ${minutes}m`;
+  return minutes === 0 ? `${hours}` : t("{0}h {1}m", hours, minutes);
 }
 
 export function buildPreviewList(items: string[], previewCount = 8) {
@@ -304,7 +362,7 @@ export function buildPreviewList(items: string[], previewCount = 8) {
   const remainingCount = sanitizedItems.length - visibleItems.length;
 
   return remainingCount > 0
-    ? `${visibleItems.join(", ")}, +${remainingCount} more`
+    ? t("{0}, +{1} more", visibleItems.join(", "), remainingCount)
     : visibleItems.join(", ");
 }
 
@@ -328,7 +386,7 @@ function formatGraphMonthYear(year: number, month: number) {
   const monthIndex = Math.min(Math.max(month - 1, 0), 11);
   const date = new Date(Date.UTC(year, monthIndex, 1));
 
-  return new Intl.DateTimeFormat("en-US", {
+  return dateTimeFormat("en-US", {
     month: "long",
     year: "numeric",
     timeZone: "UTC",
@@ -339,5 +397,5 @@ function getEmployeeLabel(employeeId: number, employeesById?: Map<number, Employ
   const employee = employeesById?.get(employeeId);
   const fullName = [employee?.firstName, employee?.lastName].filter(Boolean).join(" ").trim();
 
-  return fullName || `Employee ${employeeId}`;
+  return fullName || t("Employee {0}", employeeId);
 }

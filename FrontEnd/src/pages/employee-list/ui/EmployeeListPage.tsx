@@ -1,3 +1,4 @@
+import { t } from "@shared/i18n";
 import { useCallback, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useEmployeesQuery } from "@entities/employees/model/queries";
@@ -16,6 +17,7 @@ export function EmployeeListPage() {
   const [query, setQuery] = useState("");
   const employeesQuery = useEmployeesQuery(query, location.key);
   const employees = employeesQuery.data ?? [];
+  const onlineCount = employees.filter(employee => employee.isOnline).length;
 
   const handleAddEmployee = useCallback(() => {
     navigate("/employee/new");
@@ -31,18 +33,18 @@ export function EmployeeListPage() {
   return (
     <div className={styles.page}>
       <PageHeader
-        title="Employee List"
-        subtitle="Browse and search employee records"
+        title={t("Employee List")}
+        subtitle={t("Browse and search employee records")}
         backTo="/"
         rightSlot={
-          <IosButton label="Add New" icon={<PlusIcon size={18} />} onClick={handleAddEmployee} />
+          <IosButton label={t("Add New")} icon={<PlusIcon size={18} />} onClick={handleAddEmployee} />
         }
-        searchMeta={`Total: ${employees.length}`}
+        searchMeta={t("Total: {0} | Online: {1}", employees.length, onlineCount)}
         search={{
           value: query,
           onChange: setQuery,
-          placeholder: "Search employee",
-          ariaLabel: "Search employee",
+          placeholder: t("Search employee"),
+          ariaLabel: t("Search employee"),
         }}
       />
 

@@ -1,0 +1,12 @@
+{
+  "nowUtc": "2026-10-19T12:00:00+00:00",
+  "retentionDays": 5,
+  "limit": 80,
+  "ids": [
+    "availability-public:1:published:2026-10-19T12:00:00+00:00",
+    "open-shift:2",
+    "schedule-public:1:2026-10-19T11:00:00+00:00",
+    "swap-accepted:3",
+    "swap-public:1"
+  ]
+}
