@@ -272,6 +272,7 @@ function invalidateRealtimeQuery(queryClient: QueryClient, queryKey: readonly un
 
 function invalidateRealtimeBaselineQueries(queryClient: QueryClient) {
   invalidateRealtimeQuery(queryClient, queryKeys.home.dashboard());
+  invalidateRealtimeQuery(queryClient, queryKeys.home.activity());
   invalidateRealtimeQuery(queryClient, queryKeys.containers.all);
   invalidateRealtimeQuery(queryClient, queryKeys.employeeSchedules.all);
   invalidateRealtimeQuery(queryClient, queryKeys.shiftSwaps.all);

@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { useParams } from "react-router-dom";
+import { useLocation, useParams } from "react-router-dom";
 import { useAuth } from "@app/providers/AuthProvider";
 import { useEmployeesListQuery } from "@entities/employees";
 import { useShopByIdQuery } from "@entities/shops";
@@ -30,7 +30,11 @@ export function ManagerUrlopPage() {
   const shopId = Number.isSafeInteger(parsedShopId) && parsedShopId > 0 ? parsedShopId : 0;
   const shopQuery = useShopByIdQuery(shopId || null);
   const employees = useEmployeesListQuery();
-  const [period, setPeriod] = useState(warsawToday().slice(0, 7));
+  const location = useLocation();
+  const [period, setPeriod] = useState(() => {
+    const value = new URLSearchParams(location.search).get("period");
+    return value && /^(?!0000)\d{4}-(0[1-9]|1[0-2])$/.test(value) ? value : warsawToday().slice(0, 7);
+  });
   const [year, month] = period.split("-").map(Number);
   const query = useManagerUrlopMonthQuery(shopId, year, month);
   const data = !query.isError && query.data?.shopId === shopId && query.data.year === year && query.data.month === month ? query.data : undefined;
