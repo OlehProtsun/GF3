@@ -1,599 +1,137 @@
+import { useEffect, useRef, useState } from "react";
+import { NavLink as Link } from "react-router-dom";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { dateTimeFormat, t } from "@shared/i18n";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
-import { ArrowIcon, AvailabilityIcon, ContainerIcon, EyeIcon, ScheduleDetailsIcon } from "@shared/ui/icons";
+import { useLanguageRevision } from "@shared/i18n/useLanguageRevision";
+import { getErrorMessage } from "@shared/api/httpClient";
 import { queryKeys } from "@shared/api/queryKeys";
-import { usePageScrollbarHidden } from "@shared/lib/usePageScrollbarHidden";
-import { PageHeader } from "@shared/ui/PageHeader";
 import { ErrorBanner } from "@shared/ui/components/ErrorBanner";
+import { SearchableSelect } from "@shared/ui/components/SearchableSelect";
 import { CardSection } from "@shared/ui/sections/CardSection";
-import {
-  ContainerGraphMatrix,
-  ContainerGraphRelatedHintDialog,
-  getGraphCellKey,
-} from "@entities/containers";
-import { loadHomeDashboard, type HomeDashboardData } from "./homeDashboard";
+import { PageHeader } from "@shared/ui/PageHeader";
+import { CheckIcon, ChevronLeftIcon, ChevronRightIcon, ClockIcon, GroupIcon, NoteIcon, ScheduleDetailsIcon, ShopIcon, StatisticsIcon, SwapOffersIcon } from "@shared/ui/icons";
+import type { HomeActivityTab } from "../api/managerHomeActivityApi";
+import { formatHomeDate, getHomeActivityPresentation, getHomeActivityRoute, getWarsawShiftStatus, moveSelectedDay, parseHomeDay, setSelectedMonth, warsawToday } from "./homeActivity";
+import { loadHomeDashboard } from "./homeDashboard";
+import { useHomeActivityQuery } from "./useHomeActivityQuery";
 import styles from "./HomePage.module.css";
 
-const CURRENT_TIME_FORMATTER = dateTimeFormat("en-GB", {
-  hour: "2-digit",
-  minute: "2-digit",
-  day: "2-digit",
-  month: "2-digit",
-  year: "numeric",
-  hour12: false,
-});
-
-const EMPTY_HOME_DASHBOARD: HomeDashboardData = {
-  monthSchedulesCount: 0,
-  totalContainersCount: 0,
-  todayAssignmentsCount: 0,
-  activeShopsCount: 0,
-  get currentMonthContainerName() { return t("No active containers"); },
-  currentMonthLabel: "",
-  currentMonthScheduleNames: [],
-  currentMonthShopNames: [],
-  currentMonthEmployeeNames: [],
-  currentMonthTotalEmployees: 0,
-  currentMonthTotalSchedules: 0,
-  currentMonthTotalHoursText: "0h 00m",
-  currentMonthTotalShops: 0,
-  todayActiveEmployeesCount: 0,
-  get statusText() { return t("Loading home data..."); },
-  todayRows: [],
-  activeSchedules: [],
-};
-
-type ActiveScheduleSelectionState = {
-  graphId: number | null;
-  keys: string[];
-};
-
-type ActiveRelatedHintSelection = {
-  graphId: number;
-  cellKey: string;
-};
-
-const EMPTY_ACTIVE_SCHEDULE_SELECTION = {
-  graphId: null,
-  keys: [],
-} satisfies ActiveScheduleSelectionState;
-
-function arraysEqual(left: string[], right: string[]) {
-  return left.length === right.length && left.every((value, index) => value === right[index]);
-}
-
-function normalizeActiveScheduleSelection(
-  selection: ActiveScheduleSelectionState,
-  activeScheduleIds: number[],
-): ActiveScheduleSelectionState {
-  const activeScheduleIdSet = new Set(activeScheduleIds);
-
-  return selection.graphId !== null && !activeScheduleIdSet.has(selection.graphId)
-    ? EMPTY_ACTIVE_SCHEDULE_SELECTION
-    : selection;
-}
-
-function formatCurrentTimeText() {
-  return CURRENT_TIME_FORMATTER.format(new Date()).replace(",", "");
-}
-
-function formatGraphHintDateLabel(year: number, month: number, dayOfMonth: number) {
-  return dateTimeFormat("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    timeZone: "UTC",
-  }).format(new Date(Date.UTC(year, month - 1, dayOfMonth)));
-}
-
-function useCurrentTimeText() {
-  const [currentTimeText, setCurrentTimeText] = useState(formatCurrentTimeText);
-
-  useEffect(() => {
-    let timeoutId = 0;
-
-    const scheduleNextUpdate = () => {
-      const now = new Date();
-      const millisecondsUntilNextMinute =
-        (59 - now.getSeconds()) * 1_000 + (1_000 - now.getMilliseconds());
-
-      timeoutId = window.setTimeout(() => {
-        setCurrentTimeText(formatCurrentTimeText());
-        scheduleNextUpdate();
-      }, Math.max(1_000, millisecondsUntilNextMinute));
-    };
-
-    scheduleNextUpdate();
-
-    return () => {
-      window.clearTimeout(timeoutId);
-    };
-  }, []);
-
-  return currentTimeText;
-}
-
-function HomePillList({
-  title,
-  items,
-  emptyLabel,
-}: {
-  title: string;
-  items: string[];
-  emptyLabel: string;
-}) {
-  return (
-    <div className={styles.pillSection}>
-      <h3 className={styles.pillSectionTitle}>{title}</h3>
-      <div className={styles.pillWrap}>
-        {items.length > 0 ? (
-          items.map(item => (
-            <span key={item} className={styles.pill}>
-              {item}
-            </span>
-          ))
-        ) : (
-          <span className={styles.emptyInline}>{emptyLabel}</span>
-        )}
-      </div>
-    </div>
-  );
-}
+const shiftStatusOrder = { in_progress: 0, completed: 1, upcoming: 2 };
 
 function ManagerPcHomePage() {
-  const location = useLocation();
-  const navigate = useNavigate();
-  const currentTimeText = useCurrentTimeText();
-  const activeSchedulesSectionRef = useRef<HTMLElement | null>(null);
-  const scheduleCardRefs = useRef(new Map<number, HTMLDivElement>());
-  const scheduleScrollTimeoutRef = useRef(0);
-  const scheduleHighlightTimeoutRef = useRef(0);
-  const [isMonthDetailsExpanded, setIsMonthDetailsExpanded] = useState(false);
-  const [expandedScheduleIds, setExpandedScheduleIds] = useState<Set<number>>(() => new Set());
-  const [focusedScheduleId, setFocusedScheduleId] = useState<number | null>(null);
-  const [activeRelatedHintSelection, setActiveRelatedHintSelection] =
-    useState<ActiveRelatedHintSelection | null>(null);
-  const [activeScheduleSelection, setActiveScheduleSelection] = useState<ActiveScheduleSelectionState>(
-    EMPTY_ACTIVE_SCHEDULE_SELECTION,
-  );
-  usePageScrollbarHidden(true);
-  const homeQuery = useQuery({
-    queryKey: [...queryKeys.home.dashboard(), location.key],
-    staleTime: 60_000,
-    // Keep the dashboard bootstrap request alive through StrictMode remounts after sign-in.
-    queryFn: ({ signal }) => loadHomeDashboard(signal),
-  });
-
-  const homeData = homeQuery.data ?? EMPTY_HOME_DASHBOARD;
-  const isInitialLoading = homeQuery.isLoading && !homeQuery.data;
-  const activeScheduleIds = useMemo(
-    () => homeData.activeSchedules.map(schedule => schedule.graph.id),
-    [homeData.activeSchedules],
-  );
-  const normalizedActiveScheduleSelection = useMemo(
-    () => normalizeActiveScheduleSelection(activeScheduleSelection, activeScheduleIds),
-    [activeScheduleIds, activeScheduleSelection],
-  );
-  const activeRelatedHintSchedule = activeRelatedHintSelection
-    ? homeData.activeSchedules.find(schedule => schedule.graph.id === activeRelatedHintSelection.graphId) ?? null
-    : null;
-  const activeRelatedHint = activeRelatedHintSchedule && activeRelatedHintSelection
-    ? activeRelatedHintSchedule.visualHintDetailMap[activeRelatedHintSelection.cellKey] ?? null
-    : null;
-  const activeRelatedHintEmployeeName = activeRelatedHint
-    ? activeRelatedHintSchedule?.columns.find(column => column.employeeId === activeRelatedHint.employeeId)?.label
-      ?? t("Employee {0}", activeRelatedHint.employeeId)
-    : "";
-  const activeRelatedHintDayLabel = activeRelatedHint && activeRelatedHintSchedule
-    ? formatGraphHintDateLabel(
-      activeRelatedHintSchedule.graph.year,
-      activeRelatedHintSchedule.graph.month,
-      activeRelatedHint.dayOfMonth,
-    )
-    : "";
-  const allSchedulesExpanded =
-    activeScheduleIds.length > 0 && activeScheduleIds.every(graphId => expandedScheduleIds.has(graphId));
-  const hasExpandedSchedules = activeScheduleIds.some(graphId => expandedScheduleIds.has(graphId));
-
-  useEffect(() => () => {
-    window.clearTimeout(scheduleScrollTimeoutRef.current);
-    window.clearTimeout(scheduleHighlightTimeoutRef.current);
+  useLanguageRevision();
+  const queryClient = useQueryClient();
+  const [selectedDay, setSelectedDay] = useState(() => warsawToday());
+  const [tab, setTab] = useState<HomeActivityTab>("all");
+  const [now, setNow] = useState(() => new Date());
+  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const year = Number(selectedDay.slice(0, 4)), month = Number(selectedDay.slice(5, 7)), period = selectedDay.slice(0, 7);
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 30_000);
+    return () => window.clearInterval(timer);
   }, []);
-
-  const handleScheduleSelectionChange = useCallback((graphId: number, keys: string[]) => {
-    setActiveScheduleSelection(currentSelection => {
-      const nextSelection = normalizeActiveScheduleSelection(currentSelection, activeScheduleIds);
-      const currentKeys = nextSelection.graphId === graphId ? nextSelection.keys : [];
-
-      if (nextSelection.graphId === graphId && arraysEqual(currentKeys, keys)) {
-        return nextSelection;
-      }
-
-      if (keys.length === 0) {
-        return nextSelection.graphId === graphId
-          ? EMPTY_ACTIVE_SCHEDULE_SELECTION
-          : nextSelection;
-      }
-
-      return {
-        graphId,
-        keys,
-      };
-    });
-  }, [activeScheduleIds]);
-
-  const handleScheduleToggle = useCallback((graphId: number) => {
-    setExpandedScheduleIds(current => {
-      const next = new Set(current);
-
-      if (next.has(graphId)) {
-        next.delete(graphId);
-      } else {
-        next.add(graphId);
-      }
-
-      return next;
-    });
-  }, []);
-
-  const handleTodayEmployeeClick = useCallback((graphId: number) => {
-    if (!activeScheduleIds.includes(graphId)) {
-      return;
-    }
-
-    setExpandedScheduleIds(current => new Set(current).add(graphId));
-    setFocusedScheduleId(graphId);
-
-    const prefersReducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
-    const behavior: ScrollBehavior = prefersReducedMotion ? "auto" : "smooth";
-    activeSchedulesSectionRef.current?.scrollIntoView({ behavior, block: "start" });
-
-    window.clearTimeout(scheduleScrollTimeoutRef.current);
-    scheduleScrollTimeoutRef.current = window.setTimeout(() => {
-      scheduleCardRefs.current.get(graphId)?.scrollIntoView({ behavior, block: "start" });
-    }, prefersReducedMotion ? 0 : 220);
-
-    window.clearTimeout(scheduleHighlightTimeoutRef.current);
-    scheduleHighlightTimeoutRef.current = window.setTimeout(() => {
-      setFocusedScheduleId(current => current === graphId ? null : current);
-    }, prefersReducedMotion ? 400 : 1_600);
-  }, [activeScheduleIds]);
-
-  return (
-    <div className={styles.page}>
-      <PageHeader
-        title={t("Home")}
-        subtitle={t("Overview of current-month schedules and assignments.")}
-        rightSlot={(
-          <div className={styles.clockPanel}>
-            <span className={styles.clockLabel}>{t("Current time")}</span>
-            <strong className={styles.clockValue}>{currentTimeText}</strong>
-          </div>
-        )}
-      />
-
-      {homeQuery.error ? (
-        <ErrorBanner className={styles.banner}>
-          {t("Could not load the home dashboard.")}</ErrorBanner>
-      ) : null}
-
-      <div className={styles.topGrid}>
-        <CardSection
-          className={styles.todayCard}
-          title={t("Who Works Today?")}
-          icon={<AvailabilityIcon size={18} />}
-          headerRightSlot={
-            !isInitialLoading ? (
-              <span className={styles.sectionBadge}>
-                {t("{0} active employees", homeData.todayActiveEmployeesCount)}
-              </span>
-            ) : null
-          }
-        >
-          {isInitialLoading ? (
-            <div className={styles.stateBlock}>{t("Loading current-day assignments...")}</div>
-          ) : homeData.todayRows.length === 0 ? (
-            <div className={styles.stateBlock}>{t("No assignments for today in the current month.")}</div>
-          ) : (
-            <div className={styles.tableShell}>
-              <div className={styles.tableScroll}>
-                <table className={styles.todayTable}>
-                  <thead>
-                    <tr>
-                      <th>{t("Date")}</th>
-                      <th>{t("Employee")}</th>
-                      <th>{t("Shift")}</th>
-                      <th>{t("Shop")}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {homeData.todayRows.map(row => (
-                      <tr key={row.id}>
-                        <td>{row.dateLabel}</td>
-                        <td>
-                          <button
-                            type="button"
-                            className={styles.employeeFocusButton}
-                            onClick={() => handleTodayEmployeeClick(row.graphId)}
-                            aria-label={t("Show {0}'s schedule", row.employee)}
-                            title={t("Show schedule on this page")}
-                          >
-                            {row.employee}
-                          </button>
-                        </td>
-                        <td>{row.shift}</td>
-                        <td>{row.shop}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-        </CardSection>
-
-        <div className={styles.sideColumn}>
-          <CardSection
-            className={styles.monthCard}
-            title={t("This Month")}
-            icon={<ScheduleDetailsIcon size={18} />}
-            headerRightSlot={(
-              <button
-                type="button"
-                className={`${styles.matrixIconButton} ${styles.collapseButton}`}
-                aria-label={isMonthDetailsExpanded ? t("Collapse this month details") : t("Expand this month details")}
-                aria-expanded={isMonthDetailsExpanded}
-                aria-controls="home-month-details"
-                title={isMonthDetailsExpanded ? t("Collapse details") : t("Expand details")}
-                onClick={() => setIsMonthDetailsExpanded(current => !current)}
-              >
-                <ArrowIcon size={13} />
-              </button>
-            )}
-          >
-            <div className={styles.monthContent}>
-              <div className={styles.summaryHeader}>
-                <div className={styles.summaryCard}>
-                  <span className={styles.summaryLabel}>{t("Date")}</span>
-                  <strong className={styles.summaryValue}>
-                    {isInitialLoading ? t("Loading...") : homeData.currentMonthLabel || t("Current month")}
-                  </strong>
-                </div>
-                <div className={styles.summaryCard}>
-                  <span className={styles.summaryLabel}>{t("Container focus")}</span>
-                  <strong className={styles.summaryValue}>
-                    {isInitialLoading ? t("Loading...") : homeData.currentMonthContainerName}
-                  </strong>
-                </div>
-              </div>
-
-              <div
-                id="home-month-details"
-                className={[
-                  styles.collapsibleRegion,
-                  isMonthDetailsExpanded ? styles.collapsibleRegionExpanded : "",
-                ].filter(Boolean).join(" ")}
-                aria-hidden={!isMonthDetailsExpanded}
-                inert={isMonthDetailsExpanded ? undefined : true}
-              >
-                <div className={styles.collapsibleInner}>
-                  {isInitialLoading ? (
-                    <div className={styles.compactStateBlock}>{t("Loading month overview...")}</div>
-                  ) : (
-                    <div className={styles.monthDetails}>
-                      <div className={styles.totalGrid}>
-                        <div className={styles.totalCard}>
-                          <span className={styles.totalLabel}>{t("Total hours")}</span>
-                          <strong className={styles.totalValue}>{homeData.currentMonthTotalHoursText}</strong>
-                        </div>
-                        <div className={styles.totalCard}>
-                          <span className={styles.totalLabel}>{t("Employees")}</span>
-                          <strong className={styles.totalValue}>{homeData.currentMonthTotalEmployees}</strong>
-                        </div>
-                        <div className={styles.totalCard}>
-                          <span className={styles.totalLabel}>{t("Schedules")}</span>
-                          <strong className={styles.totalValue}>{homeData.currentMonthTotalSchedules}</strong>
-                        </div>
-                        <div className={styles.totalCard}>
-                          <span className={styles.totalLabel}>{t("Shops")}</span>
-                          <strong className={styles.totalValue}>{homeData.currentMonthTotalShops}</strong>
-                        </div>
-                      </div>
-
-                      <HomePillList
-                        title={t("Schedules in this month")}
-                        items={homeData.currentMonthScheduleNames}
-                        emptyLabel={t("No schedules yet.")}
-                      />
-                      <HomePillList
-                        title={t("Shops in this month")}
-                        items={homeData.currentMonthShopNames}
-                        emptyLabel={t("No shops connected yet.")}
-                      />
-                      <HomePillList
-                        title={t("Employees in this month")}
-                        items={homeData.currentMonthEmployeeNames}
-                        emptyLabel={t("No assigned employees yet.")}
-                      />
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </CardSection>
-        </div>
+  useEffect(() => {
+    const keys = [queryKeys.home.dashboard(selectedDay), [...queryKeys.home.activity(), year, month, tab]];
+    const refresh = () => {
+      if (document.visibilityState === "hidden") return;
+      setNow(new Date());
+      keys.forEach(queryKey => {
+        if (Date.now() - queryClient.getQueryState(queryKey).updatedAt >= 30_000) queryClient.invalidateQueries({ queryKey });
+      });
+    };
+    window.addEventListener("focus", refresh); document.addEventListener("visibilitychange", refresh);
+    return () => { window.removeEventListener("focus", refresh); document.removeEventListener("visibilitychange", refresh); };
+  }, [queryClient, selectedDay, year, month, tab]);
+  const home = useQuery({ queryKey: queryKeys.home.dashboard(selectedDay), staleTime: 30_000, queryFn: ({ signal }) => loadHomeDashboard(selectedDay, signal) });
+  const todayRows = (home.data?.todayRows ?? [])
+    .map(row => ({ row, status: getWarsawShiftStatus(selectedDay, row.fromTime, row.toTime, now) }))
+    .sort((left, right) => shiftStatusOrder[left.status] - shiftStatusOrder[right.status]);
+  const activity = useHomeActivityQuery(year, month, tab);
+  const counts = activity.data?.pages[0];
+  const items = activity.data?.pages.flatMap(page => page.items) ?? [];
+  const months = Array.from({ length: 25 }, (_, index) => {
+    const date = parseHomeDay(`${period}-01`); date.setUTCMonth(date.getUTCMonth() + index - 12); return date;
+  }).filter(date => date.getUTCFullYear() >= 1 && date.getUTCFullYear() <= 9999).map(date => ({ value: date.toISOString().slice(0, 7), label: dateTimeFormat("en-GB", { month: "long", year: "numeric", timeZone: "UTC" }).format(date) }));
+  function selectTab(next: HomeActivityTab) {
+    if (next === tab) return;
+    const key = [...queryKeys.home.activity(), year, month, next];
+    const cached = queryClient.getQueryState<NonNullable<typeof activity.data>>(key).data;
+    if (cached) queryClient.setQueryData(key, { ...cached, pages: cached.pages.slice(0, 1) });
+    setTab(next);
+  }
+  const dateLabel = formatHomeDate(selectedDay, true);
+  return <div className={styles.page}>
+    <PageHeader title={t("Home")} subtitle={t("Overview of today's schedules and recent application activity.")}
+      className={styles.pageHeader} maxWidth="min(1500px, calc(100% - 24px))" />
+    <div className={styles.dashboard}>
+    <CardSection className={styles.card} headerClassName={styles.cardHeader} titleClassName={styles.cardTitle}
+      icon={<span className={styles.headerIcon}><ScheduleDetailsIcon size={18} /></span>}
+      title={<><h2>{selectedDay === warsawToday(now) ? t("Who Works Today?") : t("Who Works on {0}?", dateLabel)}</h2><span className={styles.subtitle}>{t("Employees scheduled for {0}", dateLabel)}</span></>}
+      headerRightSlot={<span className={styles.employeeCount}><GroupIcon size={17} />{home.data ? t("{0} assigned employees", home.data.todayActiveEmployeesCount) : "—"}</span>}>
+      {home.isError && <ErrorBanner dismissible={false}>{getErrorMessage(home.error, t("Could not load scheduled employees."))}<button className={styles.retry} onClick={() => queryClient.invalidateQueries({ queryKey: queryKeys.home.dashboard(selectedDay) })}>{t("Retry")}</button></ErrorBanner>}
+      {home.data?.hasPartialData && <p role="status" className={styles.warning}>{t("Some schedules could not be loaded. Results may be incomplete.")}</p>}
+      <div className={styles.tableScroll} tabIndex={0} role="region" aria-label={t("Scheduled employees")} aria-busy={home.isLoading}>
+        <table className={styles.table}><thead><tr>{[t("Employee"), t("Shift"), t("Shop"), t("Hours"), t("Status")].map(label => <th key={label} scope="col">{label}</th>)}</tr></thead>
+          <tbody>{todayRows.map(({ row, status }) => {
+            const label = status === "upcoming" ? t("Upcoming") : status === "in_progress" ? t("In Progress") : t("Completed");
+            const to = `/container/${row.containerId}/graphs/${row.graphId}`;
+            const initials = row.employee.split(/\s+/).filter(Boolean).slice(0, 2).map(part => Array.from(part)[0]).join("").toUpperCase();
+            return <tr key={row.id}>
+              <td><Link to={to} className={styles.employeeLink} aria-label={t("Open schedule for {0}: {1}, {2}, {3}", row.employee, row.shift, row.shop, row.dateLabel)}><span className={styles.initials} aria-hidden="true">{initials}</span><strong title={row.employee}>{row.employee}</strong></Link></td>
+              <td><Link to={to} tabIndex={-1}><ClockIcon size={15} />{row.shift}</Link></td>
+              <td><Link to={to} tabIndex={-1}><ShopIcon size={15} className={styles.shopIcon} /><span title={row.shop}>{row.shop}</span></Link></td>
+              <td><Link to={to} tabIndex={-1}>{row.hoursText}</Link></td>
+              <td><Link to={to} tabIndex={-1}><span className={`${styles.status} ${styles[status]}`}>{status === "completed" && <CheckIcon size={12} />}{label}</span></Link></td>
+            </tr>;
+          })}</tbody>
+        </table>
+        {home.isLoading && <p role="status" className={styles.empty}>{t("Loading scheduled employees...")}</p>}
+        {!home.isLoading && !home.isError && !home.data?.todayRows.length && <p className={styles.empty}>{t("No employees scheduled for this date.")}</p>}
       </div>
-
-      <CardSection
-        elementRef={activeSchedulesSectionRef}
-        className={styles.activeSchedulesCard}
-        headerClassName={styles.activeSchedulesHeader}
-        headerRightClassName={styles.activeSchedulesHeaderRight}
-        title={t("Active Schedules This Month")}
-        icon={<ScheduleDetailsIcon size={18} />}
-        headerRightSlot={
-          !isInitialLoading ? (
-            <div className={styles.schedulesHeaderActions}>
-              <span className={styles.sectionBadge}>{t("{0} previews", homeData.activeSchedules.length)}</span>
-              {homeData.activeSchedules.length > 0 ? (
-                <div className={styles.bulkControls} role="group" aria-label={t("Schedule preview controls")}>
-                  <button
-                    type="button"
-                    className={styles.bulkButton}
-                    onClick={() => setExpandedScheduleIds(new Set(activeScheduleIds))}
-                    disabled={allSchedulesExpanded}
-                  >
-                    {t("Expand all")}</button>
-                  <button
-                    type="button"
-                    className={styles.bulkButton}
-                    onClick={() => setExpandedScheduleIds(new Set())}
-                    disabled={!hasExpandedSchedules}
-                  >
-                    {t("Collapse all")}</button>
-                </div>
-              ) : null}
-            </div>
-          ) : null
-        }
-      >
-        {isInitialLoading ? (
-          <div className={styles.stateBlock}>{t("Building active schedule previews...")}</div>
-        ) : homeData.activeSchedules.length === 0 ? (
-          <div className={styles.stateBlock}>{t("No active schedules found for the current month.")}</div>
-        ) : (
-          <div className={styles.scheduleGrid}>
-            {homeData.activeSchedules.map(schedule => {
-              const isExpanded = expandedScheduleIds.has(schedule.graph.id);
-              const contentId = `home-schedule-${schedule.graph.id}-content`;
-
-              return (
-                <div
-                  key={schedule.graph.id}
-                  ref={element => {
-                    if (element) {
-                      scheduleCardRefs.current.set(schedule.graph.id, element);
-                    } else {
-                      scheduleCardRefs.current.delete(schedule.graph.id);
-                    }
-                  }}
-                  className={[
-                    styles.scheduleCard,
-                    focusedScheduleId === schedule.graph.id ? styles.scheduleCardFocused : "",
-                  ].filter(Boolean).join(" ")}
-                >
-                  <div className={styles.scheduleCardHeader}>
-                    <div className={styles.scheduleIdentity}>
-                      <strong className={styles.scheduleTitle}>{schedule.graph.name}</strong>
-                      <span className={styles.scheduleMeta}>
-                        {[schedule.monthLabel, schedule.shop?.name, schedule.container?.name].filter(Boolean).join(" / ")}
-                      </span>
-                    </div>
-
-                    <div className={styles.matrixHeaderActions}>
-                      <span className={styles.matrixBadge}>{t("Employees: {0}", schedule.totals.totalEmployees)}</span>
-                      <span className={styles.matrixBadge}>{t("Hours: {0}", schedule.totals.totalHoursText)}</span>
-                      <button
-                        type="button"
-                        className={styles.matrixIconButton}
-                        onClick={() => navigate(schedule.route)}
-                        aria-label={t("Open schedule")}
-                        title={t("Open schedule")}
-                      >
-                        <EyeIcon size={16} />
-                      </button>
-                      <button
-                        type="button"
-                        className={styles.matrixIconButton}
-                        onClick={() => {
-                          if (!schedule.container) {
-                            return;
-                          }
-
-                          navigate(`/container?openContainerId=${schedule.container.id}`);
-                        }}
-                        aria-label={t("Open container")}
-                        title={t("Open container")}
-                        disabled={!schedule.container}
-                      >
-                        <ContainerIcon size={16} />
-                      </button>
-                      <button
-                        type="button"
-                        className={`${styles.matrixIconButton} ${styles.collapseButton}`}
-                        onClick={() => handleScheduleToggle(schedule.graph.id)}
-                        aria-label={isExpanded ? t("Collapse {0}", schedule.graph.name) : t("Expand {0}", schedule.graph.name)}
-                        aria-expanded={isExpanded}
-                        aria-controls={contentId}
-                        title={isExpanded ? t("Collapse schedule") : t("Expand schedule")}
-                      >
-                        <ArrowIcon size={13} />
-                      </button>
-                    </div>
-                  </div>
-
-                  <div
-                    id={contentId}
-                    className={[
-                      styles.collapsibleRegion,
-                      styles.scheduleBody,
-                      isExpanded ? styles.collapsibleRegionExpanded : "",
-                    ].filter(Boolean).join(" ")}
-                    aria-hidden={!isExpanded}
-                    inert={isExpanded ? undefined : true}
-                  >
-                    <div className={styles.collapsibleInner}>
-                      <ContainerGraphMatrix
-                        className={styles.scheduleMatrix}
-                        graph={schedule.graph}
-                        columns={schedule.columns}
-                        cellMap={schedule.cellMap}
-                        visualHintMap={schedule.visualHintMap}
-                        visualHintDetailMap={schedule.visualHintDetailMap}
-                        styleMap={schedule.styleMap}
-                        dayConflictMap={schedule.dayConflictMap}
-                        title={null}
-                        icon={null}
-                        readOnly
-                        enableSelectionWhenReadOnly
-                        compactSize
-                        selectedCellKeys={
-                          normalizedActiveScheduleSelection.graphId === schedule.graph.id
-                            ? normalizedActiveScheduleSelection.keys
-                            : []
-                        }
-                        onSelectedCellKeysChange={(keys) => handleScheduleSelectionChange(schedule.graph.id, keys)}
-                        onVisualHintClick={detail => setActiveRelatedHintSelection({
-                          graphId: schedule.graph.id,
-                          cellKey: getGraphCellKey(detail.employeeId, detail.dayOfMonth),
-                        })}
-                      />
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </CardSection>
-
-      <ContainerGraphRelatedHintDialog
-        open={activeRelatedHint !== null}
-        graphName={activeRelatedHintSchedule?.graph.name ?? ""}
-        employeeName={activeRelatedHintEmployeeName}
-        year={activeRelatedHintSchedule?.graph.year ?? new Date().getFullYear()}
-        month={activeRelatedHintSchedule?.graph.month ?? 1}
-        dayLabel={activeRelatedHintDayLabel}
-        currentCellMap={activeRelatedHintSchedule?.cellMap ?? {}}
-        detail={activeRelatedHint}
-        onCancel={() => setActiveRelatedHintSelection(null)}
-      />
+    </CardSection>
+    <CardSection className={styles.card} headerClassName={styles.cardHeader} titleClassName={styles.cardTitle} headerRightClassName={styles.activityControls}
+      icon={<span className={styles.headerIcon}><StatisticsIcon size={18} /></span>}
+      title={<><h2>{t("Application Activity")}</h2><span className={styles.subtitle}>{t("Recent actions in the system")}</span></>}
+      headerRightSlot={<>
+        <SearchableSelect value={period} options={months} onChange={value => setSelectedDay(day => setSelectedMonth(day, value))} size="compact" searchEnabled={false} showSelectedHint={false} ariaLabel={t("Activity month")} placeholder={t("Select month")} dropdownTitle={t("Select month")} leadingIcon={<ScheduleDetailsIcon size={16} />} className={styles.monthSelect} />
+        <div className={styles.dayControls}>
+          <button type="button" className={styles.iconButton} aria-label={t("Previous day")} disabled={selectedDay === "0001-01-01"} onClick={() => setSelectedDay(day => moveSelectedDay(day, -1))}><ChevronLeftIcon size={16} /></button>
+          <button type="button" className={styles.todayButton} onClick={() => setSelectedDay(warsawToday())}>{t("Today")}</button>
+          <button type="button" className={styles.iconButton} aria-label={t("Next day")} disabled={selectedDay === "9999-12-31"} onClick={() => setSelectedDay(day => moveSelectedDay(day, 1))}><ChevronRightIcon size={16} /></button>
+        </div>
+      </>}>
+      <div role="tablist" aria-label={t("Activity filters")} className={styles.tabs}>
+        {(["all", "approvals"] as const).map((value, index) => <button key={value} ref={element => { tabRefs.current[index] = element; }} type="button" role="tab" id={`home-tab-${value}`} aria-selected={tab === value} aria-controls="home-activity-panel" tabIndex={tab === value ? 0 : -1} onClick={() => selectTab(value)} onKeyDown={event => {
+          if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+          event.preventDefault(); const next = event.key === "Home" ? 0 : event.key === "End" ? 1 : 1 - index;
+          selectTab(next === 0 ? "all" : "approvals"); tabRefs.current[next]?.focus();
+        }}>{value === "all" ? t("All Activity") : t("Requires Approval")}<span className={value === "all" ? styles.allCount : styles.approvalCount}>{counts ? value === "all" ? counts.allActivityCount : counts.requiresApprovalCount : "—"}</span></button>)}
+      </div>
+      <p className={styles.scope}>{tab === "all" ? t("Events recorded in {0}", months.find(option => option.value === period)?.label) : t("All outstanding approvals, including earlier months")}</p>
+      {activity.isError && <ErrorBanner dismissible={false}>{getErrorMessage(activity.error, t("Could not load application activity."))}<button className={styles.retry} onClick={activity.refetch}>{t("Retry")}</button></ErrorBanner>}
+      <div id="home-activity-panel" role="tabpanel" aria-labelledby={`home-tab-${tab}`} className={styles.feed} aria-busy={activity.isFetching}>
+        {activity.isLoading && <p role="status" className={styles.empty}>{t("Loading activity...")}</p>}
+        {!activity.isLoading && !activity.isError && !items.length && <p className={styles.empty}>{tab === "all" ? t("No activity recorded in this month.") : t("No outstanding approvals.")}</p>}
+        {items.map(item => {
+          const view = getHomeActivityPresentation(item);
+          const route = getHomeActivityRoute(item);
+          const Icon = view.iconKind === "swap" ? SwapOffersIcon : view.iconKind === "correction" ? NoteIcon : ScheduleDetailsIcon;
+          const content = <>
+            <span className={`${styles.eventIcon} ${styles[view.tone]}`}><Icon size={18} /></span>
+            <span className={styles.eventText}><strong>{view.title}</strong><span>{view.description}</span>{!route && <span>{t("This activity's resource is no longer available.")}</span>}</span>
+            <span className={`${styles.status} ${styles[view.tone]}`}>{view.localizedStatus}</span>
+            <time dateTime={item.occurredAtUtc} title={view.dateTimeLabel} aria-label={view.dateTimeLabel}>{view.time}</time>
+          </>;
+          return route ? <Link key={item.id} to={route} className={styles.event}>{content}</Link>
+            : <div key={item.id} className={`${styles.event} ${styles.unavailableEvent}`} aria-disabled="true">{content}</div>;
+        })}
+      </div>
+      {Boolean(activity.nextPageError) && <ErrorBanner dismissible={false}>{t("Could not load more activity.")}<button className={styles.retry} onClick={() => void activity.fetchNextPage()}>{t("Retry")}</button></ErrorBanner>}
+      <div className={styles.feedFooter}>{activity.hasNextPage && <button type="button" className={styles.moreButton} disabled={activity.isFetchingNextPage || activity.isFetching} onClick={() => void activity.fetchNextPage()}>{activity.isFetchingNextPage ? t("Loading...") : t("Show more")}<ChevronRightIcon size={14} className={styles.downArrow} /></button>}</div>
+    </CardSection>
     </div>
-  );
+  </div>;
 }
-
 export function HomePage({ phoneMode = false }: { phoneMode?: boolean }) {
   if (phoneMode) {
     return <div className={`${styles.placeholder} ${styles.placeholderPhone}`}>

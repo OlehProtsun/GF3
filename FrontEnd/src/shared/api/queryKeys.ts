@@ -15,7 +15,8 @@ export const queryKeys = {
     current: () => ["publicHolidaySettings", "current"] as const,
   },
   home: {
-    dashboard: () => ["home", "dashboard"] as const,
+    dashboard: (date?: string) => date ? ["home", "dashboard", date] as const : ["home", "dashboard"] as const,
+    activity: () => ["home", "activity"] as const,
   },
   employeeUiState: {
     availabilityTimePresets: (employeeId: number) => ["employeeUiState", "availabilityTimePresets", employeeId] as const,

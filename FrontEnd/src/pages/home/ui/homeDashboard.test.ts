@@ -1,293 +1,56 @@
-import { beforeEach as beforeEnglishTest } from "vitest";
-import { setLanguage as setTestLanguage } from "@shared/i18n";
-import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import type { Container, Graph, GraphCellStyle, GraphEmployee, GraphSlot } from "@entities/containers";
-import type { Employee } from "@entities/employees/model/types";
-import type { Shop } from "@entities/shops/model/types";
-
-const mocks = vi.hoisted(() => ({
-  containersApi: {
-    list: vi.fn(),
-    listGraphs: vi.fn(),
-    listGraphEmployees: vi.fn(),
-    listGraphSlots: vi.fn(),
-    listGraphCellStyles: vi.fn(),
-  },
-  employeesApi: {
-    list: vi.fn(),
-  },
-  shopsApi: {
-    list: vi.fn(),
-  },
-}));
-
-vi.mock("@entities/containers", async importOriginal => {
-  const actual = await importOriginal<typeof import("@entities/containers")>();
-  return {
-    ...actual,
-    containersApi: mocks.containersApi,
-  };
-});
-
-vi.mock("@entities/employees/api/employeesApi", () => ({
-  employeesApi: mocks.employeesApi,
-}));
-
-vi.mock("@entities/shops/api/shopsApi", () => ({
-  shopsApi: mocks.shopsApi,
-}));
-
+import { beforeEach, expect, test, vi } from "vitest";
+import { setLanguage } from "@shared/i18n";
+import { containersApi } from "@entities/containers";
+import { employeesApi } from "@entities/employees/api/employeesApi";
+import { shopsApi } from "@entities/shops/api/shopsApi";
 import { loadHomeDashboard } from "./homeDashboard";
-
-beforeEnglishTest(() => setTestLanguage("en"));
-
-const currentDate = new Date("2026-05-10T12:00:00");
-
-const containers: Container[] = [
-  { id: 1, name: "Alpha Container" },
-  { id: 2, name: "Beta Container" },
-];
-
-const employees: Employee[] = [
-  { id: 1, firstName: "Ada", lastName: "Lovelace", hasLoginAccount: true, isOnline: false },
-  { id: 2, firstName: "Grace", lastName: "Hopper", hasLoginAccount: true, isOnline: true },
-  { id: 3, firstName: "Linus", lastName: "Torvalds", hasLoginAccount: false, isOnline: false },
-];
-
-const shops: Shop[] = [
-  { id: 1, name: "North Shop", address: "North Street" },
-  { id: 2, name: "Central Shop", address: "Main Street" },
-];
-
-const graphEmployeesByKey = new Map<string, GraphEmployee[]>();
-const graphSlotsByKey = new Map<string, GraphSlot[]>();
-const graphCellStylesByKey = new Map<string, GraphCellStyle[]>();
-
-function detailKey(containerId: number, graphId: number) {
-  return `${containerId}:${graphId}`;
-}
-
-const centralGraph: Graph = {
-  id: 10,
-  containerId: 1,
-  shopId: 2,
-  name: "Beta graph",
-  year: 2026,
-  month: 5,
-  publicationStatus: "public",
-  peoplePerShift: 1,
-  shift1Time: "08:00 - 12:00",
-  shift2Time: "",
-  maxHoursPerEmpMonth: 160,
-  maxConsecutiveDays: 5,
-  maxConsecutiveFull: 3,
-  maxFullPerMonth: 10,
-  note: null,
-  availabilityGroupId: null,
-};
-
-const northGraph: Graph = {
-  ...centralGraph,
-  id: 20,
-  containerId: 2,
-  shopId: 1,
-  name: "Alpha graph",
-};
-
-function mockBaseLists() {
-  mocks.containersApi.list.mockResolvedValue(containers);
-  mocks.employeesApi.list.mockResolvedValue(employees);
-  mocks.shopsApi.list.mockResolvedValue(shops);
-}
-
-function mockGraphDetails(params: {
-  containerId: number;
-  graphId: number;
-  graphEmployees?: GraphEmployee[];
-  slots?: GraphSlot[];
-  cellStyles?: GraphCellStyle[];
-}) {
-  const {
-    containerId,
-    graphId,
-    graphEmployees = [],
-    slots = [],
-    cellStyles = [],
-  } = params;
-  const key = detailKey(containerId, graphId);
-
-  graphEmployeesByKey.set(key, graphEmployees);
-  graphSlotsByKey.set(key, slots);
-  graphCellStylesByKey.set(key, cellStyles);
-}
-
+vi.mock("@entities/containers", async importOriginal => ({ ...await importOriginal<typeof import("@entities/containers")>(), containersApi: { list: vi.fn(), listGraphs: vi.fn(), listGraphSlots: vi.fn(), listGraphEmployees: vi.fn(), listGraphCellStyles: vi.fn() } }));
+vi.mock("@entities/employees/api/employeesApi", () => ({ employeesApi: { list: vi.fn() } }));
+vi.mock("@entities/shops/api/shopsApi", () => ({ shopsApi: { list: vi.fn() } }));
+const slot = { id: 1, scheduleId: 10, dayOfMonth: 4, slotNo: 1, fromTime: "08:00", toTime: "16:00", employeeId: 1, status: "Working" };
 beforeEach(() => {
-  vi.useFakeTimers();
-  vi.setSystemTime(currentDate);
-  vi.clearAllMocks();
-  graphEmployeesByKey.clear();
-  graphSlotsByKey.clear();
-  graphCellStylesByKey.clear();
-  mockBaseLists();
-  mocks.containersApi.listGraphEmployees.mockImplementation((containerId: number, graphId: number) =>
-    Promise.resolve(graphEmployeesByKey.get(detailKey(containerId, graphId)) ?? []),
-  );
-  mocks.containersApi.listGraphSlots.mockImplementation((containerId: number, graphId: number) =>
-    Promise.resolve(graphSlotsByKey.get(detailKey(containerId, graphId)) ?? []),
-  );
-  mocks.containersApi.listGraphCellStyles.mockImplementation((containerId: number, graphId: number) =>
-    Promise.resolve(graphCellStylesByKey.get(detailKey(containerId, graphId)) ?? []),
-  );
+ vi.resetAllMocks(); setLanguage("en");
+ vi.mocked(containersApi.list).mockResolvedValue([{ id: 8, name: "A" }, { id: 9, name: "B" }]);
+ vi.mocked(employeesApi.list).mockResolvedValue([{ id: 1, firstName: "Actual", lastName: "Person", hasLoginAccount: false, isOnline: false }]);
+ vi.mocked(shopsApi.list).mockResolvedValue([{ id: 2, name: "Shop", address: "Street" }]);
+ vi.mocked(containersApi.listGraphs).mockImplementation(async containerId => [{ id: containerId + 2, containerId, shopId: 2, year: 2026, month: 11 } as never]);
+ vi.mocked(containersApi.listGraphSlots).mockImplementation(async (_, graphId) => [{ ...slot, scheduleId: graphId }]);
 });
-
-afterEach(() => {
-  vi.useRealTimers();
+test("selected date returns genuine shifts, owning containers, duration and distinct count without previews", async () => {
+ const data = await loadHomeDashboard("2026-11-04");
+ expect(data.todayRows).toHaveLength(2); expect(data.todayActiveEmployeesCount).toBe(1); expect(data.hasPartialData).toBe(false);
+ expect(data.todayRows.map(row => [row.containerId, row.graphId])).toEqual([[8, 10], [9, 11]]);
+ expect(data.todayRows[0]).toMatchObject({ employee: "Actual Person", shop: "Shop", hoursText: "8h 0m" });
+ expect(containersApi.listGraphEmployees).not.toHaveBeenCalled(); expect(containersApi.listGraphCellStyles).not.toHaveBeenCalled();
 });
-
-describe("home dashboard loader", () => {
-  test("aggregates current month schedules, today rows, totals, and previews", async () => {
-    mocks.containersApi.listGraphs.mockImplementation((containerId: number) => {
-      if (containerId === 1) {
-        return Promise.resolve([
-          centralGraph,
-          { ...centralGraph, id: 99, year: 2026, month: 4, name: "Old graph" },
-        ]);
-      }
-
-      return Promise.resolve([northGraph]);
-    });
-
-    mockGraphDetails({
-      containerId: 1,
-      graphId: 10,
-      graphEmployees: [
-        { id: 1, scheduleId: 10, employeeId: 1, minHoursMonth: 80, displayOrder: 2 },
-        { id: 2, scheduleId: 10, employeeId: 2, minHoursMonth: 80, displayOrder: 1 },
-      ],
-      slots: [
-        { id: 1, scheduleId: 10, dayOfMonth: 10, slotNo: 1, fromTime: "08:00", toTime: "12:00", employeeId: 1, status: "Working" },
-        { id: 2, scheduleId: 10, dayOfMonth: 11, slotNo: 1, fromTime: "22:00", toTime: "02:00", employeeId: 2, status: "Working" },
-      ],
-      cellStyles: [
-        { id: 1, scheduleId: 10, dayOfMonth: 10, employeeId: 1, backgroundColorArgb: -65536, textColorArgb: null },
-      ],
-    });
-    mockGraphDetails({
-      containerId: 2,
-      graphId: 20,
-      graphEmployees: [
-        { id: 3, scheduleId: 20, employeeId: 2, minHoursMonth: 60, displayOrder: 1 },
-      ],
-      slots: [
-        { id: 3, scheduleId: 20, dayOfMonth: 10, slotNo: 1, fromTime: "10:00", toTime: "13:30", employeeId: 2, status: "Working" },
-      ],
-    });
-
-    const dashboard = await loadHomeDashboard();
-
-    expect(dashboard.statusText).toBe("Home data is up to date.");
-    expect(dashboard.monthSchedulesCount).toBe(2);
-    expect(dashboard.totalContainersCount).toBe(2);
-    expect(dashboard.activeShopsCount).toBe(2);
-    expect(dashboard.currentMonthContainerName).toBe("2 active containers");
-    expect(dashboard.currentMonthLabel).toBe("May 2026");
-    expect(dashboard.currentMonthScheduleNames).toEqual(["Alpha graph", "Beta graph"]);
-    expect(dashboard.currentMonthShopNames).toEqual(["Central Shop", "North Shop"]);
-    expect(dashboard.currentMonthEmployeeNames).toEqual(["Ada Lovelace", "Grace Hopper"]);
-    expect(dashboard.currentMonthTotalEmployees).toBe(2);
-    expect(dashboard.currentMonthTotalSchedules).toBe(2);
-    expect(dashboard.currentMonthTotalHoursText).toBe("11h 30m");
-    expect(dashboard.todayAssignmentsCount).toBe(2);
-    expect(dashboard.todayActiveEmployeesCount).toBe(2);
-    expect(dashboard.todayRows).toEqual([
-      {
-        id: "10:1",
-        employeeId: 1,
-        graphId: 10,
-        dateLabel: "10.05.2026",
-        employee: "Ada Lovelace",
-        shift: "08:00 - 12:00",
-        shop: "Central Shop",
-      },
-      {
-        id: "20:3",
-        employeeId: 2,
-        graphId: 20,
-        dateLabel: "10.05.2026",
-        employee: "Grace Hopper",
-        shift: "10:00 - 13:30",
-        shop: "North Shop",
-      },
-    ]);
-
-    expect(dashboard.activeSchedules.map(schedule => schedule.shop?.name)).toEqual(["Central Shop", "North Shop"]);
-    expect(dashboard.activeSchedules[0]).toMatchObject({
-      monthLabel: "May 2026",
-      route: "/container/1/graphs/10",
-      totals: {
-        totalEmployees: 2,
-        totalHoursText: "8h 0m",
-      },
-      cellMap: {
-        "1:10": "08:00 - 12:00",
-        "2:11": "22:00 - 02:00",
-      },
-      visualHintMap: {
-        "2:10": "Alpha graph",
-      },
-      styleMap: {
-        "1:10": {
-          backgroundColor: "rgba(255, 0, 0, 1)",
-        },
-      },
-    });
-    expect(dashboard.activeSchedules[0].visualHintDetailMap["2:10"]).toMatchObject({
-      employeeId: 2,
-      dayOfMonth: 10,
-      visualHint: "Alpha graph",
-      relatedGraphs: [
-        {
-          graphId: 20,
-          graphName: "Alpha graph",
-          intervalsText: "10:00 - 13:30",
-        },
-      ],
-    });
-    expect(dashboard.activeSchedules[1].visualHintMap).toEqual({
-      "2:11": "Beta graph",
-    });
-  });
-
-  test("keeps partial dashboard data when one graph list or detail request fails", async () => {
-    mocks.containersApi.listGraphs.mockImplementation((containerId: number) => {
-      if (containerId === 1) {
-        return Promise.resolve([centralGraph]);
-      }
-
-      return Promise.reject(new Error("Graph list failed"));
-    });
-    mocks.containersApi.listGraphEmployees.mockResolvedValue([
-      { id: 1, scheduleId: 10, employeeId: 1, minHoursMonth: 80, displayOrder: 1 },
-    ]);
-    mocks.containersApi.listGraphSlots.mockRejectedValue(new Error("Slots failed"));
-    mocks.containersApi.listGraphCellStyles.mockResolvedValue([]);
-
-    const dashboard = await loadHomeDashboard();
-
-    expect(dashboard.statusText).toBe("Home data loaded with a few missing schedule previews.");
-    expect(dashboard.monthSchedulesCount).toBe(1);
-    expect(dashboard.activeSchedules).toEqual([]);
-    expect(dashboard.todayRows).toEqual([]);
-  });
-
-  test("throws an AbortError after base data loads when the supplied signal is canceled", async () => {
-    const controller = new AbortController();
-    controller.abort();
-    mocks.containersApi.listGraphs.mockResolvedValue([]);
-
-    await expect(loadHomeDashboard(controller.signal)).rejects.toMatchObject({
-      name: "AbortError",
-      message: "Request was canceled.",
-    });
-  });
+test.each(["2026-11-03", "2026-11-05", "2027-01-01", "2025-12-31"])("loads selected historical/future day %s", async date => {
+ expect((await loadHomeDashboard(date)).todayRows).toEqual([]);
+ if (!date.startsWith("2026-11")) expect(containersApi.listGraphSlots).not.toHaveBeenCalled();
+});
+test("duplicate employee shifts retained, duplicate records removed, overnight hours correct", async () => {
+ vi.mocked(containersApi.listGraphSlots).mockResolvedValue([slot, slot, { ...slot, id: 2, fromTime: "22:00", toTime: "02:00" }, { ...slot, id: 3, employeeId: -1 }]);
+ const data = await loadHomeDashboard("2026-11-04"); expect(data.todayRows).toHaveLength(4); expect(data.todayActiveEmployeesCount).toBe(1);
+ expect(data.todayRows[2].hoursText).toBe("4h 0m");
+});
+test("partial graph reads and missing names keep usable data with explicit warning", async () => {
+ vi.mocked(containersApi.listGraphs).mockRejectedValueOnce(new Error("offline"));
+ vi.mocked(employeesApi.list).mockRejectedValue(new Error("offline")); vi.mocked(shopsApi.list).mockRejectedValue(new Error("offline"));
+ const data = await loadHomeDashboard("2026-11-04"); expect(data.hasPartialData).toBe(true); expect(data.todayRows).toHaveLength(1);
+ expect(data.todayRows[0]).toMatchObject({ employee: "Employee 1", shop: "Shop 2" });
+});
+test("partial slot failures and an empty successful response remain distinguishable", async () => {
+ vi.mocked(containersApi.listGraphSlots).mockRejectedValueOnce(new Error("offline"));
+ expect((await loadHomeDashboard("2026-11-04")).hasPartialData).toBe(true);
+ vi.mocked(containersApi.listGraphSlots).mockResolvedValue([]);
+ expect(await loadHomeDashboard("2026-11-04")).toMatchObject({ todayRows: [], hasPartialData: false, todayActiveEmployeesCount: 0 });
+});
+test("aborts before starting and after an awaited source", async () => {
+ const controller = new AbortController(); controller.abort();
+ await expect(loadHomeDashboard("2026-11-04", controller.signal)).rejects.toMatchObject({ name: "AbortError" }); expect(containersApi.list).not.toHaveBeenCalled();
+ const second = new AbortController(); vi.mocked(containersApi.list).mockImplementation(async () => { second.abort(); return []; });
+ await expect(loadHomeDashboard("2026-11-04", second.signal)).rejects.toMatchObject({ name: "AbortError" });
+});
+test("invalid input and missing container list are visible failures", async () => {
+ await expect(loadHomeDashboard("2026-02-30")).rejects.toThrow();
+ vi.mocked(containersApi.list).mockRejectedValue(new Error("offline")); await expect(loadHomeDashboard("2026-11-04")).rejects.toThrow("offline");
 });

@@ -1,418 +1,49 @@
 import { t } from "@shared/i18n";
-import {
-  buildGraphCellMap,
-  buildGraphConflictDayMap,
-  buildGraphMatrixColumns,
-  buildGraphRelatedScheduleHintData,
-  buildGraphStyleMap,
-  buildGraphTotals,
-  containersApi,
-  formatHoursMinutes,
-  formatGraphMonthYear,
-  getGraphCellKey,
-  getSlotDurationMinutes,
-  parseGraphNoteContent,
-  rehydrateGraphNoteCellStyles,
-  rehydrateGraphNoteTextCells,
-  type Container,
-  type Graph,
-  type GraphCellStyle,
-  type GraphEmployee,
-  type GraphMatrixCellMap,
-  type GraphMatrixColumn,
-  type GraphMatrixStyleMap,
-  type GraphRelatedScheduleHintDetailMap,
-  type GraphSlot,
-  type GraphTotals,
-} from "@entities/containers";
+import { containersApi, formatHoursMinutes, getSlotDurationMinutes } from "@entities/containers";
 import { employeesApi } from "@entities/employees/api/employeesApi";
 import { getEmployeeFullName } from "@entities/employees/model/presentation";
-import type { Employee } from "@entities/employees/model/types";
 import { shopsApi } from "@entities/shops/api/shopsApi";
-import type { Shop } from "@entities/shops/model/types";
-
+import { formatHomeDate, parseHomeDay } from "./homeActivity";
 export type HomeWhoWorksTodayRow = {
-  id: string;
-  employeeId: number;
-  graphId: number;
-  dateLabel: string;
-  employee: string;
-  shift: string;
-  shop: string;
+  id: string; employeeId: number; containerId: number; graphId: number; dateLabel: string;
+  employee: string; shop: string; fromTime: string; toTime: string; shift: string; hoursText: string;
 };
-
-export type HomeSchedulePreview = {
-  graph: Graph;
-  container: Container | null;
-  shop: Shop | null;
-  monthLabel: string;
-  route: string;
-  columns: GraphMatrixColumn[];
-  cellMap: GraphMatrixCellMap;
-  visualHintMap: GraphMatrixCellMap;
-  visualHintDetailMap: GraphRelatedScheduleHintDetailMap;
-  styleMap: GraphMatrixStyleMap;
-  dayConflictMap: Record<number, boolean>;
-  totals: GraphTotals;
-};
-
-export type HomeDashboardData = {
-  monthSchedulesCount: number;
-  totalContainersCount: number;
-  todayAssignmentsCount: number;
-  activeShopsCount: number;
-  currentMonthContainerName: string;
-  currentMonthLabel: string;
-  currentMonthScheduleNames: string[];
-  currentMonthShopNames: string[];
-  currentMonthEmployeeNames: string[];
-  currentMonthTotalEmployees: number;
-  currentMonthTotalSchedules: number;
-  currentMonthTotalHoursText: string;
-  currentMonthTotalShops: number;
-  todayActiveEmployeesCount: number;
-  statusText: string;
-  todayRows: HomeWhoWorksTodayRow[];
-  activeSchedules: HomeSchedulePreview[];
-};
-
-type LoadedMonthGraph = {
-  container: Container;
-  graph: Graph;
-  graphEmployees: GraphEmployee[];
-  slots: GraphSlot[];
-  cellStyles: GraphCellStyle[];
-  shop: Shop | null;
-};
-
-function createAbortError() {
-  const error = new Error(t("Request was canceled."));
-  error.name = "AbortError";
-  return error;
-}
-
+export type HomeDashboardData = { todayRows: HomeWhoWorksTodayRow[]; todayActiveEmployeesCount: number; hasPartialData: boolean };
 function throwIfAborted(signal?: AbortSignal) {
-  if (signal?.aborted) {
-    throw createAbortError();
-  }
+  if (signal?.aborted) throw new DOMException(t("Request was canceled."), "AbortError");
 }
-
-function formatShortDate(year: number, month: number, dayOfMonth: number) {
-  return `${String(dayOfMonth).padStart(2, "0")}.${String(month).padStart(2, "0")}.${year}`;
-}
-
-function buildManualColumnEmployeeId(columnId: number) {
-  return -Math.abs(columnId);
-}
-
-function sanitizeScheduleColumnOrder(
-  columnOrder: number[],
-  baseColumns: GraphMatrixColumn[],
-  manualColumns: GraphMatrixColumn[],
-) {
-  const columnByEmployeeId = new Map(
-    [...baseColumns, ...manualColumns].map(column => [column.employeeId, column] as const),
-  );
-  const fallbackOrder = [...baseColumns.map(column => column.employeeId), ...manualColumns.map(column => column.employeeId)];
-  const validIds = new Set(fallbackOrder);
-  const nextOrder: number[] = [];
-
-  columnOrder.forEach(columnId => {
-    if (!validIds.has(columnId) || nextOrder.includes(columnId)) {
-      return;
-    }
-
-    nextOrder.push(columnId);
-  });
-
-  fallbackOrder.forEach(columnId => {
-    if (!nextOrder.includes(columnId)) {
-      nextOrder.push(columnId);
-    }
-  });
-
-  return nextOrder
-    .map(columnId => columnByEmployeeId.get(columnId))
-    .filter((column): column is GraphMatrixColumn => Boolean(column));
-}
-
-function buildHomeSchedulePreview(
-  params: {
-    container: Container;
-    graph: Graph;
-    graphEmployees: GraphEmployee[];
-    slots: GraphSlot[];
-    cellStyles: GraphCellStyle[];
-    shop: Shop | null;
-    employeesById: Map<number, Employee>;
-    relatedGraphs: LoadedMonthGraph[];
-  },
-) {
-  const { container, graph, graphEmployees, slots, cellStyles, shop, employeesById, relatedGraphs } = params;
-  const parsedGraphNote = parseGraphNoteContent(graph.note);
-  const baseColumns = buildGraphMatrixColumns(graphEmployees, employeesById, slots);
-  const manualColumns = parsedGraphNote.manualColumns.map(column => ({
-    employeeId: buildManualColumnEmployeeId(column.id),
-    kind: "manual" as const,
-    manualColumnId: column.id,
-    graphEmployeeId: null,
-    label: column.label || t("Custom {0}", column.id),
-    minHoursMonth: null,
-    totalMinutes: 0,
-    totalText: "",
-  }));
-  const columns = sanitizeScheduleColumnOrder(parsedGraphNote.columnOrder, baseColumns, manualColumns);
-  const manualCellMap = parsedGraphNote.manualColumns.reduce<GraphMatrixCellMap>((accumulator, column) => {
-    Object.entries(column.cells).forEach(([dayOfMonth, value]) => {
-      if (!value.trim()) {
-        return;
-      }
-
-      accumulator[getGraphCellKey(buildManualColumnEmployeeId(column.id), Number(dayOfMonth))] = value;
-    });
-
-    return accumulator;
-  }, {});
-  const cellMap = {
-    ...buildGraphCellMap(slots),
-    ...rehydrateGraphNoteTextCells(parsedGraphNote.textCells),
-    ...manualCellMap,
-  };
-  const relatedScheduleHintData = buildGraphRelatedScheduleHintData({
-    currentGraph: graph,
-    columns,
-    cellMap,
-    relatedGraphs: relatedGraphs.map(relatedGraph => ({
-      graph: relatedGraph.graph,
-      slots: relatedGraph.slots,
-    })),
-  });
-
-  return {
-    graph,
-    container,
-    shop,
-    monthLabel: formatGraphMonthYear(graph.year, graph.month),
-    route: `/container/${container.id}/graphs/${graph.id}`,
-    columns,
-    cellMap,
-    visualHintMap: relatedScheduleHintData.visualHintMap,
-    visualHintDetailMap: relatedScheduleHintData.detailMap,
-    styleMap: buildGraphStyleMap([
-      ...cellStyles,
-      ...rehydrateGraphNoteCellStyles(parsedGraphNote.cellStyles, graph.id),
-    ]),
-    dayConflictMap: buildGraphConflictDayMap(graph, slots),
-    totals: buildGraphTotals(graphEmployees, slots, employeesById),
-  } satisfies HomeSchedulePreview;
-}
-
-function compareGraphs(left: LoadedMonthGraph, right: LoadedMonthGraph) {
-  const leftShop = left.shop?.name?.trim() || t("Shop {0}", left.graph.shopId);
-  const rightShop = right.shop?.name?.trim() || t("Shop {0}", right.graph.shopId);
-  const shopComparison = leftShop.localeCompare(rightShop);
-
-  if (shopComparison !== 0) {
-    return shopComparison;
-  }
-
-  return left.graph.name.localeCompare(right.graph.name);
-}
-
-export async function loadHomeDashboard(signal?: AbortSignal): Promise<HomeDashboardData> {
-  const now = new Date();
-  const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth() + 1;
-  const currentDay = now.getDate();
-  const currentMonthLabel = formatGraphMonthYear(currentYear, currentMonth);
-  let hasPartialData = false;
-
-  const [containers, employees, shops] = await Promise.all([
-    containersApi.list(signal),
-    employeesApi.list(signal),
-    shopsApi.list(signal),
-  ]);
-
+export async function loadHomeDashboard(selectedDate: string, signal?: AbortSignal): Promise<HomeDashboardData> {
+  const date = parseHomeDay(selectedDate);
+  const year = date.getUTCFullYear(), month = date.getUTCMonth() + 1, day = date.getUTCDate();
   throwIfAborted(signal);
-
-  const employeesById = new Map(employees.map(employee => [employee.id, employee] as const));
-  const shopsById = new Map(shops.map(shop => [shop.id, shop] as const));
-  const containersById = new Map(containers.map(container => [container.id, container] as const));
-
-  const containerGraphResults = await Promise.allSettled(
-    containers.map(async container => ({
-      containerId: container.id,
-      graphs: await containersApi.listGraphs(container.id, signal),
-    })),
-  );
-
+  const [containersResult, employeesResult, shopsResult] = await Promise.allSettled([containersApi.list(signal), employeesApi.list(signal), shopsApi.list(signal)]);
   throwIfAborted(signal);
-
-  const monthGraphs = containerGraphResults.flatMap(result => {
-    if (result.status !== "fulfilled") {
-      hasPartialData = true;
-      return [];
-    }
-
-    return result.value.graphs
-      .filter(graph => graph.year === currentYear && graph.month === currentMonth)
-      .map(graph => ({
-        container: containersById.get(result.value.containerId) ?? null,
-        graph,
-      }))
-      .filter((entry): entry is { container: Container; graph: Graph } => entry.container !== null);
+  if (containersResult.status === "rejected") throw containersResult.reason;
+  let hasPartialData = employeesResult.status === "rejected" || shopsResult.status === "rejected";
+  const employees = new Map((employeesResult.status === "fulfilled" ? employeesResult.value : []).map(employee => [employee.id, employee]));
+  const shops = new Map((shopsResult.status === "fulfilled" ? shopsResult.value : []).map(shop => [shop.id, shop]));
+  const graphResults = await Promise.allSettled(containersResult.value.map(async container => ({ containerId: container.id, graphs: await containersApi.listGraphs(container.id, signal) })));
+  throwIfAborted(signal);
+  const monthGraphs = graphResults.flatMap(result => {
+    if (result.status === "rejected") { hasPartialData = true; return []; }
+    return result.value.graphs.filter(graph => graph.year === year && graph.month === month).map(graph => ({ containerId: result.value.containerId, graph }));
   });
-
-  const monthGraphDetails = await Promise.allSettled(
-    monthGraphs.map(async ({ container, graph }) => {
-      const [graphEmployees, slots, cellStyles] = await Promise.all([
-        containersApi.listGraphEmployees(container.id, graph.id, signal),
-        containersApi.listGraphSlots(container.id, graph.id, signal),
-        containersApi.listGraphCellStyles(container.id, graph.id, signal),
-      ]);
-
-      return {
-        container,
-        graph,
-        graphEmployees,
-        slots,
-        cellStyles,
-        shop: shopsById.get(graph.shopId) ?? null,
-      };
-    }),
-  );
-
+  const slotResults = await Promise.allSettled(monthGraphs.map(async ({ containerId, graph }) => ({ containerId, graph, slots: await containersApi.listGraphSlots(containerId, graph.id, signal) })));
   throwIfAborted(signal);
-
-  const loadedMonthGraphs = monthGraphDetails.flatMap(result => {
-    if (result.status !== "fulfilled") {
-      hasPartialData = true;
-      return [];
-    }
-
-    return [result.value];
-  }).sort(compareGraphs);
-
-  const monthScheduleNames = new Set<string>();
-  const monthShopNames = new Set<string>();
-  const monthEmployeeNames = new Set<string>();
-  const monthEmployeeIds = new Set<number>();
-  const monthShopIds = new Set<number>();
-  const activeContainerIds = new Set<number>();
-  const todayEmployeeIds = new Set<number>();
-  const todayRowsByKey = new Map<string, HomeWhoWorksTodayRow>();
-  let monthTotalMinutes = 0;
-
-  const activeSchedules = loadedMonthGraphs.map(record => {
-    monthScheduleNames.add(record.graph.name);
-    monthShopIds.add(record.graph.shopId);
-    activeContainerIds.add(record.container.id);
-
-    const shopName = record.shop?.name?.trim() || t("Shop {0}", record.graph.shopId);
-    monthShopNames.add(shopName);
-
-    record.graphEmployees.forEach(graphEmployee => {
-      if (graphEmployee.employeeId <= 0) {
-        return;
-      }
-
-      monthEmployeeIds.add(graphEmployee.employeeId);
-      monthEmployeeNames.add(
-        getEmployeeFullName(employeesById.get(graphEmployee.employeeId), t("Employee {0}", graphEmployee.employeeId)),
-      );
-    });
-
-    record.slots.forEach(slot => {
-      if (!slot.employeeId || slot.employeeId <= 0) {
-        return;
-      }
-
-      monthEmployeeIds.add(slot.employeeId);
-      monthEmployeeNames.add(
-        getEmployeeFullName(employeesById.get(slot.employeeId), t("Employee {0}", slot.employeeId)),
-      );
-      monthTotalMinutes += getSlotDurationMinutes(slot);
-
-      if (slot.dayOfMonth !== currentDay) {
-        return;
-      }
-
-      const employeeName = getEmployeeFullName(employeesById.get(slot.employeeId), t("Employee {0}", slot.employeeId));
-      const shift = `${slot.fromTime} - ${slot.toTime}`;
-      const rowKey = `${record.graph.id}:${slot.id}`;
-      if (todayRowsByKey.has(rowKey)) {
-        return;
-      }
-
-      todayEmployeeIds.add(slot.employeeId);
-      todayRowsByKey.set(rowKey, {
-        id: rowKey,
-        employeeId: slot.employeeId,
-        graphId: record.graph.id,
-        dateLabel: formatShortDate(currentYear, currentMonth, slot.dayOfMonth),
-        employee: employeeName,
-        shift,
-        shop: shopName,
+  const rows = new Map<string, HomeWhoWorksTodayRow>();
+  slotResults.forEach(result => {
+    if (result.status === "rejected") { hasPartialData = true; return; }
+    const { containerId, graph, slots } = result.value;
+    slots.filter(slot => slot.employeeId != null && slot.employeeId > 0 && slot.dayOfMonth === day).forEach(slot => {
+      const employeeId = slot.employeeId!;
+      const id = `${containerId}:${graph.id}:${slot.id}`;
+      rows.set(id, { id, employeeId, containerId, graphId: graph.id,
+        employee: getEmployeeFullName(employees.get(employeeId), t("Employee {0}", employeeId)),
+        shop: shops.get(graph.shopId)?.name?.trim() || t("Shop {0}", graph.shopId), dateLabel: formatHomeDate(selectedDate, true),
+        fromTime: slot.fromTime, toTime: slot.toTime, shift: `${slot.fromTime} – ${slot.toTime}`, hoursText: formatHoursMinutes(getSlotDurationMinutes(slot)),
       });
     });
-
-    return buildHomeSchedulePreview({
-      container: record.container,
-      graph: record.graph,
-      graphEmployees: record.graphEmployees,
-      slots: record.slots,
-      cellStyles: record.cellStyles,
-      shop: record.shop,
-      employeesById,
-      relatedGraphs: loadedMonthGraphs,
-    });
   });
-
-  const activeContainerNames = [...activeContainerIds]
-    .map(containerId => containersById.get(containerId)?.name?.trim())
-    .filter((name): name is string => Boolean(name));
-
-  const currentMonthContainerName =
-    activeContainerNames.length === 0
-      ? t("No active containers")
-      : activeContainerNames.length === 1
-        ? activeContainerNames[0]
-        : t("{0} active containers", activeContainerNames.length);
-
-  const todayRows = [...todayRowsByKey.values()].sort((left, right) => {
-    const shiftComparison = left.shift.localeCompare(right.shift);
-
-    if (shiftComparison !== 0) {
-      return shiftComparison;
-    }
-
-    const employeeComparison = left.employee.localeCompare(right.employee);
-    if (employeeComparison !== 0) {
-      return employeeComparison;
-    }
-
-    return left.shop.localeCompare(right.shop);
-  });
-
-  return {
-    monthSchedulesCount: monthGraphs.length,
-    totalContainersCount: containers.length,
-    todayAssignmentsCount: todayRows.length,
-    activeShopsCount: new Set(monthGraphs.map(item => item.graph.shopId)).size,
-    currentMonthContainerName,
-    currentMonthLabel,
-    currentMonthScheduleNames: [...monthScheduleNames].sort((left, right) => left.localeCompare(right)),
-    currentMonthShopNames: [...monthShopNames].sort((left, right) => left.localeCompare(right)),
-    currentMonthEmployeeNames: [...monthEmployeeNames].sort((left, right) => left.localeCompare(right)),
-    currentMonthTotalEmployees: monthEmployeeIds.size,
-    currentMonthTotalSchedules: monthGraphs.length,
-    currentMonthTotalHoursText: formatHoursMinutes(monthTotalMinutes),
-    currentMonthTotalShops: monthShopIds.size,
-    todayActiveEmployeesCount: todayEmployeeIds.size,
-    statusText: hasPartialData
-      ? t("Home data loaded with a few missing schedule previews.")
-      : t("Home data is up to date."),
-    todayRows,
-    activeSchedules,
-  };
+  const todayRows = [...rows.values()].sort((a, b) => a.fromTime.localeCompare(b.fromTime) || a.employee.localeCompare(b.employee) || a.shop.localeCompare(b.shop) || a.id.localeCompare(b.id));
+  return { todayRows, todayActiveEmployeesCount: new Set(todayRows.map(row => row.employeeId)).size, hasPartialData };
 }
