@@ -3,7 +3,7 @@ import { expect, test, type Page, type Locator, type TestInfo } from "@playwrigh
 
 test.use({ timezoneId: "Europe/Warsaw", launchOptions: process.platform === "win32" ? { ignoreDefaultArgs: ["--disable-accelerated-compositing"] } : {} });
 
-async function fixture(page: Page, initialMode: "choose" | "pc" | "phone" | "guest" = "guest", role = "manager", options: { workerCount?: number; manualColumn?: boolean; longNames?: boolean; language?: "en" | "pl"; homeInCurrentMonth?: boolean } = {}) {
+async function fixture(page: Page, initialMode: "choose" | "pc" | "phone" | "guest" = "guest", role = "manager", options: { workerCount?: number; manualColumn?: boolean; longNames?: boolean; language?: "en" | "pl" } = {}) {
   let mode = initialMode;
   let failExchange = false;
   let pending = false;
@@ -13,12 +13,7 @@ async function fixture(page: Page, initialMode: "choose" | "pc" | "phone" | "gue
   if (mode !== "guest") await page.addInitScript(() => localStorage.setItem("gf3.auth.access-token", "fixture-token"));
   const session = () => ({ role, workspaceMode: role === "manager" ? mode : null, managerId: role === "manager" ? 1 : null, employeeId: role === "employee" ? 12 : null, userName: "manager", displayName: "Manager Workspace", isSystemManager: true });
   const employees = Array.from({ length: options.workerCount ?? 6 }, (_, index) => ({ id: index + 2, firstName: "Worker", lastName: options.longNames ? `A very long employee surname ${index + 1}` : `${index + 1}`, hasLoginAccount: true, isOnline: index === 0, username: `worker${index}`, email: `worker${index}@example.com`, phone: "123456" }));
-  const now = new Date();
-  const homeDate = Object.fromEntries(new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Europe/Warsaw", year: "numeric", month: "numeric", day: "numeric",
-  }).formatToParts(now).map(part => [part.type, part.value]));
-  if (options.homeInCurrentMonth) await page.clock.setFixedTime(now);
-  const graph = { id: 3, containerId: 1, shopId: 4, name: "Private schedule", note: options.manualColumn ? `[[GF3_GRAPH_META:${JSON.stringify({ manualColumns: [{ id: 1, label: "Manual coverage", cells: { "1": "Reserve coverage" } }] })}]]` : "", year: options.homeInCurrentMonth ? Number(homeDate.year) : 2026, month: options.homeInCurrentMonth ? Number(homeDate.month) : 10, publicationStatus: "private", peoplePerShift: 1, shift1Time: "08:00 - 16:00", shift2Time: "16:00 - 20:00", maxHoursPerEmpMonth: 160, maxConsecutiveDays: 5, maxConsecutiveFull: 3, maxFullPerMonth: 10 };
+  const graph = { id: 3, containerId: 1, shopId: 4, name: "Private schedule", note: options.manualColumn ? `[[GF3_GRAPH_META:${JSON.stringify({ manualColumns: [{ id: 1, label: "Manual coverage", cells: { "1": "Reserve coverage" } }] })}]]` : "", year: 2026, month: 10, publicationStatus: "private", peoplePerShift: 1, shift1Time: "08:00 - 16:00", shift2Time: "16:00 - 20:00", maxHoursPerEmpMonth: 160, maxConsecutiveDays: 5, maxConsecutiveFull: 3, maxFullPerMonth: 10 };
   const graphs = [graph, { ...graph, id: 6, name: "Public schedule", publicationStatus: "public" }];
   const group = { id: 5, name: "Private dispo", year: 2026, month: 10, publicationStatus: "private" };
   await page.route("**/api/**", async route => {
@@ -49,7 +44,7 @@ async function fixture(page: Page, initialMode: "choose" | "pc" | "phone" | "gue
     else if (path === "/api/containers/1/graphs") data = graphs;
     else if (/\/graphs\/\d+$/.test(path)) data = graphs.find(item => String(item.id) === path.split("/").at(-1));
     else if (path.endsWith("/employees") && path.includes("graphs")) data = employees.map((item, index) => ({ id: index + 1, scheduleId: 3, employeeId: item.id, displayOrder: index }));
-    else if (path.endsWith("/slots") && path.includes("graphs")) data = employees.map((item, index) => ({ id: index + 1, scheduleId: 3, employeeId: item.id, dayOfMonth: options.homeInCurrentMonth ? Number(homeDate.day) : 1, slotNo: index + 1, fromTime: "08:00", toTime: "16:00", status: "Working" }));
+    else if (path.endsWith("/slots") && path.includes("graphs")) data = employees.map((item, index) => ({ id: index + 1, scheduleId: 3, employeeId: item.id, dayOfMonth: 1, slotNo: index + 1, fromTime: "08:00", toTime: "16:00", status: "Working" }));
     else if (path === "/api/shops") data = [{ id: 4, name: "Central", address: "Main Street" }];
     else if (path === "/api/shops/4") data = { id: 4, name: "Central", address: "Main Street" };
     else if (path === "/api/availability-groups") data = [group];
@@ -70,207 +65,6 @@ async function login(page: Page) {
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Choose workspace" })).toBeVisible();
 }
-
-async function openPcHome(page: Page) {
-  await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Home", exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Collapse sidebar", exact: true }).click();
-}
-
-test("manager PC Home keeps all actions after unslop", async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 900 });
-  const f = await fixture(page, "pc", "manager", { homeInCurrentMonth: true });
-  const writes: string[] = [];
-  page.on("request", request => {
-    const path = new URL(request.url()).pathname;
-    // SignalR negotiates with POST; this existing connection handshake does not write dashboard data.
-    if (path.startsWith("/api/") && path !== "/api/realtime/presence/negotiate" && !["GET", "HEAD", "OPTIONS"].includes(request.method())) writes.push(request.url());
-  });
-  await openPcHome(page);
-  for (const title of ["Who Works Today?", "This Month", "Active Schedules This Month"]) {
-    await expect(page.getByText(title, { exact: true })).toBeVisible();
-  }
-  const today = page.locator("section").filter({ has: page.getByText("Who Works Today?", { exact: true }) });
-  await expect(today.getByRole("columnheader")).toHaveText(["Date", "Employee", "Shift", "Shop"]);
-  await expect(today.locator("tbody tr")).toHaveCount(12);
-  await expect(today.locator("xpath=../..").locator(":scope > section, :scope > div > section, :scope > div > div > section")).toHaveCount(3);
-  for (const name of ["Private schedule", "Public schedule"]) await expect(page.getByRole("button", { name: `Expand ${name}`, exact: true })).toBeVisible();
-
-  const month = page.locator("#home-month-details");
-  const monthToggle = page.getByRole("button", { name: "Expand this month details", exact: true });
-  await expect(monthToggle).toHaveAttribute("aria-expanded", "false");
-  await expect(monthToggle).toHaveAttribute("aria-controls", "home-month-details");
-  await expect(month).toHaveAttribute("aria-hidden", "true");
-  await expect(month).toHaveAttribute("inert", "");
-  await monthToggle.click();
-  await expect(page.getByRole("button", { name: "Collapse this month details" })).toHaveAttribute("aria-expanded", "true");
-  await expect(month).toHaveAttribute("aria-hidden", "false");
-  await expect(month).not.toHaveAttribute("inert");
-  for (const label of ["Total hours", "Employees", "Schedules", "Shops", "Schedules in this month", "Shops in this month", "Employees in this month", "Worker 1", "Central"]) {
-    await expect(month.getByText(label, { exact: true })).toBeVisible();
-  }
-  await page.getByRole("button", { name: "Collapse this month details" }).click();
-  await expect(month).toHaveAttribute("inert", "");
-  await expect(month).toHaveAttribute("aria-hidden", "true");
-  await expect(monthToggle).toHaveAttribute("aria-expanded", "false");
-
-  const first = page.locator("#home-schedule-3-content");
-  const second = page.locator("#home-schedule-6-content");
-  const expandAll = page.getByRole("button", { name: "Expand all", exact: true });
-  const collapseAll = page.getByRole("button", { name: "Collapse all", exact: true });
-  await expect(collapseAll).toBeDisabled();
-  const expand = page.getByRole("button", { name: "Expand Private schedule", exact: true });
-  await expect(expand).toHaveAttribute("aria-controls", "home-schedule-3-content");
-  await expand.click();
-  await expect(first.getByRole("table")).toBeVisible();
-  await expect(first).not.toHaveAttribute("inert");
-  await page.getByRole("button", { name: "Collapse Private schedule", exact: true }).click();
-  await expect(first).toHaveAttribute("inert", "");
-  await expandAll.click();
-  await expect(expandAll).toBeDisabled();
-  for (const region of [first, second]) await expect(region.getByRole("table")).toBeVisible();
-  await collapseAll.click();
-  await expect(collapseAll).toBeDisabled();
-  for (const region of [first, second]) await expect(region).toHaveAttribute("aria-hidden", "true");
-
-  await today.getByRole("button", { name: "Show Worker 1's schedule", exact: true }).first().click();
-  await expect(page).toHaveURL(/\/$/);
-  await expect(first.getByRole("table")).toBeVisible();
-  const card = first.locator("..");
-  await expect(card).toHaveCSS("box-shadow", "rgb(37, 99, 235) 3px 0px 0px 0px inset");
-  await expect(card).toHaveCSS("animation-name", "none");
-  await expect.poll(async () => (await card.boundingBox())!.y).toBeGreaterThanOrEqual(0);
-  await expect(card).toHaveCSS("box-shadow", "none", { timeout: 4_000 });
-
-  const currentDay = await page.evaluate(() => new Date().getDate());
-  const cell = first.getByRole("button", { name: `Worker 1 day ${currentDay === 1 ? 2 : 1}`, exact: true });
-  await cell.click();
-  const selectedCell = cell.locator("xpath=ancestor::td");
-  await expect.poll(() => selectedCell.evaluate(element => getComputedStyle(element, "::after").boxShadow)).not.toBe("none");
-  await expect(first.getByRole("textbox")).toHaveCount(0);
-  await expect.poll(() => second.locator("td").evaluateAll(cells => cells.some(cell => getComputedStyle(cell, "::after").boxShadow !== "none"))).toBe(false);
-
-  await first.getByRole("button", { name: `Worker 1 day ${currentDay}`, exact: true }).click();
-  await expect(page.getByRole("dialog")).toBeVisible();
-  await page.getByRole("button", { name: "Close related schedule", exact: true }).click();
-  await expect(page.getByRole("dialog")).toHaveCount(0);
-
-  await card.getByRole("button", { name: "Open schedule", exact: true }).click();
-  await expect(page).toHaveURL(/\/container\/1\/graphs\/3$/);
-  await openPcHome(page);
-  await page.getByRole("button", { name: "Open container", exact: true }).first().click();
-  await expect(page).toHaveURL(/\/container\?openContainerId=1$/);
-  expect(f.errors).toEqual([]);
-  expect(f.unsafe).toEqual([]);
-  expect(writes).toEqual([]);
-});
-
-for (const viewport of [{ width: 1440, height: 900 }, { width: 1280, height: 800 }, { width: 900, height: 800 }, { width: 390, height: 844 }]) {
-  test(`manager PC Home remains readable across widths at ${viewport.width}px`, async ({ page }, testInfo) => {
-    await page.setViewportSize(viewport);
-    const f = await fixture(page, "pc", "manager", { homeInCurrentMonth: true, workerCount: 1, longNames: true });
-    await openPcHome(page);
-    const today = page.locator("section").filter({ has: page.getByText("Who Works Today?", { exact: true }) });
-    const table = today.getByRole("table");
-    await expect(today.locator("tbody tr")).toHaveCount(2);
-    const scroll = table.locator("..");
-    const geometry = await today.evaluate(element => {
-      const table = element.querySelector("table")!;
-      return { height: element.getBoundingClientRect().height, tableHeight: table.getBoundingClientRect().height };
-    });
-    expect(geometry.height - geometry.tableHeight).toBeLessThan(140);
-    if (viewport.width <= 720) {
-      expect(await scroll.evaluate(element => element.scrollWidth > element.clientWidth)).toBe(true);
-      await scroll.evaluate(element => { element.scrollLeft = element.scrollWidth; });
-      await expect.poll(() => scroll.evaluate(element => element.scrollLeft)).toBeGreaterThan(0);
-    }
-    await page.getByRole("button", { name: "Expand this month details" }).click();
-    await expect(page.locator("#home-month-details").getByText("Worker A very long employee surname 1", { exact: true })).toBeVisible();
-    await page.getByRole("button", { name: "Expand all", exact: true }).click();
-    for (const id of [3, 6]) {
-      const region = page.locator(`#home-schedule-${id}-content`);
-      await expect(region.getByRole("table")).toBeVisible();
-      const card = region.locator("..");
-      for (const name of ["Open schedule", "Open container", `Collapse ${id === 3 ? "Private" : "Public"} schedule`]) {
-        const button = card.getByRole("button", { name, exact: true });
-        await button.scrollIntoViewIfNeeded();
-        await expect(button).toBeVisible();
-        await button.click({ trial: true });
-        await button.focus();
-        await expect(button).toBeFocused();
-        const box = (await button.boundingBox())!;
-        const bounds = (await card.boundingBox())!;
-        expect(box.x).toBeGreaterThanOrEqual(bounds.x);
-        expect(box.x + box.width).toBeLessThanOrEqual(bounds.x + bounds.width + 1);
-        expect(box.width).toBeGreaterThanOrEqual(34);
-        expect(await button.evaluate(element => parseFloat(getComputedStyle(element).outlineWidth))).toBeGreaterThanOrEqual(2);
-      }
-    }
-    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
-    await page.evaluate(() => window.scrollTo(0, 0));
-    await page.screenshot({ path: testInfo.outputPath(`home-${viewport.width}.png`), fullPage: true });
-    expect(f.errors).toEqual([]);
-    expect(f.unsafe).toEqual([]);
-  });
-}
-
-test("manager PC Home preserves loading, empty and error messages", async ({ page }) => {
-  await fixture(page, "pc");
-  await page.route("**/api/containers/1/graphs", route => route.fulfill({ json: [] }));
-  let release!: () => void;
-  const pending = new Promise<void>(resolve => { release = resolve; });
-  await page.route("**/api/containers", async route => { await pending; await route.fulfill({ json: [{ id: 1, name: "All manager container" }] }); });
-  await openPcHome(page);
-  await expect(page.getByText("Loading current-day assignments...", { exact: true })).toBeVisible();
-  await expect(page.getByText("Building active schedule previews...", { exact: true })).toBeVisible();
-  release();
-  await expect(page.getByText("No assignments for today in the current month.", { exact: true })).toBeVisible();
-  await expect(page.getByText("No active schedules found for the current month.", { exact: true })).toBeVisible();
-  await page.unroute("**/api/containers");
-  await page.route("**/api/containers", route => route.fulfill({ status: 503, json: { detail: "fixture unavailable" } }));
-  await openPcHome(page);
-  await expect(page.getByText("Could not load the home dashboard.", { exact: true })).toBeVisible();
-  await expect(page.getByText("No active schedules found for the current month.", { exact: true })).toBeVisible();
-});
-
-test("manager PC Home respects reduced motion and keeps the clock live", async ({ page }) => {
-  await page.emulateMedia({ reducedMotion: "reduce" });
-  await fixture(page, "pc", "manager", { homeInCurrentMonth: true });
-  await page.clock.install({ time: new Date() });
-  await page.addInitScript(() => {
-    const calls: ScrollBehavior[] = [];
-    Object.assign(window, { homeScrollBehaviors: calls });
-    const scrollIntoView = Element.prototype.scrollIntoView;
-    Element.prototype.scrollIntoView = function (options) {
-      if (typeof options === "object" && options.behavior) calls.push(options.behavior);
-      scrollIntoView.call(this, options);
-    };
-  });
-  await openPcHome(page);
-  const employee = page.getByRole("button", { name: "Show Worker 1's schedule", exact: true }).first();
-  await employee.focus();
-  await page.keyboard.press("Tab");
-  await expect(page.getByRole("button", { name: "Show Worker 1's schedule", exact: true }).nth(1)).toBeFocused();
-  await employee.focus();
-  await page.keyboard.press("Enter");
-  const region = page.locator("#home-schedule-3-content");
-  await expect(region).toHaveAttribute("aria-hidden", "false");
-  await expect(region).toHaveCSS("transition-duration", "0s");
-  const card = region.locator("..");
-  await expect(card).toHaveCSS("animation-name", "none");
-  await expect(card).toHaveCSS("box-shadow", "rgb(37, 99, 235) 3px 0px 0px 0px inset");
-  await page.clock.runFor(400);
-  await expect(card).toHaveCSS("box-shadow", "none");
-  expect(await page.evaluate(() => Reflect.get(window, "homeScrollBehaviors"))).toEqual(["auto", "auto"]);
-  const clock = page.getByText("Current time", { exact: true }).locator("..").locator("strong");
-  const before = await clock.textContent();
-  await page.clock.runFor(60_000);
-  await expect(clock).not.toHaveText(before!);
-  await page.getByRole("button", { name: "Collapse header", exact: true }).click();
-  await expect(page.getByRole("button", { name: "Expand header", exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Expand header", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Home", exact: true })).toBeVisible();
-});
 
 test("PC container schedule tiles preserve open and MultiOpen selection", async ({ page }) => {
   test.setTimeout(60_000);

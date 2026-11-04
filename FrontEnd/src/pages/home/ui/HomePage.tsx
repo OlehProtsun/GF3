@@ -282,8 +282,6 @@ function ManagerPcHomePage() {
       <div className={styles.topGrid}>
         <CardSection
           className={styles.todayCard}
-          headerClassName={styles.panelHeader}
-          titleClassName={styles.panelTitle}
           title={t("Who Works Today?")}
           icon={<AvailabilityIcon size={18} />}
           headerRightSlot={
@@ -339,8 +337,6 @@ function ManagerPcHomePage() {
         <div className={styles.sideColumn}>
           <CardSection
             className={styles.monthCard}
-            headerClassName={styles.panelHeader}
-            titleClassName={styles.panelTitle}
             title={t("This Month")}
             icon={<ScheduleDetailsIcon size={18} />}
             headerRightSlot={(
@@ -433,8 +429,7 @@ function ManagerPcHomePage() {
       <CardSection
         elementRef={activeSchedulesSectionRef}
         className={styles.activeSchedulesCard}
-        headerClassName={`${styles.panelHeader} ${styles.activeSchedulesHeader}`}
-        titleClassName={styles.panelTitle}
+        headerClassName={styles.activeSchedulesHeader}
         headerRightClassName={styles.activeSchedulesHeaderRight}
         title={t("Active Schedules This Month")}
         icon={<ScheduleDetailsIcon size={18} />}
