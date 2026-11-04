@@ -1,24 +1,27 @@
 .page {
   --home-ink: #172033;
-  --home-muted: rgba(23, 32, 51, 0.62);
-  --home-surface: rgba(255, 255, 255, 0.92);
-  --home-border: rgba(148, 163, 184, 0.18);
-  --home-shadow: 0 22px 52px rgba(15, 23, 42, 0.08);
+  --home-secondary: #475569;
+  --home-muted: #64748b;
+  --home-surface: #ffffff;
+  --home-inner: #f8fafc;
+  --home-border: #e2e8f0;
+  --home-accent: #2563eb;
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
-  gap: 12px;
-  padding: 0 clamp(8px, 0.9vw, 14px) 24px;
+  gap: 24px;
+  padding: 0 24px 32px 124px;
   width: 100%;
+  min-width: 0;
   min-height: 0;
-  max-width: none;
   background: var(--app-page-background, #f3f4f6);
-  overflow: visible;
   box-sizing: border-box;
+  color: var(--home-ink);
 }
 
 .banner {
   margin: 0;
+  overflow-wrap: anywhere;
 }
 
 .clockPanel {
@@ -47,32 +50,40 @@
   font-weight: 800;
 }
 
-.todayCard,
-.activeSchedulesCard {
+.page .todayCard,
+.page .monthCard,
+.page .activeSchedulesCard {
   width: 100%;
+  min-width: 0;
   max-width: none;
   margin: 0;
-  padding-bottom: 18px;
-  border-radius: 30px;
-  box-shadow: var(--home-shadow);
-  background: rgba(255, 255, 255, 0.9);
+  padding: 20px;
+  border: 1px solid var(--home-border);
+  border-radius: 16px;
+  box-shadow: 0 1px 2px rgb(15 23 42 / 4%);
+  background: var(--home-surface);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
-.monthCard {
-  width: 100%;
-  max-width: none;
-  margin: 0;
-  padding: 14px;
-  border-radius: 26px;
-  box-shadow: var(--home-shadow);
-  background: rgba(255, 255, 255, 0.9);
+.page .panelHeader {
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 0;
+  flex-wrap: wrap;
 }
 
-.todayCard {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  height: clamp(460px, calc(100svh - 170px), 620px);
-  min-height: 0;
+.page .panelTitle {
+  gap: 8px;
+  color: var(--home-ink);
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 24px;
+}
+
+.panelTitle svg {
+  flex-shrink: 0;
+  color: var(--home-secondary);
 }
 
 .todayCard > :last-child {
@@ -81,67 +92,56 @@
 
 .topGrid {
   display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(340px, 0.85fr);
-  gap: 16px;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1.3fr) minmax(300px, 0.7fr);
+  gap: 20px;
   align-items: start;
 }
 
 .sideColumn {
   display: grid;
-  gap: 16px;
+  min-width: 0;
   align-content: start;
 }
 
-.sectionBadge {
-  display: inline-flex;
-  align-items: center;
-  padding: 6px 10px;
-  border-radius: 999px;
-  background: rgba(148, 163, 184, 0.14);
-  color: rgba(15, 23, 42, 0.68);
-  font-size: 0.76rem;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+.sectionBadge,
+.matrixBadge {
+  color: var(--home-secondary);
+  font-size: 12px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
 }
 
 .stateBlock {
-  min-height: 160px;
-  border-radius: 24px;
-  border: 1px dashed rgba(148, 163, 184, 0.32);
-  background: rgba(248, 250, 252, 0.86);
+  min-height: 96px;
+  border-radius: 8px;
+  border: 1px solid var(--home-border);
+  background: var(--home-inner);
   display: grid;
   place-items: center;
   padding: 20px;
   text-align: center;
-  color: var(--home-muted);
+  color: var(--home-secondary);
+  font-size: 14px;
 }
 
 .tableShell {
-  border-radius: 24px;
-  border: 1px solid rgba(148, 163, 184, 0.16);
-  background: rgba(248, 250, 252, 0.76);
-  min-height: 0;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
+  min-width: 0;
+  border-radius: 8px;
+  border: 1px solid var(--home-border);
   overflow: hidden;
 }
 
 .tableScroll {
   width: 100%;
   max-width: 100%;
-  flex: 1 1 auto;
-  min-height: 0;
+  max-height: 440px;
   overflow: auto;
-  background: #ffffff;
+  background: var(--home-surface);
   scrollbar-width: thin;
-  scrollbar-color: #d6dbe3 transparent;
+  scrollbar-color: #cbd5e1 transparent;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
-  scrollbar-gutter: stable both-edges;
-  will-change: scroll-position;
   touch-action: pan-x pan-y;
 }
 
@@ -151,39 +151,39 @@
 }
 
 .tableScroll::-webkit-scrollbar-thumb {
-  border-radius: 999px;
+  border-radius: 8px;
   border: 2px solid transparent;
-  background: #d6dbe3;
+  background: #cbd5e1;
   background-clip: padding-box;
 }
 
 .todayTable {
   width: 100%;
   border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
 }
 
 .todayTable th,
 .todayTable td {
-  padding: 14px 16px;
+  padding: 12px 16px;
   text-align: left;
-  border-bottom: 1px solid rgba(226, 232, 240, 0.92);
+  border-bottom: 1px solid var(--home-border);
 }
 
 .todayTable th {
   position: sticky;
   top: 0;
   z-index: 1;
-  background: rgba(241, 245, 249, 0.92);
-  color: rgba(15, 23, 42, 0.72);
-  font-size: 0.78rem;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  background: var(--home-inner);
+  color: var(--home-secondary);
+  font-size: 12px;
+  font-weight: 500;
 }
 
 .todayTable td {
   color: var(--home-ink);
-  font-size: 0.95rem;
+  font-size: 14px;
+  overflow-wrap: anywhere;
 }
 
 .todayTable tr:last-child td {
@@ -192,162 +192,146 @@
 
 .employeeFocusButton {
   max-width: 100%;
-  padding: 4px 7px;
-  margin: -4px -7px;
+  min-height: 34px;
+  padding: 4px 8px;
+  margin: -4px -8px;
   border: 0;
-  border-radius: 9px;
+  border-radius: 8px;
   background: transparent;
-  color: #1d4ed8;
+  color: var(--home-accent);
   font: inherit;
-  font-weight: 800;
+  font-weight: 500;
   text-align: left;
+  overflow-wrap: anywhere;
   cursor: pointer;
-  transition: color 140ms ease, background 140ms ease, box-shadow 140ms ease;
+  transition: color 140ms ease, background-color 140ms ease;
 }
 
 .employeeFocusButton:hover {
-  background: rgba(219, 234, 254, 0.7);
-  color: #1e40af;
-}
-
-.employeeFocusButton:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+  background: #eff6ff;
+  color: #1d4ed8;
 }
 
 .monthContent {
   display: grid;
-  gap: 0;
+  min-width: 0;
 }
 
 .summaryHeader {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-  padding: 0;
+  gap: 16px;
 }
 
 .summaryCard {
   min-width: 0;
-  padding: 8px 10px;
-  border-radius: 16px;
-  border: 1px solid rgba(226, 232, 240, 0.86);
-  background: rgba(248, 250, 252, 0.82);
 }
 
 .summaryLabel,
 .totalLabel {
   display: block;
-  color: var(--home-muted);
-  font-size: 0.66rem;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  color: var(--home-secondary);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 16px;
 }
 
 .summaryValue {
-  margin-top: 3px;
+  margin-top: 4px;
   display: block;
-  overflow: hidden;
   color: var(--home-ink);
-  font-size: 0.82rem;
-  font-weight: 800;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-size: 14px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
 }
 
 .monthDetails {
   display: grid;
-  gap: 8px;
-  padding-top: 9px;
+  gap: 16px;
+  padding: 20px 2px 2px;
 }
 
 .totalGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  gap: 12px;
 }
 
 .totalCard {
-  border-radius: 18px;
-  border: 1px solid rgba(226, 232, 240, 0.86);
-  background: rgba(248, 250, 252, 0.82);
-}
-
-.totalCard {
-  padding: 9px 11px;
+  min-width: 0;
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--home-inner);
 }
 
 .totalValue {
   display: block;
-  color: var(--home-ink);
-  font-weight: 800;
-}
-
-.totalValue {
   margin-top: 4px;
-  font-size: 1rem;
+  color: var(--home-ink);
+  font-size: 16px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
 }
 
 .pillSection {
   display: grid;
+  min-width: 0;
   gap: 8px;
-  padding: 10px 12px;
-  border-radius: 18px;
-  border: 1px solid rgba(226, 232, 240, 0.86);
-  background: rgba(255, 255, 255, 0.76);
 }
 
 .pillSectionTitle {
   margin: 0;
-  color: var(--home-ink);
-  font-size: 0.86rem;
-  font-weight: 800;
+  color: var(--home-secondary);
+  font-size: 14px;
+  font-weight: 500;
 }
 
 .pillWrap {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 8px;
 }
 
 .pill {
   max-width: 100%;
-  padding: 6px 10px;
-  border-radius: 999px;
-  background: rgba(241, 245, 249, 0.95);
-  color: rgba(30, 41, 59, 0.88);
-  font-size: 0.78rem;
-  font-weight: 700;
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: var(--home-inner);
+  color: var(--home-secondary);
+  font-size: 12px;
+  font-weight: 400;
+  overflow-wrap: anywhere;
 }
 
 .emptyInline {
   color: var(--home-muted);
-  font-size: 0.8rem;
+  font-size: 12px;
 }
 
 .activeSchedulesCard {
-  margin: 0;
-  scroll-margin-top: 92px;
+  scroll-margin-top: 100px;
 }
 
 .scheduleGrid {
   display: grid;
-  gap: 12px;
+  min-width: 0;
+  gap: 16px;
 }
 
 .scheduleCard {
   min-width: 0;
-  padding: 12px;
-  border: 1px solid rgba(148, 163, 184, 0.18);
-  border-radius: 22px;
-  background: rgba(248, 250, 252, 0.76);
-  scroll-margin-top: 92px;
-  transition: border-color 180ms ease, background 180ms ease, box-shadow 180ms ease;
+  padding: 16px;
+  border: 1px solid var(--home-border);
+  border-radius: 14px;
+  background: var(--home-inner);
+  scroll-margin-top: 100px;
+  transition: border-color 140ms ease, background-color 140ms ease;
 }
 
 .scheduleCardHeader {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
@@ -355,30 +339,28 @@
 
 .scheduleIdentity {
   min-width: 0;
+  flex: 1 1 200px;
   display: grid;
-  gap: 2px;
+  gap: 4px;
 }
 
 .scheduleTitle {
-  overflow: hidden;
   color: var(--home-ink);
-  font-size: 0.94rem;
-  font-weight: 900;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-size: 14px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
 }
 
 .scheduleMeta {
-  overflow: hidden;
-  color: var(--home-muted);
-  font-size: 0.74rem;
-  font-weight: 700;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  color: var(--home-secondary);
+  font-size: 12px;
+  font-weight: 400;
+  overflow-wrap: anywhere;
 }
 
 .scheduleCardFocused {
-  animation: scheduleFocusPulse 1.5s ease;
+  border-color: var(--home-accent);
+  box-shadow: inset 3px 0 0 var(--home-accent);
 }
 
 .scheduleMatrix {
@@ -401,38 +383,37 @@
   min-height: 0;
   opacity: 0;
   visibility: hidden;
-  transition:
-    grid-template-rows 240ms ease,
-    opacity 180ms ease,
-    visibility 0s linear 240ms;
+  transition: opacity 140ms ease, visibility 0s linear 140ms;
 }
 
 .collapsibleRegionExpanded {
   grid-template-rows: 1fr;
   opacity: 1;
   visibility: visible;
-  transition:
-    grid-template-rows 260ms ease,
-    opacity 220ms ease,
-    visibility 0s linear 0s;
+  transition: opacity 140ms ease, visibility 0s;
 }
 
 .collapsibleInner {
+  min-width: 0;
   min-height: 0;
   overflow: hidden;
 }
 
 .scheduleBody .collapsibleInner {
-  padding-top: 10px;
+  padding-top: 0;
+}
+
+.scheduleBody.collapsibleRegionExpanded .collapsibleInner {
+  padding-top: 16px;
 }
 
 .compactStateBlock {
   min-height: 76px;
   display: grid;
   place-items: center;
-  padding-top: 9px;
-  color: var(--home-muted);
-  font-size: 0.82rem;
+  padding-top: 12px;
+  color: var(--home-secondary);
+  font-size: 14px;
   text-align: center;
 }
 
@@ -441,13 +422,8 @@
 }
 
 .collapseButton svg {
-  position: relative;
-  top: 1px;
-  left: 1px;
   display: block;
-  transform-origin: center;
   transform: rotate(180deg);
-  transition: transform 180ms ease;
 }
 
 .collapseButton[aria-expanded="true"] svg {
@@ -457,49 +433,46 @@
 .schedulesHeaderActions {
   min-width: 0;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
-  gap: 8px;
+  gap: 12px;
 }
 
 .bulkControls {
   display: inline-flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 4px;
-  padding: 3px;
-  border-radius: 12px;
-  background: rgba(241, 245, 249, 0.9);
+  gap: 8px;
 }
 
 .bulkButton {
-  min-height: 28px;
-  padding: 5px 9px;
-  border: 0;
-  border-radius: 9px;
-  background: transparent;
-  color: rgba(30, 41, 59, 0.76);
-  font-size: 0.73rem;
-  font-weight: 800;
+  min-height: 34px;
+  padding: 4px 12px;
+  border: 1px solid var(--home-border);
+  border-radius: 8px;
+  background: var(--home-surface);
+  color: var(--home-secondary);
+  font-size: 12px;
+  font-weight: 500;
   cursor: pointer;
-  transition: color 140ms ease, background 140ms ease, box-shadow 140ms ease;
+  transition: color 140ms ease, background-color 140ms ease;
 }
 
 .bulkButton:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.96);
-  color: #1d4ed8;
+  background: var(--home-inner);
+  color: var(--home-accent);
 }
 
-.bulkButton:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18);
-}
-
-.bulkButton:disabled {
-  opacity: 0.42;
-  cursor: default;
+.bulkButton:disabled,
+.matrixIconButton:disabled {
+  color: var(--home-muted);
+  background: var(--home-inner);
+  cursor: not-allowed;
 }
 
 .matrixHeaderActions {
+  min-width: 0;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -507,74 +480,43 @@
   gap: 8px;
 }
 
-.matrixBadge {
-  display: inline-flex;
-  align-items: center;
-  padding: 6px 10px;
-  border-radius: 999px;
-  background: rgba(226, 232, 240, 0.9);
-  color: rgba(15, 23, 42, 0.72);
-  font-size: 0.76rem;
-  font-weight: 800;
-}
-
 .matrixIconButton {
-  width: 34px;
-  height: 34px;
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   padding: 0;
-  border-radius: 999px;
-  border: 1px solid rgba(148, 163, 184, 0.3);
-  background: rgba(255, 255, 255, 0.92);
-  color: rgba(15, 23, 42, 0.82);
+  border-radius: 8px;
+  border: 1px solid var(--home-border);
+  background: var(--home-surface);
+  color: var(--home-secondary);
   cursor: pointer;
-  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
-  transition: background 120ms ease, border-color 120ms ease, transform 120ms ease, box-shadow 120ms ease;
+  transition: background-color 140ms ease, border-color 140ms ease;
 }
 
 .matrixIconButton:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.98);
-  border-color: rgba(100, 116, 139, 0.42);
+  background: #eff6ff;
+  border-color: var(--home-accent);
 }
 
-.matrixIconButton:active:not(:disabled) {
-  transform: translateY(1px);
-}
-
+.employeeFocusButton:focus-visible,
+.bulkButton:focus-visible,
 .matrixIconButton:focus-visible {
-  outline: none;
-  box-shadow:
-    0 0 0 4px rgba(37, 99, 235, 0.14),
-    0 8px 18px rgba(15, 23, 42, 0.1);
-}
-
-.matrixIconButton:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-  box-shadow: none;
-}
-
-@keyframes scheduleFocusPulse {
-  0%,
-  100% {
-    border-color: rgba(148, 163, 184, 0.18);
-    background: rgba(248, 250, 252, 0.76);
-    box-shadow: none;
-  }
-
-  24%,
-  70% {
-    border-color: rgba(37, 99, 235, 0.44);
-    background: rgba(239, 246, 255, 0.9);
-    box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
-  }
+  outline: 2px solid var(--home-accent);
+  outline-offset: 2px;
 }
 
 @media (max-width: 1240px) {
   .topGrid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 960px) {
+  .page {
+    padding-inline: 16px;
   }
 }
 
@@ -585,36 +527,47 @@
 
   .summaryHeader,
   .totalGrid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
 @media (max-width: 720px) {
-  .todayCard {
-    height: 480px;
+  .activeSchedulesCard,
+  .scheduleCard {
+    scroll-margin-top: 280px;
+  }
+
+  .page .todayCard,
+  .page .monthCard,
+  .page .activeSchedulesCard {
+    padding: 16px;
   }
 
   .todayTable {
     min-width: 620px;
   }
 
-  .activeSchedulesHeader {
+  .page .activeSchedulesHeader {
     flex-wrap: wrap;
   }
 
-  .activeSchedulesHeaderRight {
+  .page .activeSchedulesHeaderRight {
     flex-basis: 100%;
     justify-content: flex-start;
   }
 
   .schedulesHeaderActions {
     width: 100%;
-    justify-content: space-between;
+    justify-content: flex-start;
   }
 
   .scheduleCardHeader {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .scheduleIdentity {
+    flex-basis: auto;
   }
 
   .matrixHeaderActions {
@@ -625,19 +578,11 @@
 
 @media (prefers-reduced-motion: reduce) {
   .collapsibleRegion,
-  .collapseButton svg,
   .employeeFocusButton,
   .bulkButton,
   .matrixIconButton,
   .scheduleCard {
-    transition-duration: 0.01ms;
-  }
-
-  .scheduleCardFocused {
-    animation: none;
-    border-color: rgba(37, 99, 235, 0.44);
-    background: rgba(239, 246, 255, 0.9);
-    box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
+    transition: none;
   }
 }
 
