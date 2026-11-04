@@ -219,8 +219,9 @@ test("styled generated columns retain empty cells, selection and custom columns"
   render(<ContainerGraphEditPage />);
   act(() => mocks.editor!.onSelectedCellKeysChange(["-4:1", "-5:1"]));
   await generate();
+  await waitFor(() => expect(columns()[0].cells).toEqual({}));
   expect(columns().map(column => column.columnId)).toEqual([4, 5]);
-  expect(columns()[0].cells).toEqual({});
+  expect(columns()[1].cells).toEqual({ "1": "Keep me" });
   expect(mocks.editor!.scheduleColumns[0].employeeId).toBe(-4);
   expect(mocks.editor!.selectedCellKeys).toEqual(["-4:1", "-5:1"]);
   expect(mocks.editor!.styleMap["-4:1"].backgroundColorArgb).toBe(123);
