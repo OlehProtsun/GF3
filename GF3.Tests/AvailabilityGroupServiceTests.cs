@@ -2,6 +2,7 @@ using BusinessLogicLayer.Common;
 using BusinessLogicLayer.Contracts.Enums;
 using BusinessLogicLayer.Contracts.Models;
 using BusinessLogicLayer.Services;
+using DataAccessLayer.Repositories;
 using GF3.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using DalEnums = DataAccessLayer.Models.Enums;
@@ -334,6 +335,71 @@ public sealed class AvailabilityGroupServiceTests
             }));
 
         Assert.Equal(["Interval is required for interval availability."], exception.Errors[nameof(AvailabilityGroupDayModel.IntervalStr)]);
+    }
+
+    [Fact]
+    public async Task SoftDeletedEmployee_PreservesGroupMembersAndDays_UntilGroupIsDeleted()
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        await using var context = database.CreateContext();
+        var service = CreateService(context);
+
+        var employee = TestDataFactory.CreateDalEmployee("Alice", "Brown");
+        context.Employees.Add(employee);
+        await context.SaveChangesAsync();
+
+        var group = await service.CreateAsync(TestDataFactory.CreateAvailabilityGroupModel());
+        var member = await service.CreateMemberAsync(group.Id, new AvailabilityGroupMemberModel
+        {
+            EmployeeId = employee.Id,
+            DisplayOrder = 3,
+        });
+        var day = await service.CreateSlotAsync(group.Id,
+            TestDataFactory.CreateAvailabilityDayModel(7, AvailabilityKind.INT, "09:00 - 15:00", memberId: member.Id));
+
+        await new EmployeeRepository(context).SoftDeleteAsync(employee.Id);
+        context.ChangeTracker.Clear();
+
+        Assert.True((await context.Employees.AsNoTracking().SingleAsync(item => item.Id == employee.Id)).IsDeleted);
+        Assert.False(await context.Employees.AnyAsync(item => item.Id == employee.Id && !item.IsDeleted));
+
+        var loadedGroup = await service.GetAsync(group.Id);
+        Assert.NotNull(loadedGroup);
+        Assert.Equal(group.Id, loadedGroup.Id);
+        Assert.Equal(group.Id, Assert.Single(await service.GetAllAsync()).Id);
+
+        var loadedMember = Assert.Single(await service.GetMembersAsync(group.Id));
+        Assert.Equal(member.Id, loadedMember.Id);
+        Assert.Equal(group.Id, loadedMember.AvailabilityGroupId);
+        Assert.Equal(employee.Id, loadedMember.EmployeeId);
+        Assert.Equal(3, loadedMember.DisplayOrder);
+
+        var loadedDay = Assert.Single(await service.GetSlotsAsync(group.Id));
+        Assert.Equal(day.Id, loadedDay.Id);
+        Assert.Equal(member.Id, loadedDay.AvailabilityGroupMemberId);
+        Assert.Equal(7, loadedDay.DayOfMonth);
+        Assert.Equal(AvailabilityKind.INT, loadedDay.Kind);
+        Assert.Equal("09:00 - 15:00", loadedDay.IntervalStr);
+
+        var (fullGroup, members, days) = await service.LoadFullAsync(group.Id);
+        Assert.Equal(group.Id, fullGroup.Id);
+        var fullMember = Assert.Single(members);
+        Assert.Equal(member.Id, fullMember.Id);
+        Assert.Equal(employee.Id, fullMember.EmployeeId);
+        Assert.Equal(3, fullMember.DisplayOrder);
+        var fullDay = Assert.Single(days);
+        Assert.Equal(day.Id, fullDay.Id);
+        Assert.Equal(member.Id, fullDay.AvailabilityGroupMemberId);
+        Assert.Equal(7, fullDay.DayOfMonth);
+        Assert.Equal(AvailabilityKind.INT, fullDay.Kind);
+        Assert.Equal("09:00 - 15:00", fullDay.IntervalStr);
+
+        await service.DeleteAsync(group.Id);
+
+        Assert.False(await context.AvailabilityGroups.AnyAsync(item => item.Id == group.Id));
+        Assert.False(await context.AvailabilityGroupMembers.AnyAsync(item => item.AvailabilityGroupId == group.Id));
+        Assert.False(await context.AvailabilityGroupDays.AnyAsync(item => item.AvailabilityGroupMemberId == member.Id));
+        Assert.True((await context.Employees.AsNoTracking().SingleAsync(item => item.Id == employee.Id)).IsDeleted);
     }
 
     private static AvailabilityGroupService CreateService(DataAccessLayer.Models.DataBaseContext.AppDbContext context)

@@ -529,8 +529,7 @@ export function AvailabilityEditPage() {
     () => getAutomaticManagerAvailabilityCellKeys(automaticEmployeeIds, year, month),
     [automaticEmployeeIds, year, month],
   );
-  const hasUnresolvedEmployees = Boolean(employeesQuery.data) && selectedEmployeeIds.some(id => !employees.some(employee => employee.id === id));
-  const hasPolicyError = contractSettingsQuery.isError || employeesQuery.isError || hasUnresolvedEmployees;
+  const hasPolicyError = contractSettingsQuery.isError || employeesQuery.isError;
   const isPolicyLoading = !hasPolicyError && (!contractSettingsQuery.data || !employeesQuery.data);
   const employeeNameById = useMemo(() => {
     return new Map(employees.map(employee => [employee.id, getEmployeeFullName(employee)]));

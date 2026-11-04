@@ -103,8 +103,7 @@ export function ManagerPhoneAvailabilityDetailPage() {
     () => groupQuery.data ? buildEffectiveManagerAvailabilityCellMap(cellMap, automaticEmployeeIds, groupQuery.data.year, groupQuery.data.month) : cellMap,
     [cellMap, automaticEmployeeIds, groupQuery.data],
   );
-  const hasUnresolvedEmployees = Boolean(employeesQuery.data) && profileEmployeeIds.some(id => !employeesQuery.data?.some(employee => employee.id === id));
-  const hasPolicyError = contractSettingsQuery.isError || employeesQuery.isError || hasUnresolvedEmployees;
+  const hasPolicyError = contractSettingsQuery.isError || employeesQuery.isError;
   const isPolicyLoading = !hasPolicyError && (!contractSettingsQuery.data || !employeesQuery.data);
 
   const transferredAwayVisualHintMap = useMemo(
