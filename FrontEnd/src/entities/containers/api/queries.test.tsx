@@ -404,3 +404,38 @@ test("failed priority save clears pending state and retries the same flags", asy
   expect(result.current.isPending).toBe(false);
   expect(apiMocks.updateGraphEmployee).toHaveBeenLastCalledWith(2, 66, 70, { employeeId: 7, minHoursMonth: 80, displayOrder: 0, isPriority: true });
 });
+
+test.each([
+  { edit: "slot", graph: 0, slots: 1, employees: 0 },
+  { edit: "note", graph: 1, slots: 0, employees: 0 },
+  { edit: "priority", graph: 0, slots: 0, employees: 1 },
+  { edit: "none", graph: 0, slots: 0, employees: 0 },
+])("sends only changed workspace resources for a $edit edit", async ({ edit, graph, slots, employees }) => {
+  const client = new QueryClient();
+  const invalidate = vi.spyOn(client, "invalidateQueries");
+  const { result } = renderHook(() => useSaveGraphWorkspaceMutation(), {
+    wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>,
+  });
+  const input = updateWorkspaceInput();
+  const existingGraph = { ...input.payload, id: 66, containerId: 2, lastUpdatedAtUtc: "2026-11-08T10:00:00Z" };
+  const existingEmployees = input.existingEmployees.slice(0, 2);
+  const saved = vi.fn();
+  act(() => {
+    result.current.mutate({
+      ...input, existingGraph, existingEmployees,
+      payload: { ...input.payload, note: edit === "note" ? undefined : input.payload.note },
+      existingSlots: [
+        { ...input.existingSlots[0], toTime: "11:00" },
+        { ...input.existingSlots[0], id: 702, fromTime: "11:00" },
+        input.existingSlots[1],
+      ].reverse().map(slot => ({ ...slot, status: "Assigned", slotNo: 4 })),
+      employeeAssignments: existingEmployees.map(row => ({ ...row, isPriority: edit === "priority" && row.employeeId === 7 })),
+      cellMap: { "7:1": "09:00 - 13:00", "5:2": edit === "slot" ? "10:00 - 15:00" : "10:00 - 14:00" },
+    }, { onSuccess: saved });
+  });
+  await waitFor(() => expect(saved).toHaveBeenCalled());
+  expect(apiMocks.updateGraph).toHaveBeenCalledTimes(graph);
+  expect(apiMocks.replaceGraphSlots).toHaveBeenCalledTimes(slots);
+  expect(apiMocks.updateGraphEmployee).toHaveBeenCalledTimes(employees);
+  if (edit === "none") expect(invalidate).not.toHaveBeenCalled();
+});
