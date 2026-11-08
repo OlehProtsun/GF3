@@ -24,6 +24,64 @@
   height: 0;
 }
 
+.editorSurface {
+  display: contents;
+}
+
+.saveSummary {
+  position: relative;
+  z-index: 2;
+  flex: 0 0 auto;
+  max-height: min(24vh, 12rem);
+  overflow: auto;
+  margin-inline: 14px;
+  padding: 8px 12px;
+  border: 1px solid rgba(100, 116, 139, 0.24);
+  border-radius: 12px;
+  background: #f8fafc;
+  color: #1e293b;
+  font-size: 0.875rem;
+}
+
+.saveSummaryRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+}
+
+.saveSummary ul {
+  display: grid;
+  gap: 4px;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.saveSummary p {
+  margin: 4px 0;
+}
+
+.saveSummary button {
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 4px 8px;
+  background: #fff;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.saveSummary button:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+.saveSummary button:disabled {
+  opacity: 0.65;
+  cursor: default;
+}
+
 .headerActions,
 .headerControls {
   display: inline-flex;

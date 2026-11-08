@@ -12,6 +12,7 @@ function Harness() {
 }
 beforeEach(() => {
   window.localStorage.clear();
+  window.sessionStorage.clear();
   setAuthAccessToken(null);
   api.login.mockResolvedValue({ session, accessToken: "token", expiresAtUtc: "" });
   api.logout.mockResolvedValue(undefined);
@@ -20,6 +21,22 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.restoreAllMocks(); setAuthAccessToken(null); });
 
 describe("authentication lifecycle", () => {
+  it("clears only the signed-out manager's schedule recovery keys", async () => {
+    api.login.mockResolvedValueOnce({ session: { ...session, role: "manager", managerId: 7 }, accessToken: "token" });
+    window.sessionStorage.setItem("gf3:graph-drafts:7:1", "draft");
+    window.sessionStorage.setItem("gf3:graph-drafts:7:2", "draft");
+    window.sessionStorage.setItem("gf3:graph-drafts:70:1", "other draft");
+    render(<AuthProvider><Harness /></AuthProvider>);
+    await screen.findByText("unauthenticated");
+    fireEvent.click(screen.getByText("login"));
+    await screen.findByText("authenticated");
+    fireEvent.click(screen.getByText("logout"));
+    await screen.findByText("unauthenticated");
+    expect(window.sessionStorage.getItem("gf3:graph-drafts:7:1")).toBeNull();
+    expect(window.sessionStorage.getItem("gf3:graph-drafts:7:2")).toBeNull();
+    expect(window.sessionStorage.getItem("gf3:graph-drafts:70:1")).toBe("other draft");
+  });
+
   it("clears credentials and session after a protected request returns 401", async () => {
     render(<AuthProvider><Harness /></AuthProvider>);
     await screen.findByText("unauthenticated");

@@ -2,11 +2,13 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { beforeEach, expect, test, vi } from "vitest";
 import type { ComponentProps } from "react";
 import type { ContainerGraphEditor } from "@entities/containers/ui/ContainerGraphEditor";
-import type { Graph, GraphSlot, GraphCellStyle } from "@entities/containers/model/types";
+import type { Graph, GraphSlot, GraphCellStyle, GraphEmployee } from "@entities/containers/model/types";
+import type { SaveGraphWorkspaceEmployeeAssignment } from "@entities/containers/api/queries";
 import type { Employee } from "@entities/employees/model/types";
 import type { AvailabilitySlot } from "@entities/availability-groups/model/types";
 import type { ShiftSwap } from "@entities/shift-swaps/model/types";
 import { buildGraphNoteContent, parseGraphNoteContent } from "@entities/containers/model/graphNote";
+import { buildGraphDraftSlots } from "@entities/containers/model/graphWorkspace";
 import { setLanguage, t } from "@shared/i18n";
 import { ApiError, RequestCanceledError } from "@shared/api/httpClient";
 import { QueryClient } from "@tanstack/react-query";
@@ -20,7 +22,7 @@ const mocks = vi.hoisted(() => ({
   params: { containerId: "1", graphId: "1" as string | undefined },
   location: { key: "test", pathname: "/container/1/graphs/1/edit", search: "?openGraphIds=1,2" },
   graphs: [] as Graph[], slots: [] as GraphSlot[], offers: [] as ShiftSwap[], styles: [] as GraphCellStyle[],
-  graphEmployees: [{ id: 1, scheduleId: 1, employeeId: 1, displayOrder: 0 }],
+  graphEmployees: [{ id: 1, scheduleId: 1, employeeId: 1, displayOrder: 0, isPriority: false }],
   employees: [{ id: 1, firstName: "Ada", lastName: "Lovelace", hasLoginAccount: true, isOnline: false }] as Employee[],
   contractSettings: { data: { automaticWeekdayAvailability: false } as { automaticWeekdayAvailability: boolean } | undefined, isError: false },
   availabilitySlots: [] as AvailabilitySlot[],
@@ -29,9 +31,13 @@ const mocks = vi.hoisted(() => ({
   container: { id: 1, name: "Container" },
   generate: vi.fn(), save: vi.fn(), publish: vi.fn(), navigate: vi.fn(),
   commit: vi.fn(), listStyles: vi.fn(), graphById: vi.fn(),
+  offersByGraph: new Map<number, ShiftSwap[]>(),
+  savedSlots: new Map<number, GraphSlot[]>(),
+  savedEmployees: new Map<number, GraphEmployee[]>(),
   editor: null as EditorProps | null, queryClient: null as QueryClient | null,
 }));
 
+vi.mock("@app/providers/AuthProvider", () => ({ useAuth: () => ({ session: null }) }));
 vi.mock("react-router-dom", async importOriginal => ({
   ...await importOriginal<object>(), useParams: () => mocks.params, useLocation: () => mocks.location, useNavigate: () => mocks.navigate,
 }));
@@ -54,11 +60,17 @@ vi.mock("@entities/containers", async importOriginal => {
   return { ...actual, ...overrides,
     useContainerByIdQuery: () => query(mocks.container), useContainerGraphsQuery: () => query(mocks.graphs),
     useGraphByIdQuery: () => query(mocks.graphs.find(graph => graph.id === Number(mocks.params.graphId))),
-    useGraphEmployeesQuery: () => query(mocks.graphEmployees), useGraphSlotsQuery: () => query(mocks.slots),
+    useGraphEmployeesQuery: () => query(mocks.savedEmployees.get(Number(mocks.params.graphId)) ?? mocks.graphEmployees),
+    useGraphSlotsQuery: () => query(mocks.savedSlots.get(Number(mocks.params.graphId)) ?? mocks.slots),
     useGraphCellStylesQuery: () => query(mocks.styles),
     useGenerateGraphPreviewMutation: () => ({ mutate: mocks.generate, isPending: false }),
     useSaveGraphWorkspaceMutation: () => ({ mutate: mocks.save, isPending: false }),
-    containersApi: { ...actual.containersApi as object, graphById: mocks.graphById, listGraphCellStyles: mocks.listStyles, commitGraphVersion: mocks.commit },
+    containersApi: { ...actual.containersApi as object,
+      graphById: mocks.graphById, listGraphCellStyles: mocks.listStyles, commitGraphVersion: mocks.commit,
+      listGraphVersions: async () => ({ currentVersionId: null, versions: [] }),
+      listGraphEmployees: async (_: number, id: number) => mocks.savedEmployees.get(id) ?? mocks.graphEmployees,
+      listGraphSlots: async (_: number, id: number) => mocks.savedSlots.get(id) ?? mocks.slots,
+    },
     ContainerGraphEditor: (props: EditorProps) => {
       mocks.editor = props;
       return <div>
@@ -83,6 +95,7 @@ vi.mock("@entities/availability-binds", async importOriginal => ({ ...await impo
   useCreateAvailabilityBindMutation: () => ({ isPending: false }), useUpdateAvailabilityBindMutation: () => ({ isPending: false }), useDeleteAvailabilityBindMutation: () => ({ isPending: false }),
 }));
 vi.mock("@entities/shift-swaps", async importOriginal => ({ ...await importOriginal<object>(),
+  shiftSwapsApi: { listGraphLog: async (_: number, id: number) => mocks.offersByGraph.get(id) ?? mocks.offers },
   useGraphShiftSwapLogQuery: () => ({ data: mocks.offers }), useCreateManagerManualShiftSwapMutation: () => ({ mutate: mocks.publish, isPending: false }),
   useCancelManagerManualShiftSwapMutation: () => ({ mutate: vi.fn(), isPending: false }),
 }));
@@ -98,15 +111,37 @@ beforeEach(() => {
   mocks.contractSettings = { data: { automaticWeekdayAvailability: false }, isError: false };
   mocks.employees = [{ id: 1, firstName: "Ada", lastName: "Lovelace", contractType: "zlecenie", hasLoginAccount: true, isOnline: false }];
   mocks.availabilitySlots = [];
-  mocks.graphEmployees = [{ id: 1, scheduleId: 1, employeeId: 1, displayOrder: 0 }];
+  mocks.graphEmployees = [{ id: 1, scheduleId: 1, employeeId: 1, displayOrder: 0, isPriority: false }];
   mocks.members = [{ id: 1, employeeId: 1, displayOrder: 0 }];
   mocks.groups = [{ id: 1, name: "Availability", year: 2026, month: 2 }];
   mocks.params = { containerId: "1", graphId: "1" };
+  mocks.location.search = "?openGraphIds=1,2";
   mocks.graphs = [{ ...graph }, { ...graph, id: 2, name: "Graph two" }];
   mocks.slots = []; mocks.offers = []; mocks.styles = []; mocks.editor = null; mocks.queryClient = new QueryClient();
   mocks.generate.mockImplementation((_variables, callbacks) => callbacks.onSuccess({ slots: preview() }));
-  mocks.save.mockImplementation((variables, callbacks) => callbacks.onSuccess({ graphId: variables.graphId ?? 1 }));
-  mocks.publish.mockImplementation((_variables, callbacks) => callbacks.onSuccess({}));
+  mocks.savedSlots.clear(); mocks.savedEmployees.clear(); mocks.offersByGraph.clear();
+  mocks.save.mockImplementation((variables, callbacks) => {
+    const { graphId: id = 1, payload, employeeAssignments, existingSlots, cellMap } = variables;
+    mocks.graphs = mocks.graphs.map(item => item.id === id ? { ...item, ...payload } : item);
+    mocks.savedEmployees.set(id, employeeAssignments.map((row: SaveGraphWorkspaceEmployeeAssignment, displayOrder: number) =>
+      ({ ...row, id: row.id ?? displayOrder + 1, scheduleId: id, displayOrder })));
+    mocks.savedSlots.set(id, buildGraphDraftSlots({ scheduleId: id, existingSlots,
+      employeeIds: employeeAssignments.map((row: { employeeId: number }) => row.employeeId),
+      year: payload.year, month: payload.month, cellMap,
+    }).slots);
+    callbacks.onSuccess({ graphId: id });
+  });
+  mocks.publish.mockImplementation((variables, callbacks) => {
+    const { graphId: id, ...offer } = variables;
+    const offers = mocks.offersByGraph.get(id) ?? mocks.offers;
+    const slotId = 1000 + offers.length;
+    const created = { ...offer, id: slotId, scheduleId: id, scheduleSlotId: slotId, status: "open", isManagerCreated: true };
+    mocks.offersByGraph.set(id, [...offers, created]);
+    mocks.savedSlots.set(id, [...mocks.savedSlots.get(id) ?? [], {
+      ...offer, id: slotId, scheduleId: id, slotNo: 1, employeeId: null, status: 0,
+    }]);
+    callbacks.onSuccess(created);
+  });
   mocks.listStyles.mockResolvedValue([]); mocks.commit.mockResolvedValue({});
   mocks.graphById.mockImplementation((_containerId, id) => Promise.resolve(mocks.graphs.find(graph => graph.id === id)));
 });
@@ -133,7 +168,7 @@ test("preview displays generated matrix cell, repeats stably, saves provenance a
   render(<ContainerGraphEditPage />); expect(columns()).toEqual(original);
 });
 
-test("externally accepted shift refreshes clean editor and blocks a stale dirty save", async () => {
+test("externally accepted shift refreshes a clean editor and timestamp-only noise allows a dirty save", async () => {
   mocks.graphs[0].note = buildGraphNoteContent("", [{ id: 4, label: "Auto", source: "generated-unfilled", cells: { "1": "08:00 - 12:00" } }], [1, -4]);
   const view = render(<ContainerGraphEditPage />);
   const accepted = buildGraphNoteContent("", [{ id: 4, label: "Auto", source: "generated-unfilled", cells: {} }], [1, -4], [
@@ -143,11 +178,21 @@ test("externally accepted shift refreshes clean editor and blocks a stale dirty 
   view.rerender(<ContainerGraphEditPage />);
   await waitFor(() => expect(mocks.editor!.styleMap["-4:1"].backgroundColorArgb).toBe(-4528387));
   expect(columns()[0].cells).toEqual({});
-  act(() => mocks.editor!.onFieldChange("name", "Dirty name"));
-  mocks.graphById.mockResolvedValue({ ...mocks.graphs[0], lastUpdatedAtUtc: "2026-10-24T22:00:00Z" });
+  act(() => mocks.editor!.onFieldChange("name")("Dirty name"));
+  mocks.graphById.mockImplementation(async () => ({ ...mocks.graphs[0], lastUpdatedAtUtc: "2026-10-24T22:00:00Z" }));
   fireEvent.click(screen.getByText("Save editor")); fireEvent.click(screen.getByText("Confirm save"));
-  await waitFor(() => expect(screen.getByTestId("errors")).toHaveTextContent("Refresh before saving"));
+  await waitFor(() => expect(mocks.commit).toHaveBeenCalledOnce());
+  expect(mocks.save).toHaveBeenCalledOnce();
+});
+
+test("a persisted shift change still conflicts with a dirty workspace", async () => {
+  render(<ContainerGraphEditPage />);
+  act(() => mocks.editor!.onFieldChange("name")("Dirty name"));
+  mocks.savedSlots.set(1, preview());
+  fireEvent.click(screen.getByText("Save editor")); fireEvent.click(screen.getByText("Confirm save"));
+  expect(await screen.findByText("Graph one · Conflict")).toBeVisible();
   expect(mocks.save).not.toHaveBeenCalled();
+  expect(mocks.editor!.form.name).toBe("Dirty name");
 });
 
 test.each(["error", "missing", "empty"])("failed or malformed %s preview keeps columns", async kind => {

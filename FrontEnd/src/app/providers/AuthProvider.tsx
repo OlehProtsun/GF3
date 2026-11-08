@@ -4,6 +4,7 @@ import { ApiError, getAuthAccessToken, getErrorMessage, setAuthAccessToken, subs
 import { authApi } from "@entities/auth";
 import type { AuthLoginResult, AuthSession, LoginInput } from "@entities/auth";
 import { disableForDevice, syncPushSubscription } from "@entities/employee-push/lib/pushSubscription";
+import { clearAllGraphRecoveryForManager } from "@entities/containers/model/graphDraftRecovery";
 
 type AuthStatus = "loading" | "authenticated" | "unauthenticated";
 
@@ -166,6 +167,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       try { await disableForDevice(() => generation.current === logoutGeneration); } catch { /* Local logout must finish when push is unavailable. */ }
     }
     if (logoutGeneration !== generation.current) return;
+    if (session?.role === "manager" && session.managerId) clearAllGraphRecoveryForManager(session.managerId);
     storeAccessToken(null);
     applyUnauthenticatedState(null);
     try {

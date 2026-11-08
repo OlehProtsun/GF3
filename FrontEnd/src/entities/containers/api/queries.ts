@@ -1,10 +1,9 @@
 import { t } from "@shared/i18n";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { GraphEmployee, GraphSlot } from "@entities/containers/model/types";
-import {
-  buildGraphDraftSlots,
-  type GraphMatrixCellMap,
-} from "@entities/containers/model/graphWorkspace";
+import type { Graph, GraphEmployee, GraphSlot } from "@entities/containers/model/types";
+import { buildGraphWorkspaceSaveSlots, graphSaveFields, normalizeGraphSlots } from "@entities/containers/model/graphSaveIntegrity";
+import { stableSerialize } from "@shared/lib/stableSerialize";
+import type { GraphMatrixCellMap } from "@entities/containers/model/graphWorkspace";
 import { queryKeys } from "@shared/api/queryKeys";
 import { containersApi, managerGraphFillColorBindsApi, managerGraphTextColorBindsApi } from "./containersApi";
 import type {
@@ -82,6 +81,7 @@ export type SaveGraphWorkspaceInput = {
   payload: SaveGraphDto;
   employeeAssignments: SaveGraphWorkspaceEmployeeAssignment[];
   cellMap: GraphMatrixCellMap;
+  existingGraph?: Graph;
   existingEmployees?: GraphEmployee[];
   existingSlots?: GraphSlot[];
 };
@@ -98,15 +98,19 @@ async function syncGraphWorkspace({
   payload,
   employeeAssignments,
   cellMap,
+  existingGraph,
   existingEmployees = [],
   existingSlots = [],
-}: SaveGraphWorkspaceInput): Promise<SaveGraphWorkspaceResult> {
+}: SaveGraphWorkspaceInput): Promise<SaveGraphWorkspaceResult & { changed: boolean }> {
   let resolvedGraphId = graphId;
+  const graphChanged = !existingGraph ||
+    stableSerialize(graphSaveFields({ ...existingGraph, ...payload, note: payload.note })) !==
+    stableSerialize(graphSaveFields(existingGraph));
 
   if (resolvedGraphId === null) {
     const createdGraph = await containersApi.createGraph(containerId, payload);
     resolvedGraphId = createdGraph.id;
-  } else {
+  } else if (graphChanged) {
     await containersApi.updateGraph(containerId, resolvedGraphId, payload);
   }
 
@@ -179,29 +183,33 @@ async function syncGraphWorkspace({
     );
   }
 
-  const draft = buildGraphDraftSlots({
+  const draft = buildGraphWorkspaceSaveSlots({
     scheduleId: resolvedGraphId as number,
     existingSlots,
     employeeIds: selectedEmployeeIds,
     year: payload.year,
     month: payload.month,
     cellMap,
-  });
+  }, Boolean(existingGraph));
 
   if (Object.keys(draft.errors).length > 0) {
     throw new Error(Object.values(draft.errors)[0] ?? t("The schedule matrix contains invalid time ranges."));
   }
 
-  await containersApi.replaceGraphSlots(containerId, resolvedGraphId as number, {
-    slots: draft.slots.map(slot => ({
-      dayOfMonth: slot.dayOfMonth,
-      slotNo: slot.slotNo,
-      fromTime: slot.fromTime,
-      toTime: slot.toTime,
-      employeeId: slot.employeeId ?? null,
-      status: slot.status,
-    })),
-  });
+  const slotsChanged = graphId === null || !existingGraph ||
+    stableSerialize(normalizeGraphSlots(draft.slots)) !== stableSerialize(normalizeGraphSlots(existingSlots));
+  if (slotsChanged) {
+    await containersApi.replaceGraphSlots(containerId, resolvedGraphId as number, {
+      slots: draft.slots.map(slot => ({
+        dayOfMonth: slot.dayOfMonth,
+        slotNo: slot.slotNo,
+        fromTime: slot.fromTime,
+        toTime: slot.toTime,
+        employeeId: slot.employeeId ?? null,
+        status: slot.status,
+      })),
+    });
+  }
 
   if (employeesToRemove.length > 0) {
     await Promise.all(
@@ -211,7 +219,11 @@ async function syncGraphWorkspace({
     );
   }
 
-  return { graphId: resolvedGraphId as number };
+  return {
+    graphId: resolvedGraphId as number,
+    changed: graphId === null || graphChanged || slotsChanged ||
+      employeesToCreate.length > 0 || employeesToUpdate.length > 0 || employeesToRemove.length > 0,
+  };
 }
 
 export const useContainersListQuery = (refreshKey?: string) =>
@@ -342,16 +354,19 @@ export function useSaveGraphWorkspaceMutation() {
   const qc = useQueryClient();
 
   return useMutation({
-    mutationFn: syncGraphWorkspace,
-    onSuccess: (result, variables) => {
-      qc.invalidateQueries({ queryKey: queryKeys.containers.all });
-      qc.invalidateQueries({ queryKey: queryKeys.containers.graphs(variables.containerId) });
-      qc.invalidateQueries({ queryKey: queryKeys.containers.graphById(variables.containerId, result.graphId) });
-      qc.invalidateQueries({ queryKey: queryKeys.containers.graphEmployees(variables.containerId, result.graphId) });
-      qc.invalidateQueries({ queryKey: queryKeys.containers.graphSlots(variables.containerId, result.graphId) });
-      qc.invalidateQueries({ queryKey: queryKeys.containers.graphCellStyles(variables.containerId, result.graphId) });
-      qc.invalidateQueries({ queryKey: queryKeys.employeeSchedules.all });
-      qc.invalidateQueries({ queryKey: queryKeys.shiftSwaps.all });
+    mutationFn: async (variables: SaveGraphWorkspaceInput): Promise<SaveGraphWorkspaceResult> => {
+      const { graphId, changed } = await syncGraphWorkspace(variables);
+      if (changed) {
+        if (!variables.existingGraph) qc.invalidateQueries({ queryKey: queryKeys.containers.all });
+        qc.invalidateQueries({ queryKey: queryKeys.containers.graphs(variables.containerId) });
+        qc.invalidateQueries({ queryKey: queryKeys.containers.graphById(variables.containerId, graphId) });
+        qc.invalidateQueries({ queryKey: queryKeys.containers.graphEmployees(variables.containerId, graphId) });
+        qc.invalidateQueries({ queryKey: queryKeys.containers.graphSlots(variables.containerId, graphId) });
+        qc.invalidateQueries({ queryKey: queryKeys.containers.graphCellStyles(variables.containerId, graphId) });
+        qc.invalidateQueries({ queryKey: queryKeys.employeeSchedules.all });
+        qc.invalidateQueries({ queryKey: queryKeys.shiftSwaps.all });
+      }
+      return { graphId };
     },
   });
 }
