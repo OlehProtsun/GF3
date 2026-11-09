@@ -1,10 +1,12 @@
 import { expect, test } from "vitest";
+import { readFileSync, writeFileSync } from "node:fs";
+import { buildGraphCellMap } from "./graphWorkspace";
 import { buildGraphNoteContent, parseGraphNoteContent } from "./graphNote";
 import {
   buildStyleOnlyUpdatedNote, classifyGraphDraftChange, diffGraphColors, fingerprintPersistedGraph,
-  hasPersistedWorkspaceChanges, matchGraphColors, mergeGraphColorStyles, type PersistedGraphState,
+  buildGraphWorkspaceSaveSlots, graphSaveMismatch, hasPersistedWorkspaceChanges, matchGraphColors, mergeGraphColorStyles, type PersistedGraphState,
 } from "./graphSaveIntegrity";
-import type { GraphCellStyle } from "./types";
+import type { GraphCellStyle, GraphSlot } from "./types";
 
 const style = (backgroundColorArgb: number | null, textColorArgb: number | null, employeeId = 2, dayOfMonth = 3): GraphCellStyle =>
   ({ id: 1, scheduleId: 4, employeeId, dayOfMonth, backgroundColorArgb, textColorArgb });
@@ -19,6 +21,54 @@ const state: PersistedGraphState = {
   slots: [1, 2].map(dayOfMonth => ({ id: dayOfMonth, scheduleId: 4, dayOfMonth, slotNo: 1, employeeId: 2, status: 1, fromTime: "08:00", toTime: "12:00" })),
   styles: [style(-1, null), style(null, -2, 3)],
 };
+
+test("replacement numbering is technical; slot multiplicity and status remain semantic", () => {
+  const intended = { ...state, slots: [
+    ...[1, 2, 4].map((slotNo, index) => ({ ...state.slots[0], dayOfMonth: 10, slotNo, employeeId: index + 1 })),
+    ...[1, 3].map((slotNo, index) => ({ ...state.slots[0], dayOfMonth: 29, slotNo, employeeId: index + 1 })),
+    ...[5, 8].map(slotNo => ({ ...state.slots[0], slotNo, employeeId: null, status: 0 })),
+  ] };
+  const actual = { ...intended, slots: intended.slots.map((slot, index) => ({ ...slot,
+    slotNo: [1, 2, 3, 1, 2, 1, 2][index],
+  })).toReversed() };
+  expect(fingerprintPersistedGraph(actual)).toBe(fingerprintPersistedGraph(intended));
+  expect(hasPersistedWorkspaceChanges(state, intended, actual)).toBe(true);
+  for (const slots of [
+    actual.slots.slice(1), [...actual.slots, actual.slots[0]],
+    ...[{ employeeId: 99 }, { dayOfMonth: 7 }, { fromTime: "07:00" }, { toTime: "11:00" }, { status: 2 }].map(change =>
+      actual.slots.map((slot, index) => index ? slot : { ...slot, ...change })),
+  ]) expect(fingerprintPersistedGraph({ ...actual, slots })).not.toBe(fingerprintPersistedGraph(intended));
+});
+
+test("diagnostics identify semantic fields without exposing graph text", () => {
+  const actual = { ...state, graph: { ...state.graph, note: "Private text" } };
+  expect(graphSaveMismatch(state, actual)).toEqual({ field: "graph.note" });
+  expect(JSON.stringify(graphSaveMismatch(state, actual))).not.toContain("Private text");
+  expect(graphSaveMismatch(state, { ...state, slots: [] })).toEqual({ field: "slots.count", intended: 2, persisted: 0 });
+  expect(graphSaveMismatch(state, { ...state, slots: state.slots.map(slot => ({ ...slot, slotNo: 90 })) })).toBeNull();
+});
+
+// Private input stays outside the repository; CI uses the synthetic regression above.
+test.skipIf(!process.env.GF3_SAVE_PRIVATE_FIXTURE)("replays the supplied F42/F35 snapshots through the actual editor builder", () => {
+  const fixture = JSON.parse(readFileSync(process.env.GF3_SAVE_PRIVATE_FIXTURE!, "utf8")) as {
+    graphs: Array<{ graphId: number; before: { slots: GraphSlot[] }; after: { slots: GraphSlot[]; employeeOrder: number[] } }>;
+  };
+  const replay = fixture.graphs.map(graph => {
+    const hydrate = (slots: GraphSlot[]) => slots.map((slot, index) => ({ ...slot, id: index + 1, scheduleId: graph.graphId }));
+    const persisted = hydrate(graph.after.slots);
+    const draft = buildGraphWorkspaceSaveSlots({ scheduleId: graph.graphId, year: 2026, month: 11,
+      employeeIds: graph.after.employeeOrder, existingSlots: hydrate(graph.before.slots), cellMap: buildGraphCellMap(persisted),
+    }, true);
+    expect(draft.errors).toEqual({});
+    expect(draft.slots).toHaveLength(graph.graphId === 39 ? 203 : 93);
+    const key = (slot: GraphSlot) => `${slot.dayOfMonth}/${slot.fromTime}/${slot.toTime}/${slot.employeeId}`;
+    const byKey = new Map(persisted.map(slot => [key(slot), slot]));
+    expect(draft.slots.filter(slot => slot.slotNo !== byKey.get(key(slot))?.slotNo)).toHaveLength(graph.graphId === 39 ? 2 : 0);
+    expect(fingerprintPersistedGraph({ ...state, slots: draft.slots })).toBe(fingerprintPersistedGraph({ ...state, slots: persisted }));
+    return { graphId: graph.graphId, intended: draft.slots, persisted };
+  });
+  if (process.env.GF3_SAVE_REPLAY) writeFileSync(process.env.GF3_SAVE_REPLAY, JSON.stringify(replay));
+});
 
 test("fingerprints persisted values independently of timestamps, API ordering and row IDs", () => {
   expect(fingerprintPersistedGraph({

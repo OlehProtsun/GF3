@@ -297,6 +297,65 @@ public sealed class ContainerServiceTests
     }
 
     [Fact]
+    public async Task ReplaceGraphSlotsAsync_ReplaysEditorNumberingAgainstDisposableSqliteCopy()
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        var snapshot = Environment.GetEnvironmentVariable("GF3_SAVE_SQLITE_SNAPSHOT");
+        if (!string.IsNullOrEmpty(snapshot))
+        {
+            await using var source = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={snapshot};Mode=ReadOnly;Pooling=False");
+            await using var target = new Microsoft.Data.Sqlite.SqliteConnection(database.ConnectionString);
+            await source.OpenAsync();
+            await target.OpenAsync();
+            source.BackupDatabase(target);
+        }
+        await using var context = database.CreateContext();
+        var service = CreateService(context, new FakeScheduleGenerator());
+        var container = TestDataFactory.CreateDalContainer($"Save replay {Guid.NewGuid():N}");
+        var shop = TestDataFactory.CreateDalShop($"Save replay {Guid.NewGuid():N}");
+        context.AddRange(container, shop);
+        await context.SaveChangesAsync();
+
+        // The private replay is produced by the actual TS builder, never copied into source control.
+        var replayPath = Environment.GetEnvironmentVariable("GF3_SAVE_REPLAY");
+        using var replay = string.IsNullOrEmpty(replayPath) ? null : System.Text.Json.JsonDocument.Parse(await File.ReadAllTextAsync(replayPath));
+        var cases = new List<(List<ScheduleSlotModel> Intended, List<ScheduleSlotModel> Persisted)>();
+        foreach (var (day, numbers) in new[] { (10, new[] { 1, 2, 4 }), (29, new[] { 1, 3 }) })
+        {
+            var intended = numbers.Select((number, index) => TestDataFactory.CreateScheduleSlotModel(day, number, index + 1, "09:00", "15:00")).ToList();
+            intended.Add(TestDataFactory.CreateScheduleSlotModel(day, 8, null, "09:00", "15:00"));
+            intended.Add(TestDataFactory.CreateScheduleSlotModel(day, 9, null, "09:00", "15:00"));
+            cases.Add((intended, intended.Select((slot, index) => TestDataFactory.CreateScheduleSlotModel(day, index + 1, slot.EmployeeId, "09:00", "15:00")).ToList()));
+        }
+        if (replay is not null)
+        {
+            List<ScheduleSlotModel> ReadSlots(System.Text.Json.JsonElement rows) => rows.EnumerateArray().Select(row =>
+                TestDataFactory.CreateScheduleSlotModel(row.GetProperty("dayOfMonth").GetInt32(), row.GetProperty("slotNo").GetInt32(),
+                    row.GetProperty("employeeId").ValueKind == System.Text.Json.JsonValueKind.Null ? null : row.GetProperty("employeeId").GetInt32(),
+                    row.GetProperty("fromTime").GetString()!, row.GetProperty("toTime").GetString()!)).ToList();
+            foreach (var graph in replay.RootElement.EnumerateArray())
+                cases.Add((ReadSlots(graph.GetProperty("intended")), ReadSlots(graph.GetProperty("persisted"))));
+        }
+        foreach (var (intended, persisted) in cases)
+        {
+            var employees = intended.Where(slot => slot.EmployeeId.HasValue).Select(slot => slot.EmployeeId!.Value).Distinct()
+                .ToDictionary(id => id, id => TestDataFactory.CreateDalEmployee("Synthetic", Guid.NewGuid().ToString("N")));
+            context.Employees.AddRange(employees.Values);
+            var graph = TestDataFactory.CreateDalSchedule(container.Id, shop.Id, $"Replay {Guid.NewGuid():N}", 2026, 11);
+            context.Schedules.Add(graph);
+            await context.SaveChangesAsync();
+            foreach (var slot in intended.Concat(persisted)) if (slot.EmployeeId is int id) slot.EmployeeId = employees[id].Id;
+            await service.ReplaceGraphSlotsAsync(container.Id, graph.Id, intended);
+            await using var readContext = database.CreateContext();
+            var stored = await readContext.ScheduleSlots.AsNoTracking().Where(slot => slot.ScheduleId == graph.Id).ToListAsync();
+            static string Key(int day, int number, string from, string to, int? employee, int status) => $"{day}/{number}/{from}/{to}/{employee}/{status}";
+            Assert.Equal(persisted.Select(slot => Key(slot.DayOfMonth, slot.SlotNo, slot.FromTime, slot.ToTime, slot.EmployeeId,
+                    (int)(slot.EmployeeId.HasValue ? SlotStatus.ASSIGNED : SlotStatus.UNFURNISHED))).Order(),
+                stored.Select(slot => Key(slot.DayOfMonth, slot.SlotNo, slot.FromTime, slot.ToTime, slot.EmployeeId, (int)slot.Status)).Order());
+        }
+    }
+
+    [Fact]
     public async Task ReplaceGraphSlotsAsync_ValidatesSplitShiftsAndRebuildsSlotNumbers()
     {
         await using var database = await SqliteTestDatabase.CreateAsync();

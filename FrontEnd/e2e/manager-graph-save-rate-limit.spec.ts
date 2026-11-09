@@ -1,4 +1,8 @@
 import { expect, test, type Page, type WebSocketRoute } from "@playwright/test";
+import { readFileSync } from "node:fs";
+
+type FixtureSlot = { dayOfMonth: number; slotNo: number; fromTime: string; toTime: string; employeeId: number | null; status: number | string };
+type IncidentGraph = { graphId: number; before: { slots: FixtureSlot[]; employeeOrder: number[] }; after: { slots: FixtureSlot[]; employeeOrder: number[] } };
 
 const ids = [34, 36, 37, 38, 42];
 const graphRoot = "/api/containers/7/graphs";
@@ -12,7 +16,8 @@ const oldSummary = (page: Page) => page.getByRole("region", { name: "Schedule sa
 test.use({ serviceWorkers: "block" });
 
 async function workspace(page: Page, baseURL: string, loseThirdBatch: boolean,
-  options: { graphIds?: number[]; roster?: number[]; throttle?: boolean; enforceLimits?: boolean } = {}) {
+  options: { graphIds?: number[]; roster?: number[]; throttle?: boolean; enforceLimits?: boolean;
+    incident?: IncidentGraph[]; loseCommittedReadback?: boolean } = {}) {
   const graphIds = options.graphIds ?? ids;
   const roster = options.roster ?? employeeIds;
   const fixtureEmployees = roster.map(id => ({ id, firstName: "Worker", lastName: String(id) }));
@@ -25,15 +30,19 @@ async function workspace(page: Page, baseURL: string, loseThirdBatch: boolean,
       allowSwap: true, peoplePerShift: 1, shift1Time: "08:00 - 12:00", shift2Time: "12:00 - 16:00",
       maxHoursPerEmpMonth: 160, maxConsecutiveDays: 5, maxConsecutiveFull: 3, maxFullPerMonth: 10, note: "" },
     styles: new Map<string, Record<string, unknown>>(),
-    slots: [{ id: 1, scheduleId: id, employeeId: 1, dayOfMonth: 12, slotNo: 1, status: 1, fromTime: "08:00", toTime: "12:00" }],
+    slots: [{ id: 1, scheduleId: id, employeeId: 1 as number | null, dayOfMonth: 12, slotNo: 1, status: 1, fromTime: "08:00", toTime: "12:00" }],
     versionCount: 0,
   }]));
+  for (const graph of options.incident ?? []) states.get(graph.graphId)!.slots = graph.before.slots.map((slot, i) => ({
+    ...slot, status: slot.employeeId ? 1 : 0, id: i + 1, scheduleId: graph.graphId,
+  }));
   const traffic: Array<{ method: string; path: string; time: number }> = [];
   let socket: WebSocketRoute | undefined;
   let recording = false;
   let firstThrottle = !loseThirdBatch && options.throttle !== false;
   let verifyOutage = false;
   let backgroundOutage = false;
+  let committedReadbackOutage = options.loseCommittedReadback;
   let backgroundThrottleCount = 0;
   let activeRequests = 0;
   let peakConcurrency = 0;
@@ -127,6 +136,8 @@ async function workspace(page: Page, baseURL: string, loseThirdBatch: boolean,
     const tracked = recording;
     if (tracked) peakConcurrency = Math.max(peakConcurrency, ++activeRequests);
     try {
+      if (id === 39 && state.versionCount === 1 && resourceRead && resource === "/slots" && committedReadbackOutage)
+        return await route.abort("connectionreset");
       if (pause?.id === id && pause.method === method && (method === "GET" ? resource === "" : resource === "/cell-styles/batch")) {
         paused = true; await new Promise<void>(resolve => { release = resolve; }); pause = undefined;
       }
@@ -149,6 +160,14 @@ async function workspace(page: Page, baseURL: string, loseThirdBatch: boolean,
       }
       if (resource === "/slots" && method === "PUT") {
         state.slots = request.postDataJSON().slots.map((slot: object, index: number) => ({ ...slot, id: index + 1, scheduleId: id }));
+        // C# parity is exercised separately against SQLite; this HTTP fixture must also renumber.
+        const groups = new Map<string, typeof state.slots>();
+        for (const slot of state.slots) {
+          const key = `${slot.dayOfMonth}/${slot.fromTime}/${slot.toTime}`;
+          groups.set(key, [...groups.get(key) ?? [], slot]);
+        }
+        state.slots = [...groups.values()].flatMap(rows => rows.sort((a, b) => a.slotNo - b.slotNo ||
+          (a.employeeId ?? Infinity) - (b.employeeId ?? Infinity)).map((slot, i) => ({ ...slot, slotNo: i + 1, status: slot.employeeId ? 1 : 0 })));
         burst(id);
         return await accepted();
       }
@@ -170,12 +189,15 @@ async function workspace(page: Page, baseURL: string, loseThirdBatch: boolean,
       }
       if (resource === "/versions") {
         if (method === "POST") state.versionCount++;
-        return await json({ currentVersionId: state.versionCount || null,
-          versions: Array.from({ length: state.versionCount }, (_, i) => ({ id: i + 1, scheduleId: id, createdAtUtc: "2026-11-09T10:00:00Z" })) });
+        const baseline = options.incident ? id === 36 ? 4 : id === 39 ? 20 : 1 : 0;
+        return await json({ currentVersionId: baseline + state.versionCount || null,
+          versions: Array.from({ length: baseline + state.versionCount }, (_, i) => ({ id: i + 1, versionNumber: i + 1,
+            scheduleId: id, createdAtUtc: "2026-11-09T10:00:00Z" })) });
       }
       if (resource === "/slots") return await json(state.slots);
       if (resource === "/cell-styles") return await json([...state.styles.values()]);
-      if (resource === "/employees") return await json(roster.map((employeeId, displayOrder) => ({ id: employeeId, employeeId, displayOrder, scheduleId: id, isPriority: false })));
+      if (resource === "/employees") return await json((options.incident?.find(graph => graph.graphId === id)?.after.employeeOrder ?? roster)
+        .map((employeeId, displayOrder) => ({ id: employeeId, employeeId, displayOrder, scheduleId: id, isPriority: false })));
       return await json(resource === "" ? state.graph : []);
     } finally {
       if (tracked) activeRequests--;
@@ -216,7 +238,7 @@ async function workspace(page: Page, baseURL: string, loseThirdBatch: boolean,
     }),
     failBackground: () => { backgroundOutage = true; burst(42); },
     backgroundThrottleCount: () => backgroundThrottleCount,
-    recover: () => { verifyOutage = false; backgroundOutage = false; },
+    recover: () => { verifyOutage = false; backgroundOutage = false; committedReadbackOutage = false; },
   };
 }
 
@@ -262,6 +284,75 @@ async function save(page: Page, beforeConfirm?: () => Promise<void>) {
 function desktopOnly(project: string) {
   test.skip(project === "mobile-chrome" || project === "webkit-iphone-x", "The full matrix stress scenario uses the desktop manager workspace.");
 }
+
+for (const loseCommittedReadback of [false, true]) test(`seven-graph slot normalization incident completes all tabs (retry=${loseCommittedReadback})`, async ({ page, baseURL }, testInfo) => {
+  desktopOnly(testInfo.project.name);
+  test.setTimeout(180_000);
+  const seven = [36, 39, 38, 34, 37, 40, 41];
+  const privateGraphs = process.env.GF3_SAVE_PRIVATE_FIXTURE
+    ? (JSON.parse(readFileSync(process.env.GF3_SAVE_PRIVATE_FIXTURE, "utf8")) as { graphs: IncidentGraph[] }).graphs : [];
+  const roster = [...new Set([...Array.from({ length: 17 }, (_, i) => i + 1), ...privateGraphs.flatMap(graph => graph.after.employeeOrder)])];
+  const incident = seven.map(graphId => {
+    const existing = privateGraphs.find(graph => graph.graphId === graphId);
+    if (existing) return existing;
+    const count = graphId === 36 ? 91 : graphId === 39 ? 201 : 20;
+    const slots: FixtureSlot[] = Array.from({ length: count }, (_, i) => ({ employeeId: i % 17 + 1,
+      dayOfMonth: Math.floor(i / 17) + 1, slotNo: i % 17 + 3, status: 1, fromTime: "08:00", toTime: "12:00" }));
+    const added = [{ employeeId: 1, dayOfMonth: 20, slotNo: 1, status: 1, fromTime: "09:00", toTime: "15:00" },
+      { employeeId: 2, dayOfMonth: 21, slotNo: 1, status: 1, fromTime: "09:00", toTime: "15:00" }];
+    return { graphId, before: { slots, employeeOrder: roster }, after: { slots: [...slots, ...added], employeeOrder: roster } };
+  });
+  await page.setViewportSize({ width: 1600, height: 960 });
+  const fixture = await workspace(page, baseURL!, false, { graphIds: seven, roster, incident, loseCommittedReadback, throttle: false });
+  await page.goto(`/container/7/graphs/36/edit?openGraphIds=${seven.join(",")}`);
+  await page.getByRole("button", { name: "Collapse sidebar", exact: true }).click();
+  const cells = (slots: FixtureSlot[]) => {
+    const map = new Map<string, string[]>();
+    for (const slot of slots) if (slot.employeeId) {
+      const key = `${slot.employeeId}:${slot.dayOfMonth}`;
+      map.set(key, [...map.get(key) ?? [], `${slot.fromTime} - ${slot.toTime}`]);
+    }
+    return new Map([...map].map(([key, values]) => [key, values.sort().join(", ")]));
+  };
+  for (const [index, graph] of incident.entries()) {
+    if (index) await page.getByRole("tab", { name: `Graph ${graph.graphId}`, exact: true }).click();
+    const before = cells(graph.before.slots), after = cells(graph.after.slots);
+    for (const key of new Set([...before.keys(), ...after.keys()])) {
+      if (before.get(key) === after.get(key)) continue;
+      const cell = scheduleCell(page, key);
+      await cell.getByRole("button").dblclick();
+      await cell.getByRole("textbox").fill(after.get(key) ?? "");
+      await cell.getByRole("textbox").press("Enter");
+    }
+    await matrix(page).locator('[data-matrix-target="day"][data-day-of-month="1"]').click();
+    await page.getByRole("button", { name: /^Fill #/ }).click();
+  }
+  await expect.poll(fixture.resourceReadsSettled).toBe(true);
+  await fixture.startRecording(); await save(page);
+  if (loseCommittedReadback) {
+    await expect(page.getByRole("button", { name: "Try again", exact: true })).toBeVisible({ timeout: 60000 });
+    expect([...fixture.states.values()].filter(state => state.versionCount)).toHaveLength(2);
+    fixture.recover(); await page.getByRole("button", { name: "Try again", exact: true }).click();
+  }
+  await expect(page).toHaveURL(url => url.pathname === "/container/7/graphs/41", { timeout: 90000 });
+  const writes = fixture.traffic.filter(row => row.method !== "GET");
+  for (const resource of ["/slots", "/cell-styles/batch", "/versions"])
+    expect(writes.filter(row => row.path.endsWith(resource)).map(row => Number(row.path.split("/")[5]))).toEqual(seven);
+  expect(fixture.states.get(36)!.slots).toHaveLength(93);
+  expect(fixture.states.get(39)!.slots).toHaveLength(203);
+  expect(fixture.states.get(39)!.versionCount).toBe(1);
+  await testInfo.attach("seven-graph-save-traffic", { body: JSON.stringify(fixture.metrics()), contentType: "application/json" });
+  await page.goto(`/container/7/graphs/39/edit?openGraphIds=${seven.join(",")}`);
+  await page.getByRole("button", { name: "Collapse sidebar", exact: true }).click();
+  await expect(matrix(page)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Restore draft" })).toHaveCount(0);
+  // A second edit after reopening must save normally and leave no stale checkpoint/inert UI.
+  await matrix(page).locator('[data-matrix-target="day"][data-day-of-month="2"]').click();
+  await page.getByRole("button", { name: /^Text #/ }).click();
+  await save(page);
+  await expect(page).toHaveURL(url => url.pathname === "/container/7/graphs/39", { timeout: 60000 });
+  expect(fixture.states.get(39)!.versionCount).toBe(2);
+});
 
 test("five graphs save 256 styles without adding a status panel or moving the matrix", async ({ page, baseURL }, testInfo) => {
   desktopOnly(testInfo.project.name);
