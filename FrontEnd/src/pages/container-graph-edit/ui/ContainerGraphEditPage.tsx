@@ -4,19 +4,15 @@ import { canReserveManualShift } from "@entities/containers/model/manualShiftInt
 import { useLanguageRevision } from "@shared/i18n/useLanguageRevision";
 import { dateTimeFormat, t } from "@shared/i18n";
 import { useGraphApprovedUrlopQuery, approvedKeys } from "@entities/urlop";
-import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { deriveGeneratedVacancies, reconcileGeneratedManualColumns } from "@entities/containers/model/generatedManualShifts";
 import { pinGeneratedColumnsFirst } from "@entities/containers/model/graphColumnOrder";
 import {
   buildGraphWorkspaceSaveSlots, buildStyleOnlyUpdatedNote, classifyGraphDraftChange, diffGraphColors,
   fingerprintPersistedGraph, graphSaveFields, hasPersistedWorkspaceChanges,
-  matchGraphColors, mergeGraphColorStyles, normalizeGraphSlots, normalizeGraphStyles,
+  matchGraphColors, mergeGraphColorStyles, normalizeGraphEmployees, normalizeGraphSlots, normalizeGraphStyles,
   type GraphColorChange, type GraphSaveComparisonInput, type PersistedGraphState,
 } from "@entities/containers/model/graphSaveIntegrity";
-import {
-  clearGraphRecovery, GRAPH_RECOVERY_VERSION, readGraphRecovery, writeGraphRecovery,
-  type RecoveryDraft,
-} from "@entities/containers/model/graphDraftRecovery";
 import type { GraphCellStyleFieldPatchDto, GraphVersionTreeDto } from "@entities/containers/api/dto";
 import { useAuth } from "@app/providers/AuthProvider";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
@@ -117,17 +113,17 @@ import {
 } from "@entities/shift-swaps";
 import { useShopsListQuery } from "@entities/shops/api/queries";
 import { queryKeys } from "@shared/api/queryKeys";
+import { createGraphSavePacer, type RunGraphSaveRequest } from "@shared/api/graphSavePacer";
 import { retry429Read } from "@shared/api/retry429Read";
 import { beginGraphSaveTraffic, finishGraphSaveTraffic, isGraphSaveTrafficActive } from "@shared/api/graphSaveTraffic";
-import { ApiError, getAuthAccessToken, isRequestCanceledError } from "@shared/api/httpClient";
+import { ApiError, isRequestCanceledError } from "@shared/api/httpClient";
 import { usePageScrollbarHidden } from "@shared/lib/usePageScrollbarHidden";
 import { stableSerialize } from "@shared/lib/stableSerialize";
 import { useUnsavedChangesPrompt } from "@shared/lib/useUnsavedChangesPrompt";
 import { ConfirmDialog } from "@shared/ui/ConfirmDialog";
 import { ManagerEditLockDialog } from "@shared/ui/ManagerEditLockDialog";
-import { pushErrorAlert } from "@shared/ui/feedback/error-alerts/errorAlerts";
 import { IosButton } from "@shared/ui/components/IosButton";
-import { SaveIcon, WarnIcon } from "@shared/ui/icons";
+import { SaveIcon } from "@shared/ui/icons";
 import { PageHeader } from "@shared/ui/PageHeader";
 import styles from "./ContainerGraphEditPage.module.css";
 
@@ -170,7 +166,27 @@ type GraphSaveOutcome = {
   versionCommitted?: boolean;
 };
 
-type GraphSaveGuard = Pick<RecoveryDraft, "blockedBy" | "needsStyleVersion" | "manualPublicationAttempted">;
+type SavePhase = "idle" | "confirming" | "checking" | "saving" | "verifying" | "stopRequested" | "failed";
+type SaveProgress = { stage: "checking" | "saving" | "verifying"; dirtyTotal: number; checkedCount: number; verifiedCount: number; currentGraphName?: string };
+
+type GraphSaveGuard = {
+  blockedBy?: "workspace-write" | "version-commit";
+  needsStyleVersion?: true;
+  manualPublicationAttempted?: true;
+  checkpoint?: {
+    kind: "style-only" | "workspace";
+    draft: GraphEditorSessionDraft;
+    before: PersistedGraphState;
+    expected: PersistedGraphState;
+    versionBaseline?: GraphVersionTreeDto;
+    versionCommitted: boolean;
+    versionAttempted: boolean;
+    safeToResume: boolean;
+    rateLimited?: boolean;
+    resumeManual?: (state: PersistedGraphState, signal: AbortSignal, readRequest: RunGraphSaveRequest, writeRequest: RunGraphSaveRequest) => Promise<void>;
+    verify: (state: PersistedGraphState, signal: AbortSignal, runSaveRequest: RunGraphSaveRequest) => Promise<{ complete: boolean; partial: boolean }>;
+  };
+};
 
 type PreflightedGraph = {
   draft: GraphEditorSessionDraft;
@@ -204,18 +220,6 @@ const FOLLOW_SCHEDULE_DETAILS_PREVIEW = "__schedule-details__";
 const AUTO_UNAVAILABLE_AVAILABILITY_BACKGROUND_ARGB = rgbHexToArgb("#f8b4b4") ?? -478600;
 const GRAPH_UNDO_HISTORY_LIMIT = 50;
 const GRAPH_UNDO_COALESCE_MS = 800;
-
-function graphSaveStatusLabel(status: GraphSaveOutcome["status"]) {
-  switch (status) {
-    case "unchanged": return t("Unchanged");
-    case "pending": return t("Pending");
-    case "saving": return t("Saving...");
-    case "saved": return t("Saved");
-    case "conflict": return t("Conflict");
-    case "partial": return t("Partially saved");
-    case "unknown": return t("Cannot verify");
-  }
-}
 
 function runMutation<TData, TVariables>(
   mutate: (
@@ -604,37 +608,6 @@ function graphDraftPayload(draft: GraphEditorSessionDraft) {
     draft.styleRecords, draft.cellMap, draft.autoAvailabilityStyleSuppressions);
 }
 
-function isGraphEditorDraft(value: unknown): value is GraphEditorSessionDraft {
-  const record = (data: unknown): data is Record<string, unknown> => !!data && typeof data === "object" && !Array.isArray(data);
-  const textMap = (data: unknown) => record(data) && Object.values(data).every(entry => typeof entry === "string");
-  const optionalId = (data: unknown) => data === null || Number.isSafeInteger(data);
-  if (!record(value) || typeof value.graphId !== "number" || !Number.isSafeInteger(value.graphId) || value.graphId <= 0) return false;
-  const form = value.form;
-  return record(form) && Object.entries(createInitialGraphForm()).every(([key, initial]) => typeof form[key] === typeof initial) &&
-    (form.publicationStatus === "private" || form.publicationStatus === "public") &&
-    Array.isArray(value.graphEmployeeRows) && value.graphEmployeeRows.every(row => record(row) &&
-      Number.isSafeInteger(row.employeeId) && optionalId(row.id) && typeof row.minHoursMonth === "string" && typeof row.isPriority === "boolean") &&
-    textMap(value.cellMap) &&
-    Array.isArray(value.manualColumns) && value.manualColumns.every(column => record(column) && Number.isSafeInteger(column.columnId) &&
-      typeof column.label === "string" && textMap(column.cells)) &&
-    Array.isArray(value.pendingManualShiftPublishes) && value.pendingManualShiftPublishes.every(shift => record(shift) &&
-      Number.isSafeInteger(shift.manualColumnId) && Number.isSafeInteger(shift.dayOfMonth) &&
-      typeof shift.clientId === "string" && typeof shift.fromTime === "string" && typeof shift.toTime === "string" &&
-      typeof shift.allowPartialAcceptance === "boolean" &&
-      optionalId(shift.targetEmployeeId ?? null)) &&
-    Array.isArray(value.scheduleColumnOrder) && value.scheduleColumnOrder.every(Number.isSafeInteger) &&
-    Array.isArray(value.selectedCellKeys) && value.selectedCellKeys.every(key => typeof key === "string") &&
-    Array.isArray(value.styleRecords) && value.styleRecords.every(row => record(row) &&
-      Number.isSafeInteger(row.id) && Number.isSafeInteger(row.scheduleId) &&
-      Number.isSafeInteger(row.employeeId) && Number.isSafeInteger(row.dayOfMonth) &&
-      optionalId(row.backgroundColorArgb ?? null) && optionalId(row.textColorArgb ?? null)) &&
-    record(value.autoAvailabilityStyleSuppressions) && Object.values(value.autoAvailabilityStyleSuppressions)
-      .every(keys => Array.isArray(keys) && keys.every(key => typeof key === "string")) &&
-    typeof value.fillColor === "string" && typeof value.textColor === "string" &&
-    typeof value.previewAvailabilitySelection === "string" &&
-    optionalId(value.syncedAvailabilityGroupId) && optionalId(value.selectedEmployeeId) && optionalId(value.selectedSchedulePresetId);
-}
-
 function persistedGraphStyles(state: PersistedGraphState) {
   return mergeNormalizedStyleRecords(state.styles, rehydrateGraphNoteCellStyles(
     parseGraphNoteContent(state.graph.note).cellStyles, state.graph.id,
@@ -939,6 +912,7 @@ async function persistGraphStyleDraft(params: {
   graphId: number;
   styleRecords: GraphCellStyle[];
   existingStyles: GraphCellStyle[];
+  runSaveRequest?: RunGraphSaveRequest;
 }) {
   const { containerId, graphId, styleRecords, existingStyles } = params;
   const before = normalizeApiStyleRecords(existingStyles, graphId);
@@ -963,7 +937,8 @@ async function persistGraphStyleDraft(params: {
   }
 
   if (patches.size) {
-    await containersApi.applyGraphCellStyleBatch(containerId, graphId, { changes: [...patches.values()] });
+    const send = () => containersApi.applyGraphCellStyleBatch(containerId, graphId, { changes: [...patches.values()] });
+    await (params.runSaveRequest ? params.runSaveRequest(send) : send());
   }
 }
 
@@ -974,23 +949,52 @@ async function readGraphPair<A, B>(first: Promise<A>, second: Promise<B>): Promi
   return [left.value, right.value];
 }
 
-async function readPersistedGraph(containerId: number, graphId: number, signal?: AbortSignal): Promise<PersistedGraphState> {
+async function readSaveRequest<T>(send: (signal?: AbortSignal) => Promise<T>, signal?: AbortSignal, runSaveRequest?: RunGraphSaveRequest) {
+  if (!runSaveRequest) return retry429Read(() => send(signal), { signal });
+  const budget = new AbortController();
+  const timer = setTimeout(() => budget.abort(), 180000);
+  const readSignal = signal ? AbortSignal.any([signal, budget.signal]) : budget.signal;
+  try {
+    return await retry429Read(() => runSaveRequest(() => send(readSignal), readSignal), {
+      signal: readSignal, maxRetries: 6, maxElapsedMs: 180000,
+    });
+  } catch (error) {
+    if (budget.signal.aborted && !signal?.aborted) throw new Error(t("The current schedule could not be read. Your edits are still here."));
+    throw error;
+  } finally { clearTimeout(timer); }
+}
+
+async function readPersistedGraph(containerId: number, graphId: number, signal?: AbortSignal, runSaveRequest?: RunGraphSaveRequest): Promise<PersistedGraphState> {
   const [graph, employees] = await readGraphPair(
-    retry429Read(() => containersApi.graphById(containerId, graphId, signal), { signal }),
-    retry429Read(() => containersApi.listGraphEmployees(containerId, graphId, signal), { signal }),
+    readSaveRequest(readSignal => containersApi.graphById(containerId, graphId, readSignal), signal, runSaveRequest),
+    readSaveRequest(readSignal => containersApi.listGraphEmployees(containerId, graphId, readSignal), signal, runSaveRequest),
   );
   const [slots, styles] = await readGraphPair(
-    retry429Read(() => containersApi.listGraphSlots(containerId, graphId, signal), { signal }),
-    retry429Read(() => containersApi.listGraphCellStyles(containerId, graphId, signal), { signal }),
+    readSaveRequest(readSignal => containersApi.listGraphSlots(containerId, graphId, readSignal), signal, runSaveRequest),
+    readSaveRequest(readSignal => containersApi.listGraphCellStyles(containerId, graphId, readSignal), signal, runSaveRequest),
   );
   return { graph, employees, slots, styles };
 }
 
-const readGraphVersions = (containerId: number, graphId: number, signal: AbortSignal) =>
-  retry429Read(() => containersApi.listGraphVersions(containerId, graphId, signal), { signal });
+const readGraphVersions = (containerId: number, graphId: number, signal: AbortSignal, runSaveRequest?: RunGraphSaveRequest) =>
+  readSaveRequest(readSignal => containersApi.listGraphVersions(containerId, graphId, readSignal), signal, runSaveRequest);
 
-const readGraphOffers = (containerId: number, graphId: number, signal: AbortSignal) =>
-  retry429Read(() => shiftSwapsApi.listGraphLog(containerId, graphId, signal), { signal });
+const readGraphOffers = (containerId: number, graphId: number, signal: AbortSignal, runSaveRequest?: RunGraphSaveRequest) =>
+  readSaveRequest(readSignal => shiftSwapsApi.listGraphLog(containerId, graphId, readSignal), signal, runSaveRequest);
+
+function canResumeWorkspace(before: PersistedGraphState, intended: PersistedGraphState, actual: PersistedGraphState) {
+  const same = (a: unknown, b: unknown) => stableSerialize(a) === stableSerialize(b);
+  if (!same(graphSaveFields(actual.graph), graphSaveFields(before.graph)) &&
+      !same(graphSaveFields(actual.graph), graphSaveFields(intended.graph))) return false;
+  if (!same(normalizeGraphSlots(actual.slots), normalizeGraphSlots(before.slots)) &&
+      !same(normalizeGraphSlots(actual.slots), normalizeGraphSlots(intended.slots))) return false;
+  const index = (state: PersistedGraphState) => new Map(normalizeGraphEmployees(state.employees).map(row => [row.employeeId, row]));
+  const oldRows = index(before), desiredRows = index(intended), actualRows = index(actual);
+  for (const id of new Set([...oldRows.keys(), ...desiredRows.keys(), ...actualRows.keys()])) {
+    if (!same(actualRows.get(id), oldRows.get(id)) && !same(actualRows.get(id), desiredRows.get(id))) return false;
+  }
+  return mergeGraphColorStyles(before.styles, intended.styles, actual.styles).conflicts.length === 0;
+}
 
 function sameGraphVersionTree(left: GraphVersionTreeDto, right: GraphVersionTreeDto) {
   const versionIds = (tree: GraphVersionTreeDto) => tree.versions.map(version => version.id).sort((a, b) => a - b);
@@ -1008,11 +1012,7 @@ function matchPublishedShifts(
   pending.forEach((shift, index) => {
     const matches = offers.filter(offer => !previousIds.has(offer.id) &&
       (responseIds[index] === undefined || offer.id === responseIds[index]) &&
-      offer.isManagerCreated && offer.scheduleId === state.graph.id && offer.status === "open" &&
-      offer.manualColumnId === shift.manualColumnId && offer.dayOfMonth === shift.dayOfMonth &&
-      offer.fromTime.slice(0, 5) === shift.fromTime && offer.toTime.slice(0, 5) === shift.toTime &&
-      (offer.targetEmployeeId ?? null) === (shift.targetEmployeeId ?? null) &&
-      offer.allowPartialAcceptance === shift.allowPartialAcceptance);
+      offer.status === "open" && matchesManualPublication(offer, shift, state.graph.id));
     if (matches.length !== 1) return;
     const slot = state.slots.find(row => row.id === matches[0].scheduleSlotId);
     if (slot && slot.dayOfMonth === shift.dayOfMonth && !slot.employeeId &&
@@ -1022,6 +1022,14 @@ function matchPublishedShifts(
     }
   });
   return matchedSlots;
+}
+
+function matchesManualPublication(offer: ShiftSwap, shift: PendingManualColumnShiftPublication, graphId: number) {
+  return offer.isManagerCreated && offer.scheduleId === graphId &&
+    offer.manualColumnId === shift.manualColumnId && offer.dayOfMonth === shift.dayOfMonth &&
+    offer.fromTime.slice(0, 5) === shift.fromTime && offer.toTime.slice(0, 5) === shift.toTime &&
+    (offer.targetEmployeeId ?? null) === (shift.targetEmployeeId ?? null) &&
+    offer.allowPartialAcceptance === shift.allowPartialAcceptance;
 }
 
 function getFullySelectedDayOfMonths(selectedCellKeys: string[], employeeIds: number[]) {
@@ -1142,28 +1150,13 @@ export function ContainerGraphEditPage() {
   const [hasLocalBindChanges, setHasLocalBindChanges] = useState(false);
   const [bindDeleteTarget, setBindDeleteTarget] = useState<EditableAvailabilityBind | null>(null);
   const [employeeRemoveTargetId, setEmployeeRemoveTargetId] = useState<number | null>(null);
-  const [isSaveConfirmOpen, setIsSaveConfirmOpen] = useState(false);
-  const [discardTarget, setDiscardTarget] = useState<number | "recovered" | null>(null);
-  const [isRecoveryDialogOpen, setIsRecoveryDialogOpen] = useState(false);
+  const [savePhase, setSavePhase] = useState<SavePhase>("idle");
+  const [saveProgress, setSaveProgress] = useState<SaveProgress>({ stage: "checking", dirtyTotal: 0, checkedCount: 0, verifiedCount: 0 });
+  const stopRequestedRef = useRef(false);
+  const activeWriteGraphRef = useRef<number | null>(null);
   const [saveIssue, setSaveIssue] = useState<string>();
-  const recoveryDialog = useRef<HTMLDialogElement>(null);
-  const recoveryDialogTitle = useId();
-  useEffect(() => {
-    if (!isRecoveryDialogOpen) return;
-    const dialog = recoveryDialog.current;
-    const opener = document.activeElement;
-    dialog?.showModal();
-    return () => {
-      dialog?.close();
-      if (opener instanceof HTMLElement && opener.isConnected) opener.focus({ preventScroll: true });
-    };
-  }, [isRecoveryDialogOpen]);
+  const saveIssueRef = useRef<string | undefined>(undefined);
   const [sessionOperation, setSessionOperation] = useState<"save" | "review" | null>(null);
-  const [saveOutcomes, setSaveOutcomes] = useState<Record<number, GraphSaveOutcome>>({});
-  const [recoveryDrafts, setRecoveryDrafts] = useState<RecoveryDraft[]>([]);
-  const [restoredGraphIds, setRestoredGraphIds] = useState<number[]>([]);
-  const [recoveryUnavailable, setRecoveryUnavailable] = useState(false);
-  const [invalidRecovery, setInvalidRecovery] = useState(false);
   const [undoDepth, setUndoDepth] = useState(0);
   const optimisticStyleIdRef = useRef(-1);
   const styleRecordsRef = useRef<GraphCellStyle[]>([]);
@@ -1176,36 +1169,25 @@ export function ContainerGraphEditPage() {
   const saveInFlightRef = useRef(false);
   const finishSaveTrafficRef = useRef<(() => Promise<void>) | null>(null);
   const editorReadAbortRef = useRef<AbortController | null>(null);
-  const [isRetryingLoad, setIsRetryingLoad] = useState(false);
   const saveGuardByIdRef = useRef<Record<number, GraphSaveGuard>>({});
   const pendingReadbackByIdRef = useRef<Record<number, {
     snapshot: string;
-    verify: (state: PersistedGraphState, signal: AbortSignal) => Promise<{ complete: boolean; partial: boolean }>;
+    verify: (state: PersistedGraphState, signal: AbortSignal, runSaveRequest: RunGraphSaveRequest) => Promise<{ complete: boolean; partial: boolean }>;
   }>>({});
   const pendingVersionRejectionByIdRef = useRef<Record<number, {
     baseline: GraphVersionTreeDto;
     workspace: boolean;
   }>>({});
-  const submittedDraftsRef = useRef<Map<number, GraphEditorSessionDraft> | null>(null);
   useEffect(() => {
     setSessionOperation(null);
-    setIsRetryingLoad(false);
     return () => {
       editorReadAbortRef.current?.abort();
       editorReadAbortRef.current = null;
       saveInFlightRef.current = false;
-      submittedDraftsRef.current = null;
       void finishSaveTrafficRef.current?.();
     };
   }, [containerId, graphId, managerId, queryClient]);
 
-  const recoveryContextRef = useRef<{
-    managerId: number;
-    containerId: number;
-    pending: Set<number>;
-    currentDraft: () => GraphEditorSessionDraft | null;
-  } | null>(null);
-  const editedDraftsRef = useRef(new Map<number, { snapshot: string; editedAt: number }>());
   const undoHistoryRef = useRef<GraphEditorUndoEntry[]>([]);
   const generationSessionRef = useRef({ containerId, graphId, token: 0 });
   const generationEditorRef = useRef({ manualColumns, scheduleColumnOrder, pendingManualShiftPublishes, offers: shiftSwapLogQuery.data });
@@ -1261,18 +1243,15 @@ export function ContainerGraphEditPage() {
   }, []);
 
   useEffect(() => {
-    if (!managerId || !containerId || isCreate) return;
-    let invalid = false;
-    const entries = readGraphRecovery(managerId, containerId, () => { invalid = true; }) ?? [];
-    setRecoveryDrafts(entries.filter(entry => {
-      if (!isGraphEditorDraft(entry.draft)) {
-        invalid = true;
-        return false;
+    if (!managerId || isCreate) return;
+    try {
+      const prefix = `gf3:graph-drafts:${managerId}:`;
+      for (let index = sessionStorage.length - 1; index >= 0; index--) {
+        const key = sessionStorage.key(index);
+        if (key?.startsWith(prefix)) sessionStorage.removeItem(key);
       }
-      return Boolean(entry.blockedBy) || classifyGraphDraftChange(entry.comparisonBaseline, compareGraphDraft(entry.draft)) !== "unchanged";
-    }));
-    setInvalidRecovery(invalid);
-  }, [containerId, isCreate, managerId]);
+    } catch { /* Storage may be disabled. Legacy drafts are never restored. */ }
+  }, [isCreate, managerId]);
 
   const persistedState = useMemo<PersistedGraphState | null>(() => {
     if (!graphQuery.data || graphQuery.data.id !== graphId || !graphEmployeesQuery.data || !slotsQuery.data || !cellStylesQuery.data) {
@@ -1702,7 +1681,7 @@ export function ContainerGraphEditPage() {
       return [];
     }
 
-    const requestedGraphIds = [...new Set([...getGraphSessionIds(location.search, graphId), ...restoredGraphIds])];
+    const requestedGraphIds = [...new Set(getGraphSessionIds(location.search, graphId))];
     const availableGraphIdSet = new Set((containerGraphsQuery.data ?? []).map(item => item.id));
 
     if (availableGraphIdSet.size === 0) {
@@ -1715,7 +1694,7 @@ export function ContainerGraphEditPage() {
     }
 
     return filteredGraphIds.length > 0 ? filteredGraphIds : (graphId !== null ? [graphId] : []);
-  }, [containerGraphsQuery.data, graphId, isCreate, location.search, restoredGraphIds]);
+  }, [containerGraphsQuery.data, graphId, isCreate, location.search]);
   const sessionGraphs = useMemo(
     () => resolveGraphSession(openGraphIds, containerGraphsQuery.data ?? [], graphQuery.data ?? null),
     [containerGraphsQuery.data, graphQuery.data, openGraphIds],
@@ -1901,7 +1880,7 @@ export function ContainerGraphEditPage() {
   });
 
   const handleEditLockDialogClose = () => {
-    flushGraphRecovery();
+
     runWithoutPrompt(() => {
       if (containerId && graphId !== null) {
         navigate(`/container/${containerId}/graphs/${graphId}${sessionSearch}`);
@@ -2018,28 +1997,6 @@ export function ContainerGraphEditPage() {
   const isPolicyUnavailable = isAvailabilityPolicyLoading || hasAvailabilityPolicyError ||
     (Number(form.shopId) > 0 && urlop.data === undefined) ||
     (Boolean(scheduleAvailabilityGroupId) && (!availabilityGroupsQuery.data || !scheduleAvailabilityMembersQuery.data || !scheduleAvailabilitySlotsQuery.data));
-
-  const retryEditorLoading = async () => {
-    if (editorReadAbortRef.current || !failedLoadQueries.length) return;
-    const controller = new AbortController();
-    editorReadAbortRef.current = controller;
-    const { signal } = controller;
-    setIsRetryingLoad(true);
-    try {
-      for (const query of failedLoadQueries) {
-        try {
-          await retry429Read<unknown>(() => query.refetchWithSignal(signal), { signal });
-        } catch (error) {
-          if (signal.aborted || isRequestCanceledError(error)) break;
-        }
-      }
-    } finally {
-      if (editorReadAbortRef.current === controller) {
-        editorReadAbortRef.current = null;
-        setIsRetryingLoad(false);
-      }
-    }
-  };
 
   useEffect(() => {
     const employeeIdSet = new Set(orderedEmployeeIds);
@@ -2167,95 +2124,6 @@ export function ContainerGraphEditPage() {
       previewAvailabilitySelection,
     });
   };
-  useLayoutEffect(() => {
-    recoveryContextRef.current = managerId && containerId && !isCreate ? {
-      managerId, containerId, pending: new Set(recoveryDrafts.map(entry => entry.graphId)), currentDraft: createCurrentGraphDraft,
-    } : null;
-  });
-
-  const flushGraphRecovery = useCallback(() => {
-    const context = recoveryContextRef.current;
-    if (!context) return;
-    const candidates = submittedDraftsRef.current ?? new Map(
-      Object.values(sessionDraftsRef.current).map(draft => [draft.graphId, draft]),
-    );
-    const currentDraft = submittedDraftsRef.current ? null : context.currentDraft();
-    if (currentDraft) candidates.set(currentDraft.graphId, currentDraft);
-    const entries = [...candidates.values()].flatMap<RecoveryDraft>(draft => {
-      const id = draft.graphId;
-      const persistedBaseline = baselinePersistedByIdRef.current[id];
-      const comparisonBaseline = baselineComparisonByIdRef.current[id];
-      const guard = saveGuardByIdRef.current[id];
-      const previous = editedDraftsRef.current.get(id);
-      if (context.pending.has(id) || !comparisonBaseline || persistedBaseline?.graph.containerId !== context.containerId ||
-        (!previous && !guard?.blockedBy && classifyGraphDraftChange(comparisonBaseline, compareGraphDraft(draft)) === "unchanged")) {
-        return [];
-      }
-      const snapshot = buildGraphDraftSnapshot(draft);
-      const editedAt = previous?.snapshot === snapshot ? previous.editedAt : Date.now();
-      editedDraftsRef.current.set(id, { snapshot, editedAt });
-      return [{
-        version: GRAPH_RECOVERY_VERSION, graphId: id, draft, persistedBaseline, comparisonBaseline, editedAt, ...guard,
-      }];
-    });
-    if (entries.length) {
-      setRecoveryUnavailable(!writeGraphRecovery(context.managerId, context.containerId, entries).ok);
-    }
-  }, []);
-
-  const clearVerifiedGraphRecovery = (id: number) => {
-    submittedDraftsRef.current?.delete(id);
-    editedDraftsRef.current.delete(id);
-    if (managerId && containerId) clearGraphRecovery(managerId, containerId, [id]);
-  };
-
-  useEffect(() => {
-    const timer = window.setTimeout(flushGraphRecovery, 300);
-    return () => window.clearTimeout(timer);
-  }, [currentGraphSnapshot, flushGraphRecovery, graphId, hasDirtySessionDrafts, recoveryDrafts]);
-
-  useEffect(() => {
-    window.addEventListener("pagehide", flushGraphRecovery);
-    return () => {
-      window.removeEventListener("pagehide", flushGraphRecovery);
-      // Explicit logout clears the access token before unmounting the editor.
-      if (getAuthAccessToken()) flushGraphRecovery();
-      recoveryContextRef.current = null;
-    };
-  }, [flushGraphRecovery]);
-
-  const restoreGraphRecovery = () => {
-    const restoredIds: number[] = [];
-    recoveryDrafts.forEach(entry => {
-      if (!isGraphEditorDraft(entry.draft)) return;
-      const id = entry.graphId;
-      captureGraphBaseline(entry.persistedBaseline, createPersistedGraphDraft(entry.persistedBaseline, employeesById));
-      baselineComparisonByIdRef.current[id] = entry.comparisonBaseline;
-      sessionDraftsRef.current[id] = entry.draft;
-      editedDraftsRef.current.set(id, { snapshot: buildGraphDraftSnapshot(entry.draft), editedAt: entry.editedAt });
-      saveGuardByIdRef.current[id] = {
-        blockedBy: entry.blockedBy, needsStyleVersion: entry.needsStyleVersion, manualPublicationAttempted: entry.manualPublicationAttempted,
-      };
-      setSaveOutcome(id, entry.blockedBy
-        ? { status: "unknown", message: t("Review the saved schedule before retrying these edits.") }
-        : { status: "pending" });
-      if (id === graphId) applyGraphDraft(entry.draft);
-      restoredIds.push(id);
-    });
-    setRestoredGraphIds(restoredIds);
-    setRecoveryDrafts([]);
-  };
-
-  const discardGraphRecovery = () => {
-    if (managerId && containerId) clearGraphRecovery(managerId, containerId, recoveryDrafts.map(entry => entry.graphId));
-    setRecoveryDrafts([]);
-  };
-
-  const requestDraftDiscard = (target: number | "recovered") => {
-    setIsRecoveryDialogOpen(false);
-    setDiscardTarget(target);
-  };
-
   const storeCurrentGraphDraft = () => {
     const nextDraft = createCurrentGraphDraft();
     if (!nextDraft) {
@@ -2450,14 +2318,17 @@ export function ContainerGraphEditPage() {
     return true;
   };
 
-  const setSaveOutcome = (id: number, outcome: GraphSaveOutcome) => {
-    setSaveOutcomes(current => ({ ...current, [id]: outcome }));
+  const setSaveOutcome = (_id: number, outcome: GraphSaveOutcome) => {
+    if (outcome.status === "conflict" || outcome.status === "unknown") {
+      saveIssueRef.current = outcome.message ?? t("Other saved changes were detected. Your edits are still here. Automatic merge is unavailable.");
+      setSaveIssue(saveIssueRef.current);
+    }
   };
 
   const selectGraphTab = (id: number) => {
     if (!containerId || id === graphId || saveInFlightRef.current) return;
     storeCurrentGraphDraft();
-    flushGraphRecovery();
+
     runWithoutPrompt(() => navigate(`/container/${containerId}/graphs/${id}/edit${buildGraphSessionSearch(openGraphIds)}`));
   };
 
@@ -2483,13 +2354,12 @@ export function ContainerGraphEditPage() {
     delete pendingReadbackByIdRef.current[id];
     delete pendingVersionRejectionByIdRef.current[id];
     setConfirmedGraph(state);
-    clearVerifiedGraphRecovery(id);
+
     setSaveOutcome(id, { status: "saved", contentPersisted: true, versionCommitted });
   };
 
   const startEditorReads = (operation: "save" | "review" = "review") => {
     editorReadAbortRef.current?.abort();
-    setIsRetryingLoad(false);
     const controller = new AbortController();
     editorReadAbortRef.current = controller;
     saveInFlightRef.current = true;
@@ -2500,21 +2370,25 @@ export function ContainerGraphEditPage() {
   const finishEditorReads = (controller: AbortController) => {
     if (editorReadAbortRef.current !== controller) return;
     editorReadAbortRef.current = null;
-    submittedDraftsRef.current = null;
     saveInFlightRef.current = false;
     setSessionOperation(null);
   };
 
-  const preflightGraph = async (draft: GraphEditorSessionDraft, signal: AbortSignal): Promise<PreflightedGraph | null> => {
+  const preflightGraph = async (draft: GraphEditorSessionDraft, signal: AbortSignal, runSaveRequest: RunGraphSaveRequest): Promise<PreflightedGraph | null> => {
     if (!containerId) return null;
     const id = draft.graphId;
     const baseline = baselinePersistedByIdRef.current[id];
     const comparison = baselineComparisonByIdRef.current[id];
     const current = compareGraphDraft(draft);
     try {
-      const remote = await readPersistedGraph(containerId, id, signal);
-      if (classifyGraphDraftChange(comparison, current) === "workspace") {
-        if (fingerprintPersistedGraph(baseline) !== fingerprintPersistedGraph(remote)) {
+      const remote = await readPersistedGraph(containerId, id, signal, runSaveRequest);
+      const checkpoint = saveGuardByIdRef.current[id]?.checkpoint;
+      const changedAfterPartialWrite = checkpoint?.kind === "workspace" &&
+        classifyGraphDraftChange(compareGraphDraft(createPersistedGraphDraft(remote, employeesById)), current) === "workspace";
+      if (classifyGraphDraftChange(comparison, current) === "workspace" || changedAfterPartialWrite) {
+        if (fingerprintPersistedGraph(baseline) !== fingerprintPersistedGraph(remote) &&
+            !(checkpoint?.safeToResume && !saveGuardByIdRef.current[id]?.manualPublicationAttempted &&
+              canResumeWorkspace(checkpoint.before, checkpoint.expected, remote))) {
           setSaveOutcome(id, { status: "conflict", message: t("Other saved changes were detected. Your edits are still here. Automatic merge is unavailable.") });
           return null;
         }
@@ -2530,87 +2404,90 @@ export function ContainerGraphEditPage() {
     } catch (error) {
       if (isRequestCanceledError(error) || signal.aborted) throw error;
       setSaveOutcome(id, { status: "unknown", message: error instanceof ApiError && error.status === 429 ? error.message
-        : t("The current schedule could not be read. Your draft is still here.") });
+        : t("The current schedule could not be read. Your edits are still here.") });
       return null;
     }
   };
 
-  const reviewGraphSave = async (id: number) => {
-    if (!containerId || saveInFlightRef.current || !canEdit) return;
-    const draft = id === graphId ? createCurrentGraphDraft() : sessionDraftsRef.current[id];
-    if (!draft) return;
+  const reconcileGraphSave = async (draft: GraphEditorSessionDraft, signal: AbortSignal, runSaveRequest: RunGraphSaveRequest, markWrite: () => void) => {
+    const writeRequest: RunGraphSaveRequest = (send, requestSignal) => runSaveRequest(() => { markWrite(); return send(); }, requestSignal);
+    const id = draft.graphId;
     const guard = saveGuardByIdRef.current[id];
-    const controller = startEditorReads();
-    const { signal } = controller;
-    try {
-      if (!guard?.blockedBy) {
-        if (await preflightGraph(draft, signal)) setSaveOutcome(id, { status: "pending" });
-      } else {
-        const remote = await readPersistedGraph(containerId, id, signal);
-        const baseline = baselinePersistedByIdRef.current[id];
-        const pendingReadback = pendingReadbackByIdRef.current[id];
-        if (pendingReadback?.snapshot === buildGraphDraftSnapshot(draft) && (await pendingReadback.verify(remote, signal)).complete) {
-          confirmGraphSave(remote, true);
-        } else if (guard.blockedBy === "workspace-write" && !guard.manualPublicationAttempted &&
-          fingerprintPersistedGraph(remote) === fingerprintPersistedGraph(baseline)) {
-          delete saveGuardByIdRef.current[id];
-          setSaveOutcome(id, { status: "pending" });
-          flushGraphRecovery();
-        } else {
-          if (guard.blockedBy === "version-commit") {
-            const versions = await readGraphVersions(containerId, id, signal);
-            const rejection = pendingVersionRejectionByIdRef.current[id];
-            if (rejection && sameGraphVersionTree(rejection.baseline, versions)) {
-              guard.blockedBy = rejection.workspace ? "workspace-write" : undefined;
-              delete pendingVersionRejectionByIdRef.current[id];
-              setSaveOutcome(id, { status: "partial", versionCommitted: false });
-              flushGraphRecovery();
-              return;
-            }
-          }
-          setSaveOutcome(id, {
-            ...saveOutcomes[id],
-            status: saveOutcomes[id]?.status === "partial" ? "partial" : "unknown",
-            message: t("Your draft is still here. Review the saved schedule or discard this draft to start from the saved state."),
-          });
+    if (!guard?.checkpoint || !containerId) return draft;
+    const checkpoint = guard.checkpoint;
+    let remote = await readPersistedGraph(containerId, id, signal, runSaveRequest);
+    const versions = await readGraphVersions(containerId, id, signal, runSaveRequest);
+    const pendingReadback = pendingReadbackByIdRef.current[id];
+    let complete = pendingReadback ? (await pendingReadback.verify(remote, signal, runSaveRequest)).complete :
+      (await checkpoint.verify(remote, signal, runSaveRequest)).complete;
+    if (!complete && guard.manualPublicationAttempted && checkpoint.rateLimited &&
+        !checkpoint.versionAttempted && checkpoint.resumeManual) {
+      await checkpoint.resumeManual(remote, signal, runSaveRequest, writeRequest);
+      remote = await readPersistedGraph(containerId, id, signal, runSaveRequest);
+      complete = (await checkpoint.verify(remote, signal, runSaveRequest)).complete;
+    }
+    if (!checkpoint.versionCommitted && checkpoint.versionAttempted) {
+      const rejection = pendingVersionRejectionByIdRef.current[id];
+      if (!rejection || !sameGraphVersionTree(rejection.baseline, versions)) {
+        throw new Error(t("The previous save could not be verified. Your edits are still here."));
+      }
+    } else if (!checkpoint.versionCommitted && checkpoint.versionBaseline &&
+        !sameGraphVersionTree(checkpoint.versionBaseline, versions)) {
+      throw new Error(t("Other saved changes were detected. Your edits are still here. Automatic merge is unavailable."));
+    }
+    if (complete) {
+      if (!checkpoint.versionCommitted && buildGraphDraftSnapshot(draft) !== buildGraphDraftSnapshot(checkpoint.draft)) {
+        if (guard.manualPublicationAttempted) throw new Error(t("The previous save could not be verified. Your edits are still here."));
+        guard.blockedBy = undefined;
+        checkpoint.safeToResume = true;
+        return draft;
+      }
+      if (!checkpoint.versionCommitted) {
+        signal.throwIfAborted();
+        guard.blockedBy = "version-commit";
+        checkpoint.versionAttempted = true;
+        delete pendingVersionRejectionByIdRef.current[id];
+        // Record a definite rejection before returning; an unknown POST response is never replayed.
+        try {
+          const tree = await writeRequest(() => containersApi.commitGraphVersion(containerId, id));
+          queryClient.setQueryData(queryKeys.containers.graphVersions(containerId, id), tree);
+          checkpoint.versionCommitted = true;
+          delete pendingVersionRejectionByIdRef.current[id];
+        } catch (error) {
+          if (error instanceof ApiError && error.status === 429 && checkpoint.versionBaseline) {
+            pendingVersionRejectionByIdRef.current[id] = { baseline: checkpoint.versionBaseline, workspace: true };
+          } else delete pendingVersionRejectionByIdRef.current[id];
+          throw error;
         }
       }
-    } catch (error) {
-      if (signal.aborted || isRequestCanceledError(error)) return;
-      setSaveOutcome(id, { status: "unknown", message: t("The current schedule could not be read. Your draft is still here.") });
-    } finally {
-      finishEditorReads(controller);
+      const confirmed = await readPersistedGraph(containerId, id, signal, runSaveRequest);
+      if (!(await checkpoint.verify(confirmed, signal, runSaveRequest)).complete) throw new Error(t("The previous save could not be verified. Your edits are still here."));
+      confirmGraphSave(confirmed, true);
+      if (buildGraphDraftSnapshot(draft) === buildGraphDraftSnapshot(checkpoint.draft)) return null;
+      const completedPublishes = new Set(checkpoint.draft.pendingManualShiftPublishes.map(row => row.clientId));
+      const remaining = { ...draft,
+        graphEmployeeRows: draft.graphEmployeeRows.map(row => ({ ...row, id: confirmed.employees.find(employee => employee.employeeId === row.employeeId)?.id ?? null })),
+        pendingManualShiftPublishes: draft.pendingManualShiftPublishes.filter(row => !completedPublishes.has(row.clientId)),
+      };
+      sessionDraftsRef.current[id] = remaining;
+      if (id === graphId) applyGraphDraft(remaining);
+      return remaining;
     }
-    selectGraphTab(id);
+    if (guard.manualPublicationAttempted || !checkpoint.safeToResume ||
+        !canResumeWorkspace(checkpoint.before, checkpoint.expected, remote)) {
+      throw new Error(t("The previous save could not be verified. Your edits are still here."));
+    }
+    guard.blockedBy = undefined;
+    return draft;
   };
 
-  const discardSubmittedGraph = async () => {
-    if (!containerId || discardTarget === null || saveInFlightRef.current) return;
-    setDiscardTarget(null);
-    if (discardTarget === "recovered") {
-      discardGraphRecovery();
-      return;
-    }
-    const id = discardTarget;
-    const controller = startEditorReads();
-    const { signal } = controller;
-    try {
-      const remote = await readPersistedGraph(containerId, id, signal);
-      delete saveGuardByIdRef.current[id];
-      delete pendingReadbackByIdRef.current[id];
-      delete pendingVersionRejectionByIdRef.current[id];
-      setConfirmedGraph(remote);
-      clearVerifiedGraphRecovery(id);
-      setSaveOutcome(id, { status: "unchanged" });
-    } catch (error) {
-      if (signal.aborted || isRequestCanceledError(error)) return;
-      setSaveOutcome(id, { status: "unknown", message: t("The current schedule could not be read. Your draft is still here.") });
-    } finally {
-      finishEditorReads(controller);
-    }
-  };
-
-  const saveGraphDraft = async (containerId: number, { draft, remote, change }: PreflightedGraph, signal: AbortSignal) => {
+  const saveGraphDraft = async (containerId: number, { draft, remote, change }: PreflightedGraph, signal: AbortSignal, runSaveRequest: RunGraphSaveRequest, markWrite: () => void) => {
+    let writeIssued = false;
+    const writeRequest: RunGraphSaveRequest = (send, requestSignal) => runSaveRequest(() => {
+      writeIssued = true;
+      markWrite();
+      return send();
+    }, requestSignal);
     const id = draft.graphId;
     const guard = saveGuardByIdRef.current[id] ??= {};
     const previousOfferIds = new Set<number>();
@@ -2626,6 +2503,59 @@ export function ContainerGraphEditPage() {
     let expected = remote;
     let styleNote = remote.graph.note ?? null;
 
+    const verifyReadback = async (readback: PersistedGraphState, readSignal: AbortSignal, readRequest: RunGraphSaveRequest) => {
+      if (change.kind === "style-only") {
+        const matches = matchGraphColors(change.colors, persistedGraphStyles(readback));
+        return { complete: matches === change.colors.length, partial: matches > 0 };
+      }
+      const pending = draft.pendingManualShiftPublishes;
+      const publicationSlots = pending.length && guard.manualPublicationAttempted
+        ? matchPublishedShifts(readback, pending, await readGraphOffers(containerId, id, readSignal, readRequest), previousOfferIds, responseOfferIds)
+        : new Set<number>();
+      const readbackWorkspace = { ...readback, slots: readback.slots.filter(slot => !publicationSlots.has(slot.id)) };
+      return {
+        complete: publicationSlots.size === pending.length &&
+          fingerprintPersistedGraph(readbackWorkspace) === fingerprintPersistedGraph(expected),
+        partial: publicationSlots.size > 0 || hasPersistedWorkspaceChanges(remote, expected, readbackWorkspace),
+      };
+    };
+
+    const prepareCheckpoint = () => {
+      guard.checkpoint = {
+        kind: change.kind,
+        draft: cloneGraphEditorSessionDraft(draft), before: structuredClone(remote), expected,
+        versionBaseline, versionCommitted: false, versionAttempted: false, safeToResume: false,
+        verify: verifyReadback,
+        resumeManual: async (state, readSignal, request, write) => {
+          const pending = draft.pendingManualShiftPublishes;
+          const offers = await readGraphOffers(containerId, id, readSignal, request);
+          const appliedSlots = matchPublishedShifts(state, pending, offers, previousOfferIds, responseOfferIds);
+          if (fingerprintPersistedGraph({ ...state, slots: state.slots.filter(slot => !appliedSlots.has(slot.id)) }) !==
+              fingerprintPersistedGraph(expected)) throw new Error(t("The previous save could not be verified. Your edits are still here."));
+          for (const [index, shift] of pending.entries()) {
+            const matches = matchPublishedShifts(state, [shift], offers, previousOfferIds,
+              responseOfferIds[index] === undefined ? [] : [responseOfferIds[index]]);
+            if (matches.size === 1) continue;
+            if (offers.some(offer => !previousOfferIds.has(offer.id) && matchesManualPublication(offer, shift, id))) {
+              throw new Error(t("The previous save could not be verified. Your edits are still here."));
+            }
+            if (guard.checkpoint) guard.checkpoint.rateLimited = false;
+            const { manualColumnId, dayOfMonth, fromTime, toTime, targetEmployeeId, allowPartialAcceptance } = shift;
+            try {
+              const published = await write(() => runMutation(createManualShiftSwapMutation.mutate, {
+                containerId, graphId: id, manualColumnId, dayOfMonth, fromTime, toTime,
+                targetEmployeeId: targetEmployeeId ?? null, allowPartialAcceptance,
+              }));
+              responseOfferIds[index] = published.id;
+            } catch (error) {
+              if (guard.checkpoint) guard.checkpoint.rateLimited = error instanceof ApiError && error.status === 429;
+              throw error;
+            }
+          }
+        },
+      };
+    };
+
     try {
       if (change.kind === "style-only") {
         styleNote = buildStyleOnlyUpdatedNote(styleNote, change.merged);
@@ -2633,18 +2563,21 @@ export function ContainerGraphEditPage() {
         const stylesChanged = stableSerialize(normalizeGraphStyles(apiStyles)) !== stableSerialize(normalizeGraphStyles(remote.styles));
         const noteChanged = styleNote !== (remote.graph.note ?? null);
         versionRequired = stylesChanged || noteChanged || Boolean(guard.needsStyleVersion);
+        expected = { ...remote, graph: { ...remote.graph, note: styleNote }, styles: apiStyles };
+        guard.checkpoint = undefined;
         if (versionRequired) {
-          versionBaseline = await readGraphVersions(containerId, id, signal);
+          versionBaseline = await readGraphVersions(containerId, id, signal, runSaveRequest);
           guard.needsStyleVersion = true;
-          flushGraphRecovery();
+          prepareCheckpoint();
+
         }
         if (noteChanged) {
-          await containersApi.updateGraph(containerId, id, { ...graphSaveFields(remote.graph), note: styleNote ?? undefined });
+          await writeRequest(() => containersApi.updateGraph(containerId, id, { ...graphSaveFields(remote.graph), note: styleNote ?? undefined }));
         }
         signal.throwIfAborted();
         if (stylesChanged) {
           batchWithoutEarlierWrites = !noteChanged;
-          await persistGraphStyleDraft({ containerId, graphId: id, styleRecords: apiStyles, existingStyles: remote.styles });
+          await persistGraphStyleDraft({ containerId, graphId: id, styleRecords: apiStyles, existingStyles: remote.styles, runSaveRequest: writeRequest });
           batchWithoutEarlierWrites = false;
         }
       } else {
@@ -2673,35 +2606,37 @@ export function ContainerGraphEditPage() {
           styles: normalizeApiStyleRecords(workspaceStyles, id),
         };
         const pending = draft.pendingManualShiftPublishes;
-        versionRequired = pending.length > 0 || fingerprintPersistedGraph(expected) !== fingerprintPersistedGraph(remote);
+        versionRequired = Boolean(guard.needsStyleVersion) || pending.length > 0 || fingerprintPersistedGraph(expected) !== fingerprintPersistedGraph(remote);
         if (versionRequired) {
-          versionBaseline = await readGraphVersions(containerId, id, signal);
+          versionBaseline = await readGraphVersions(containerId, id, signal, runSaveRequest);
           if (pending.length) {
-            (await readGraphOffers(containerId, id, signal)).forEach(offer => previousOfferIds.add(offer.id));
+            (await readGraphOffers(containerId, id, signal, runSaveRequest)).forEach(offer => previousOfferIds.add(offer.id));
           }
+          guard.needsStyleVersion = true;
+          prepareCheckpoint();
           guard.blockedBy = "workspace-write";
-          flushGraphRecovery();
+
           await runMutation(saveWorkspaceMutation.mutate, {
-            containerId, graphId: id, payload, employeeAssignments, cellMap: draft.cellMap, signal,
+            containerId, graphId: id, payload, employeeAssignments, cellMap: draft.cellMap, signal, runSaveRequest: writeRequest,
             existingGraph: remote.graph, existingEmployees: remote.employees, existingSlots: remote.slots,
           });
           signal.throwIfAborted();
           batchWithoutEarlierWrites = fingerprintPersistedGraph({ ...expected, styles: remote.styles }) === fingerprintPersistedGraph(remote);
           await persistGraphStyleDraft({
-            containerId, graphId: id, styleRecords: expected.styles, existingStyles: remote.styles,
+            containerId, graphId: id, styleRecords: expected.styles, existingStyles: remote.styles, runSaveRequest: writeRequest,
           });
           batchWithoutEarlierWrites = false;
           signal.throwIfAborted();
           if (pending.length) {
             guard.manualPublicationAttempted = true;
-            flushGraphRecovery();
+
           }
           for (const { manualColumnId, dayOfMonth, fromTime, toTime, targetEmployeeId, allowPartialAcceptance } of pending) {
             signal.throwIfAborted();
-            const published = await runMutation(createManualShiftSwapMutation.mutate, {
+            const published = await writeRequest(() => runMutation(createManualShiftSwapMutation.mutate, {
               containerId, graphId: id, manualColumnId, dayOfMonth, fromTime, toTime,
               targetEmployeeId: targetEmployeeId ?? null, allowPartialAcceptance,
-            });
+            }));
             responseOfferIds.push(published.id);
           }
         }
@@ -2710,22 +2645,32 @@ export function ContainerGraphEditPage() {
       signal.throwIfAborted();
       if (versionRequired) {
         guard.blockedBy = "version-commit";
-        flushGraphRecovery();
-        const version = await containersApi.commitGraphVersion(containerId, id);
+        if (guard.checkpoint) guard.checkpoint.versionAttempted = true;
+        delete pendingVersionRejectionByIdRef.current[id];
+
+        const version = await writeRequest(() => containersApi.commitGraphVersion(containerId, id));
         signal.throwIfAborted();
         versionCommitted = true;
+        if (guard.checkpoint) guard.checkpoint.versionCommitted = true;
         queryClient.setQueryData(queryKeys.containers.graphVersions(containerId, id), version);
       }
     } catch (error) {
       if (signal.aborted || isRequestCanceledError(error)) throw error;
       writeFailed = true;
       writeError = error;
+      if (guard.checkpoint) {
+        const employeeIds = (state: PersistedGraphState) => state.employees.map(row => row.employeeId).sort((a, b) => a - b);
+        guard.checkpoint.safeToResume = change.kind === "style-only" ||
+          (error instanceof ApiError && error.status >= 400 && error.status < 500) ||
+          stableSerialize(employeeIds(remote)) === stableSerialize(employeeIds(expected));
+        guard.checkpoint.rateLimited = writeIssued && error instanceof ApiError && error.status === 429;
+      }
       if (guard.blockedBy === "version-commit" && versionBaseline) {
         if (error instanceof ApiError && error.status === 429) {
           pendingVersionRejectionByIdRef.current[id] = { baseline: versionBaseline, workspace: change.kind === "workspace" };
         }
         try {
-          const currentVersions = await readGraphVersions(containerId, id, signal);
+          const currentVersions = await readGraphVersions(containerId, id, signal, runSaveRequest);
           queryClient.setQueryData(queryKeys.containers.graphVersions(containerId, id), currentVersions);
           // The tree alone does not prove that a lost commit response came from this request.
           knownVersionRejection = sameGraphVersionTree(currentVersions, versionBaseline) &&
@@ -2736,29 +2681,14 @@ export function ContainerGraphEditPage() {
       }
     }
 
-    const verifyReadback = async (readback: PersistedGraphState, readSignal: AbortSignal) => {
-      if (change.kind === "style-only") {
-        const matches = matchGraphColors(change.colors, persistedGraphStyles(readback));
-        return { complete: matches === change.colors.length, partial: matches > 0 };
-      }
-      const pending = draft.pendingManualShiftPublishes;
-      const publicationSlots = pending.length && guard.manualPublicationAttempted
-        ? matchPublishedShifts(readback, pending, await readGraphOffers(containerId, id, readSignal), previousOfferIds, responseOfferIds)
-        : new Set<number>();
-      const readbackWorkspace = { ...readback, slots: readback.slots.filter(slot => !publicationSlots.has(slot.id)) };
-      return {
-        complete: publicationSlots.size === pending.length &&
-          fingerprintPersistedGraph(readbackWorkspace) === fingerprintPersistedGraph(expected),
-        partial: publicationSlots.size > 0 || hasPersistedWorkspaceChanges(remote, expected, readbackWorkspace),
-      };
-    };
-
+    if (!stopRequestedRef.current) setSavePhase("verifying");
+    setSaveProgress(current => ({ ...current, stage: "verifying" }));
     let contentPersisted = false;
     let partialContent = false;
     let readback: PersistedGraphState | undefined;
     try {
-      readback = await readPersistedGraph(containerId, id, signal);
-      ({ complete: contentPersisted, partial: partialContent } = await verifyReadback(readback, signal));
+      readback = await readPersistedGraph(containerId, id, signal, runSaveRequest);
+      ({ complete: contentPersisted, partial: partialContent } = await verifyReadback(readback, signal, runSaveRequest));
       signal.throwIfAborted();
     } catch (error) {
       if (signal.aborted || isRequestCanceledError(error)) throw error;
@@ -2766,7 +2696,6 @@ export function ContainerGraphEditPage() {
     }
     if (knownVersionRejection && readback) {
       guard.blockedBy = change.kind === "workspace" ? "workspace-write" : undefined;
-      delete pendingVersionRejectionByIdRef.current[id];
     }
 
     if (readback && contentPersisted && (versionCommitted || (!versionRequired && !writeFailed))) {
@@ -2783,13 +2712,13 @@ export function ContainerGraphEditPage() {
     }
     const status = batchConflict ? "conflict" : !readback || versionUncertain || !(contentPersisted || partialContent) ? "unknown" : "partial";
     const message = writeError instanceof ApiError ? writeError.message
-      : guard.blockedBy ? t("Review the saved schedule before retrying these edits.") : undefined;
+      : guard.blockedBy ? t("The previous save could not be verified. Your edits are still here.") : undefined;
     setSaveOutcome(id, { status, message, contentPersisted, versionCommitted });
     if (writeError instanceof ApiError) {
       if (writeError.status === 409 && !batchConflict) queryClient.invalidateQueries({ queryKey: queryKeys.urlop.all });
       if (id === graphId) setFormErrors(current => ({ ...current, ...applyGraphApiErrors(writeError.validationErrors) }));
     }
-    flushGraphRecovery();
+
     reportSaveIssue(message ?? t("Could not save this schedule."));
     return false;
   };
@@ -2828,12 +2757,18 @@ export function ContainerGraphEditPage() {
 
   const reportSaveIssue = (message: string) => {
     setSaveIssue(message);
-    pushErrorAlert({ message });
+    setSavePhase("failed");
+  };
+
+  const navigateAfterSave = () => {
+    setSavePhase("idle");
+    runWithoutPrompt(() => navigate(graphId !== null
+      ? `/container/${containerId}/graphs/${graphId}${sessionSearch}`
+      : `/container?openContainerId=${containerId}`));
   };
 
   const handleSave = async () => {
-    setIsSaveConfirmOpen(false);
-    if (saveInFlightRef.current || recoveryDrafts.length || generateMutation.isPending || hasLoadError || isLoading || isPolicyUnavailable) return;
+    if (saveInFlightRef.current || generateMutation.isPending || hasLoadError || isLoading || isPolicyUnavailable) return;
 
     if (editLockMessage) {
       setSubmitError(editLockMessage);
@@ -2851,16 +2786,26 @@ export function ContainerGraphEditPage() {
 
     setSubmitError(undefined);
     setSaveIssue(undefined);
+    saveIssueRef.current = undefined;
 
+    stopRequestedRef.current = false;
     const attemptedGraphIds: number[] = [];
+    const markGraphWrite = (id: number) => { if (!attemptedGraphIds.includes(id)) attemptedGraphIds.push(id); };
     let finishTraffic: (() => Promise<void>) | undefined;
     const controller = startEditorReads("save");
     const { signal } = controller;
+    const pacer = createGraphSavePacer();
+    const runSaveRequest: RunGraphSaveRequest = (send, requestSignal = signal) => pacer.run(() => {
+      signal.throwIfAborted();
+      return send();
+    }, requestSignal);
     try {
 
       if (isCreate) {
+        setSavePhase("saving");
+        setSaveProgress({ stage: "saving", dirtyTotal: 1, checkedCount: 1, verifiedCount: 0, currentGraphName: form.name });
         const result = await runMutation(saveWorkspaceMutation.mutate, {
-          signal,
+          signal, runSaveRequest,
           containerId,
           graphId,
           payload: toPayload(
@@ -2888,11 +2833,13 @@ export function ContainerGraphEditPage() {
           containerId,
           graphId: result.graphId,
           styleRecords: styleRecordsRef.current.filter(style => graphEmployeeRows.some(row => row.employeeId === style.employeeId)),
-          existingStyles: [],
+          existingStyles: [], runSaveRequest,
         });
         signal.throwIfAborted();
-        await containersApi.commitGraphVersion(containerId, result.graphId);
+        await runSaveRequest(() => containersApi.commitGraphVersion(containerId, result.graphId));
         signal.throwIfAborted();
+        await readPersistedGraph(containerId, result.graphId, signal, runSaveRequest);
+        setSavePhase("idle");
         runWithoutPrompt(() => navigate(`/container/${containerId}/graphs/${result.graphId}`));
         return;
       }
@@ -2907,7 +2854,6 @@ export function ContainerGraphEditPage() {
       if (currentDraft) {
         draftsToSave.set(currentDraft.graphId, currentDraft);
       }
-      submittedDraftsRef.current = draftsToSave;
 
       if (graphId !== null && !draftsToSave.has(graphId)) {
         throw new Error(t("Current schedule draft is not ready yet."));
@@ -2918,14 +2864,16 @@ export function ContainerGraphEditPage() {
         const baseline = baselineComparisonByIdRef.current[id];
         if (!draft || !baseline) return [];
         const kind = classifyGraphDraftChange(baseline, compareGraphDraft(draft));
-        return kind === "unchanged" && !saveGuardByIdRef.current[id]?.blockedBy ? [] : [{ draft, kind }];
+        return kind === "unchanged" && !saveGuardByIdRef.current[id]?.needsStyleVersion && !saveGuardByIdRef.current[id]?.checkpoint ? [] : [{ draft, kind }];
       });
       if (!dirty.length) {
-        setSubmitError(t("Nothing to save."));
+        navigateAfterSave();
         return;
       }
 
-      const ready = dirty.filter(({ draft }) => !saveGuardByIdRef.current[draft.graphId]?.blockedBy);
+      const ready = dirty;
+      setSavePhase("checking");
+      setSaveProgress({ stage: "checking", dirtyTotal: dirty.length, checkedCount: 0, verifiedCount: 0 });
       beginGraphSaveTraffic(queryClient, containerId);
       let trafficFinished = false;
       finishTraffic = async () => {
@@ -2934,21 +2882,25 @@ export function ContainerGraphEditPage() {
         await finishGraphSaveTraffic(queryClient, containerId, attemptedGraphIds);
       };
       finishSaveTrafficRef.current = finishTraffic;
-      setSaveOutcomes(current => ({
-        ...current,
-        ...Object.fromEntries(ready.map(({ draft }) => [draft.graphId, { status: "pending" }])),
-      }));
-      flushGraphRecovery();
-
       const preflighted: Array<PreflightedGraph | null> = [];
-      for (const { draft } of ready) preflighted.push(await preflightGraph(draft, signal));
+      for (const { draft } of ready) {
+        if (stopRequestedRef.current) { setSavePhase("idle"); return; }
+        setSaveProgress(current => ({ ...current, currentGraphName: graphLabel(draft.graphId) }));
+        if (saveGuardByIdRef.current[draft.graphId]?.checkpoint) activeWriteGraphRef.current = draft.graphId;
+        const remaining = await reconcileGraphSave(draft, signal, runSaveRequest, () => markGraphWrite(draft.graphId));
+        activeWriteGraphRef.current = null;
+        if (remaining) preflighted.push(await preflightGraph(remaining, signal, runSaveRequest));
+        setSaveProgress(current => ({ ...current, checkedCount: current.checkedCount + 1,
+          verifiedCount: current.verifiedCount + (remaining ? 0 : 1) }));
+        if (stopRequestedRef.current) { setSavePhase("idle"); return; }
+      }
       if (preflighted.some(plan => !plan)) {
-        reportSaveIssue(t("Could not save this schedule."));
+        reportSaveIssue(saveIssueRef.current ?? t("Could not save this schedule."));
         return;
       }
       for (const plan of preflighted) {
         if (!plan || plan.change.kind === "style-only") continue;
-        if (plan.draft.graphId === graphId && !handleValidate()) return;
+        if (plan.draft.graphId === graphId && !handleValidate()) { reportSaveIssue(t("Check highlighted fields before continuing.")); return; }
         const { draft } = plan;
         const matchingGroups = new Set((availabilityGroupsQuery.data ?? [])
           .filter(group => group.year === Number(draft.form.year) && group.month === Number(draft.form.month))
@@ -2962,23 +2914,33 @@ export function ContainerGraphEditPage() {
       }
       for (const plan of preflighted) {
         if (!plan) continue;
-        attemptedGraphIds.push(plan.draft.graphId);
-        setSaveOutcome(plan.draft.graphId, { status: "saving" });
-        if (!await saveGraphDraft(containerId, plan, signal)) return;
-      }
-      if (ready.length !== dirty.length) {
-        reportSaveIssue(t("Review the saved schedule before retrying these edits."));
-        return;
+        if (stopRequestedRef.current) { setSavePhase("idle"); return; }
+        activeWriteGraphRef.current = plan.draft.graphId;
+        setSavePhase("saving");
+        setSaveProgress(current => ({ ...current, stage: "saving", currentGraphName: graphLabel(plan.draft.graphId) }));
+        let saved = await saveGraphDraft(containerId, plan, signal, runSaveRequest, () => markGraphWrite(plan.draft.graphId));
+        if (!saved && saveGuardByIdRef.current[plan.draft.graphId]?.checkpoint?.rateLimited) {
+          setSavePhase(stopRequestedRef.current ? "stopRequested" : "checking");
+          const remaining = await reconcileGraphSave(plan.draft, signal, runSaveRequest, () => markGraphWrite(plan.draft.graphId));
+          if (!remaining) saved = true;
+          else {
+            const resumed = await preflightGraph(remaining, signal, runSaveRequest);
+            if (resumed) saved = await saveGraphDraft(containerId, resumed, signal, runSaveRequest, () => markGraphWrite(plan.draft.graphId));
+          }
+        }
+        if (!saved) return;
+        setSaveIssue(undefined);
+        setSaveProgress(current => ({ ...current, verifiedCount: current.verifiedCount + 1 }));
+        activeWriteGraphRef.current = null;
+        if (stopRequestedRef.current) { setSavePhase("idle"); return; }
       }
 
-      if (graphId !== null) {
-        runWithoutPrompt(() => navigate(`/container/${containerId}/graphs/${graphId}${sessionSearch}`));
-        return;
-      }
-
-      runWithoutPrompt(() => navigate(`/container?openContainerId=${containerId}`));
+      navigateAfterSave();
     } catch (error) {
-      if (signal.aborted || isRequestCanceledError(error)) return;
+      if (signal.aborted || isRequestCanceledError(error)) {
+        if (stopRequestedRef.current) setSavePhase("idle");
+        return;
+      }
       if (error instanceof ApiError) {
         if (error.status === 409) queryClient.invalidateQueries({ queryKey: queryKeys.urlop.all });
         setFormErrors(currentErrors => ({ ...currentErrors, ...applyGraphApiErrors(error.validationErrors) }));
@@ -2988,9 +2950,13 @@ export function ContainerGraphEditPage() {
 
       reportSaveIssue(error instanceof Error ? error.message : t("Could not save this schedule."));
     } finally {
-      await finishTraffic?.();
-      if (finishSaveTrafficRef.current === finishTraffic) finishSaveTrafficRef.current = null;
-      finishEditorReads(controller);
+      try { await finishTraffic?.(); }
+      finally {
+        activeWriteGraphRef.current = null;
+        if (finishSaveTrafficRef.current === finishTraffic) finishSaveTrafficRef.current = null;
+        finishEditorReads(controller);
+        if (stopRequestedRef.current) setSavePhase(current => current === "failed" ? current : "idle");
+      }
     }
   };
 
@@ -3440,37 +3406,7 @@ export function ContainerGraphEditPage() {
     );
   };
 
-  const saveEntries = Object.entries(saveOutcomes).flatMap(([id, outcome]) =>
-    openGraphIds.includes(Number(id)) && outcome.status !== "unchanged" ? [{ id: Number(id), ...outcome }] : [],
-  );
-  const retryAvailable = saveEntries.some(entry =>
-    (entry.status === "pending" || entry.status === "partial" || entry.status === "unknown") &&
-    !saveGuardByIdRef.current[entry.id]?.blockedBy,
-  );
-  const recoveryPending = recoveryDrafts.length > 0;
-  const hasUnresolvedSave = saveEntries.some(entry => entry.status !== "saved") || (saveEntries.length === 0 && Boolean(saveIssue));
-  const hasLoadIssue = failedLoadQueries.length > 0 || (hasLoadedEditor && isPolicyUnavailable);
-  const showRecoveryAction = recoveryPending || recoveryUnavailable || invalidRecovery || hasLoadIssue || (hasUnresolvedSave && !isSaving);
-  const recoveryInHeader = showSessionTabs || recoveryPending || isLoading || hasLoadError;
-  const recoveryLabel = recoveryPending ? t("Restore draft") : t("Review issue");
-  const recoveryAction = (
-    <span className={styles.recoveryTriggerSlot}>
-      {showRecoveryAction ? <button
-        type="button"
-        className={styles.recoveryAction}
-        aria-haspopup="dialog"
-        aria-label={recoveryLabel}
-        disabled={isSaving}
-        title={recoveryLabel}
-        onClick={() => setIsRecoveryDialogOpen(true)}
-      >
-        <WarnIcon size={16} />
-        <span className={styles.recoveryLabel}>{recoveryLabel}</span>
-      </button> : null}
-    </span>
-  );
-  const saveDisabled = isLoading || hasLoadError || isPolicyUnavailable || isSaving || recoveryPending || generateMutation.isPending || (Boolean(graphId && saveGuardByIdRef.current[graphId]?.blockedBy) &&
-    !retryAvailable && !hasDirtySessionDrafts);
+  const saveDisabled = isLoading || hasLoadError || isPolicyUnavailable || isSaving || generateMutation.isPending;
   const graphLabel = (id: number) =>
     baselinePersistedByIdRef.current[id]?.graph.name ?? sessionGraphs.find(graph => graph.id === id)?.name ?? t("Schedule {0}", id);
 
@@ -3481,7 +3417,7 @@ export function ContainerGraphEditPage() {
         subtitle={isCreate ? t("Create a new saved schedule for this container") : t("Update schedule details, employees, matrix content and styling")}
         onBack={() => {
           if (saveInFlightRef.current) return;
-          flushGraphRecovery();
+
           navigate(isCreate
             ? `/container?openContainerId=${containerId ?? ""}`
             : `/container/${containerId}/graphs/${graphId}${sessionSearch}`);
@@ -3506,14 +3442,13 @@ export function ContainerGraphEditPage() {
                 onSelect={selectGraphTab}
                 actionSlot={
                   <div className={styles.saveActions}>
-                    {recoveryAction}
                     <IosButton
                       label={t("Save")}
                       busy={sessionOperation === "save"}
                       busyLabel={t("Saving...")}
                       icon={<SaveIcon size={18} />}
                       disabled={saveDisabled || !canEdit}
-                      onClick={() => setIsSaveConfirmOpen(true)}
+                      onClick={() => setSavePhase("confirming")}
                     />
                   </div>
                 }
@@ -3525,90 +3460,10 @@ export function ContainerGraphEditPage() {
                 checked={isCompactMatrix}
                 onToggle={() => setIsCompactMatrix(current => !current)}
               />
-              {recoveryInHeader ? recoveryAction : null}
             </div>
           )
         }
       />
-
-      {isRecoveryDialogOpen ? (
-        <dialog
-          ref={recoveryDialog}
-          className={styles.recoveryDialog}
-          aria-labelledby={recoveryDialogTitle}
-          onCancel={event => {
-            event.preventDefault();
-            setIsRecoveryDialogOpen(false);
-          }}
-        >
-          <header className={styles.recoveryDialogHeader}>
-            <h2 id={recoveryDialogTitle}>{t("Schedule save and recovery")}</h2>
-            <button type="button" className={styles.recoveryAction} onClick={() => setIsRecoveryDialogOpen(false)}>{t("Close")}</button>
-          </header>
-          {hasLoadIssue ? (
-            <div className={styles.recoveryGroup}>
-              {hasLoadedEditor && failedLoadQueries.length > 0 ? <p>{t("Schedule data could not be refreshed. Your edits are still here.")}</p> : null}
-              {hasLoadedEditor && isPolicyUnavailable ? <p>{t("Save and generation require vacation, availability and contract data.")}</p> : null}
-              {failedLoadQueries.length > 0 ? (
-                <button type="button" className={styles.recoveryAction} onClick={() => void retryEditorLoading()} disabled={isRetryingLoad || isSaving}>
-                  {t("Retry loading")}
-                </button>
-              ) : null}
-            </div>
-          ) : null}
-          {recoveryPending ? (
-            <div className={styles.recoveryGroup}>
-              <p>{t("Local drafts for {0} schedules. Last edited {1}.", recoveryDrafts.length,
-                dateTimeFormat(undefined, { dateStyle: "short", timeStyle: "short" })
-                  .format(Math.max(...recoveryDrafts.map(entry => entry.editedAt))))}</p>
-              <div className={styles.recoveryActions}>
-                <button type="button" className={styles.recoveryAction} onClick={restoreGraphRecovery} disabled={!canEdit || isSaving}>{t("Restore draft")}</button>
-                <button type="button" className={styles.recoveryAction} onClick={() => requestDraftDiscard("recovered")} disabled={isSaving}>{t("Discard local draft")}</button>
-              </div>
-            </div>
-          ) : null}
-          {recoveryUnavailable ? <p>{t("Edits are kept on this page, but restoring after refresh is unavailable.")}</p> : null}
-          {invalidRecovery ? <p>{t("Some local drafts could not be restored.")}</p> : null}
-          {hasUnresolvedSave && saveIssue && !saveEntries.some(entry => entry.message === saveIssue) ? <p>{saveIssue}</p> : null}
-          {saveEntries.length ? (
-            <ul className={styles.recoveryList} aria-live="polite">
-              {saveEntries.map(entry => (
-                <li key={entry.id}>
-                  <strong>{graphLabel(entry.id)} · {graphSaveStatusLabel(entry.status)}</strong>
-                  {entry.message ? <p>{entry.message}</p> : null}
-                  {entry.conflicts?.map(conflict => (
-                    <p key={`${conflict.employeeId}:${conflict.dayOfMonth}:${conflict.field}`}>
-                      {conflict.field === "backgroundColorArgb"
-                        ? t("Conflicting background color at employee {0}, day {1}.", conflict.employeeId, conflict.dayOfMonth)
-                        : t("Conflicting text color at employee {0}, day {1}.", conflict.employeeId, conflict.dayOfMonth)}
-                    </p>
-                  ))}
-                  {entry.status === "conflict" || saveGuardByIdRef.current[entry.id]?.blockedBy ? (
-                    <div className={styles.recoveryActions}>
-                      <button type="button" className={styles.recoveryAction} disabled={!canEdit || isSaving || recoveryPending} onClick={() => void reviewGraphSave(entry.id)}>
-                        {entry.status === "conflict" ? t("Review conflict") : t("Review saved schedule")}
-                      </button>
-                      <button type="button" className={styles.recoveryAction} disabled={isSaving || recoveryPending} onClick={() => requestDraftDiscard(entry.id)}>
-                        {t("Discard local draft")}
-                      </button>
-                    </div>
-                  ) : null}
-                </li>
-              ))}
-            </ul>
-          ) : null}
-          {retryAvailable && !recoveryPending ? (
-            <button type="button" className={styles.recoveryAction} disabled={isSaving || !canEdit || isPolicyUnavailable || hasLoadError}
-              onClick={() => {
-                setIsRecoveryDialogOpen(false);
-                void handleSave();
-              }}
-            >
-              {t("Retry unsaved graphs")}
-            </button>
-          ) : null}
-        </dialog>
-      ) : null}
 
       {isCheckingLocks ? (
         <ManagerEditLockDialog
@@ -3628,7 +3483,7 @@ export function ContainerGraphEditPage() {
       ) : null}
 
       {canEdit ? (
-        <div className={styles.editorSurface} inert={isSaving || recoveryPending}>
+        <div className={styles.editorSurface} inert={isSaving}>
         <ContainerGraphEditor
         urlopCellKeys={urlopCellKeys}
         graph={effectiveGraph}
@@ -3684,7 +3539,6 @@ export function ContainerGraphEditPage() {
         isStylingBusy={false}
         hasUnsavedChanges={hasUnsavedChanges}
         showMatrixSaveAction={!showSessionTabs}
-        saveRecoveryAction={recoveryInHeader ? null : recoveryAction}
         isBindsLoading={bindsQuery.isLoading && bindRows.length === 0}
         isBindBusy={createBindMutation.isPending || updateBindMutation.isPending || deleteBindMutation.isPending}
         isFillColorBindBusy={upsertFillColorBindMutation.isPending || deleteFillColorBindMutation.isPending}
@@ -3829,26 +3683,15 @@ export function ContainerGraphEditPage() {
         canUndo={undoDepth > 0}
         onUndo={handleUndo}
         onVersionCheckoutComplete={() => {
-          flushGraphRecovery();
+
           runWithoutPrompt(() => navigate(0));
         }}
-        onSave={() => { if (!saveDisabled) setIsSaveConfirmOpen(true); }}
+        onSave={() => { if (!saveDisabled) setSavePhase("confirming"); }}
         onGenerate={() => void handleGenerate()}
         />
         </div>
       ) : null}
 
-      <ConfirmDialog
-        open={discardTarget !== null}
-        title={t("Discard local draft")}
-        message={t("Discard your local edits and open the saved schedule?")}
-        onCancel={() => {
-          setDiscardTarget(null);
-          setIsRecoveryDialogOpen(true);
-        }}
-        onConfirm={() => void discardSubmittedGraph()}
-        confirmText={t("Discard local draft")}
-      />
       <ConfirmDialog
         open={employeeRemoveTargetId !== null}
         title={t("Remove employee")}
@@ -3869,15 +3712,26 @@ export function ContainerGraphEditPage() {
       />
 
       <ConfirmDialog
-        open={isSaveConfirmOpen}
+        open={savePhase !== "idle"}
         title={sessionGraphNames.length > 1 ? t("Save schedule session") : t("Save schedule")}
-        message={
+        message={savePhase === "failed" ? saveIssue ?? t("Could not save this schedule.") :
+          savePhase === "stopRequested" ? t("Finishing current schedule…") :
+          isSaving ? (saveProgress.stage === "checking"
+            ? t("Checking schedules: {0}/{1}", saveProgress.checkedCount, saveProgress.dirtyTotal)
+            : saveProgress.stage === "verifying"
+              ? t("Verifying schedules: {0}/{1} verified", saveProgress.verifiedCount, saveProgress.dirtyTotal)
+              : t("Saving schedules: {0}/{1} verified", saveProgress.verifiedCount, saveProgress.dirtyTotal)) :
           sessionGraphNames.length > 1
             ? t("Save changes for the schedules in this editing session?")
             : t("Save changes for '{0}'?", sessionGraphNames[0])
         }
-        footerSlot={
-          sessionGraphNames.length > 0 ? (
+        footerSlot={isSaving && saveProgress.dirtyTotal > 0 ? (
+          <div className={styles.saveProgress} aria-live="polite">
+            <progress aria-label={t("Verified save progress")} max={saveProgress.dirtyTotal * 2}
+              value={saveProgress.checkedCount + saveProgress.verifiedCount} />
+            <span>{saveProgress.currentGraphName}</span>
+          </div>
+        ) : savePhase === "confirming" && sessionGraphNames.length > 0 ? (
             <div className={styles.dialogList}>
               <span className={styles.dialogListTitle}>
                 {sessionGraphNames.length > 1 ? t("Open schedules") : t("Selected schedule")}
@@ -3886,11 +3740,18 @@ export function ContainerGraphEditPage() {
             </div>
           ) : null
         }
-        onCancel={() => setIsSaveConfirmOpen(false)}
+        onCancel={() => {
+          if (saveInFlightRef.current) {
+            stopRequestedRef.current = true;
+            setSavePhase("stopRequested");
+            if (!isCreate && activeWriteGraphRef.current === null) editorReadAbortRef.current?.abort();
+          } else setSavePhase("idle");
+        }}
         onConfirm={() => void handleSave()}
-        confirmText={isSaving ? t("Saving...") : t("Save")}
+        confirmText={savePhase === "failed" ? t("Try again") : isSaving ? t("Saving...") : t("Save")}
+        cancelText={isSaving ? t("Cancel saving") : savePhase === "failed" ? t("Return to editor") : t("Cancel")}
         confirmDisabled={isSaving}
-        cancelDisabled={isSaving}
+        cancelDisabled={savePhase === "stopRequested" || (isCreate && isSaving)}
         variant="confirm"
       />
 

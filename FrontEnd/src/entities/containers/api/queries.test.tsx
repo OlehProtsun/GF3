@@ -67,6 +67,22 @@ test("the editor gate suppresses five workspace mutation refetches", async () =>
   expect(invalidate.mock.calls.every(([filters]) => filters.refetchType === "none")).toBe(true);
 });
 
+test.each(["create", "update"])("the optional Save adapter wraps every %s HTTP operation once", async mode => {
+  const client = new QueryClient();
+  const { result } = renderHook(() => useSaveGraphWorkspaceMutation(), {
+    wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>,
+  });
+  const runSaveRequest = vi.fn(<T,>(send: () => Promise<T>) => send());
+  await act(async () => new Promise<void>((resolve, reject) => result.current.mutate({
+    ...(mode === "create" ? createWorkspaceInput() : updateWorkspaceInput()), runSaveRequest,
+  }, { onSuccess: () => resolve(), onError: reject })));
+  const httpCalls = [apiMocks.createGraph, apiMocks.updateGraph, apiMocks.createGraphEmployee,
+    apiMocks.updateGraphEmployee, apiMocks.replaceGraphSlots, apiMocks.removeGraphEmployee]
+    .reduce((count, mock) => count + mock.mock.calls.length, 0);
+  expect(runSaveRequest).toHaveBeenCalledTimes(httpCalls);
+  expect(httpCalls).toBeGreaterThan(2);
+});
+
 test("exact graph list refresh leaves active graph detail, slot and version observers alone", async () => {
   const client = new QueryClient();
   const reads = [vi.fn(), vi.fn(), vi.fn(), vi.fn()].map(read => read.mockResolvedValue([]));

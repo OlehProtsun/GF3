@@ -3,12 +3,13 @@ import type { ComponentProps } from "react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ContainerGraphEditor } from "@entities/containers/ui/ContainerGraphEditor";
+import type { ConfirmDialog } from "@shared/ui/ConfirmDialog";
 import type { GraphSlot } from "@entities/containers/model/types";
 import type { PersistedGraphState } from "@entities/containers/model/graphSaveIntegrity";
 import type { BatchUpdateGraphCellStylesDto, GraphVersionTreeDto, SaveGraphDto, SaveGraphSlotDto, UpsertGraphCellStyleDto } from "@entities/containers/api/dto";
 import type { ShiftSwap } from "@entities/shift-swaps";
 import { buildGraphNoteContent, parseGraphNoteContent } from "@entities/containers/model/graphNote";
-import { readGraphRecovery } from "@entities/containers/model/graphDraftRecovery";
+import { createGraphFormFromGraph } from "@entities/containers/model/graphForm";
 import { rgbHexToArgb } from "@entities/containers/model/graphWorkspace";
 import { ApiError } from "@shared/api/httpClient";
 import { isGraphSaveTrafficActive } from "@shared/api/graphSaveTraffic";
@@ -26,6 +27,7 @@ const defaults = vi.hoisted(() => ({
 }));
 const m = vi.hoisted(() => ({
   id: 34,
+  openIds: [34, 36, 37, 38, 42],
   managerId: 9,
   editor: null as EditorProps | null,
   states: new Map<number, PersistedGraphState>(),
@@ -49,7 +51,7 @@ const m = vi.hoisted(() => ({
 vi.mock("@app/providers/AuthProvider", () => ({ useAuth: () => ({ session: { role: "manager", managerId: m.managerId } }) }));
 vi.mock("react-router-dom", async importOriginal => ({
   ...await importOriginal<object>(), useParams: () => ({ containerId: "7", graphId: String(m.id) }),
-  useLocation: () => ({ key: "test", pathname: `/container/7/graphs/${m.id}/edit`, search: `?openGraphIds=${ids.join(",")}` }),
+  useLocation: () => ({ key: "test", pathname: `/container/7/graphs/${m.id}/edit`, search: `?openGraphIds=${m.openIds.join(",")}` }),
   useNavigate: () => m.navigate,
 }));
 vi.mock("@app/providers/PresenceProvider", () => ({
@@ -62,9 +64,13 @@ vi.mock("@shared/lib/useUnsavedChangesPrompt", () => ({
     return { dialog: null, runWithoutPrompt: (callback: () => void) => callback() };
   },
 }));
+// Pacing itself is covered with deterministic clocks in graphSavePacer.test and real HTTP in Playwright.
+vi.mock("@shared/api/graphSavePacer", () => ({ createGraphSavePacer: () => ({ run: <T,>(send: () => Promise<T>) => send() }) }));
 vi.mock("@shared/ui/ConfirmDialog", () => ({
-  ConfirmDialog: ({ open, title, onConfirm, onCancel }: { open: boolean; title: string; onConfirm: () => void; onCancel: () => void }) =>
-    open ? <div role="dialog" aria-label={title}><button onClick={onConfirm}>Confirm action</button><button onClick={onCancel}>Cancel</button></div> : null,
+  ConfirmDialog: ({ open, title, message, footerSlot, onConfirm, onCancel, confirmText, cancelText, confirmDisabled, cancelDisabled }: ComponentProps<typeof ConfirmDialog>) =>
+    open ? <div role="dialog" aria-label={title}><p>{message}</p>{footerSlot}
+      <button disabled={confirmDisabled} onClick={onConfirm}>{confirmText === "Try again" || confirmDisabled ? confirmText : "Confirm action"}</button>
+      <button disabled={cancelDisabled} onClick={onCancel}>{cancelText ?? "Cancel"}</button></div> : null,
 }));
 vi.mock("@entities/containers/api/containersApi", async importOriginal => ({
   ...await importOriginal<object>(),
@@ -148,17 +154,13 @@ const save = () => {
 const renamed = (name: string) => act(() => m.editor!.onFieldChange("name")(name));
 const calls = (mock: ReturnType<typeof vi.fn>) => mock.mock.calls.map(([, id]) => id);
 const findRecoveryDialog = () => screen.queryByRole("dialog", { name: "Schedule save and recovery" });
-const openRecovery = async (name = "Review issue") => {
-  if (!findRecoveryDialog()) fireEvent.click(await screen.findByRole("button", { name, exact: true }));
-  return within(screen.getByRole("dialog", { name: "Schedule save and recovery" }));
+const failure = async () => {
+  await screen.findByRole("button", { name: "Try again" });
+  return within(screen.getByRole("dialog", { name: /Save schedule/ }));
 };
-const restoreDrafts = async () => {
-  const dialog = await openRecovery("Restore draft");
-  fireEvent.click(dialog.getByRole("button", { name: "Restore draft" }));
-  return dialog;
-};
+const retry = () => fireEvent.click(screen.getByRole("button", { name: "Try again" }));
 const expectNavigation = async () => {
-  await waitFor(() => expect(m.navigate, findRecoveryDialog()?.textContent ?? m.editor?.submitError).toHaveBeenCalledOnce());
+  await waitFor(() => expect(m.navigate, screen.queryByRole("dialog", { name: /Save schedule/ })?.textContent ?? m.editor?.submitError).toHaveBeenCalledOnce());
   expect(findRecoveryDialog()).not.toBeInTheDocument();
   expect(screen.queryByRole("region", { name: "Schedule save and recovery" })).not.toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Review issue" })).not.toBeInTheDocument();
@@ -189,9 +191,12 @@ beforeEach(() => {
   vi.clearAllMocks();
   Object.values(defaults).forEach(mock => mock.mockReset());
   m.states.clear(); m.versions.clear(); m.offers.clear();
+  m.publish.mockReset();
+  m.employees = [{ id: 1, firstName: "Test", lastName: "One" }, { id: 2, firstName: "Test", lastName: "Two" }];
   m.groups = []; m.members = [];
   m.slotsFailed = false; m.urlopFailed = false;
   m.retrySlots.mockReset(); m.retryUrlop.mockReset();
+  m.openIds = [...ids];
   m.id = 34; m.managerId = 9; m.editor = null; m.locks.lockedByOtherState = null;
   for (const id of ids) {
     m.states.set(id, {
@@ -245,6 +250,142 @@ beforeEach(() => {
   m.listGraphLog.mockImplementation(async (_, id) => m.offers.get(id) ?? []);
 });
 
+function tenGraphs(employeeCount = 2) {
+  m.openIds = [34, 36, 37, 38, 42, 43, 44, 45, 46, 47];
+  m.employees = Array.from({ length: employeeCount }, (_, index) => ({ id: index + 1, firstName: "Worker", lastName: String(index) }));
+  const template = structuredClone(getState(34));
+  for (const id of m.openIds) {
+    m.states.set(id, { ...structuredClone(template), graph: { ...template.graph, id, name: `Graph ${id}` },
+      slots: template.slots.map(slot => ({ ...slot, scheduleId: id })),
+      employees: m.employees.map(({ id: employeeId }, displayOrder) => ({ id: employeeId, employeeId, scheduleId: id, displayOrder, isPriority: false })),
+    });
+    m.versions.set(id, { currentVersionId: 1, versions: [{ id: 1 }] as GraphVersionTreeDto["versions"] });
+  }
+}
+
+test.each([1, 10])("unchanged %s-tab Save navigates with zero writes and versions", async count => {
+  tenGraphs(); m.openIds = m.openIds.slice(0, count);
+  open(); save(); await expectNavigation();
+  expect(defaults.updateGraph).not.toHaveBeenCalled();
+  expectNoWorkspaceWrites();
+  expect(defaults.applyGraphCellStyleBatch).not.toHaveBeenCalled();
+  expect(defaults.commitGraphVersion).not.toHaveBeenCalled();
+  expect(defaults.graphById).not.toHaveBeenCalled();
+  expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
+  expect(screen.queryByText("Nothing to save.")).not.toBeInTheDocument();
+});
+
+test("already reconciled colors navigate without writes, versions or unrelated invalidations", async () => {
+  const view = open(); paint("text", "#abcdef", ["1:1"]);
+  setStyle(34, { employeeId: 1, dayOfMonth: 1, textColorArgb: argb("#abcdef"), backgroundColorArgb: null });
+  const invalidate = vi.spyOn(view.client, "invalidateQueries");
+  save(); await expectNavigation();
+  expect(defaults.applyGraphCellStyleBatch).not.toHaveBeenCalled();
+  expect(defaults.commitGraphVersion).not.toHaveBeenCalled();
+  expect(invalidate).not.toHaveBeenCalled();
+});
+
+test("three dirty graphs of ten write precisely their changed resource categories", async () => {
+  tenGraphs(); const view = open();
+  paint("text", "#abcdef", ["1:1"]);
+  view.select(38); renamed("Metadata only");
+  view.select(47); act(() => m.editor!.onCellChange(2, 3, "09:00 - 12:00"));
+  save(); await expectNavigation();
+  expect(calls(defaults.updateGraph)).toEqual([38]);
+  expect(calls(defaults.replaceGraphSlots)).toEqual([47]);
+  expect(calls(defaults.applyGraphCellStyleBatch)).toEqual([34]);
+  expect(calls(defaults.commitGraphVersion)).toEqual([34, 38, 47]);
+  expect(defaults.removeGraphEmployee).not.toHaveBeenCalled();
+  expect(defaults.upsertGraphCellStyle).not.toHaveBeenCalled();
+});
+
+test("ten graphs retain 500 mixed edited cells each after authoritative fixture reload", async () => {
+  tenGraphs(20); const view = open();
+  const keys = Array.from({ length: 20 }, (_, employee) => Array.from({ length: 25 }, (_, day) => `${employee + 1}:${day + 1}`)).flat();
+  for (const id of m.openIds) {
+    if (id !== 34) view.select(id);
+    paint("background", "#123456", keys);
+    paint("text", "#abcdef", keys.filter((_, index) => index % 2 === 0));
+    act(() => {
+      for (let day = 1; day <= 25; day++) m.editor!.onCellChange(1, day, day % 2 ? "09:00 - 12:00" : "Training");
+      m.editor!.onAddManualColumn();
+    });
+    act(() => m.editor!.onCellChange(-1, 1, "Manual note"));
+  }
+  save(); await expectNavigation();
+  expect(defaults.applyGraphCellStyleBatch).toHaveBeenCalledTimes(10);
+  expect(defaults.replaceGraphSlots).toHaveBeenCalledTimes(10);
+  expect(defaults.commitGraphVersion).toHaveBeenCalledTimes(10);
+  expect(defaults.removeGraphEmployee).not.toHaveBeenCalled();
+  expect(defaults.upsertGraphCellStyle).not.toHaveBeenCalled();
+  for (const id of m.openIds) {
+    const persisted = structuredClone(getState(id));
+    expect(persisted.employees).toHaveLength(20);
+    expect(persisted.styles).toHaveLength(500);
+    expect(persisted.styles.every(style => style.backgroundColorArgb === argb("#123456"))).toBe(true);
+    expect(persisted.styles.filter(style => style.textColorArgb === argb("#abcdef"))).toHaveLength(250);
+    expect(persisted.slots.filter(slot => slot.employeeId === 1)).toHaveLength(13);
+    const note = parseGraphNoteContent(persisted.graph.note);
+    expect(note.textCells.filter(cell => cell.value === "Training")).toHaveLength(12);
+    expect(note.manualColumns[0].cells["1"]).toBe("Manual note");
+  }
+});
+
+test("Cancel during preflight closes the same dialog with zero writes and editable drafts", async () => {
+  tenGraphs(); const view = open(); paint("text", "#abcdef", ["1:1"]);
+  let release!: () => void;
+  const read = defaults.graphById.getMockImplementation()!;
+  defaults.graphById.mockImplementationOnce(async (...args) => { await new Promise<void>(resolve => { release = resolve; }); return read(...args); });
+  save();
+  const progress = screen.getByRole("progressbar", { name: "Verified save progress" });
+  expect(progress).toHaveAttribute("value", "0");
+  await waitFor(() => expect(release).toBeTypeOf("function"));
+  fireEvent.click(screen.getByRole("button", { name: "Cancel saving" }));
+  expect(screen.getByRole("button", { name: "Cancel saving" })).toBeDisabled();
+  await act(async () => release());
+  await waitFor(() => expect(m.editor!.isSaving).toBe(false));
+  expect(defaults.applyGraphCellStyleBatch).not.toHaveBeenCalled();
+  expect(defaults.commitGraphVersion).not.toHaveBeenCalled();
+  expect(m.navigate).not.toHaveBeenCalled();
+  expect(isGraphSaveTrafficActive(view.client, 7)).toBe(false);
+  expect(screen.queryByRole("dialog", { name: /Save schedule/ })).not.toBeInTheDocument();
+  paint("background", "#123456", ["1:2"]);
+  expect(m.prompt).toHaveBeenLastCalledWith(true);
+});
+
+test("Cancel during graph two finishes it and retry writes only graphs three to ten", async () => {
+  tenGraphs(); const view = open();
+  for (const id of m.openIds) { if (id !== 34) view.select(id); paint("text", "#abcdef", ["1:1"]); }
+  let release!: () => void;
+  const apply = defaults.applyGraphCellStyleBatch.getMockImplementation()!;
+  defaults.applyGraphCellStyleBatch.mockImplementationOnce(apply).mockImplementationOnce(async (...args) => {
+    await new Promise<void>(resolve => { release = resolve; }); return apply(...args);
+  });
+  save(); await waitFor(() => expect(defaults.applyGraphCellStyleBatch).toHaveBeenCalledTimes(2));
+  expect(screen.getByRole("progressbar")).toHaveAttribute("value", "11");
+  fireEvent.click(screen.getByRole("button", { name: "Cancel saving" }));
+  await act(async () => release());
+  await waitFor(() => expect(m.editor!.isSaving).toBe(false));
+  expect(calls(defaults.commitGraphVersion)).toEqual([34, 36]);
+  expect(m.navigate).not.toHaveBeenCalled();
+  save(); await expectNavigation();
+  expect(calls(defaults.applyGraphCellStyleBatch)).toEqual(m.openIds);
+  expect(calls(defaults.commitGraphVersion)).toEqual(m.openIds);
+});
+
+test("new edits after failed readback survive reconciliation of an acknowledged save", async () => {
+  open(); paint("text", "#abcdef", ["1:1"]);
+  const read = defaults.graphById.getMockImplementation()!;
+  defaults.graphById.mockImplementationOnce(read).mockRejectedValueOnce(new Error("Offline"));
+  save(); await failure();
+  fireEvent.click(screen.getByRole("button", { name: "Return to editor" }));
+  paint("background", "#123456", ["1:2"]);
+  save(); await expectNavigation();
+  expect(getState().styles).toHaveLength(2);
+  expect(defaults.applyGraphCellStyleBatch).toHaveBeenCalledTimes(2);
+  expect(defaults.commitGraphVersion).toHaveBeenCalledTimes(2);
+});
+
 test("preflights and writes only dirty tabs and navigates after both readbacks", async () => {
   const view = open();
   view.select(36); renamed("Second changed");
@@ -257,7 +398,6 @@ test("preflights and writes only dirty tabs and navigates after both readbacks",
   expect(calls(defaults.updateGraph)).toEqual([36, 42]);
   expect(calls(defaults.commitGraphVersion)).toEqual([36, 42]);
   expectNoWorkspaceWrites();
-  expect(readGraphRecovery(9, 7)).toBeNull();
 });
 
 test("saves five dirty graphs in tab order after all bounded preflights", async () => {
@@ -301,7 +441,6 @@ test("saves five dirty graphs in tab order after all bounded preflights", async 
     expect(note.textCells).toContainEqual({ employeeId: 1, dayOfMonth: 28, value: "Training" });
     expect(note.cellStyles).toContainEqual(expect.objectContaining({ employeeId: 0, dayOfMonth: 26, textColorArgb: argb("#abcdef") }));
   }
-  expect(readGraphRecovery(9, 7)).toBeNull();
 });
 
 test("rate-limited third preflight keeps all drafts and writes nothing until the GET recovers", async () => {
@@ -314,19 +453,16 @@ test("rate-limited third preflight keeps all drafts and writes nothing until the
   });
   vi.useFakeTimers();
   save();
-  expect(screen.getByRole("button", { name: "Saving..." })).toBeDisabled();
+  expect(screen.getAllByRole("button", { name: "Saving..." }).every(button => button.hasAttribute("disabled"))).toBe(true);
   expect(findRecoveryDialog()).not.toBeInTheDocument();
-  await act(async () => vi.advanceTimersByTimeAsync(2000));
+  await act(async () => vi.advanceTimersByTimeAsync(6000));
   vi.useRealTimers();
-  const issue = await openRecovery();
-  expect(issue.getByText("Graph 37 · Cannot verify")).toBeVisible();
-  expect(screen.getByText("Graph 38 · Pending")).toBeVisible();
+  await failure();
   expect(defaults.applyGraphCellStyleBatch).not.toHaveBeenCalled();
   expect(defaults.commitGraphVersion).not.toHaveBeenCalled();
-  expect(readGraphRecovery(9, 7)).toHaveLength(5);
   expect(isGraphSaveTrafficActive(view.client, 7)).toBe(false);
   available = true;
-  fireEvent.click(screen.getByRole("button", { name: "Retry unsaved graphs" }));
+  retry();
   await expectNavigation();
   expect(calls(defaults.applyGraphCellStyleBatch)).toEqual(ids);
 });
@@ -340,15 +476,6 @@ test.each([false, true])("third rate-limited batch does not replay writes (persi
       throw rateLimited();
     });
   save();
-  expect(await (await openRecovery()).findByText(persisted ? "Graph 37 · Partially saved" : "Graph 37 · Cannot verify")).toBeVisible();
-  expect(screen.getByText("Graph 34 · Saved")).toBeVisible();
-  expect(screen.getByText("Graph 36 · Saved")).toBeVisible();
-  expect(screen.getByText("Graph 38 · Pending")).toBeVisible();
-  expect(screen.getByText("Graph 42 · Pending")).toBeVisible();
-  expect(calls(defaults.applyGraphCellStyleBatch)).toEqual(ids.slice(0, 3));
-  expect(calls(defaults.commitGraphVersion)).toEqual(ids.slice(0, 2));
-  expect(readGraphRecovery(9, 7)?.map(entry => entry.graphId)).toEqual(ids.slice(2));
-  fireEvent.click(screen.getByRole("button", { name: "Retry unsaved graphs" }));
   await expectNavigation();
   expect(calls(defaults.applyGraphCellStyleBatch)).toEqual(persisted ? ids : [34, 36, 37, 37, 38, 42]);
   expect(calls(defaults.commitGraphVersion)).toEqual(ids);
@@ -363,11 +490,10 @@ test("a same-field change between preflight and the style batch preserves the wh
     return apply(...args);
   });
   save();
-  expect(await (await openRecovery()).findByText("Graph 34 · Conflict")).toBeVisible();
+  await failure();
   expect(getState().styles).toHaveLength(1);
   expect(defaults.applyGraphCellStyleBatch).toHaveBeenCalledOnce();
   expect(defaults.commitGraphVersion).not.toHaveBeenCalled();
-  expect(readGraphRecovery(9, 7)).toHaveLength(1);
 });
 
 test.each([false, true])("removing an employee never upserts their unsaved styles (persisted=%s)", async persisted => {
@@ -403,7 +529,6 @@ test("unmount cancels a waiting preflight without leaving the traffic gate activ
   expect(isGraphSaveTrafficActive(view.client, 7)).toBe(false);
   expect(defaults.graphById).toHaveBeenCalledOnce();
   expect(defaults.applyGraphCellStyleBatch).not.toHaveBeenCalled();
-  expect(readGraphRecovery(9, 7)).toHaveLength(1);
 });
 
 test("one color-only tab persists real, manual and header styles without writing the slot matrix", async () => {
@@ -467,14 +592,12 @@ test("color conflict preflights all dirty schedules and writes none", async () =
   renamed("Second changed");
   setStyle(34, { employeeId: 1, dayOfMonth: 1, backgroundColorArgb: -7, textColorArgb: null });
   save();
-  expect(await (await openRecovery()).findByText("Graph 34 · Conflict")).toBeVisible();
-  expect(screen.getByText("Conflicting background color at employee 1, day 1.")).toBeVisible();
-  expect(screen.getByText("Graph 36 · Pending")).toBeVisible();
+  await failure();
+  expect(screen.getByRole("dialog", { name: /Save schedule/ })).toHaveTextContent("Other saved changes were detected. Your edits are still here. Automatic merge is unavailable.");
   expect(calls(defaults.graphById)).toEqual([34, 36]);
   expect(defaults.updateGraph).not.toHaveBeenCalled();
   expect(defaults.applyGraphCellStyleBatch).not.toHaveBeenCalled();
   expect(m.navigate).not.toHaveBeenCalled();
-  expect(readGraphRecovery(9, 7)?.map(entry => entry.graphId)).toEqual([34, 36]);
   expect(m.prompt).toHaveBeenLastCalledWith(true);
 });
 
@@ -500,7 +623,8 @@ test("same-mounted saves advance the baseline and an unchanged Save sends nothin
   save();
   await waitFor(() => expect(m.navigate).toHaveBeenCalledTimes(2));
   save();
-  expect(await screen.findByText("Nothing to save.")).toBeVisible();
+  await waitFor(() => expect(m.navigate).toHaveBeenCalledTimes(3));
+  expect(screen.queryByText("Nothing to save.")).not.toBeInTheDocument();
   expect(defaults.applyGraphCellStyleBatch).toHaveBeenCalledTimes(2);
   expect(defaults.commitGraphVersion).toHaveBeenCalledTimes(2);
   expect(defaults.updateGraph).not.toHaveBeenCalled();
@@ -515,16 +639,14 @@ test.each([false, true])("retry finishes only missing color operations after a f
     throw new Error("Lost style response");
   });
   save();
-  expect(await (await openRecovery()).findByText(persisted ? "Graph 34 · Partially saved" : "Graph 34 · Cannot verify")).toBeVisible();
+  await failure();
   expect(defaults.commitGraphVersion).not.toHaveBeenCalled();
   expect(m.navigate).not.toHaveBeenCalled();
-  expect(readGraphRecovery(9, 7)?.[0].needsStyleVersion).toBe(true);
-  fireEvent.click(screen.getByRole("button", { name: "Retry unsaved graphs" }));
+  retry();
   await expectNavigation();
   expect(defaults.applyGraphCellStyleBatch).toHaveBeenCalledTimes(persisted ? 1 : 2);
   expect(defaults.commitGraphVersion).toHaveBeenCalledOnce();
   expect(getState().styles).toHaveLength(2);
-  expect(readGraphRecovery(9, 7)).toBeNull();
 });
 
 test("a failed second graph preserves earlier verified results and unsent drafts", async () => {
@@ -536,13 +658,10 @@ test("a failed second graph preserves earlier verified results and unsent drafts
   const normalUpsert = defaults.applyGraphCellStyleBatch.getMockImplementation()!;
   defaults.applyGraphCellStyleBatch.mockImplementationOnce(normalUpsert).mockRejectedValueOnce(new Error("Network error"));
   save();
-  expect(await (await openRecovery()).findByText("Graph 36 · Cannot verify")).toBeVisible();
-  expect(screen.getByText("Graph 34 · Saved")).toBeVisible();
-  expect(screen.getByText("Graph 42 · Pending")).toBeVisible();
+  await failure();
   expect(calls(defaults.applyGraphCellStyleBatch)).toEqual([34, 36]);
   expect(calls(defaults.commitGraphVersion)).toEqual([34]);
-  expect(readGraphRecovery(9, 7)?.map(entry => entry.graphId)).toEqual([36, 42]);
-  fireEvent.click(screen.getByRole("button", { name: "Retry unsaved graphs" }));
+  retry();
   await waitFor(() => expect(m.navigate).toHaveBeenCalledOnce());
   expect(calls(defaults.applyGraphCellStyleBatch)).toEqual([34, 36, 36, 42]);
   expect(calls(defaults.commitGraphVersion)).toEqual([34, 36, 42]);
@@ -552,35 +671,100 @@ test.each(["graph", "slots", "version"] as const)("keeps the workspace draft aft
   open();
   renamed("Changed name");
   act(() => m.editor!.onCellChange(2, 3, "09:00 - 12:00"));
-  const failure = new ApiError({ message: "Injected write error", status: 409 });
-  if (stage === "graph") defaults.updateGraph.mockRejectedValueOnce(failure);
-  if (stage === "slots") defaults.replaceGraphSlots.mockRejectedValueOnce(failure);
-  if (stage === "version") defaults.commitGraphVersion.mockRejectedValueOnce(failure);
+  const writeFailure = new ApiError({ message: "Injected write error", status: 409 });
+  if (stage === "graph") defaults.updateGraph.mockRejectedValueOnce(writeFailure);
+  if (stage === "slots") defaults.replaceGraphSlots.mockRejectedValueOnce(writeFailure);
+  if (stage === "version") defaults.commitGraphVersion.mockRejectedValueOnce(writeFailure);
   save();
-  expect(await (await openRecovery()).findByText(`Graph 34 · ${stage === "graph" ? "Cannot verify" : "Partially saved"}`)).toBeVisible();
+  await failure();
   expect(m.navigate).not.toHaveBeenCalled();
   expect(m.editor!.form.name).toBe("Changed name");
-  expect(readGraphRecovery(9, 7)?.[0].blockedBy).toBe("workspace-write");
   expect(defaults.listGraphVersions).toHaveBeenCalledTimes(stage === "version" ? 2 : 1);
 });
 
-test("an ambiguous version commit is checked against the version tree and never replayed", async () => {
-  const view = open();
-  paint("text", "#abcdef", ["1:1"]);
+test("an ambiguous version commit is checked and never replayed", async () => {
+  open(); paint("text", "#abcdef", ["1:1"]);
   const commit = defaults.commitGraphVersion.getMockImplementation()!;
-  defaults.commitGraphVersion.mockImplementationOnce(async (...args) => {
-    await commit(...args);
-    throw new Error("Lost commit response");
-  });
-  save();
-  expect(await (await openRecovery()).findByText("Graph 34 · Cannot verify")).toBeVisible();
+  defaults.commitGraphVersion.mockImplementationOnce(async (...args) => { await commit(...args); throw new Error("Lost commit response"); });
+  save(); await failure();
   expect(defaults.listGraphVersions).toHaveBeenCalledTimes(2);
-  expect(readGraphRecovery(9, 7)?.[0].blockedBy).toBe("version-commit");
-  view.unmount(); open();
-  await restoreDrafts();
-  fireEvent.click(screen.getByRole("button", { name: "Review saved schedule" }));
-  await waitFor(() => expect(defaults.listGraphVersions).toHaveBeenCalledTimes(3));
+  retry(); await failure();
   expect(defaults.commitGraphVersion).toHaveBeenCalledOnce();
+  expect(m.navigate).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "Return to editor" }));
+  expect(m.editor!.isSaving).toBe(false);
+  paint("background", "#123456", ["1:2"]);
+  expect(m.editor!.styleMap["1:2"]).toBeDefined();
+});
+
+test.each([false, true])("a lost metadata PUT resumes only missing resources after readback (applied=%s)", async applied => {
+  open(); renamed("Changed name");
+  act(() => m.editor!.onCellChange(2, 3, "09:00 - 12:00"));
+  const update = defaults.updateGraph.getMockImplementation()!;
+  defaults.updateGraph.mockImplementationOnce(async (...args) => {
+    if (applied) await update(...args);
+    throw new Error("Lost PUT response");
+  });
+  save(); await failure(); retry(); await expectNavigation();
+  expect(defaults.updateGraph).toHaveBeenCalledTimes(applied ? 1 : 2);
+  expect(defaults.replaceGraphSlots).toHaveBeenCalledOnce();
+  expect(defaults.commitGraphVersion).toHaveBeenCalledOnce();
+  expect(getState().graph.name).toBe("Changed name");
+  expect(getState().slots[0].fromTime).toBe("09:00");
+});
+
+test.each([false, true])("an unknown employee POST is reconciled without blind replay (applied=%s)", async applied => {
+  m.employees = [...m.employees, { id: 3, firstName: "New", lastName: "Worker" }];
+  open(); act(() => m.editor!.onSelectedEmployeeIdChange(3)); act(() => m.editor!.onAddEmployee());
+  defaults.createGraphEmployee.mockImplementationOnce(async (_, id, payload) => {
+    if (applied) getState(id).employees = [...getState(id).employees, { ...payload, id: 3, scheduleId: id }];
+    throw new Error("Lost employee POST response");
+  });
+  save(); await failure(); retry();
+  if (applied) await expectNavigation();
+  else { await failure(); expect(m.navigate).not.toHaveBeenCalled(); }
+  expect(defaults.createGraphEmployee).toHaveBeenCalledOnce();
+  expect(defaults.commitGraphVersion).toHaveBeenCalledTimes(applied ? 1 : 0);
+});
+
+test("reverting edits after a partial PUT saves the current in-memory values", async () => {
+  open(); renamed("Partial name");
+  act(() => m.editor!.onCellChange(2, 3, "09:00 - 12:00"));
+  const update = defaults.updateGraph.getMockImplementation()!;
+  defaults.updateGraph.mockImplementationOnce(async (...args) => { await update(...args); throw new Error("Lost PUT response"); });
+  save(); await failure();
+  fireEvent.click(screen.getByRole("button", { name: "Return to editor" }));
+  renamed("Graph 34"); act(() => m.editor!.onCellChange(2, 3, "08:00 - 12:00"));
+  save(); await expectNavigation();
+  expect(getState().graph.name).toBe("Graph 34");
+  expect(getState().slots[0].fromTime).toBe("08:00");
+  expect(defaults.updateGraph).toHaveBeenCalledTimes(2);
+  expect(defaults.replaceGraphSlots).not.toHaveBeenCalled();
+});
+
+test("new edits after an unversioned acknowledged style create one final version", async () => {
+  open(); paint("background", "#123456", ["1:1"]);
+  const apply = defaults.applyGraphCellStyleBatch.getMockImplementation()!;
+  defaults.applyGraphCellStyleBatch.mockImplementationOnce(async (...args) => { await apply(...args); throw new Error("Lost style response"); });
+  save(); await failure();
+  fireEvent.click(screen.getByRole("button", { name: "Return to editor" }));
+  paint("text", "#abcdef", ["1:2"]);
+  save(); await expectNavigation();
+  expect(getState().styles).toHaveLength(2);
+  expect(defaults.commitGraphVersion).toHaveBeenCalledOnce();
+  expect(defaults.applyGraphCellStyleBatch).toHaveBeenCalledTimes(2);
+});
+
+test("a previous version 429 never authorizes replay after a later unknown response", async () => {
+  open(); paint("text", "#abcdef", ["1:1", "1:2"]);
+  defaults.commitGraphVersion.mockImplementationOnce(async () => {
+    getState().styles = getState().styles.filter(row => row.dayOfMonth !== 2);
+    throw rateLimited();
+  }).mockRejectedValueOnce(new Error("Unknown version response"));
+  save(); await failure();
+  expect(defaults.commitGraphVersion).toHaveBeenCalledTimes(2);
+  retry(); await failure();
+  expect(defaults.commitGraphVersion).toHaveBeenCalledTimes(2);
   expect(m.navigate).not.toHaveBeenCalled();
 });
 
@@ -590,140 +774,136 @@ test("a confirmed commit with an unavailable readback can be verified without re
   const read = defaults.graphById.getMockImplementation()!;
   defaults.graphById.mockImplementationOnce(read).mockRejectedValueOnce(new Error("Readback unavailable"));
   save();
-  expect(await (await openRecovery()).findByText("Graph 34 · Cannot verify")).toBeVisible();
+  await failure();
   expect(defaults.commitGraphVersion).toHaveBeenCalledOnce();
-  fireEvent.click(screen.getByRole("button", { name: "Review saved schedule" }));
-  expect(await (await openRecovery()).findByText("Graph 34 · Saved")).toBeVisible();
+  retry();
+  await expectNavigation();
   expect(defaults.applyGraphCellStyleBatch).toHaveBeenCalledOnce();
   expect(defaults.commitGraphVersion).toHaveBeenCalledOnce();
-  expect(readGraphRecovery(9, 7)).toBeNull();
 });
 
-test("background errors preserve the draft and retry only failed reads before allowing Save", async () => {
+test("background errors retain editable in-memory changes while required data is unavailable", async () => {
   const view = open();
   paint("text", "#abcdef", ["1:1"]);
-  act(() => {
-    m.editor!.onCellChange(1, 28, "Training");
-    m.editor!.onCellChange(2, 3, "09:00 - 12:00");
-  });
+  act(() => m.editor!.onCellChange(1, 28, "Training"));
   const { cellMap, styleMap } = m.editor!;
-  m.slotsFailed = true;
-  m.urlopFailed = true;
-  view.refresh();
+  m.slotsFailed = true; m.urlopFailed = true; view.refresh();
   expect(m.editor!.hasLoadError).toBe(false);
-  expect(m.editor!.isLoading).toBe(false);
   expect(m.editor!.isSaveBlocked).toBe(true);
   expect(m.editor!.isGenerationBlocked).toBe(true);
-  expect(screen.queryByText(/Schedule data could not be refreshed/)).not.toBeInTheDocument();
-  const issue = await openRecovery();
-  expect(issue.getByText(/Schedule data could not be refreshed/)).toBeVisible();
-  fireEvent.click(screen.getByRole("button", { name: "Save editor" }));
-  expect(screen.queryByRole("button", { name: "Confirm action" })).not.toBeInTheDocument();
-  m.retryUrlop.mockRejectedValueOnce(rateLimited()).mockImplementationOnce(async () => { m.urlopFailed = false; });
-  m.retrySlots.mockImplementationOnce(async () => { m.slotsFailed = false; });
-  vi.useFakeTimers();
-  fireEvent.click(screen.getByRole("button", { name: "Retry loading" }));
-  expect(m.retrySlots).not.toHaveBeenCalled();
-  await act(async () => vi.advanceTimersByTimeAsync(1000));
-  vi.useRealTimers();
-  expect(m.retryUrlop).toHaveBeenCalledTimes(2);
-  expect(m.retrySlots).toHaveBeenCalledOnce();
-  expect(defaults.graphById).not.toHaveBeenCalled();
-  expect(defaults.applyGraphCellStyleBatch).not.toHaveBeenCalled();
-  view.refresh();
-  expect(m.editor!.cellMap).toEqual(cellMap);
-  expect(m.editor!.styleMap).toEqual(styleMap);
-  expect(m.editor!.isSaveBlocked).toBe(false);
-  expect(m.editor!.isGenerationBlocked).toBe(false);
-  fireEvent.click(issue.getByRole("button", { name: "Close" }));
-  save();
-  await expectNavigation();
+  expect(screen.queryByRole("button", { name: "Review issue" })).not.toBeInTheDocument();
+  expect(m.editor!.cellMap).toEqual(cellMap); expect(m.editor!.styleMap).toEqual(styleMap);
+  m.slotsFailed = false; m.urlopFailed = false; view.refresh();
+  save(); await expectNavigation();
 });
 
-test("a rate-limited version commit can retry without rewriting confirmed colors", async () => {
-  open();
-  paint("text", "#abcdef", ["1:1"]);
-  const list = defaults.listGraphVersions.getMockImplementation()!;
-  const limited = rateLimited();
-  defaults.listGraphVersions.mockImplementationOnce(list).mockRejectedValueOnce(limited)
-    .mockRejectedValueOnce(limited).mockRejectedValueOnce(limited);
-  defaults.commitGraphVersion.mockRejectedValueOnce(limited);
-  vi.useFakeTimers();
-  save();
-  await act(async () => vi.advanceTimersByTimeAsync(2000));
-  vi.useRealTimers();
-  expect(await (await openRecovery()).findByText("Graph 34 · Cannot verify")).toBeVisible();
-  expect(defaults.commitGraphVersion).toHaveBeenCalledOnce();
-  expect(readGraphRecovery(9, 7)?.[0].blockedBy).toBe("version-commit");
-  fireEvent.click(screen.getByRole("button", { name: "Review saved schedule" }));
-  expect(await (await openRecovery()).findByText("Graph 34 · Partially saved")).toBeVisible();
-  fireEvent.click(screen.getByRole("button", { name: "Retry unsaved graphs" }));
-  await expectNavigation();
+test("a definite version 429 is reconciled before retry without rewriting colors", async () => {
+  open(); paint("text", "#abcdef", ["1:1"]);
+  defaults.commitGraphVersion.mockRejectedValueOnce(rateLimited());
+  save(); await expectNavigation();
   expect(defaults.applyGraphCellStyleBatch).toHaveBeenCalledOnce();
   expect(defaults.commitGraphVersion).toHaveBeenCalledTimes(2);
   expect(m.versions.get(34)?.versions).toHaveLength(2);
 });
 
-test("a lost manual publication response survives refresh without publishing again", async () => {
+test("a lost manual publication response reconciles its unique offer without duplicating it", async () => {
   getState().graph.note = buildGraphNoteContent("", [{ id: 1, label: "Manual", cells: { "2": "08:00 - 12:00" } }]);
-  const view = open();
+  open();
   act(() => m.editor!.onPublishManualShift({ manualColumnId: 1, dayOfMonth: 2, fromTime: "08:00", toTime: "12:00", allowPartialAcceptance: false }));
   m.publish.mockImplementationOnce((variables, callbacks) => {
     getState().slots = [...getState().slots, { ...changedSlot(34), id: 100, employeeId: null, status: 0, dayOfMonth: 2 }];
     m.offers.set(34, [{ ...variables, id: 20, scheduleId: 34, scheduleSlotId: 100, isManagerCreated: true, status: "open" }]);
     callbacks.onError(new Error("Lost offer response"));
   });
-  save();
-  expect(await (await openRecovery()).findByText("Graph 34 · Partially saved")).toBeVisible();
-  expect(readGraphRecovery(9, 7)?.[0].manualPublicationAttempted).toBe(true);
-  view.unmount(); open();
-  await restoreDrafts();
-  fireEvent.click(screen.getByRole("button", { name: "Review saved schedule" }));
-  await screen.findByText(/Review the saved schedule or discard this draft/);
-  expect(m.publish).toHaveBeenCalledOnce();
-  expect(defaults.commitGraphVersion).not.toHaveBeenCalled();
+  save(); await failure(); retry(); await expectNavigation();
+  expect(m.publish).toHaveBeenCalledOnce(); expect(defaults.commitGraphVersion).toHaveBeenCalledOnce();
 });
 
-test("explicit recovery retains the original baseline and discard opens server data", async () => {
-  let view = open();
-  renamed("Recovered name");
-  act(() => window.dispatchEvent(new Event("pagehide")));
-  view.unmount();
-  getState().slots = [changedSlot(34, "09:00")];
-  m.managerId = 99;
-  view = open();
-  expect(screen.queryByRole("button", { name: "Restore draft" })).not.toBeInTheDocument();
-  view.unmount(); m.managerId = 9;
-  view = open();
-  expect(m.editor!.form.name).toBe("Graph 34");
-  const restored = await restoreDrafts();
-  fireEvent.click(restored.getByRole("button", { name: "Close" }));
-  expect(m.editor!.form.name).toBe("Recovered name");
-  save();
-  expect(await (await openRecovery()).findByText("Graph 34 · Conflict")).toBeVisible();
-  expect(defaults.updateGraph).not.toHaveBeenCalled();
-  view.unmount(); open();
-  const issue = await openRecovery("Restore draft");
-  fireEvent.click(issue.getByRole("button", { name: "Discard local draft" }));
-  const confirmation = () => within(screen.getByRole("dialog", { name: "Discard local draft" }));
-  expect(readGraphRecovery(9, 7)).toHaveLength(1);
-  fireEvent.click(confirmation().getByRole("button", { name: "Cancel" }));
-  expect(readGraphRecovery(9, 7)).toHaveLength(1);
-  fireEvent.click((await openRecovery("Restore draft")).getByRole("button", { name: "Discard local draft" }));
-  fireEvent.click(confirmation().getByRole("button", { name: "Confirm action" }));
-  expect(readGraphRecovery(9, 7)).toBeNull();
-  expect(m.editor!.form.name).toBe("Graph 34");
-});
-
-test("corrupt storage is ignored and unavailable storage keeps the navigation guard", async () => {
-  window.sessionStorage.setItem("gf3:graph-drafts:9:7", "{bad");
+test("a definite manual POST 429 resumes only the offer proven absent", async () => {
+  getState().graph.note = buildGraphNoteContent("", [{ id: 1, label: "Manual", cells: { "2": "08:00 - 12:00", "4": "08:00 - 12:00" } }]);
   open();
-  expect((await openRecovery()).getByText("Some local drafts could not be restored.")).toBeVisible();
-  const storage = vi.spyOn(Storage.prototype, "setItem").mockImplementationOnce(() => { throw new Error("Quota"); });
-  renamed("Draft in memory");
-  act(() => window.dispatchEvent(new Event("pagehide")));
-  expect(await screen.findByText(/restoring after refresh is unavailable/)).toBeVisible();
+  for (const dayOfMonth of [2, 4]) act(() => m.editor!.onPublishManualShift({
+    manualColumnId: 1, dayOfMonth, fromTime: "08:00", toTime: "12:00", allowPartialAcceptance: false,
+  }));
+  let rejected = false;
+  m.publish.mockImplementation((variables, callbacks) => {
+    if (variables.dayOfMonth === 4 && !rejected) { rejected = true; callbacks.onError(rateLimited()); return; }
+    const id = variables.dayOfMonth + 100;
+    getState().slots = [...getState().slots, { ...changedSlot(34), id, employeeId: null, status: 0, dayOfMonth: variables.dayOfMonth }];
+    const offer = { ...variables, id, scheduleId: 34, scheduleSlotId: id, isManagerCreated: true, status: "open" };
+    m.offers.set(34, [...m.offers.get(34) ?? [], offer]); callbacks.onSuccess(offer);
+  });
+  save(); await expectNavigation();
+  expect(m.publish.mock.calls.map(([row]) => row.dayOfMonth)).toEqual([2, 4, 4]);
+  expect(m.offers.get(34)).toHaveLength(2);
+  expect(defaults.commitGraphVersion).toHaveBeenCalledOnce();
+});
+
+test("a conflicting version after a rejected commit never overwrites or commits again", async () => {
+  open(); paint("text", "#abcdef", ["1:1"]);
+  defaults.commitGraphVersion.mockRejectedValueOnce(rateLimited());
+  const list = defaults.listGraphVersions.getMockImplementation()!;
+  defaults.listGraphVersions.mockImplementationOnce(list).mockImplementation(async (_, id) => ({
+    ...m.versions.get(id), currentVersionId: 999, versions: [{ id: 1 }, { id: 999 }],
+  }));
+  save(); await failure(); retry(); await failure();
+  expect(defaults.commitGraphVersion).toHaveBeenCalledOnce();
+  expect(m.navigate).not.toHaveBeenCalled();
+});
+
+test("a fourth-graph failure retains seven editable graphs and never rewrites the first three", async () => {
+  tenGraphs(); const view = open();
+  for (const id of m.openIds) { if (id !== 34) view.select(id); paint("text", "#abcdef", ["1:1"]); }
+  const apply = defaults.applyGraphCellStyleBatch.getMockImplementation()!;
+  defaults.applyGraphCellStyleBatch.mockImplementationOnce(apply).mockImplementationOnce(apply)
+    .mockImplementationOnce(apply).mockRejectedValueOnce(new Error("Offline"));
+  save(); await failure();
+  expect(calls(defaults.commitGraphVersion)).toEqual(m.openIds.slice(0, 3));
+  fireEvent.click(screen.getByRole("button", { name: "Return to editor" }));
+  expect(m.editor!.isSaving).toBe(false);
+  save(); await expectNavigation();
+  expect(calls(defaults.commitGraphVersion)).toEqual(m.openIds);
+  expect(calls(defaults.applyGraphCellStyleBatch)).toEqual([...m.openIds.slice(0, 4), ...m.openIds.slice(3)]);
+});
+
+test("legacy manager drafts are removed without hydration across repeated edit entries", async () => {
+  const baseline = structuredClone(getState());
+  sessionStorage.setItem("gf3:graph-drafts:9:7", JSON.stringify([{ version: 1, graphId: 34,
+    persistedBaseline: baseline, comparisonBaseline: { nonStyleFingerprint: "original", styles: [] }, editedAt: Date.now(),
+    draft: {
+      graphId: 34, form: { ...createGraphFormFromGraph(baseline.graph), name: "Stale" },
+      graphEmployeeRows: baseline.employees.map(row => ({ ...row, minHoursMonth: "" })),
+      selectedSchedulePresetId: null, selectedEmployeeId: null, cellMap: {}, manualColumns: [],
+      pendingManualShiftPublishes: [], scheduleColumnOrder: [1, 2], selectedCellKeys: [], styleRecords: [],
+      autoAvailabilityStyleSuppressions: {}, fillColor: "#123456", textColor: "#abcdef",
+      syncedAvailabilityGroupId: null, previewAvailabilitySelection: "__schedule-details__",
+    },
+  }]));
+  sessionStorage.setItem("gf3:graph-drafts:9:8", "old");
+  sessionStorage.setItem("gf3:graph-drafts:99:7", "other manager");
+  sessionStorage.setItem("setting", "keep");
+  for (let cycle = 0; cycle < 3; cycle++) {
+    const view = open();
+    expect(m.editor!.isSaveBlocked).toBe(false);
+    expect(screen.getByRole("button", { name: "Save editor" }).closest('[inert]')).toBeNull();
+    expect(screen.queryByRole("button", { name: "Restore draft" })).not.toBeInTheDocument();
+    expect(sessionStorage.getItem("gf3:graph-drafts:9:7")).toBeNull();
+    renamed(`Saved cycle ${cycle}`); save(); await expectNavigation();
+    expect(getState().graph.name).toBe(`Saved cycle ${cycle}`);
+    view.unmount(); m.navigate.mockClear();
+  }
+  expect(sessionStorage.getItem("gf3:graph-drafts:9:8")).toBeNull();
+  expect(sessionStorage.getItem("gf3:graph-drafts:99:7")).toBe("other manager");
+  expect(sessionStorage.getItem("setting")).toBe("keep");
+});
+
+test("unavailable storage cannot disable editing or the unsaved changes warning", () => {
+  sessionStorage.setItem("gf3:graph-drafts:9:7", "obsolete");
+  const storage = vi.spyOn(Storage.prototype, "key").mockImplementation(() => { throw new Error("Unavailable"); });
+  open(); renamed("Draft in memory");
   expect(m.prompt).toHaveBeenLastCalledWith(true);
+  expect(m.editor!.isSaveBlocked).toBe(false);
+  expect(screen.queryByRole("button", { name: "Restore draft" })).not.toBeInTheDocument();
   storage.mockRestore();
 });
 
