@@ -92,3 +92,35 @@
 .secondary {
   --btn-bg: #6b7280;
 }
+
+.busyLabels {
+  display: inline-grid;
+}
+
+.busyLabels > span {
+  grid-area: 1 / 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hiddenLabel {
+  visibility: hidden;
+}
+
+.spinner {
+  width: 14px;
+  height: 14px;
+  box-sizing: border-box;
+  border: 2px solid currentColor;
+  border-inline-end-color: transparent;
+  border-radius: 50%;
+  animation: spin 800ms linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner { animation: none; }
+}

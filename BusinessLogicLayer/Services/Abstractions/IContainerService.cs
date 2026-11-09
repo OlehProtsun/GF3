@@ -146,6 +146,8 @@ public interface IContainerService : IBaseService<ContainerModel>
     /// </summary>
     Task<ScheduleCellStyleModel> UpsertGraphCellStyleAsync(int containerId, int graphId, ScheduleCellStyleModel model, CancellationToken ct = default);
 
+    Task<bool> ApplyGraphCellStyleBatchAsync(int containerId, int graphId, IReadOnlyList<GraphCellStyleFieldPatchModel> changes, CancellationToken ct = default);
+
     /// <summary>
     /// Deletes one per-cell style override from the specified graph.
     /// </summary>

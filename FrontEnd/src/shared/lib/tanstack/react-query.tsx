@@ -10,10 +10,16 @@ import {
   useSyncExternalStore,
 } from "react";
 import type { PropsWithChildren } from "react";
-import { ApiError, isRequestCanceledError } from "@shared/api/httpClient";
+import { ApiError, getAuthGeneration, isRequestCanceledError, RequestCanceledError } from "@shared/api/httpClient";
+import { waitForReadRetry } from "@shared/api/retry429Read";
 
 type QueryKey = readonly unknown[];
-type QueryFilters = { queryKey?: QueryKey };
+type QueryFilters = {
+  queryKey?: QueryKey;
+  exact?: boolean;
+  refetchType?: "none";
+  predicate?: (query: { queryKey: QueryKey }) => boolean;
+};
 type QueryEvent =
   | { type: "invalidate"; key: string }
   | { type: "setData"; key: string; data: unknown };
@@ -36,7 +42,7 @@ type MutationOptions<TData, TVariables> = {
 
 type QueryClientOptions = {
   defaultOptions?: {
-    queries?: { staleTime?: number; retry?: number; refetchOnWindowFocus?: boolean };
+    queries?: { staleTime?: number; retry?: number; retryDelay?: (attempt: number, error: unknown) => number; refetchOnWindowFocus?: boolean };
     mutations?: { retry?: number };
   };
   queryCache?: QueryCache;
@@ -50,6 +56,8 @@ type CacheRecord = {
   promise?: Promise<unknown>;
   controller?: AbortController;
   invalidatedWhileFetching?: boolean;
+  staleOnSettle?: boolean;
+  dataRevision?: number;
 };
 
 export class QueryCache {
@@ -88,17 +96,26 @@ function isQueryKeyPrefix(prefix: QueryKey | undefined, queryKey: QueryKey): boo
   return prefix.every((segment, index) => Object.is(segment, queryKey[index]));
 }
 
-async function runWithRetry<TData>(queryFn: () => Promise<TData>, retry: number): Promise<TData> {
+async function runWithRetry<TData>(
+  queryFn: () => Promise<TData>,
+  retry: number,
+  signal: AbortSignal,
+  retryDelay?: (attempt: number, error: unknown) => number,
+): Promise<TData> {
   let attempt = 0;
+  const generation = getAuthGeneration();
 
   while (true) {
+    if (signal.aborted || getAuthGeneration() !== generation) throw new RequestCanceledError();
     try {
       return await queryFn();
     } catch (error) {
-      if (isRequestCanceledError(error) || (error instanceof ApiError && error.status === 429) || attempt >= retry) {
+      if (isRequestCanceledError(error) || (!retryDelay && error instanceof ApiError && error.status === 429) || attempt >= retry) {
         throw error;
       }
 
+      const delay = retryDelay?.(attempt, error) ?? 0;
+      if (delay > 0) await waitForReadRetry(delay, signal);
       attempt += 1;
     }
   }
@@ -175,11 +192,13 @@ export class QueryClient {
   }
 
   invalidateQueries(filters: QueryFilters): void {
+    const exactKey = filters.exact && filters.queryKey ? hashQueryKey(filters.queryKey) : undefined;
     const matchingKeys = [...this.records.entries()]
-      .filter(([, record]) => isQueryKeyPrefix(filters.queryKey, record.queryKey))
+      .filter(([key, record]) => (exactKey === undefined ? isQueryKeyPrefix(filters.queryKey, record.queryKey) : key === exactKey) &&
+        (!filters.predicate || filters.predicate(record)))
       .map(([key]) => key);
 
-    if (matchingKeys.length === 0 && filters.queryKey) {
+    if (matchingKeys.length === 0 && filters.queryKey && !filters.predicate) {
       const fallbackKey = hashQueryKey(filters.queryKey);
       this.ensureRecord(filters.queryKey);
       matchingKeys.push(fallbackKey);
@@ -190,10 +209,12 @@ export class QueryClient {
       if (record) {
         record.updatedAt = 0;
         if (record.promise) {
-          record.invalidatedWhileFetching = true;
+          if (filters.refetchType === "none") record.staleOnSettle = true;
+          else record.invalidatedWhileFetching = true;
         }
       }
 
+      if (filters.refetchType === "none") return;
       this.bumps.set(key, this.getBump(key) + 1);
       this.listeners.forEach((listener) => listener({ type: "invalidate", key }));
     });
@@ -205,6 +226,7 @@ export class QueryClient {
 
     record.data = data;
     record.updatedAt = Date.now();
+    record.dataRevision = (record.dataRevision ?? 0) + 1;
 
     this.listeners.forEach((listener) => listener({ type: "setData", key, data }));
   }
@@ -238,15 +260,19 @@ export class QueryClient {
     const controller = new AbortController();
     const retry = Math.max(0, options.retry ?? this.defaults?.queries?.retry ?? 0);
     record.invalidatedWhileFetching = false;
+    record.staleOnSettle = false;
+    const dataRevision = record.dataRevision;
 
     const promise = runWithRetry(
       () => queryFn({ signal: controller.signal }),
       retry,
+      controller.signal,
+      this.defaults?.queries?.retryDelay,
     )
       .then((data) => {
         const activeRecord = this.records.get(key);
 
-        if (activeRecord?.promise === promise && !activeRecord.invalidatedWhileFetching) {
+        if (activeRecord?.promise === promise && !activeRecord.invalidatedWhileFetching && activeRecord.dataRevision === dataRevision) {
           this.setQueryData(queryKey, data);
         }
 
@@ -260,9 +286,11 @@ export class QueryClient {
         }
 
         const shouldRefetch = activeRecord.invalidatedWhileFetching;
+        if (activeRecord.staleOnSettle) activeRecord.updatedAt = 0;
         activeRecord.promise = undefined;
         activeRecord.controller = undefined;
         activeRecord.invalidatedWhileFetching = false;
+        activeRecord.staleOnSettle = false;
 
         if (shouldRefetch) {
           activeRecord.updatedAt = 0;
@@ -435,12 +463,19 @@ export function useQuery<TData>(options: QueryOptions<TData>) {
     };
   }, [bump, client, keyString, options.cancelOnUnmount, options.enabled, retry, staleTime]);
 
+  const refetchWithSignal = useCallback((signal: AbortSignal) => {
+    signal.throwIfAborted();
+    return client.fetchQuery(queryKeyRef.current, ({ signal: querySignal }) =>
+      queryFnRef.current({ signal: AbortSignal.any([querySignal, signal]) }), { retry: 0 });
+  }, [client]);
+
   return {
     data,
     error,
     isLoading,
     isFetching,
     isError: Boolean(error),
+    refetchWithSignal,
   };
 }
 

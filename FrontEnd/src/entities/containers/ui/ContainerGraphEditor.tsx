@@ -155,10 +155,14 @@ type ContainerGraphEditorProps = {
   isLoading: boolean;
   hasLoadError: boolean;
   isSaving: boolean;
+  isSubmittingSave?: boolean;
   isGenerating: boolean;
+  isSaveBlocked?: boolean;
+  isGenerationBlocked?: boolean;
   isStylingBusy: boolean;
   hasUnsavedChanges?: boolean;
   showMatrixSaveAction?: boolean;
+  saveRecoveryAction?: ReactNode;
   isBindsLoading: boolean;
   isBindBusy: boolean;
   isFillColorBindBusy: boolean;
@@ -409,10 +413,14 @@ export function ContainerGraphEditor({
   isLoading,
   hasLoadError,
   isSaving,
+  isSubmittingSave = isSaving,
   isGenerating,
+  isSaveBlocked,
+  isGenerationBlocked,
   isStylingBusy,
   hasUnsavedChanges = false,
   showMatrixSaveAction = true,
+  saveRecoveryAction,
   isBindsLoading,
   isBindBusy,
   isFillColorBindBusy,
@@ -787,7 +795,7 @@ export function ContainerGraphEditor({
                   <IosButton
                     className={styles.generateButton}
                     label={isGenerating ? t("Generating...") : t("Generate")}
-                    disabled={isGenerating || isSaving}
+                    disabled={isGenerating || isSaving || isGenerationBlocked}
                     onClick={handleGenerate}
                   />
                 </div>
@@ -1217,11 +1225,14 @@ export function ContainerGraphEditor({
                     <div className={styles.matrixHeaderActions}>
                       <span className={styles.headerBadge}>{t("Employees: {0}", totals.totalEmployees)}</span>
                       <span className={styles.headerBadge}>{t("Hours: {0}", totals.totalHoursText)}</span>
+                      {saveRecoveryAction}
                       {showMatrixSaveAction ? (
                         <IosButton
-                          label={isSaving ? t("Saving...") : t("Save")}
+                          label={t("Save")}
+                          busy={isSubmittingSave}
+                          busyLabel={t("Saving...")}
                           icon={<SaveIcon size={18} />}
-                          disabled={isSaving || isGenerating}
+                          disabled={isSaving || isGenerating || isSaveBlocked}
                           onClick={onSave}
                         />
                       ) : null}

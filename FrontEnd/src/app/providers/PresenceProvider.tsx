@@ -23,6 +23,7 @@ import {
   getAuthAccessToken,
 } from "@shared/api/httpClient";
 import { queryKeys } from "@shared/api/queryKeys";
+import { deferGraphRealtimeRefresh } from "@shared/api/graphSaveTraffic";
 import {
   getEmployeeAvailabilityNotificationId,
   getEmployeeOpenShiftNotificationId,
@@ -281,16 +282,32 @@ function invalidateRealtimeBaselineQueries(queryClient: QueryClient) {
   invalidateRealtimeQuery(queryClient, queryKeys.employeeUiState.current());
 }
 
-function invalidateGraphRealtimeQueries(queryClient: QueryClient, containerId: number, graphId: number) {
-  invalidateRealtimeBaselineQueries(queryClient);
-  invalidateRealtimeQuery(queryClient, queryKeys.containers.byId(containerId));
-  invalidateRealtimeQuery(queryClient, queryKeys.containers.graphs(containerId));
-  invalidateRealtimeQuery(queryClient, queryKeys.containers.graphById(containerId, graphId));
-  invalidateRealtimeQuery(queryClient, queryKeys.containers.graphSlots(containerId, graphId));
-  invalidateRealtimeQuery(queryClient, queryKeys.containers.graphSlotsBatches(containerId));
-  invalidateRealtimeQuery(queryClient, queryKeys.containers.graphEmployees(containerId, graphId));
-  invalidateRealtimeQuery(queryClient, queryKeys.containers.graphCellStyles(containerId, graphId));
-  invalidateRealtimeQuery(queryClient, queryKeys.containers.graphRecordsPrefix(containerId));
+function invalidateGraphRealtimeQueries(queryClient: QueryClient, graphs: Map<number, Set<number>>) {
+  const { containers } = queryKeys;
+  let refreshed = false;
+  for (const [containerId, queued] of graphs) {
+    const ids = new Set([...queued].filter(id => !deferGraphRealtimeRefresh(queryClient, containerId, id)));
+    if (!ids.size) continue;
+    refreshed = true;
+    queryClient.invalidateQueries({ queryKey: containers.graphs(containerId), exact: true });
+    for (const id of ids) {
+      for (const key of [containers.graphById, containers.graphSlots, containers.graphEmployees, containers.graphCellStyles, containers.graphVersions]) {
+        queryClient.invalidateQueries({ queryKey: key(containerId, id), exact: true });
+      }
+    }
+    const batches = containers.graphSlotsBatches(containerId);
+    queryClient.invalidateQueries({
+      queryKey: batches,
+      predicate: ({ queryKey }) => queryKey.slice(batches.length).some(id => typeof id === "number" && ids.has(id)),
+    });
+    invalidateRealtimeQuery(queryClient, containers.graphRecordsPrefix(containerId));
+  }
+  if (refreshed) {
+    invalidateRealtimeQuery(queryClient, queryKeys.home.dashboard());
+    invalidateRealtimeQuery(queryClient, queryKeys.home.activity());
+    invalidateRealtimeQuery(queryClient, queryKeys.employeeSchedules.all);
+    invalidateRealtimeQuery(queryClient, queryKeys.shiftSwaps.all);
+  }
 }
 
 function patchEmployeePresence<T extends Pick<Employee, "id" | "isOnline" | "lastLoginAtUtc">>(
@@ -352,8 +369,29 @@ export function PresenceProvider({ children }: PropsWithChildren) {
     invalidateRealtimeQuery(queryClient, queryKeys.employees.all);
   });
 
+  const queuedGraphRefreshes = useRef(new Map<number, Set<number>>());
+  const graphRefreshTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  useEffect(() => () => {
+    clearTimeout(graphRefreshTimer.current);
+    queuedGraphRefreshes.current = new Map();
+  }, [queryClient, session?.role, session?.managerId, session?.employeeId]);
+
+  const queueScheduleRefresh = (containerId: number, graphId: number) => {
+    if (deferGraphRealtimeRefresh(queryClient, containerId, graphId)) return;
+    const ids = queuedGraphRefreshes.current.get(containerId) ?? new Set<number>();
+    ids.add(graphId);
+    queuedGraphRefreshes.current.set(containerId, ids);
+    clearTimeout(graphRefreshTimer.current);
+    graphRefreshTimer.current = setTimeout(() => {
+      const graphs = queuedGraphRefreshes.current;
+      queuedGraphRefreshes.current = new Map();
+      invalidateGraphRealtimeQueries(queryClient, graphs);
+    }, 300);
+  };
+
   const applyScheduleChanged = useEffectEvent((update: ScheduleChangedUpdate) => {
-    invalidateGraphRealtimeQueries(queryClient, update.containerId, update.graphId);
+    queueScheduleRefresh(update.containerId, update.graphId);
 
     if (update.reason === "manager-schedule-published") {
       pushEmployeeNotification({
@@ -376,6 +414,10 @@ export function PresenceProvider({ children }: PropsWithChildren) {
         queryClient.getQueryState<boolean>(queryKeys.managerProfile.updating()).data) {
       return;
     }
+    if (update.resourceType === managerEditResourceTypes.schedule) {
+      if (update.containerId != null && update.graphId != null) queueScheduleRefresh(update.containerId, update.graphId);
+      return;
+    }
     invalidateRealtimeBaselineQueries(queryClient);
 
     const parsedResourceId = update.resourceId ? Number(update.resourceId) : null;
@@ -394,12 +436,6 @@ export function PresenceProvider({ children }: PropsWithChildren) {
         invalidateRealtimeQuery(queryClient, queryKeys.employeeAvailability.all);
         invalidateRealtimeQuery(queryClient, queryKeys.shiftSwaps.all);
         break;
-      case managerEditResourceTypes.schedule:
-        if (update.containerId != null && update.graphId != null) {
-          invalidateGraphRealtimeQueries(queryClient, update.containerId, update.graphId);
-        }
-        break;
-
       case managerEditResourceTypes.container:
         invalidateRealtimeQuery(queryClient, queryKeys.containers.all);
         invalidateRealtimeQuery(queryClient, queryKeys.containers.schedulePresets());
@@ -476,11 +512,12 @@ export function PresenceProvider({ children }: PropsWithChildren) {
   });
 
   const applyShiftSwapsChanged = useEffectEvent((update: ShiftSwapsChangedUpdate) => {
-    invalidateRealtimeQuery(queryClient, queryKeys.shiftSwaps.all);
-    invalidateRealtimeQuery(queryClient, queryKeys.employeeSchedules.all);
-
-    if (update.containerId != null && update.graphId != null) {
-      invalidateRealtimeQuery(queryClient, queryKeys.shiftSwaps.graphLog(update.containerId, update.graphId));
+    if (update.containerId != null && update.graphId != null &&
+        (update.reason.startsWith("manager-schedule-") || update.reason === "manager-manual-shift-offer-created")) {
+      queueScheduleRefresh(update.containerId, update.graphId);
+    } else {
+      invalidateRealtimeQuery(queryClient, queryKeys.shiftSwaps.all);
+      invalidateRealtimeQuery(queryClient, queryKeys.employeeSchedules.all);
     }
 
     if (update.reason === "manager-manual-shift-offer-created" || update.reason === "employee-swap-created") {
@@ -527,9 +564,9 @@ export function PresenceProvider({ children }: PropsWithChildren) {
         logsQueryKey,
         [entry, ...current.filter(item => item.id !== entry.id)],
       );
+    } else {
+      queryClient.invalidateQueries({ queryKey: logsQueryKey, exact: true });
     }
-
-    invalidateRealtimeQuery(queryClient, queryKeys.workflowLogs.all);
   });
 
   const applySessionRevoked = useEffectEvent((update: EmployeeSessionRevokedUpdate) => {

@@ -6,6 +6,7 @@ export class ApiError extends Error {
   public readonly status: number;
   public readonly details?: unknown;
   public readonly traceId?: string;
+  public readonly retryAfterMs?: number;
   public readonly validationErrors?: ValidationErrors;
 
   constructor(params: {
@@ -13,6 +14,7 @@ export class ApiError extends Error {
     status: number;
     details?: unknown;
     traceId?: string;
+    retryAfterMs?: number;
     validationErrors?: ValidationErrors;
   }) {
     super(params.message);
@@ -20,6 +22,7 @@ export class ApiError extends Error {
     this.status = params.status;
     this.details = params.details;
     this.traceId = params.traceId;
+    this.retryAfterMs = params.retryAfterMs;
     this.validationErrors = params.validationErrors;
   }
 }
@@ -136,6 +139,10 @@ export function getAuthAccessToken() {
   return authAccessToken;
 }
 
+export function getAuthGeneration() {
+  return authGeneration;
+}
+
 function withQueryString(url: string, query?: Record<string, QueryValue>) {
   if (!query) {
     return url;
@@ -244,9 +251,29 @@ function getFirstValidationErrorMessage(validationErrors?: ValidationErrors): st
     .find((message) => message.trim().length > 0);
 }
 
-function toApiError(status: number, payload: unknown): ApiError {
-  if (status === 429) return new ApiError({ status, message: t("Too many requests. Please try again later.") });
+function parseRetryAfter(header: string | null): number {
+  const value = header?.trim() ?? "";
+  const clamp = (delay: number) => Math.min(60_000, Math.max(1_000, Math.ceil(delay)));
+  if (/^\d+$/.test(value)) return clamp(Number(value) * 1000);
+
+  const standardDate = /^[A-Za-z]{3}, \d{2} [A-Za-z]{3} \d{4} \d{2}:\d{2}:\d{2} GMT$/.test(value);
+  const legacyDate = /^[A-Za-z]+, \d{2}-[A-Za-z]{3}-\d{2} \d{2}:\d{2}:\d{2} GMT$/.test(value);
+  const asctimeDate = /^[A-Za-z]{3} [A-Za-z]{3} (?: \d|\d{2}) \d{2}:\d{2}:\d{2} \d{4}$/.test(value);
+  if (!standardDate && !legacyDate && !asctimeDate) return 3_000;
+
+  const delay = Date.parse(asctimeDate ? `${value} GMT` : value) - Date.now();
+  return delay > 0 ? clamp(delay) : 3_000;
+}
+
+function toApiError(response: Response, payload: unknown): ApiError {
+  const { status } = response;
   const problem = (payload ?? {}) as ProblemDetailsResponse;
+  if (status === 429) return new ApiError({
+    status,
+    message: t("Too many requests. Please try again later."),
+    traceId: problem.traceId,
+    retryAfterMs: parseRetryAfter(response.headers.get("Retry-After")),
+  });
   const validationErrors = normalizeValidationErrors(problem.errors);
   const textPayload = typeof payload === "string" ? payload.trim() : "";
   const fallbackMessage = t("Request failed with status {0}", status);
@@ -343,7 +370,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   if (!response.ok) {
     const errorPayload = await readBody("json");
     notifyUnauthorized();
-    throw toApiError(response.status, errorPayload);
+    throw toApiError(response, errorPayload);
   }
 
   const responseType = options.responseType ?? "json";
@@ -366,7 +393,7 @@ export async function requestFile(path: string, options: Omit<RequestOptions, "r
   if (!response.ok) {
     const errorPayload = await readBody("json");
     notifyUnauthorized();
-    throw toApiError(response.status, errorPayload);
+    throw toApiError(response, errorPayload);
   }
 
   return {

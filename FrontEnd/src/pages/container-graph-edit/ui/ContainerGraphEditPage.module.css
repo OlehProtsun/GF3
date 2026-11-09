@@ -28,58 +28,110 @@
   display: contents;
 }
 
-.saveSummary {
-  position: relative;
-  z-index: 2;
-  flex: 0 0 auto;
-  max-height: min(24vh, 12rem);
-  overflow: auto;
-  margin-inline: 14px;
-  padding: 8px 12px;
-  border: 1px solid rgba(100, 116, 139, 0.24);
-  border-radius: 12px;
-  background: #f8fafc;
-  color: #1e293b;
-  font-size: 0.875rem;
-}
-
-.saveSummaryRow {
+.saveActions,
+.recoveryActions {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 6px 12px;
+  gap: 6px;
 }
 
-.saveSummary ul {
-  display: grid;
-  gap: 4px;
-  margin: 4px 0 0;
-  padding: 0;
-  list-style: none;
+.recoveryTriggerSlot {
+  display: flex;
+  justify-content: flex-end;
+  inline-size: 8rem;
+  flex: 0 0 auto;
+  max-inline-size: min(8rem, 35vw);
+  min-inline-size: 0;
 }
 
-.saveSummary p {
-  margin: 4px 0;
-}
-
-.saveSummary button {
-  border: 1px solid #cbd5e1;
-  border-radius: 8px;
-  padding: 4px 8px;
-  background: #fff;
-  color: inherit;
+.recoveryAction {
+  min-inline-size: 0;
+  min-block-size: 32px;
+  padding: 4px 10px;
+  border: 1px solid rgba(100, 116, 139, 0.25);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.74);
+  color: #334155;
   font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
   cursor: pointer;
 }
 
-.saveSummary button:focus-visible {
+.recoveryTriggerSlot .recoveryAction {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recoveryAction:hover:not(:disabled) {
+  background: #f1f5f9;
+}
+
+.recoveryAction:focus-visible {
   outline: 2px solid #2563eb;
   outline-offset: 2px;
 }
 
-.saveSummary button:disabled {
-  opacity: 0.65;
+.recoveryAction:disabled {
+  opacity: 0.6;
   cursor: default;
+}
+
+.recoveryDialog {
+  composes: surface from "../../../shared/ui/ViewportOverlay.module.css";
+  width: min(28rem, calc(100% - 24px));
+  max-height: min(72dvh, 34rem);
+  padding: clamp(14px, 4vw, 22px);
+  border: 1px solid rgba(255, 255, 255, 0.62);
+  border-radius: 22px;
+  background: linear-gradient(150deg, #fff, #f1f5f9);
+  color: #1e293b;
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.2);
+  font-size: 0.875rem;
+}
+
+.recoveryDialog::backdrop {
+  background: rgba(15, 23, 42, 0.3);
+  backdrop-filter: blur(4px);
+}
+
+.recoveryDialogHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-block-end: 10px;
+}
+
+.recoveryDialogHeader h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.recoveryDialog p {
+  margin: 0.35rem 0;
+  line-height: 1.45;
+}
+
+.recoveryGroup,
+.recoveryList li {
+  padding-block: 7px;
+  border-block-start: 1px solid rgba(100, 116, 139, 0.18);
+}
+
+.recoveryActions {
+  flex-wrap: wrap;
+  margin-block-start: 5px;
+}
+
+.recoveryList {
+  margin: 6px 0;
+  padding: 0;
+  list-style: none;
 }
 
 .headerActions,
@@ -224,6 +276,20 @@
 }
 
 @media (max-width: 960px) {
+  .recoveryTriggerSlot {
+    inline-size: 32px;
+  }
+
+  .recoveryTriggerSlot .recoveryAction {
+    inline-size: 32px;
+    padding: 6px;
+    justify-content: center;
+  }
+
+  .recoveryLabel {
+    display: none;
+  }
+
   .page {
     height: calc(100dvh - 4px);
     min-height: 0;
@@ -236,6 +302,11 @@
   .headerControls,
   .headerActionCluster {
     width: 100%;
+  }
+
+  .headerActions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
   }
 
   .headerActionCluster {

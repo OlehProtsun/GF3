@@ -444,6 +444,24 @@ public class ContainerService : IContainerService
         return existing.ToContract();
     }
 
+    public async Task<bool> ApplyGraphCellStyleBatchAsync(
+        int containerId, int graphId, IReadOnlyList<GraphCellStyleFieldPatchModel> changes, CancellationToken ct = default)
+    {
+        await EnsureGraphOwnershipAsync(containerId, graphId, ct).ConfigureAwait(false);
+        var keys = new HashSet<(int EmployeeId, int DayOfMonth)>();
+        foreach (var change in changes)
+        {
+            if (change.EmployeeId <= 0 || change.DayOfMonth is < 1 or > 31 ||
+                !change.ChangeBackgroundColor && !change.ChangeTextColor || !keys.Add((change.EmployeeId, change.DayOfMonth)))
+                throw ValidationException.ForField(nameof(changes), "Each valid cell must appear once and change at least one color.");
+        }
+
+        var patches = changes.Select(change => new DataAccessLayer.Models.ScheduleCellStyleFieldPatchModel(
+            change.EmployeeId, change.DayOfMonth, change.ChangeBackgroundColor, change.ExpectedBackgroundColorArgb,
+            change.BackgroundColorArgb, change.ChangeTextColor, change.ExpectedTextColorArgb, change.TextColorArgb)).ToArray();
+        return await _cellStyleRepo.ApplyFieldPatchesIfUnchangedAsync(graphId, patches, ct).ConfigureAwait(false);
+    }
+
     public async Task DeleteGraphCellStyleAsync(int containerId, int graphId, int styleId, CancellationToken ct = default)
     {
         await EnsureGraphOwnershipAsync(containerId, graphId, ct).ConfigureAwait(false);

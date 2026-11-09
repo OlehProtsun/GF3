@@ -1,5 +1,6 @@
 import { request } from "@shared/api/httpClient";
 import type {
+  BatchUpdateGraphCellStylesDto,
   ContainerDto,
   GenerateGraphRequestDto,
   GenerateGraphPreviewRequestDto,
@@ -80,6 +81,8 @@ export const containersApi = {
 
   listGraphCellStyles: (containerId: number, graphId: number, signal?: AbortSignal) =>
     request<GraphCellStyleDto[]>(`${endpoint}/${containerId}/graphs/${graphId}/cell-styles`, { signal }),
+  applyGraphCellStyleBatch: (containerId: number, graphId: number, payload: BatchUpdateGraphCellStylesDto) =>
+    request<void>(`${endpoint}/${containerId}/graphs/${graphId}/cell-styles/batch`, { method: "PUT", body: payload }),
   upsertGraphCellStyle: (containerId: number, graphId: number, payload: UpsertGraphCellStyleDto) =>
     request<GraphCellStyleDto>(`${endpoint}/${containerId}/graphs/${graphId}/cell-styles`, { method: "PUT", body: payload }),
   removeGraphCellStyle: (containerId: number, graphId: number, styleId: number) =>
