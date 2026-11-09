@@ -66,20 +66,40 @@ function normalizeTime(time: string) {
 const slotStatusValues: Record<string, number> = { free: 0, unfurnished: 0, working: 1, assigned: 1, blocked: 2 };
 
 export function normalizeGraphSlots(slots: GraphSlot[]) {
+  // Replacement assigns dense slotNo values. Compare a sorted multiset of content,
+  // retaining every row (including duplicate assignments and unassigned capacity).
   return slots.map(slot => ({
     dayOfMonth: slot.dayOfMonth,
-    slotNo: slot.slotNo,
     fromTime: normalizeTime(slot.fromTime),
     toTime: normalizeTime(slot.toTime),
     employeeId: slot.employeeId ?? null,
     status: slotStatusValues[String(slot.status).toLowerCase()] ?? slot.status,
   })).sort((left, right) =>
     left.dayOfMonth - right.dayOfMonth ||
-    left.slotNo - right.slotNo ||
     left.fromTime.localeCompare(right.fromTime) ||
     left.toTime.localeCompare(right.toTime) ||
     (left.employeeId ?? 0) - (right.employeeId ?? 0) ||
     String(left.status).localeCompare(String(right.status)));
+}
+
+export function graphSaveMismatch(expected: PersistedGraphState, actual: PersistedGraphState) {
+  const fields = graphSaveFields(expected.graph);
+  const actualFields = graphSaveFields(actual.graph);
+  for (const field of Object.keys(fields) as Array<keyof typeof fields>) {
+    // Graph values can contain private text; only expose the field name.
+    if (fields[field] !== actualFields[field]) return { field: `graph.${field}` };
+  }
+  for (const [field, before, after] of [
+    ["employees", normalizeGraphEmployees(expected.employees), normalizeGraphEmployees(actual.employees)],
+    ["slots", normalizeGraphSlots(expected.slots), normalizeGraphSlots(actual.slots)],
+    ["styles", normalizeGraphStyles(expected.styles.filter(row => row.employeeId > 0)),
+      normalizeGraphStyles(actual.styles.filter(row => row.employeeId > 0))],
+  ] as const) {
+    if (before.length !== after.length) return { field: `${field}.count`, intended: before.length, persisted: after.length };
+    const index = before.findIndex((row, i) => stableSerialize(row) !== stableSerialize(after[i]));
+    if (index >= 0) return { field, index, intended: before[index], persisted: after[index] };
+  }
+  return null;
 }
 
 export function buildGraphWorkspaceSaveSlots(params: Parameters<typeof buildGraphDraftSlots>[0], preserveExisting: boolean) {

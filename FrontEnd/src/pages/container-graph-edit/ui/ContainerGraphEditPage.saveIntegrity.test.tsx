@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { readFileSync } from "node:fs";
 import type { ComponentProps } from "react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -10,7 +11,7 @@ import type { BatchUpdateGraphCellStylesDto, GraphVersionTreeDto, SaveGraphDto, 
 import type { ShiftSwap } from "@entities/shift-swaps";
 import { buildGraphNoteContent, parseGraphNoteContent } from "@entities/containers/model/graphNote";
 import { createGraphFormFromGraph } from "@entities/containers/model/graphForm";
-import { rgbHexToArgb } from "@entities/containers/model/graphWorkspace";
+import { buildGraphCellMap, rgbHexToArgb } from "@entities/containers/model/graphWorkspace";
 import { ApiError } from "@shared/api/httpClient";
 import { isGraphSaveTrafficActive } from "@shared/api/graphSaveTraffic";
 import { setLanguage } from "@shared/i18n";
@@ -329,6 +330,110 @@ test("ten graphs retain 500 mixed edited cells each after authoritative fixture 
     expect(note.textCells.filter(cell => cell.value === "Training")).toHaveLength(12);
     expect(note.manualColumns[0].cells["1"]).toBe("Manual note");
   }
+});
+
+test.each([false, true])("seven-graph incident verifies normalized slots and resumes committed F35 without writes (readback lost=%s)", async lost => {
+  m.openIds = [36, 39, 38, 34, 37, 40, 41]; m.id = 36;
+  m.employees = Array.from({ length: 17 }, (_, i) => ({ id: i + 1, firstName: "Synthetic", lastName: String(i) }));
+  const template = structuredClone(getState(34));
+  const privateFixture = process.env.GF3_SAVE_PRIVATE_FIXTURE ? JSON.parse(readFileSync(process.env.GF3_SAVE_PRIVATE_FIXTURE, "utf8")) as {
+    graphs: Array<{ graphId: number; before: { slots: GraphSlot[]; employeeOrder: number[] }; after: { slots: GraphSlot[]; employeeOrder: number[] } }>;
+  } : undefined;
+  if (privateFixture) {
+    const allIds = [...new Set(privateFixture.graphs.flatMap(row => row.after.employeeOrder))];
+    m.employees = allIds.map(id => ({ id, firstName: "Fixture", lastName: String(id) }));
+  }
+  for (const id of m.openIds) {
+    const fixture = privateFixture?.graphs.find(row => row.graphId === id);
+    const count = id === 36 ? 91 : id === 39 ? 201 : 20;
+    const slots = fixture?.before.slots ?? Array.from({ length: count }, (_, i) => ({ ...changedSlot(id),
+      employeeId: i % 17 + 1, dayOfMonth: Math.floor(i / 17) + 1, slotNo: i % 17 + 3,
+    }));
+    const roster = fixture?.after.employeeOrder ?? m.employees.map(row => row.id);
+    m.states.set(id, { ...structuredClone(template), graph: { ...template.graph, id, name: `Graph ${id}` },
+      slots: slots.map((slot, i) => ({ ...slot, id: i + 1, scheduleId: id })),
+      employees: roster.map((employeeId, displayOrder) => ({ id: employeeId, employeeId, scheduleId: id, displayOrder, isPriority: false })),
+    });
+    const version = id === 36 ? 4 : id === 39 ? 20 : 1;
+    m.versions.set(id, { currentVersionId: version, versions: [{ id: version }] as GraphVersionTreeDto["versions"] });
+  }
+  defaults.replaceGraphSlots.mockImplementation(async (_, id, { slots }: { slots: SaveGraphSlotDto[] }) => {
+    const groups = new Map<string, SaveGraphSlotDto[]>();
+    for (const slot of slots) {
+      const key = `${slot.dayOfMonth}/${slot.fromTime}/${slot.toTime}`;
+      groups.set(key, [...groups.get(key) ?? [], slot]);
+    }
+    getState(id).slots = [...groups.values()].flatMap(rows => rows.sort((a, b) => a.slotNo - b.slotNo || (a.employeeId ?? Infinity) - (b.employeeId ?? Infinity))
+      .map((slot, i) => ({ ...slot, slotNo: i + 1, status: slot.employeeId ? 1 : 0, id: i + 1, scheduleId: id })));
+  });
+  const read = defaults.listGraphSlots.getMockImplementation()!;
+  let outage = lost;
+  defaults.listGraphSlots.mockImplementation(async (_, id) => {
+    if (id === 39 && m.versions.get(id)?.currentVersionId === 21 && outage) throw new Error("Readback unavailable");
+    return read(_, id);
+  });
+  const view = open();
+  for (const id of m.openIds) {
+    if (id !== 36) view.select(id);
+    const fixture = privateFixture?.graphs.find(row => row.graphId === id);
+    act(() => {
+      if (fixture) {
+        const map = buildGraphCellMap(fixture.after.slots);
+        for (const employee of fixture.after.employeeOrder) for (let day = 1; day <= 30; day++)
+          m.editor!.onCellChange(employee, day, map[`${employee}:${day}`] ?? "");
+      } else {
+        m.editor!.onCellChange(1, 20, "09:00 - 15:00");
+        if (id === 36 || id === 39) m.editor!.onCellChange(2, 21, "09:00 - 15:00");
+      }
+    });
+    paint("background", "#123456", [`${getState(id).employees[0].employeeId}:1`]);
+  }
+  save();
+  if (lost) {
+    await failure();
+    expect(calls(defaults.commitGraphVersion)).toEqual([36, 39]);
+    outage = false; retry();
+  }
+  await expectNavigation();
+  expect(calls(defaults.commitGraphVersion)).toEqual(m.openIds);
+  expect(calls(defaults.replaceGraphSlots)).toEqual(m.openIds);
+  expect(calls(defaults.applyGraphCellStyleBatch)).toEqual(m.openIds);
+  expect(getState(36).slots).toHaveLength(93);
+  expect(getState(39).slots).toHaveLength(203);
+  expect(m.versions.get(39)?.currentVersionId).toBe(21);
+  expect(m.navigate).toHaveBeenCalledWith("/container/7/graphs/41?openGraphIds=36%2C39%2C38%2C34%2C37%2C40%2C41");
+});
+
+test.each(["employee", "day", "time", "count", "status", "style"])("a committed %s mismatch remains unsaved and never replays the version", async field => {
+  open();
+  act(() => m.editor!.onCellChange(2, 3, "09:00 - 12:00"));
+  paint("background", "#123456", ["2:3"]);
+  const commit = defaults.commitGraphVersion.getMockImplementation()!;
+  defaults.commitGraphVersion.mockImplementationOnce(async (...args) => {
+    const result = await commit(...args);
+    const state = getState();
+    if (field === "employee") state.slots[0].employeeId = 1;
+    if (field === "day") state.slots[0].dayOfMonth = 4;
+    if (field === "time") state.slots[0].toTime = "13:00";
+    if (field === "count") state.slots.push({ ...state.slots[0], id: 99 });
+    if (field === "status") state.slots[0].status = 2;
+    if (field === "style") state.styles = [];
+    return result;
+  });
+  save(); await failure(); retry(); await failure();
+  expect(m.navigate).not.toHaveBeenCalled();
+  expect(defaults.replaceGraphSlots).toHaveBeenCalledOnce();
+  expect(defaults.commitGraphVersion).toHaveBeenCalledOnce();
+  expect(m.editor!.cellMap["2:3"]).toBe("09:00 - 12:00");
+});
+
+test("server-only renumbering before preflight causes no conflict or redundant slot replacement", async () => {
+  open(); renamed("Metadata edit");
+  getState().slots = getState().slots.map(slot => ({ ...slot, slotNo: 99 }));
+  save(); await expectNavigation();
+  expect(defaults.updateGraph).toHaveBeenCalledOnce();
+  expect(defaults.replaceGraphSlots).not.toHaveBeenCalled();
+  expect(defaults.commitGraphVersion).toHaveBeenCalledOnce();
 });
 
 test("Cancel during preflight closes the same dialog with zero writes and editable drafts", async () => {

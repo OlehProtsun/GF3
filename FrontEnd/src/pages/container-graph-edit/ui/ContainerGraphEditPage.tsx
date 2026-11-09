@@ -9,7 +9,7 @@ import { deriveGeneratedVacancies, reconcileGeneratedManualColumns } from "@enti
 import { pinGeneratedColumnsFirst } from "@entities/containers/model/graphColumnOrder";
 import {
   buildGraphWorkspaceSaveSlots, buildStyleOnlyUpdatedNote, classifyGraphDraftChange, diffGraphColors,
-  fingerprintPersistedGraph, graphSaveFields, hasPersistedWorkspaceChanges,
+  fingerprintPersistedGraph, graphSaveFields, graphSaveMismatch, hasPersistedWorkspaceChanges,
   matchGraphColors, mergeGraphColorStyles, normalizeGraphEmployees, normalizeGraphSlots, normalizeGraphStyles,
   type GraphColorChange, type GraphSaveComparisonInput, type PersistedGraphState,
 } from "@entities/containers/model/graphSaveIntegrity";
@@ -999,6 +999,10 @@ function canResumeWorkspace(before: PersistedGraphState, intended: PersistedGrap
 function sameGraphVersionTree(left: GraphVersionTreeDto, right: GraphVersionTreeDto) {
   const versionIds = (tree: GraphVersionTreeDto) => tree.versions.map(version => version.id).sort((a, b) => a - b);
   return left.currentVersionId === right.currentVersionId && stableSerialize(versionIds(left)) === stableSerialize(versionIds(right));
+}
+
+function diagnoseGraphSave(graphId: number, phase: string, detail: object = {}) {
+  if (import.meta.env.DEV) console.debug("graph-save", { graphId, phase, ...detail });
 }
 
 function matchPublishedShifts(
@@ -2354,6 +2358,7 @@ export function ContainerGraphEditPage() {
     delete pendingReadbackByIdRef.current[id];
     delete pendingVersionRejectionByIdRef.current[id];
     setConfirmedGraph(state);
+    diagnoseGraphSave(id, "content-verified", { versionCommitted });
 
     setSaveOutcome(id, { status: "saved", contentPersisted: true, versionCommitted });
   };
@@ -2389,6 +2394,7 @@ export function ContainerGraphEditPage() {
         if (fingerprintPersistedGraph(baseline) !== fingerprintPersistedGraph(remote) &&
             !(checkpoint?.safeToResume && !saveGuardByIdRef.current[id]?.manualPublicationAttempted &&
               canResumeWorkspace(checkpoint.before, checkpoint.expected, remote))) {
+          diagnoseGraphSave(id, "preflight-conflict", { mismatch: graphSaveMismatch(baseline, remote) });
           setSaveOutcome(id, { status: "conflict", message: t("Other saved changes were detected. Your edits are still here. Automatic merge is unavailable.") });
           return null;
         }
@@ -2513,6 +2519,11 @@ export function ContainerGraphEditPage() {
         ? matchPublishedShifts(readback, pending, await readGraphOffers(containerId, id, readSignal, readRequest), previousOfferIds, responseOfferIds)
         : new Set<number>();
       const readbackWorkspace = { ...readback, slots: readback.slots.filter(slot => !publicationSlots.has(slot.id)) };
+      if (import.meta.env.DEV) {
+        const mismatch = graphSaveMismatch(expected, readbackWorkspace);
+        if (mismatch) diagnoseGraphSave(id, "semantic-mismatch", { versionCommitted: guard.checkpoint?.versionCommitted,
+          mismatch, baseline: graphSaveMismatch(expected, remote) });
+      }
       return {
         complete: publicationSlots.size === pending.length &&
           fingerprintPersistedGraph(readbackWorkspace) === fingerprintPersistedGraph(expected),
@@ -2655,6 +2666,8 @@ export function ContainerGraphEditPage() {
         queryClient.setQueryData(queryKeys.containers.graphVersions(containerId, id), version);
       }
     } catch (error) {
+      diagnoseGraphSave(id, signal.aborted || isRequestCanceledError(error) ? "cancelled" :
+        error instanceof ApiError && error.status === 429 ? "429" : "api-error");
       if (signal.aborted || isRequestCanceledError(error)) throw error;
       writeFailed = true;
       writeError = error;
@@ -2692,6 +2705,7 @@ export function ContainerGraphEditPage() {
       signal.throwIfAborted();
     } catch (error) {
       if (signal.aborted || isRequestCanceledError(error)) throw error;
+      diagnoseGraphSave(id, "readback-failure");
       readback = undefined;
     }
     if (knownVersionRejection && readback) {
@@ -2711,6 +2725,7 @@ export function ContainerGraphEditPage() {
       guard.needsStyleVersion = priorStyleVersion;
     }
     const status = batchConflict ? "conflict" : !readback || versionUncertain || !(contentPersisted || partialContent) ? "unknown" : "partial";
+    diagnoseGraphSave(id, status === "partial" ? "partial-write" : "unverified", { versionCommitted, contentPersisted });
     const message = writeError instanceof ApiError ? writeError.message
       : guard.blockedBy ? t("The previous save could not be verified. Your edits are still here.") : undefined;
     setSaveOutcome(id, { status, message, contentPersisted, versionCommitted });
