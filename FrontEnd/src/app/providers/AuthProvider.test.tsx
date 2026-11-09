@@ -21,7 +21,7 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.restoreAllMocks(); setAuthAccessToken(null); });
 
 describe("authentication lifecycle", () => {
-  it("clears only the signed-out manager's schedule recovery keys", async () => {
+  it("clears the signed-out manager session without unrelated storage changes", async () => {
     api.login.mockResolvedValueOnce({ session: { ...session, role: "manager", managerId: 7 }, accessToken: "token" });
     window.sessionStorage.setItem("gf3:graph-drafts:7:1", "draft");
     window.sessionStorage.setItem("gf3:graph-drafts:7:2", "draft");
@@ -32,8 +32,8 @@ describe("authentication lifecycle", () => {
     await screen.findByText("authenticated");
     fireEvent.click(screen.getByText("logout"));
     await screen.findByText("unauthenticated");
-    expect(window.sessionStorage.getItem("gf3:graph-drafts:7:1")).toBeNull();
-    expect(window.sessionStorage.getItem("gf3:graph-drafts:7:2")).toBeNull();
+    expect(window.sessionStorage.getItem("gf3:graph-drafts:7:1")).toBe("draft");
+    expect(window.sessionStorage.getItem("gf3:graph-drafts:7:2")).toBe("draft");
     expect(window.sessionStorage.getItem("gf3:graph-drafts:70:1")).toBe("other draft");
   });
 

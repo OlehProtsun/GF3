@@ -25,6 +25,25 @@ test("caps a persistently limited read at two retries", async () => {
   expect(read).toHaveBeenCalledTimes(3);
 });
 
+test("Save can opt into six retries without changing the default budget", async () => {
+  vi.useFakeTimers();
+  const read = vi.fn().mockRejectedValue(limited);
+  const rejected = expect(retry429Read(read, { maxRetries: 6, maxElapsedMs: 180000 })).rejects.toBe(limited);
+  await vi.advanceTimersByTimeAsync(42000);
+  await rejected;
+  expect(read).toHaveBeenCalledTimes(7);
+});
+
+test("does not sleep beyond the Save elapsed budget or shorten Retry-After", async () => {
+  vi.useFakeTimers();
+  const read = vi.fn().mockRejectedValue(new ApiError({ status: 429, message: "Long cooldown", retryAfterMs: 90000 }));
+  const rejected = expect(retry429Read(read, { maxRetries: 6, maxElapsedMs: 180000 })).rejects.toThrow("Long cooldown");
+  await vi.advanceTimersByTimeAsync(90000);
+  await rejected;
+  expect(read).toHaveBeenCalledTimes(2);
+  expect(vi.getTimerCount()).toBe(0);
+});
+
 test.each([400, 409, 500])("does not retry HTTP %s", async status => {
   const error = new ApiError({ status, message: "Failed" });
   const read = vi.fn().mockRejectedValue(error);

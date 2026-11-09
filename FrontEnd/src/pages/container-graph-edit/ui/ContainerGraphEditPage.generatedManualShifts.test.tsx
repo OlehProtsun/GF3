@@ -47,7 +47,7 @@ vi.mock("@app/providers/PresenceProvider", () => ({
   buildManagerEditLockMessage: () => null,
 }));
 vi.mock("@shared/lib/useUnsavedChangesPrompt", () => ({ useUnsavedChangesPrompt: () => ({ dialog: null, runWithoutPrompt: (callback: () => void) => callback() }) }));
-vi.mock("@shared/ui/ConfirmDialog", () => ({ ConfirmDialog: ({ open, onConfirm }: { open: boolean; onConfirm: () => void }) => open ? <button onClick={onConfirm}>Confirm save</button> : null }));
+vi.mock("@shared/ui/ConfirmDialog", () => ({ ConfirmDialog: ({ open, message, onConfirm }: { open: boolean; message: string; onConfirm: () => void }) => open ? <div role="dialog"><p>{message}</p><button onClick={onConfirm}>Confirm save</button></div> : null }));
 vi.mock("@entities/containers", async importOriginal => {
   const actual = await importOriginal<Record<string, unknown>>();
   const query = (data: unknown) => ({ data, isLoading: false, isError: false });
@@ -190,8 +190,8 @@ test("a persisted shift change still conflicts with a dirty workspace", async ()
   act(() => mocks.editor!.onFieldChange("name")("Dirty name"));
   mocks.savedSlots.set(1, preview());
   fireEvent.click(screen.getByText("Save editor")); fireEvent.click(screen.getByText("Confirm save"));
-  fireEvent.click(await screen.findByRole("button", { name: "Review issue" }));
-  expect(await screen.findByText("Graph one · Conflict")).toBeVisible();
+  expect(await screen.findByText("Other saved changes were detected. Your edits are still here. Automatic merge is unavailable.")).toBeVisible();
+  expect(screen.queryByRole("button", { name: "Review issue" })).not.toBeInTheDocument();
   expect(mocks.save).not.toHaveBeenCalled();
   expect(mocks.editor!.form.name).toBe("Dirty name");
 });

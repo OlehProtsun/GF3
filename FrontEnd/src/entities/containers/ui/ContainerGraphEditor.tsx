@@ -162,7 +162,6 @@ type ContainerGraphEditorProps = {
   isStylingBusy: boolean;
   hasUnsavedChanges?: boolean;
   showMatrixSaveAction?: boolean;
-  saveRecoveryAction?: ReactNode;
   isBindsLoading: boolean;
   isBindBusy: boolean;
   isFillColorBindBusy: boolean;
@@ -420,7 +419,6 @@ export function ContainerGraphEditor({
   isStylingBusy,
   hasUnsavedChanges = false,
   showMatrixSaveAction = true,
-  saveRecoveryAction,
   isBindsLoading,
   isBindBusy,
   isFillColorBindBusy,
@@ -1225,7 +1223,6 @@ export function ContainerGraphEditor({
                     <div className={styles.matrixHeaderActions}>
                       <span className={styles.headerBadge}>{t("Employees: {0}", totals.totalEmployees)}</span>
                       <span className={styles.headerBadge}>{t("Hours: {0}", totals.totalHoursText)}</span>
-                      {saveRecoveryAction}
                       {showMatrixSaveAction ? (
                         <IosButton
                           label={t("Save")}

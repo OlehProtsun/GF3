@@ -19,9 +19,10 @@ export function waitForReadRetry(delay: number, signal?: AbortSignal): Promise<v
 }
 
 /** The callback must issue only a GET. Writes need authoritative readback before any explicit retry. */
-export async function retry429Read<T>(read: () => Promise<T>, options: { signal?: AbortSignal; maxRetries?: number } = {}): Promise<T> {
-  const { signal, maxRetries = 2 } = options;
-  const retries = Number.isNaN(maxRetries) ? 0 : Math.min(2, Math.max(0, Math.floor(maxRetries)));
+export async function retry429Read<T>(read: () => Promise<T>, options: { signal?: AbortSignal; maxRetries?: number; maxElapsedMs?: number } = {}): Promise<T> {
+  const { signal, maxRetries = 2, maxElapsedMs } = options;
+  const retries = Number.isFinite(maxRetries) ? Math.min(maxElapsedMs === undefined ? 2 : 6, Math.max(0, Math.floor(maxRetries))) : 0;
+  const started = performance.now();
   const token = getAuthAccessToken();
   const generation = getAuthGeneration();
   const ensureCurrent = () => {
@@ -38,7 +39,11 @@ export async function retry429Read<T>(read: () => Promise<T>, options: { signal?
     } catch (error) {
       ensureCurrent();
       if (!(error instanceof ApiError) || error.status !== 429 || attempt >= retries) throw error;
-      await waitForReadRetry(error.retryAfterMs ?? 3000, signal);
+      const delay = Math.max(0, error.retryAfterMs ?? 3000);
+      if (maxElapsedMs !== undefined && performance.now() - started + delay >= maxElapsedMs) throw error;
+      await waitForReadRetry(delay, signal);
+      ensureCurrent();
+      if (maxElapsedMs !== undefined && performance.now() - started >= maxElapsedMs) throw error;
     }
   }
 }

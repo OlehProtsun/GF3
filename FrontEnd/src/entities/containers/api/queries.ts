@@ -86,6 +86,7 @@ export type SaveGraphWorkspaceInput = {
   existingEmployees?: GraphEmployee[];
   existingSlots?: GraphSlot[];
   signal?: AbortSignal;
+  runSaveRequest?: <T>(send: () => Promise<T>) => Promise<T>;
 };
 
 export type SaveGraphWorkspaceResult = {
@@ -117,6 +118,7 @@ async function syncGraphWorkspace({
   existingEmployees = [],
   existingSlots = [],
   signal,
+  runSaveRequest = send => send(),
 }: SaveGraphWorkspaceInput): Promise<SaveGraphWorkspaceResult & { changed: boolean }> {
   signal?.throwIfAborted();
   let resolvedGraphId = graphId;
@@ -125,10 +127,10 @@ async function syncGraphWorkspace({
     stableSerialize(graphSaveFields(existingGraph));
 
   if (resolvedGraphId === null) {
-    const createdGraph = await containersApi.createGraph(containerId, payload);
+    const createdGraph = await runSaveRequest(() => containersApi.createGraph(containerId, payload));
     resolvedGraphId = createdGraph.id;
   } else if (graphChanged) {
-    await containersApi.updateGraph(containerId, resolvedGraphId, payload);
+    await runSaveRequest(() => containersApi.updateGraph(containerId, resolvedGraphId as number, payload));
   }
 
   const uniqueAssignments = [...employeeAssignments]
@@ -154,12 +156,12 @@ async function syncGraphWorkspace({
 
   if (employeesToCreate.length > 0) {
     const createdEmployees = await mapInPairs(employeesToCreate, employee =>
-      containersApi.createGraphEmployee(containerId, resolvedGraphId as number, {
+      runSaveRequest(() => containersApi.createGraphEmployee(containerId, resolvedGraphId as number, {
         employeeId: employee.employeeId,
         minHoursMonth: employee.minHoursMonth ?? null,
         isPriority: employee.isPriority,
         displayOrder: displayOrderByEmployeeId.get(employee.employeeId) ?? 0,
-      }), signal,
+      })), signal,
     );
 
     createdEmployees.forEach(employee => {
@@ -187,12 +189,12 @@ async function syncGraphWorkspace({
 
   if (employeesToUpdate.length > 0) {
     await mapInPairs(employeesToUpdate, ({ assignment, existingEmployee, displayOrder }) =>
-      containersApi.updateGraphEmployee(containerId, resolvedGraphId as number, existingEmployee.id, {
+      runSaveRequest(() => containersApi.updateGraphEmployee(containerId, resolvedGraphId as number, existingEmployee.id, {
         employeeId: assignment.employeeId,
         minHoursMonth: assignment.minHoursMonth ?? null,
         isPriority: assignment.isPriority,
         displayOrder,
-      }), signal,
+      })), signal,
     );
   }
 
@@ -213,7 +215,7 @@ async function syncGraphWorkspace({
     stableSerialize(normalizeGraphSlots(draft.slots)) !== stableSerialize(normalizeGraphSlots(existingSlots));
   signal?.throwIfAborted();
   if (slotsChanged) {
-    await containersApi.replaceGraphSlots(containerId, resolvedGraphId as number, {
+    await runSaveRequest(() => containersApi.replaceGraphSlots(containerId, resolvedGraphId as number, {
       slots: draft.slots.map(slot => ({
         dayOfMonth: slot.dayOfMonth,
         slotNo: slot.slotNo,
@@ -222,12 +224,12 @@ async function syncGraphWorkspace({
         employeeId: slot.employeeId ?? null,
         status: slot.status,
       })),
-    });
+    }));
   }
 
   if (employeesToRemove.length > 0) {
     await mapInPairs(employeesToRemove, employee =>
-      containersApi.removeGraphEmployee(containerId, resolvedGraphId as number, employee.id), signal,
+      runSaveRequest(() => containersApi.removeGraphEmployee(containerId, resolvedGraphId as number, employee.id)), signal,
     );
   }
 
