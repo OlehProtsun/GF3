@@ -8,7 +8,8 @@ import {
   QueryClientProvider,
 } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
-import { isRequestCanceledError } from "@shared/api/httpClient";
+import { ApiError, isRequestCanceledError } from "@shared/api/httpClient";
+import { graphEditorSaveMutationKey } from "@shared/api/graphSaveTraffic";
 import { isDev } from "@shared/lib/isDev";
 import { pushErrorAlertFromError } from "@shared/ui/feedback/error-alerts/errorAlerts";
 import { useAuth } from "./AuthProvider";
@@ -16,11 +17,13 @@ import { PublicHolidayVisibilityProvider } from "./PublicHolidayVisibilityProvid
 import { usePendingRegulationsQuery } from "@entities/regulations/api/queries";
 
 function createQueryClient() {
-  return new QueryClient({
+  let lastRateLimitToast = -Infinity;
+  const client = new QueryClient({
     defaultOptions: {
       queries: {
         staleTime: 30_000,
         retry: 1,
+        retryDelay: (_, error) => error instanceof ApiError && error.status === 429 ? error.retryAfterMs ?? 3000 : 0,
         refetchOnWindowFocus: false,
       },
       mutations: {
@@ -32,6 +35,11 @@ function createQueryClient() {
         if (isRequestCanceledError(error)) {
           return;
         }
+        if (error instanceof ApiError && error.status === 429) {
+          const now = Date.now();
+          if (client.getQueryState(query.queryKey).data !== undefined || now - lastRateLimitToast < 5000) return;
+          lastRateLimitToast = now;
+        }
 
         pushErrorAlertFromError(error, t("Could not load data from the server."));
 
@@ -42,7 +50,7 @@ function createQueryClient() {
     }),
     mutationCache: new MutationCache({
       onError: (error, _variables, _context, mutation) => {
-        if (isRequestCanceledError(error)) {
+        if (isRequestCanceledError(error) || mutation.options.mutationKey === graphEditorSaveMutationKey) {
           return;
         }
 
@@ -54,6 +62,7 @@ function createQueryClient() {
       },
     }),
   });
+  return client;
 }
 
 export function QueryProvider({ children }: PropsWithChildren) {

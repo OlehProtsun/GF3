@@ -33,6 +33,33 @@ afterEach(() => {
 });
 
 describe("httpClient", () => {
+  test("retains server retry guidance and trace ID for a localized 429", async () => {
+    mockFetch(Response.json({ traceId: "trace", title: "Private upstream error" }, {
+      status: 429, headers: { "Retry-After": "7" },
+    }));
+    await expect(request("profile")).rejects.toMatchObject({
+      status: 429, retryAfterMs: 7000, traceId: "trace", message: t("Too many requests. Please try again later."),
+    });
+  });
+
+  test.each([
+    ["Mon, 09 Nov 2026 12:00:05 GMT", 5000], ["Mon, 09 Nov 2026 12:00:00 GMT", 3000],
+    ["Monday, 09-Nov-26 12:00:05 GMT", 5000], ["Mon Nov  9 12:00:05 2026", 5000], ["Nov 9 2099", 3000],
+    ["0", 1000], ["99999999999999999999999", 60_000], ["", 3000], ["-3", 3000], ["1.2", 3000], ["unknown", 3000], [null, 3000],
+  ])("reads Retry-After %s as %s milliseconds from a proxy error", async (header, retryAfterMs) => {
+    const now = vi.spyOn(Date, "now").mockReturnValue(Date.parse("2026-11-09T12:00:00Z"));
+    try {
+      mockFetch(new Response("", { status: 429, headers: header === null ? {} : { "Retry-After": header } }));
+      await expect(requestFile("download")).rejects.toMatchObject({ status: 429, retryAfterMs });
+    } finally { now.mockRestore(); }
+  });
+
+  test.each(["POST", "PUT", "DELETE"] as const)("does not retry a rate-limited %s", async method => {
+    const fetchMock = mockFetch(new Response("", { status: 429, headers: { "Retry-After": "1" } }));
+    await expect(request("style", { method })).rejects.toMatchObject({ status: 429, retryAfterMs: 1000 });
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
   test.each(["en", "pl", "uk"] as const)("normalizes JSON, HTML and empty 429 responses in %s without retries or logout", async language => {
     setLanguage(language);
     const revoked = vi.fn(); const unsubscribe = subscribeUnauthorized(revoked);

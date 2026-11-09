@@ -538,6 +538,31 @@ public class ContainersController(
         return Ok(style.ToGraphCellStyleDto());
     }
 
+    [HttpPut("{containerId:int}/graphs/{graphId:int}/cell-styles/batch")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> ApplyGraphCellStyleBatch(
+        int containerId, int graphId, [FromBody] BatchUpdateGraphCellStylesRequest request, CancellationToken cancellationToken)
+    {
+        if (CreateEditLockConflictResult(ManagerEditLockTargets.Schedule(containerId, graphId), "This schedule") is { } conflict)
+            return conflict;
+
+        var changes = request.Changes.Select(change => new GraphCellStyleFieldPatchModel(
+            change.EmployeeId, change.DayOfMonth, change.ChangeBackgroundColor, change.ExpectedBackgroundColorArgb,
+            change.BackgroundColorArgb, change.ChangeTextColor, change.ExpectedTextColorArgb, change.TextColorArgb)).ToArray();
+        if (await containerService.ApplyGraphCellStyleBatchAsync(containerId, graphId, changes, cancellationToken).ConfigureAwait(false))
+        {
+            var graph = await containerService.GetGraphByIdAsync(containerId, graphId, cancellationToken).ConfigureAwait(false);
+            await LogManagerActionAsync(
+                $"Updated cell styles in {DescribeScheduleOrFallback(graph)} ({changes.Length} cells).",
+                cancellationToken).ConfigureAwait(false);
+            await NotifyGraphChangedAsync(containerId, graphId, "manager-schedule-style-updated").ConfigureAwait(false);
+        }
+        return NoContent();
+    }
+
     [HttpDelete("{containerId:int}/graphs/{graphId:int}/cell-styles/{styleId:int}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> DeleteGraphCellStyle(int containerId, int graphId, int styleId, CancellationToken cancellationToken)

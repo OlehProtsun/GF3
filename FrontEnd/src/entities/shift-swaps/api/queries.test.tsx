@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { queryKeys } from "@shared/api/queryKeys";
+import { beginGraphSaveTraffic, finishGraphSaveTraffic } from "@shared/api/graphSaveTraffic";
 import { useState } from "react";
 import {
   useGraphShiftSwapHighlightSettingQuery,
@@ -174,6 +175,7 @@ describe("shift swap query mutations", () => {
     const user = userEvent.setup();
     const client = new QueryClient();
     const invalidateSpy = vi.spyOn(client, "invalidateQueries");
+    client.setQueryData(queryKeys.shiftSwaps.graphLog(2, 10), []);
     const events: string[] = [];
     client.subscribe(event => events.push(`${event.type}:${event.key}`));
     renderHarness(client);
@@ -190,7 +192,6 @@ describe("shift swap query mutations", () => {
       });
     });
 
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.shiftSwaps.graphLog(2, 10) });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.shiftSwaps.all });
     expect(events).toContain(`invalidate:${JSON.stringify(queryKeys.shiftSwaps.graphLog(2, 10))}`);
 
@@ -201,13 +202,24 @@ describe("shift swap query mutations", () => {
 
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.containers.graphSlots(2, 10) });
     expect(invalidateSpy.mock.calls.map(([filters]) => filters)).toEqual([
-      { queryKey: queryKeys.shiftSwaps.graphLog(2, 10) },
       { queryKey: queryKeys.shiftSwaps.all },
       { queryKey: queryKeys.shiftSwaps.graphLog(2, 10) },
       { queryKey: queryKeys.shiftSwaps.all },
       { queryKey: queryKeys.containers.graphSlots(2, 10) },
     ]);
     expect(events).toContain(`invalidate:${JSON.stringify(queryKeys.containers.graphSlots(2, 10))}`);
+  });
+
+  test("defers a saved manual offer's refresh until the editor save completes", async () => {
+    const client = new QueryClient();
+    const invalidate = vi.spyOn(client, "invalidateQueries");
+    beginGraphSaveTraffic(client, 2);
+    renderHarness(client);
+    await userEvent.click(screen.getByRole("button", { name: "create manager" }));
+    await waitFor(() => expect(apiMocks.createManagerManual).toHaveBeenCalledOnce());
+    expect(invalidate).not.toHaveBeenCalled();
+    await finishGraphSaveTraffic(client, 2, [10]);
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.shiftSwaps.all, exact: false, refetchType: "none" });
   });
 });
 

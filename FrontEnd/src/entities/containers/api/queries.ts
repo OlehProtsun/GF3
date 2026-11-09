@@ -5,6 +5,7 @@ import { buildGraphWorkspaceSaveSlots, graphSaveFields, normalizeGraphSlots } fr
 import { stableSerialize } from "@shared/lib/stableSerialize";
 import type { GraphMatrixCellMap } from "@entities/containers/model/graphWorkspace";
 import { queryKeys } from "@shared/api/queryKeys";
+import { graphEditorSaveMutationKey, isGraphSaveTrafficActive } from "@shared/api/graphSaveTraffic";
 import { containersApi, managerGraphFillColorBindsApi, managerGraphTextColorBindsApi } from "./containersApi";
 import type {
   GenerateGraphRequestDto,
@@ -84,6 +85,7 @@ export type SaveGraphWorkspaceInput = {
   existingGraph?: Graph;
   existingEmployees?: GraphEmployee[];
   existingSlots?: GraphSlot[];
+  signal?: AbortSignal;
 };
 
 export type SaveGraphWorkspaceResult = {
@@ -91,6 +93,19 @@ export type SaveGraphWorkspaceResult = {
 };
 
 export type GraphSlotsBatchResult = Record<number, GraphSlot[]>;
+
+async function mapInPairs<T, R>(items: readonly T[], run: (item: T) => Promise<R>, signal?: AbortSignal): Promise<R[]> {
+  const results: R[] = [];
+  for (let i = 0; i < items.length; i += 2) {
+    signal?.throwIfAborted();
+    const pair = await Promise.allSettled(items.slice(i, i + 2).map(run));
+    for (const result of pair) {
+      if (result.status === "rejected") throw result.reason;
+      results.push(result.value);
+    }
+  }
+  return results;
+}
 
 async function syncGraphWorkspace({
   containerId,
@@ -101,7 +116,9 @@ async function syncGraphWorkspace({
   existingGraph,
   existingEmployees = [],
   existingSlots = [],
+  signal,
 }: SaveGraphWorkspaceInput): Promise<SaveGraphWorkspaceResult & { changed: boolean }> {
+  signal?.throwIfAborted();
   let resolvedGraphId = graphId;
   const graphChanged = !existingGraph ||
     stableSerialize(graphSaveFields({ ...existingGraph, ...payload, note: payload.note })) !==
@@ -136,15 +153,13 @@ async function syncGraphWorkspace({
   const employeesToRemove = existingEmployees.filter(employee => !selectedEmployeeIdSet.has(employee.employeeId));
 
   if (employeesToCreate.length > 0) {
-    const createdEmployees = await Promise.all(
-      employeesToCreate.map(employee =>
-        containersApi.createGraphEmployee(containerId, resolvedGraphId as number, {
-          employeeId: employee.employeeId,
-          minHoursMonth: employee.minHoursMonth ?? null,
-          isPriority: employee.isPriority,
-          displayOrder: displayOrderByEmployeeId.get(employee.employeeId) ?? 0,
-        }),
-      ),
+    const createdEmployees = await mapInPairs(employeesToCreate, employee =>
+      containersApi.createGraphEmployee(containerId, resolvedGraphId as number, {
+        employeeId: employee.employeeId,
+        minHoursMonth: employee.minHoursMonth ?? null,
+        isPriority: employee.isPriority,
+        displayOrder: displayOrderByEmployeeId.get(employee.employeeId) ?? 0,
+      }), signal,
     );
 
     createdEmployees.forEach(employee => {
@@ -171,15 +186,13 @@ async function syncGraphWorkspace({
   });
 
   if (employeesToUpdate.length > 0) {
-    await Promise.all(
-      employeesToUpdate.map(({ assignment, existingEmployee, displayOrder }) => {
-        return containersApi.updateGraphEmployee(containerId, resolvedGraphId as number, existingEmployee.id, {
-          employeeId: assignment.employeeId,
-          minHoursMonth: assignment.minHoursMonth ?? null,
-          isPriority: assignment.isPriority,
-          displayOrder,
-        });
-      }),
+    await mapInPairs(employeesToUpdate, ({ assignment, existingEmployee, displayOrder }) =>
+      containersApi.updateGraphEmployee(containerId, resolvedGraphId as number, existingEmployee.id, {
+        employeeId: assignment.employeeId,
+        minHoursMonth: assignment.minHoursMonth ?? null,
+        isPriority: assignment.isPriority,
+        displayOrder,
+      }), signal,
     );
   }
 
@@ -198,6 +211,7 @@ async function syncGraphWorkspace({
 
   const slotsChanged = graphId === null || !existingGraph ||
     stableSerialize(normalizeGraphSlots(draft.slots)) !== stableSerialize(normalizeGraphSlots(existingSlots));
+  signal?.throwIfAborted();
   if (slotsChanged) {
     await containersApi.replaceGraphSlots(containerId, resolvedGraphId as number, {
       slots: draft.slots.map(slot => ({
@@ -212,13 +226,12 @@ async function syncGraphWorkspace({
   }
 
   if (employeesToRemove.length > 0) {
-    await Promise.all(
-      employeesToRemove.map(employee =>
-        containersApi.removeGraphEmployee(containerId, resolvedGraphId as number, employee.id),
-      ),
+    await mapInPairs(employeesToRemove, employee =>
+      containersApi.removeGraphEmployee(containerId, resolvedGraphId as number, employee.id), signal,
     );
   }
 
+  signal?.throwIfAborted();
   return {
     graphId: resolvedGraphId as number,
     changed: graphId === null || graphChanged || slotsChanged ||
@@ -354,15 +367,23 @@ export function useSaveGraphWorkspaceMutation() {
   const qc = useQueryClient();
 
   return useMutation({
+    mutationKey: graphEditorSaveMutationKey,
     mutationFn: async (variables: SaveGraphWorkspaceInput): Promise<SaveGraphWorkspaceResult> => {
       const { graphId, changed } = await syncGraphWorkspace(variables);
-      if (changed) {
-        if (!variables.existingGraph) qc.invalidateQueries({ queryKey: queryKeys.containers.all });
-        qc.invalidateQueries({ queryKey: queryKeys.containers.graphs(variables.containerId) });
-        qc.invalidateQueries({ queryKey: queryKeys.containers.graphById(variables.containerId, graphId) });
-        qc.invalidateQueries({ queryKey: queryKeys.containers.graphEmployees(variables.containerId, graphId) });
-        qc.invalidateQueries({ queryKey: queryKeys.containers.graphSlots(variables.containerId, graphId) });
-        qc.invalidateQueries({ queryKey: queryKeys.containers.graphCellStyles(variables.containerId, graphId) });
+      const { containerId } = variables;
+      if (changed && !isGraphSaveTrafficActive(qc, containerId)) {
+        const { containers } = queryKeys;
+        if (!variables.existingGraph) {
+          qc.invalidateQueries({ queryKey: containers.list() });
+          qc.invalidateQueries({ queryKey: containers.byId(containerId), exact: true });
+        }
+        qc.invalidateQueries({ queryKey: containers.graphs(containerId), exact: true });
+        for (const key of [containers.graphById, containers.graphEmployees, containers.graphSlots, containers.graphCellStyles, containers.graphVersions]) {
+          qc.invalidateQueries({ queryKey: key(containerId, graphId), exact: true });
+        }
+        const batches = containers.graphSlotsBatches(containerId);
+        qc.invalidateQueries({ queryKey: batches, predicate: ({ queryKey }) => queryKey.slice(batches.length).includes(graphId) });
+        qc.invalidateQueries({ queryKey: containers.graphRecordsPrefix(containerId) });
         qc.invalidateQueries({ queryKey: queryKeys.employeeSchedules.all });
         qc.invalidateQueries({ queryKey: queryKeys.shiftSwaps.all });
       }
@@ -457,11 +478,8 @@ export const useGraphSlotsBatchQuery = (containerId: number | null, graphIds: nu
     cancelOnUnmount: true,
     staleTime: 30_000,
     queryFn: async ({ signal }) => {
-      const slotEntries = await Promise.all(
-        normalizedGraphIds.map(async graphId => (
-          [graphId, await containersApi.listGraphSlots(containerId as number, graphId, signal)] as const
-        )),
-      );
+      const slotEntries = await mapInPairs(normalizedGraphIds, async graphId =>
+        [graphId, await containersApi.listGraphSlots(containerId as number, graphId, signal)] as const, signal);
 
       return slotEntries.reduce<GraphSlotsBatchResult>((accumulator, [graphId, slots]) => {
         accumulator[graphId] = slots;

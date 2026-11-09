@@ -126,6 +126,19 @@ export type UpsertGraphCellStyleDto = {
   textColorArgb?: number | null;
 };
 
+export type GraphCellStyleFieldPatchDto = {
+  employeeId: number;
+  dayOfMonth: number;
+  changeBackgroundColor: boolean;
+  expectedBackgroundColorArgb?: number | null;
+  backgroundColorArgb?: number | null;
+  changeTextColor: boolean;
+  expectedTextColorArgb?: number | null;
+  textColorArgb?: number | null;
+};
+
+export type BatchUpdateGraphCellStylesDto = { changes: GraphCellStyleFieldPatchDto[] };
+
 export type ManagerGraphFillColorBindDto = {
   id: number;
   key: string;

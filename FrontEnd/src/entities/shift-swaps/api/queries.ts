@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@shared/api/queryKeys";
+import { graphEditorSaveMutationKey, isGraphSaveTrafficActive } from "@shared/api/graphSaveTraffic";
 import type { AcceptShiftSwapInput, CreateManagerShiftSwapInput, CreateShiftSwapInput } from "../model/types";
 import { shiftSwapsApi } from "./shiftSwapsApi";
 import type { ShiftSwapCandidateParams, SwapWizardRequest } from "../model/types";
@@ -114,10 +115,12 @@ export function useCreateManagerManualShiftSwapMutation() {
   const queryClient = useQueryClient();
 
   return useMutation({
+    mutationKey: graphEditorSaveMutationKey,
     mutationFn: (payload: CreateManagerShiftSwapInput) => shiftSwapsApi.createManagerManual(payload),
     onSuccess: (_data, payload) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.shiftSwaps.graphLog(payload.containerId, payload.graphId) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.shiftSwaps.all });
+      if (!isGraphSaveTrafficActive(queryClient, payload.containerId)) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.shiftSwaps.all });
+      }
     },
   });
 }

@@ -1059,6 +1059,9 @@ public sealed class FacadeAndControllerRouteTests
         public Task<List<ScheduleCellStyleModel>?> GetGraphCellStylesAsync(int containerId, int graphId, CancellationToken ct = default)
             => Task.FromResult<List<ScheduleCellStyleModel>?>(Styles);
 
+        public Task<bool> ApplyGraphCellStyleBatchAsync(int containerId, int graphId, IReadOnlyList<BusinessLogicLayer.Contracts.Models.GraphCellStyleFieldPatchModel> changes, CancellationToken ct = default)
+            => throw new NotSupportedException();
+
         public Task<ScheduleCellStyleModel> UpsertGraphCellStyleAsync(int containerId, int graphId, ScheduleCellStyleModel model, CancellationToken ct = default)
         {
             LastUpsertedStyle = model;

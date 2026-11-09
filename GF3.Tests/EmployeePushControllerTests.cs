@@ -28,7 +28,11 @@ public sealed class EmployeePushControllerTests
     [Fact]
     public async Task ProductionStaticPipeline_ServesWorkerAsRevalidatedJavaScript()
     {
-        var webRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../FrontEnd/public"));
+        var root = new DirectoryInfo(AppContext.BaseDirectory);
+        while (root is not null && !File.Exists(Path.Combine(root.FullName, "GF3.sln")))
+            root = root.Parent;
+        Assert.NotNull(root);
+        var webRoot = Path.Combine(root.FullName, "FrontEnd", "public");
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = "Production", WebRootPath = webRoot });
         builder.Logging.ClearProviders(); builder.WebHost.UseUrls("http://127.0.0.1:0");
         await using var app = builder.Build();

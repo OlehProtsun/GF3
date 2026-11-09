@@ -428,6 +428,73 @@ public sealed class ContainerServiceTests
         Assert.Equal(30, style.TextColorArgb);
     }
 
+    [Fact]
+    public async Task StyleBatch_UsesExpectedFieldsPreservesIdsAndRollsBackConflicts()
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        await using var context = database.CreateContext();
+        var service = CreateService(context, new FakeScheduleGenerator());
+        var container = TestDataFactory.CreateDalContainer();
+        var shop = TestDataFactory.CreateDalShop();
+        var first = TestDataFactory.CreateDalEmployee();
+        var second = TestDataFactory.CreateDalEmployee("Second", "Employee");
+        var foreign = TestDataFactory.CreateDalEmployee("Foreign", "Employee");
+        context.AddRange(container, shop, first, second, foreign);
+        await context.SaveChangesAsync();
+        var graph = TestDataFactory.CreateDalSchedule(container.Id, shop.Id);
+        context.Schedules.Add(graph);
+        await context.SaveChangesAsync();
+        await service.AddGraphEmployeeAsync(container.Id, graph.Id, new ScheduleEmployeeModel { EmployeeId = first.Id, DisplayOrder = 0 });
+        var assignment = await service.AddGraphEmployeeAsync(container.Id, graph.Id, new ScheduleEmployeeModel { EmployeeId = second.Id, DisplayOrder = 1 });
+
+        var patches = new[] { first.Id, second.Id }.SelectMany(id => Enumerable.Range(1, 25)
+            .Select(day => new GraphCellStyleFieldPatchModel(id, day, true, null, 10, true, null, 20))).ToArray();
+        Task<bool> Apply(params GraphCellStyleFieldPatchModel[] changes) => service.ApplyGraphCellStyleBatchAsync(container.Id, graph.Id, changes);
+        Assert.True(await Apply(patches));
+        var before = await context.ScheduleCellStyles.AsNoTracking().OrderBy(row => row.Id).ToListAsync();
+        Assert.Equal(50, before.Count);
+        Assert.False(await Apply(patches));
+        await using (var writer = database.CreateContext())
+        await using (var transaction = await writer.Database.BeginTransactionAsync())
+        await using (var competing = new DataAccessLayer.Models.DataBaseContext.AppDbContext(
+            new DbContextOptionsBuilder<DataAccessLayer.Models.DataBaseContext.AppDbContext>()
+                .UseSqlite(database.ConnectionString + ";Default Timeout=1").Options))
+        {
+            var busy = await Assert.ThrowsAsync<Microsoft.Data.Sqlite.SqliteException>(() =>
+                CreateService(competing, new FakeScheduleGenerator()).ApplyGraphCellStyleBatchAsync(container.Id, graph.Id,
+                    [patches[0] with { ExpectedBackgroundColorArgb = 10, BackgroundColorArgb = 99 }]));
+            Assert.Contains(busy.SqliteErrorCode, new[] { 5, 6 });
+        }
+        var firstRow = before.Single(row => row.EmployeeId == first.Id && row.DayOfMonth == 1);
+        await using (var other = database.CreateContext())
+        {
+            await other.ScheduleCellStyles.Where(row => row.Id == firstRow.Id)
+                .ExecuteUpdateAsync(update => update.SetProperty(row => row.TextColorArgb, 30));
+        }
+
+        var clearBackground = new GraphCellStyleFieldPatchModel(first.Id, 1, true, 10, null, false, null, null);
+        var staleText = clearBackground with { DayOfMonth = 1, ChangeBackgroundColor = false, ChangeTextColor = true, ExpectedTextColorArgb = 20, TextColorArgb = 40 };
+        await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => Apply(clearBackground with { DayOfMonth = 2 }, staleText));
+        Assert.All(await context.ScheduleCellStyles.AsNoTracking().ToListAsync(), row => Assert.Equal(10, row.BackgroundColorArgb));
+        Assert.True(await Apply(clearBackground));
+        var changed = await context.ScheduleCellStyles.AsNoTracking().SingleAsync(row => row.Id == firstRow.Id);
+        Assert.Null(changed.BackgroundColorArgb);
+        Assert.Equal(30, changed.TextColorArgb);
+        Assert.True(await Apply(staleText with { ExpectedTextColorArgb = 30, TextColorArgb = null }));
+        Assert.False(await context.ScheduleCellStyles.AnyAsync(row => row.Id == firstRow.Id));
+        await Assert.ThrowsAsync<ValidationException>(() => Apply(clearBackground, clearBackground));
+        await Assert.ThrowsAsync<System.ComponentModel.DataAnnotations.ValidationException>(
+            () => Apply(clearBackground with { EmployeeId = foreign.Id, BackgroundColorArgb = 42 }));
+        await Assert.ThrowsAsync<KeyNotFoundException>(() => service.ApplyGraphCellStyleBatchAsync(container.Id + 1, graph.Id, patches));
+
+        await service.RemoveGraphEmployeeAsync(container.Id, graph.Id, assignment.Id);
+        var legacyClear = new GraphCellStyleFieldPatchModel(second.Id, 1, true, 10, null, true, 20, null);
+        Assert.True(await Apply(legacyClear));
+        Assert.False(await Apply(legacyClear));
+        await Assert.ThrowsAsync<System.ComponentModel.DataAnnotations.ValidationException>(
+            () => Apply(legacyClear with { EmployeeId = int.MaxValue }));
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

@@ -19,6 +19,7 @@ server {
     location ^~ /api/ {
         limit_req zone=gf3_api burst=60 nodelay;
         limit_req_status 429;
+        error_page 429 = @gf3_rate_limited;
 
         proxy_pass http://gf3_app;
         proxy_http_version 1.1;
@@ -35,6 +36,13 @@ server {
 
         proxy_read_timeout 3600s;
         proxy_send_timeout 3600s;
+    }
+
+    location @gf3_rate_limited {
+        default_type application/problem+json;
+        add_header Retry-After 3 always;
+        add_header Cache-Control no-store always;
+        return 429 '{"title":"Too many requests","status":429}';
     }
 
     location / {

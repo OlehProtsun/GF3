@@ -1,8 +1,9 @@
 import { act, render, renderHook, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, test, vi } from "vitest";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { queryKeys } from "@shared/api/queryKeys";
+import { beginGraphSaveTraffic, finishGraphSaveTraffic } from "@shared/api/graphSaveTraffic";
 import { getGraphCellKey } from "../model/graphWorkspace";
 import type { GraphEmployee, GraphSlot } from "../model/types";
 import {
@@ -13,6 +14,7 @@ import {
   useDeleteContainerMutation,
   useDeleteGraphMutation,
   useSaveGraphWorkspaceMutation,
+  useGraphSlotsBatchQuery,
   useUpdateContainerMutation,
   useUpdateGraphMutation,
 } from "./queries";
@@ -45,6 +47,89 @@ const apiMocks = vi.hoisted(() => ({
   upsertGraphCellStyle: vi.fn(),
   removeGraphCellStyle: vi.fn(),
 }));
+
+test("the editor gate suppresses five workspace mutation refetches", async () => {
+  const client = new QueryClient();
+  const invalidate = vi.spyOn(client, "invalidateQueries");
+  const { result } = renderHook(() => useSaveGraphWorkspaceMutation(), {
+    wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>,
+  });
+  beginGraphSaveTraffic(client, 2);
+  const ids = [65, 66, 67, 68, 69];
+  try {
+    for (const graphId of ids) {
+      await act(async () => new Promise<void>((resolve, reject) =>
+        result.current.mutate({ ...updateWorkspaceInput(), graphId }, { onSuccess: () => resolve(), onError: reject })));
+    }
+    expect(apiMocks.updateGraph.mock.calls.map(([, id]) => id)).toEqual(ids);
+    expect(invalidate).not.toHaveBeenCalled();
+  } finally { await finishGraphSaveTraffic(client, 2, ids); }
+  expect(invalidate.mock.calls.every(([filters]) => filters.refetchType === "none")).toBe(true);
+});
+
+test("exact graph list refresh leaves active graph detail, slot and version observers alone", async () => {
+  const client = new QueryClient();
+  const reads = [vi.fn(), vi.fn(), vi.fn(), vi.fn()].map(read => read.mockResolvedValue([]));
+  const keys = [queryKeys.containers.graphs(2), queryKeys.containers.graphById(2, 66),
+    queryKeys.containers.graphSlots(2, 66), queryKeys.containers.graphVersions(2, 66)];
+  function Observers() {
+    useQuery({ queryKey: keys[0], queryFn: reads[0], staleTime: 60_000 });
+    useQuery({ queryKey: keys[1], queryFn: reads[1], staleTime: 60_000 });
+    useQuery({ queryKey: keys[2], queryFn: reads[2], staleTime: 60_000 });
+    useQuery({ queryKey: keys[3], queryFn: reads[3], staleTime: 60_000 });
+    return null;
+  }
+  render(<QueryClientProvider client={client}><Observers /></QueryClientProvider>);
+  await waitFor(() => reads.forEach(read => expect(read).toHaveBeenCalledOnce()));
+  await act(async () => client.invalidateQueries({ queryKey: keys[0], exact: true }));
+  expect(reads.map(read => read.mock.calls.length)).toEqual([2, 1, 1, 1]);
+});
+
+test("loads related slot batches in pairs with a stable result order", async () => {
+  let active = 0;
+  let peak = 0;
+  apiMocks.listGraphSlots.mockImplementation(async (_, id) => {
+    peak = Math.max(peak, ++active);
+    await Promise.resolve();
+    active--;
+    return [{ id }];
+  });
+  const client = new QueryClient();
+  const { result } = renderHook(() => useGraphSlotsBatchQuery(2, [9, 3, 5, 1, 7]), {
+    wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>,
+  });
+  await waitFor(() => expect(Object.keys(result.current.data ?? {})).toEqual(["1", "3", "5", "7", "9"]));
+  expect(peak).toBe(2);
+  expect(apiMocks.listGraphSlots.mock.calls.map(([, id]) => id)).toEqual([1, 3, 5, 7, 9]);
+});
+
+test.each([false, true])("settles employee writes in pairs and respects cancellation (canceled: %s)", async canceled => {
+  let active = 0;
+  let peak = 0;
+  const controller = new AbortController();
+  apiMocks.createGraphEmployee.mockImplementation(async (_, scheduleId, payload) => {
+    peak = Math.max(peak, ++active);
+    await Promise.resolve();
+    if (canceled) controller.abort();
+    active--;
+    return { ...payload, scheduleId, id: payload.employeeId };
+  });
+  const client = new QueryClient();
+  const { result } = renderHook(() => useSaveGraphWorkspaceMutation(), {
+    wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>,
+  });
+  const saved = vi.fn();
+  const failed = vi.fn();
+  act(() => result.current.mutate({
+    ...createWorkspaceInput(),
+    cellMap: {},
+    employeeAssignments: [1, 2, 3, 4, 5].map(employeeId => ({ id: null, employeeId, isPriority: false })),
+    signal: controller.signal,
+  }, { onSuccess: saved, onError: failed }));
+  await waitFor(() => expect(canceled ? failed : saved).toHaveBeenCalledOnce());
+  expect(peak).toBe(2);
+  expect(apiMocks.createGraphEmployee).toHaveBeenCalledTimes(canceled ? 2 : 5);
+});
 
 vi.mock("./containersApi", () => ({
   containersApi: apiMocks,
@@ -287,12 +372,16 @@ describe("container graph workspace query mutation", () => {
       ],
     });
     expect(invalidateSpy.mock.calls.map(([filters]) => filters)).toEqual([
-      { queryKey: queryKeys.containers.all },
-      { queryKey: queryKeys.containers.graphs(2) },
-      { queryKey: queryKeys.containers.graphById(2, 66) },
-      { queryKey: queryKeys.containers.graphEmployees(2, 66) },
-      { queryKey: queryKeys.containers.graphSlots(2, 66) },
-      { queryKey: queryKeys.containers.graphCellStyles(2, 66) },
+      { queryKey: queryKeys.containers.list() },
+      { queryKey: queryKeys.containers.byId(2), exact: true },
+      { queryKey: queryKeys.containers.graphs(2), exact: true },
+      { queryKey: queryKeys.containers.graphById(2, 66), exact: true },
+      { queryKey: queryKeys.containers.graphEmployees(2, 66), exact: true },
+      { queryKey: queryKeys.containers.graphSlots(2, 66), exact: true },
+      { queryKey: queryKeys.containers.graphCellStyles(2, 66), exact: true },
+      { queryKey: queryKeys.containers.graphVersions(2, 66), exact: true },
+      { queryKey: queryKeys.containers.graphSlotsBatches(2), predicate: expect.any(Function) },
+      { queryKey: queryKeys.containers.graphRecordsPrefix(2) },
       { queryKey: queryKeys.employeeSchedules.all },
       { queryKey: queryKeys.shiftSwaps.all },
     ]);
@@ -334,12 +423,16 @@ describe("container graph workspace query mutation", () => {
     });
     expect(apiMocks.removeGraphEmployee).toHaveBeenCalledWith(2, 66, 90);
     expect(invalidateSpy.mock.calls.map(([filters]) => filters)).toEqual([
-      { queryKey: queryKeys.containers.all },
-      { queryKey: queryKeys.containers.graphs(2) },
-      { queryKey: queryKeys.containers.graphById(2, 66) },
-      { queryKey: queryKeys.containers.graphEmployees(2, 66) },
-      { queryKey: queryKeys.containers.graphSlots(2, 66) },
-      { queryKey: queryKeys.containers.graphCellStyles(2, 66) },
+      { queryKey: queryKeys.containers.list() },
+      { queryKey: queryKeys.containers.byId(2), exact: true },
+      { queryKey: queryKeys.containers.graphs(2), exact: true },
+      { queryKey: queryKeys.containers.graphById(2, 66), exact: true },
+      { queryKey: queryKeys.containers.graphEmployees(2, 66), exact: true },
+      { queryKey: queryKeys.containers.graphSlots(2, 66), exact: true },
+      { queryKey: queryKeys.containers.graphCellStyles(2, 66), exact: true },
+      { queryKey: queryKeys.containers.graphVersions(2, 66), exact: true },
+      { queryKey: queryKeys.containers.graphSlotsBatches(2), predicate: expect.any(Function) },
+      { queryKey: queryKeys.containers.graphRecordsPrefix(2) },
       { queryKey: queryKeys.employeeSchedules.all },
       { queryKey: queryKeys.shiftSwaps.all },
     ]);

@@ -17,6 +17,8 @@ public interface IScheduleCellStyleRepository : IBaseRepository<ScheduleCellStyl
     /// </summary>
     Task<ScheduleCellStyleModel?> GetByScheduleCellAsync(int scheduleId, int dayOfMonth, int employeeId, CancellationToken ct = default);
 
+    Task<bool> ApplyFieldPatchesIfUnchangedAsync(int scheduleId, IReadOnlyList<ScheduleCellStyleFieldPatchModel> patches, CancellationToken ct = default);
+
     /// <summary>
     /// Replaces all style overrides for one schedule in one database batch.
     /// </summary>

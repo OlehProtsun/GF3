@@ -190,6 +190,7 @@ test("a persisted shift change still conflicts with a dirty workspace", async ()
   act(() => mocks.editor!.onFieldChange("name")("Dirty name"));
   mocks.savedSlots.set(1, preview());
   fireEvent.click(screen.getByText("Save editor")); fireEvent.click(screen.getByText("Confirm save"));
+  fireEvent.click(await screen.findByRole("button", { name: "Review issue" }));
   expect(await screen.findByText("Graph one · Conflict")).toBeVisible();
   expect(mocks.save).not.toHaveBeenCalled();
   expect(mocks.editor!.form.name).toBe("Dirty name");
@@ -390,6 +391,7 @@ test("availability preview overlays the same calendar as profiles and red hints 
 });
 
 test("graph availability policy loading and errors block preview presentation", () => {
+  mocks.graphs = [];
   mocks.contractSettings.data = undefined;
   const view = render(<ContainerGraphEditPage />);
   expect(mocks.editor!.isLoading).toBe(true);
