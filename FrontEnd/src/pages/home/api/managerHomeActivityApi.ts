@@ -1,4 +1,5 @@
 import { request } from "@shared/api/httpClient";
+export type ManagerNavBadges = { totalPending: number; graphPending: number; urlopPending: number };
 export type HomeActivityTab = "all" | "approvals";
 export type HomeActivityKind = "swap_created" | "swap_accepted" | "swap_cancelled" | "correction_requested" | "correction_reviewed" | "day_off_requested" | "day_off_reviewed" | "approval_requested" | "approval_reviewed" | "urlop_requested" | "urlop_reviewed" | "urlop_manager_created" | "availability_updated";
 export type ManagerHomeActivityItem = {
@@ -15,6 +16,8 @@ export type ManagerHomeActivityPage = {
   items: ManagerHomeActivityItem[]; allActivityCount: number; requiresApprovalCount: number; hasMore: boolean; nextOffset: number;
 };
 export const managerHomeActivityApi = {
+  navBadges: (signal?: AbortSignal): Promise<ManagerNavBadges> =>
+    request<ManagerNavBadges>("manager-home/nav-badges", { signal }),
   list: (query: { year: number; month: number; tab: HomeActivityTab; offset: number; limit: number }, signal?: AbortSignal) =>
     request<ManagerHomeActivityPage>("manager-home/activity", { query, signal }),
 };

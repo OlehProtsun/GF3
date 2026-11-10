@@ -15,6 +15,7 @@ export const queryKeys = {
     current: () => ["publicHolidaySettings", "current"] as const,
   },
   home: {
+    navBadges: () => ["home", "navBadges"] as const,
     dashboard: (date?: string) => date ? ["home", "dashboard", date] as const : ["home", "dashboard"] as const,
     activity: () => ["home", "activity"] as const,
   },

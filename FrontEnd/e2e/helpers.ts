@@ -13,7 +13,7 @@ export async function loginWithCredentials(page: Page, username: string, passwor
 
   const signInHeading = page.getByRole("heading", { name: /^(Sign in|Zaloguj się)$/ });
   const signInButton = page.getByRole("button", { name: /^(Sign in|Zaloguj się)$/ });
-  const appShell = page.locator("aside:visible, [data-employee-nav]:visible").first();
+  const appShell = page.locator("aside:visible, [data-employee-nav]:visible, nav:has([data-manager-dock-anchor]):visible, button[aria-controls='manager-sidebar-navigation']:visible").first();
   const initialScreen = await Promise.race([
     appShell.waitFor({ state: "visible", timeout: 10000 }).then(() => "app"),
     signInHeading.waitFor({ state: "visible", timeout: 10000 }).then(() => "login"),
@@ -45,6 +45,9 @@ export async function loginWithCredentials(page: Page, username: string, passwor
 
 export async function loginAsManager(page: Page) {
   await loginWithCredentials(page, "manager", "123456");
+  const toggle = page.getByRole("button", { name: "Open sidebar", exact: true });
+  if (await toggle.isVisible()) await toggle.click();
+  await expect(page.locator("#manager-sidebar-navigation")).toHaveCSS("transform", "matrix(1, 0, 0, 1, 0, 0)");
   await expect(page.getByRole("link", { name: "Home" })).toBeVisible({ timeout: 10000 });
 }
 

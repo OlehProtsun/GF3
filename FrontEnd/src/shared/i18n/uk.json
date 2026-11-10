@@ -1,4 +1,7 @@
 {
+  "New approval requests: {0}": "Нові запити на підтвердження: {0}",
+  "{0} pending approval requests": "Запити, що очікують підтвердження: {0}",
+  "{0} pending": "Очікують: {0}",
   "Choose a shop to manage vacation requests.": "Виберіть магазин, щоб керувати заявками на відпустку.",
   "Choose a shop": "Виберіть магазин",
   "View approved vacations and manage requests for each shop.": "Переглядайте затверджені відпустки та керуйте заявками для кожного магазину.",

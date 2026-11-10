@@ -14,6 +14,63 @@ public sealed class ManagerHomeActivityControllerTests
 {
     private static readonly DateTimeOffset Stamp = DateTimeOffset.Parse("2026-11-04T10:00:00Z");
     [Fact]
+    public async Task NavBadgeEndpointEnforcesRolesAndAllowsReadOnlyPhone()
+    {
+        await using var host = await ManagerWorkspaceTestHost.CreateAsync();
+        const string path = "/api/manager-home/nav-badges";
+        Assert.Equal(HttpStatusCode.Unauthorized, (await host.Client.GetAsync(path)).StatusCode);
+        await host.Login("employee");
+        Assert.Equal(HttpStatusCode.Forbidden, (await host.Client.GetAsync(path)).StatusCode);
+        await host.Login("manager"); await host.Exchange("pc");
+        Assert.Equal(new ManagerNavBadgesDto(0, 0, 0), await host.Client.GetFromJsonAsync<ManagerNavBadgesDto>(path));
+        await host.Exchange("phone");
+        Assert.Equal(HttpStatusCode.OK, (await host.Client.GetAsync(path)).StatusCode);
+    }
+
+    [Fact]
+    public async Task NavBadgesUseGlobalGroupedPendingCountsWithoutPagingOrWrites()
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync(); await using var db = database.CreateContext(); await Seed(db);
+        Assert.Equal(new ManagerNavBadgesDto(0, 0, 0), await ManagerHomeActivityReader.ReadNavBadgesAsync(db, default));
+        // Spread requests across schedules and months; the aggregate must exceed the activity page limit.
+        for (int i = 0; i < 61; i++) db.Add(Correction(i < 31 ? 1 : 2, i % 31 + 1, ShiftCorrectionStatus.Pending, Stamp.AddMonths(-2)));
+        db.Add(Correction(1, 1, ShiftCorrectionStatus.Approved));
+        db.Add(Correction(1, 2, ShiftCorrectionStatus.Rejected));
+        var approval = new ContractShiftApprovalRequestModel { EmployeeId = 1, ScheduleId = 2, ScheduleSlotId = 2, ShopId = 1, Year = 2026, Month = 11, OriginalDayOfMonth = 4, FromTime = "08:00", ToTime = "16:00", OriginalFromTime = "08:00", OriginalToTime = "16:00", CreatedAtUtc = Stamp };
+        db.Add(approval);
+        db.Add(new ShiftSwapRequestModel { ScheduleId = 1, ScheduleSlotId = 1, FromEmployeeId = 1, Status = ShiftSwapStatus.Open, CreatedAtUtc = Stamp });
+        db.Add(new AvailabilityGroupMemberModel { AvailabilityGroupId = 1, EmployeeId = 1, EmployeeLastModifiedAtUtc = Stamp });
+        var requestId = Guid.NewGuid();
+        for (int day = 10; day <= 12; day++) db.Add(new UrlopDayModel { RequestId = requestId, EmployeeId = 1, ShopId = 1, Date = new(2026, 12, day), Status = "pending", CreatedAtUtc = Stamp });
+        await db.SaveChangesAsync(); db.ChangeTracker.Clear();
+        var before = await db.ShiftCorrectionRequests.CountAsync();
+        var counts = await ManagerHomeActivityReader.ReadNavBadgesAsync(db, default);
+        Assert.Equal(new ManagerNavBadgesDto(63, 62, 1), counts);
+        Assert.Equal((await Read(db)).RequiresApprovalCount, counts.TotalPending);
+        Assert.Empty(db.ChangeTracker.Entries());
+        Assert.Equal(before, await db.ShiftCorrectionRequests.CountAsync());
+        foreach (var day in await db.UrlopDays.ToListAsync()) day.Status = "approved";
+        approval = (await db.ContractShiftApprovalRequests.FindAsync(approval.Id))!;
+        approval.Status = "rejected";
+        approval.ReviewedAtUtc = Stamp.AddHours(1);
+        approval.ReviewedByManagerId = 1;
+        await db.SaveChangesAsync(); db.ChangeTracker.Clear();
+        Assert.Equal(new ManagerNavBadgesDto(61, 61, 0), await ManagerHomeActivityReader.ReadNavBadgesAsync(db, default));
+        db.ContractShiftApprovalRequests.Remove((await db.ContractShiftApprovalRequests.FindAsync(approval.Id))!);
+        await db.SaveChangesAsync();
+        db.Schedules.Remove((await db.Schedules.FindAsync(2))!); await db.SaveChangesAsync(); db.ChangeTracker.Clear();
+        Assert.Equal(new ManagerNavBadgesDto(31, 31, 0), await ManagerHomeActivityReader.ReadNavBadgesAsync(db, default));
+        Assert.Empty(db.ChangeTracker.Entries());
+    }
+
+    [Fact]
+    public async Task NavBadgeCancellationPropagates()
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync(); await using var db = database.CreateContext();
+        using var cancel = new CancellationTokenSource(); cancel.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => ManagerHomeActivityReader.ReadNavBadgesAsync(db, cancel.Token));
+    }
+    [Fact]
     public async Task EndpointEnforcesRolesAndKeepsPhoneReadOnly()
     {
         await using var host = await ManagerWorkspaceTestHost.CreateAsync();

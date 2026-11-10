@@ -274,6 +274,7 @@ function invalidateRealtimeQuery(queryClient: QueryClient, queryKey: readonly un
 function invalidateRealtimeBaselineQueries(queryClient: QueryClient) {
   invalidateRealtimeQuery(queryClient, queryKeys.home.dashboard());
   invalidateRealtimeQuery(queryClient, queryKeys.home.activity());
+  invalidateRealtimeQuery(queryClient, queryKeys.home.navBadges());
   invalidateRealtimeQuery(queryClient, queryKeys.containers.all);
   invalidateRealtimeQuery(queryClient, queryKeys.employeeSchedules.all);
   invalidateRealtimeQuery(queryClient, queryKeys.shiftSwaps.all);
@@ -305,6 +306,7 @@ function invalidateGraphRealtimeQueries(queryClient: QueryClient, graphs: Map<nu
   if (refreshed) {
     invalidateRealtimeQuery(queryClient, queryKeys.home.dashboard());
     invalidateRealtimeQuery(queryClient, queryKeys.home.activity());
+    invalidateRealtimeQuery(queryClient, queryKeys.home.navBadges());
     invalidateRealtimeQuery(queryClient, queryKeys.employeeSchedules.all);
     invalidateRealtimeQuery(queryClient, queryKeys.shiftSwaps.all);
   }
@@ -512,6 +514,7 @@ export function PresenceProvider({ children }: PropsWithChildren) {
   });
 
   const applyShiftSwapsChanged = useEffectEvent((update: ShiftSwapsChangedUpdate) => {
+    invalidateRealtimeQuery(queryClient, queryKeys.home.navBadges());
     if (update.containerId != null && update.graphId != null &&
         (update.reason.startsWith("manager-schedule-") || update.reason === "manager-manual-shift-offer-created")) {
       queueScheduleRefresh(update.containerId, update.graphId);
