@@ -411,7 +411,7 @@
 @media (max-width: 640px) {
   .headerRoot {
     top: calc(env(safe-area-inset-top) + 52px);
-    left: 12px;
+    left: calc(12px + var(--page-header-fixed-offset, 0px));
     right: 12px;
   }
 

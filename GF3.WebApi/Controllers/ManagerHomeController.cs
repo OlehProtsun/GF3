@@ -14,6 +14,11 @@ namespace WebApi.Controllers;
 [Authorize(Roles = AuthRoles.Manager)]
 public sealed class ManagerHomeController(AppDbContext db) : ControllerBase
 {
+    [HttpGet("nav-badges")]
+    [ProducesResponseType<ManagerNavBadgesDto>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<ManagerNavBadgesDto>> NavBadges(CancellationToken cancellationToken)
+        => Ok(await ManagerHomeActivityReader.ReadNavBadgesAsync(db, cancellationToken));
+
     [HttpGet("activity")]
     [ProducesResponseType<ManagerHomeActivityPageDto>(StatusCodes.Status200OK)]
     public async Task<ActionResult<ManagerHomeActivityPageDto>> Activity(

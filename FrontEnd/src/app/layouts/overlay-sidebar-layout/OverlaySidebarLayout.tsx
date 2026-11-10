@@ -4,19 +4,13 @@ import { useState } from "react";
 import type { ReactNode } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "@app/providers/AuthProvider";
+import { ManagerDockNav } from "./ManagerDockNav";
 import styles from "./OverlaySidebarLayout.module.css";
 import {
-  InfoIcon,
   EmployeeIcon,
-  ShopIcon,
-  AvailabilityIcon,
-  ContainerIcon,
   HomeIcon,
-  DatabaseIcon,
   LogoutIcon,
   ArrowIcon,
-  NoteIcon,
-  SettingsIcon,
 } from "@shared/ui/icons";
 import { matchPath } from "@shared/lib/react-router-dom";
 import { ManagerNotepad } from "@features/manager-notepad/ui/ManagerNotepad";
@@ -60,9 +54,9 @@ function NavItem({
 
 export function OverlaySidebarLayout({ children }: OverlaySidebarLayoutProps) {
   useLanguageRevision();
-  const [isCollapsed, setIsCollapsed] = useState(false);
-  const { pathname } = useLocation();
   const { logout, session } = useAuth();
+  const [isCollapsed, setIsCollapsed] = useState(() => session?.role === "manager");
+  const { pathname } = useLocation();
   const isManager = session?.role === "manager";
   const isSystemManager = isManager && session?.isSystemManager === true;
   const accountPath = isManager ? "/manager-profile" : "/profile";
@@ -98,29 +92,13 @@ export function OverlaySidebarLayout({ children }: OverlaySidebarLayoutProps) {
   const isContainerGraphHeaderAligned = isContainerGraphEditorContent;
   const contentClassName = [
     styles.content,
-    isCollapsed ? styles.contentExpanded : styles.contentShifted,
+    isManager ? styles.contentManagerSidebar : isCollapsed ? styles.contentExpanded : styles.contentShifted,
     isWideContent ? styles.contentWide : "",
     isWideScrollableContent ? styles.contentWideScrollable : "",
     isContainerGraphHeaderAligned ? styles.contentWideHeaderAligned : "",
     isManager ? styles.contentManager : "",
   ].filter(Boolean).join(" ");
-  const mainNavItems: NavItemDefinition[] = isManager
-    ? [
-        {
-          label: t("Home"),
-          to: "/",
-          icon: <img className={styles.navLogo} src="/gf-favicon.svg" alt="" aria-hidden="true" />,
-        },
-        { label: t("Employee"), to: "/employee", icon: <EmployeeIcon size={22} /> },
-        { label: t("Shop"), to: "/shop", icon: <ShopIcon size={28} style={{ transform: "scaleY(-1)" }} /> },
-        { label: t("Availability"), to: "/availability", icon: <AvailabilityIcon size={22} /> },
-        { label: t("Urlop"), to: "/urlop", icon: <AvailabilityIcon size={22} /> },
-        { label: t("Container"), to: "/container", icon: <ContainerIcon size={25} /> },
-        ...(isSystemManager ? [{ label: t("Information"), to: "/information", icon: <InfoIcon size={26} /> }] : []),
-        { label: t("Message"), to: "/communications", icon: <NoteIcon size={24} /> },
-        { label: t("Settings"), to: "/settings", icon: <SettingsIcon size={22} /> },
-      ]
-    : [
+  const mainNavItems: NavItemDefinition[] = [
         {
           label: t("Home"),
           to: "/",
@@ -134,7 +112,8 @@ export function OverlaySidebarLayout({ children }: OverlaySidebarLayoutProps) {
 
   return (
     <div className={styles.layout}>
-      <button
+      {isManager ? <ManagerDockNav isSystemManager={isSystemManager} accountPath={accountPath} displayName={session?.displayName} userName={session?.userName}
+        isCollapsed={isCollapsed} onToggleCollapse={() => setIsCollapsed(current => !current)} /> : <><button
         type="button"
         className={`${styles.openTab} ${
           isCollapsed ? styles.openTabVisible : styles.openTabHidden
@@ -160,14 +139,6 @@ export function OverlaySidebarLayout({ children }: OverlaySidebarLayoutProps) {
             ))}
           </div>
 
-          {isSystemManager ? (
-            <div className={styles.section}>
-              <div className={styles.sectionTitle}>{t("Settings")}</div>
-              <div className={styles.nav}>
-                <NavItem label={t("DataBase")} to="/database" icon={<DatabaseIcon size={30} />} />
-              </div>
-            </div>
-          ) : null}
         </div>
 
         <div className={styles.sidebarFooter}>
@@ -213,7 +184,7 @@ export function OverlaySidebarLayout({ children }: OverlaySidebarLayoutProps) {
             </span>
           </button>
         </div>
-      </aside>
+      </aside></>}
       <main className={contentClassName}>
         <div className="container">{children}</div>
         {pathname === accountPath && <nav className={styles.legalLinks} aria-label={t("Legal documents")}>

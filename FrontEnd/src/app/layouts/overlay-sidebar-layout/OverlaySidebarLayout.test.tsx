@@ -1,6 +1,6 @@
 import { beforeEach as beforeEnglishTest } from "vitest";
 import { setLanguage as setTestLanguage } from "@shared/i18n";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -8,6 +8,8 @@ import { BrowserRouter } from "react-router-dom";
 import { OverlaySidebarLayout } from "./OverlaySidebarLayout";
 
 beforeEnglishTest(() => setTestLanguage("en"));
+
+vi.mock("@shared/api/httpClient", async importOriginal => ({ ...await importOriginal<typeof import("@shared/api/httpClient")>(), request: vi.fn(() => Promise.resolve({ totalPending: 0, graphPending: 0, urlopPending: 0 })) }));
 
 const authMock = vi.hoisted(() => ({
   session: { role: "manager" as "manager" | "employee", displayName: "Synthetic manager", userName: "manager", isSystemManager: undefined as boolean | undefined },
@@ -31,19 +33,28 @@ vi.mock("@features/manager-system-news/ui/ManagerSystemNews", () => ({
   ManagerSystemNews: () => <div data-testid="manager-system-news" />,
 }));
 
-function renderManagerLayout(pathname = "/") {
+function renderManagerLayout(pathname = "/", openSidebar = true) {
   window.history.replaceState({}, "", pathname);
 
-  return render(
+  const result = render(
     <QueryClientProvider client={new QueryClient()}><BrowserRouter>
       <OverlaySidebarLayout>
         <div>Manager content</div>
       </OverlaySidebarLayout>
     </BrowserRouter></QueryClientProvider>,
   );
+  if (openSidebar && authMock.session.role === "manager") fireEvent.click(screen.getByRole("button", { name: "Open sidebar" }));
+  return result;
 }
 
 describe("OverlaySidebarLayout", () => {
+  it.each(["/employee/2", "/shop/2", "/availability/2", "/urlop/2", "/container/2/graphs/3"])("activates only the nested parent for %s", path => {
+    renderManagerLayout(path);
+    const links = screen.getByRole("navigation", { name: "Manager navigation" }).querySelectorAll('[aria-current="page"]');
+    expect(links).toHaveLength(1);
+    expect(links[0]).toHaveAttribute("href", "/" + path.split("/")[1]);
+    expect(screen.getByRole("link", { name: "Home" })).not.toHaveAttribute("aria-current");
+  });
   beforeEach(() => {
     authMock.logout.mockClear();
     authMock.setManagerWorkspaceMode.mockClear();
@@ -52,30 +63,61 @@ describe("OverlaySidebarLayout", () => {
     window.history.replaceState({}, "", "/");
   });
 
-  it("keeps manager profile and collapse without sidebar session actions", async () => {
+  it("restores expanded manager labels and controls without sidebar session actions", async () => {
     const user = userEvent.setup();
     const { container } = renderManagerLayout();
 
     const homeLink = screen.getByRole("link", { name: "Home" });
     const managerLink = screen.getByRole("link", { name: "Open manager profile" });
-    expect(homeLink.className).toContain("navButton");
-    expect(managerLink.className).toContain("navButton");
+    expect(homeLink.className).toContain("dockLink");
+    expect(managerLink.className).toContain("dockLink");
     expect(container.querySelector("main")?.className).toContain("contentManager");
-    expect(screen.getByRole("button", { name: "Collapse sidebar" })).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Collapse sidebar" })[0]).toHaveAttribute("aria-expanded", "true");
+    expect(screen.queryByRole("button", { name: "Open sidebar" })).not.toBeInTheDocument();
+    expect(container.querySelector('[class*="backdrop"]')?.className).toContain("backdropVisible");
+    expect(screen.getByRole("navigation", { name: "Manager navigation" }).querySelectorAll("a")).toHaveLength(9);
+    expect(screen.getByText("Home")).toBeInTheDocument();
+    expect(screen.getByText("Manager")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Switch to Phone" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Log out" })).not.toBeInTheDocument();
 
     await user.click(managerLink);
 
     expect(window.location.pathname).toBe("/manager-profile");
-    expect(managerLink.className).toContain("navButtonActive");
+    expect(managerLink.className).toContain("dockLinkActive");
+    for (const name of ["Legal documents", "Terms", "Privacy policy"]) {
+      expect(screen.getByRole("link", { name })).toBeVisible();
+    }
+  });
+
+  it("starts hidden and toggles the mounted overlay without reserving a compact rail", async () => {
+    const user = userEvent.setup(); const { container } = renderManagerLayout("/", false);
+    const nav = container.querySelector("#manager-sidebar-navigation")!;
+    const toggle = screen.getByRole("button", { name: "Open sidebar" });
+    expect(nav).toHaveAttribute("data-collapsed", "true");
+    expect(nav).toHaveAttribute("aria-hidden", "true");
+    expect(nav).toHaveAttribute("inert");
+    expect(screen.queryByRole("link", { name: "Container" })).toBeNull();
+    expect(container.querySelector('[class*="backdrop"]')?.className).toContain("backdropHidden");
+    await user.click(toggle);
+    expect(nav).toHaveAttribute("data-collapsed", "false");
+    expect(nav).not.toHaveAttribute("inert");
+    expect(screen.getByRole("link", { name: "Container" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Open sidebar" })).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Collapse sidebar" }));
+    expect(nav).toHaveAttribute("aria-hidden", "true");
+    expect(container.querySelector("#manager-sidebar-navigation")).toBe(nav);
+    await user.click(screen.getByRole("button", { name: "Open sidebar" }));
+    await user.click(container.querySelector('[class*="backdrop"]')!);
+    expect(nav).toHaveAttribute("data-collapsed", "true");
   });
 
   it("collapses and reopens the sidebar while keeping the collapsed arrow pointed down", async () => {
     const user = userEvent.setup();
-    const { container } = renderManagerLayout("/manager-profile");
+    authMock.session.role = "employee";
+    const { container } = renderManagerLayout("/profile");
 
-    await user.click(screen.getByRole("button", { name: "Collapse sidebar" }));
+    await user.click(screen.getAllByRole("button", { name: "Collapse sidebar" })[0]);
 
     expect(container.querySelector("aside")?.getAttribute("aria-hidden")).toBe("true");
     for (const name of ["Legal documents", "Terms", "Privacy policy"]) {
@@ -100,7 +142,7 @@ describe("OverlaySidebarLayout", () => {
     renderManagerLayout();
     expect(screen.getByRole("link", { name: "Information" })).toHaveAttribute("href", "/information");
     expect(screen.getByRole("link", { name: "DataBase" })).toHaveAttribute("href", "/database");
-    expect(screen.getAllByText("Settings")).toHaveLength(2);
+    expect(screen.getByText("Settings")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Settings" })).toHaveAttribute("href", "/settings");
   });
 
@@ -111,13 +153,13 @@ describe("OverlaySidebarLayout", () => {
     expect(screen.queryByRole("link", { name: "Information" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "DataBase" })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Settings" })).toHaveAttribute("href", "/settings");
-    for (const name of ["Home", "Employee", "Shop", "Availability", "Container", "Message", "Open manager profile"]) {
+    for (const name of ["Home", "Employee", "Shop", "Availability", "Urlop", "Container", "Message", "Open manager profile"]) {
       expect(screen.getByRole("link", { name })).toBeInTheDocument();
     }
     expect(screen.getByTestId("manager-notepad")).toBeInTheDocument();
     expect(screen.getByTestId("manager-system-news")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Collapse sidebar" }));
-    await user.click(screen.getByRole("button", { name: "Open sidebar" }));
+    await user.click(screen.getByRole("link", { name: "Message" }));
+    expect(window.location.pathname).toBe("/communications");
     expect(screen.getByRole("link", { name: "Message" })).toBeInTheDocument();
   });
 

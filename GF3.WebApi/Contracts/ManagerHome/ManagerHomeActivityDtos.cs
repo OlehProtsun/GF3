@@ -1,5 +1,7 @@
 namespace WebApi.Contracts.ManagerHome;
 
+public sealed record ManagerNavBadgesDto(int TotalPending, int GraphPending, int UrlopPending);
+
 public sealed record ManagerHomeActivityItemDto
 {
     public required string Id { get; init; }

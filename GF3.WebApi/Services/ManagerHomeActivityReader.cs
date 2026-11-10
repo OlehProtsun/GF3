@@ -9,6 +9,24 @@ namespace WebApi.Services;
 
 public static class ManagerHomeActivityReader
 {
+    public static async Task<ManagerNavBadgesDto> ReadNavBadgesAsync(AppDbContext db, CancellationToken cancellationToken)
+    {
+        var counts = await db.Database.SqlQueryRaw<NavBadgeCountsRow>(CanonicalSql + """
+            SELECT COALESCE(SUM(RequiresApproval = 1), 0) AS TotalPending,
+                   COALESCE(SUM(RequiresApproval = 1 AND TargetType = 'graph'), 0) AS GraphPending,
+                   COALESCE(SUM(RequiresApproval = 1 AND TargetType = 'urlop'), 0) AS UrlopPending
+            FROM events
+            """).AsNoTracking().SingleAsync(cancellationToken);
+        return new(counts.TotalPending, counts.GraphPending, counts.UrlopPending);
+    }
+
+    private sealed class NavBadgeCountsRow
+    {
+        public int TotalPending { get; set; }
+        public int GraphPending { get; set; }
+        public int UrlopPending { get; set; }
+    }
+
     public static async Task<ManagerHomeActivityPageDto> ReadAsync(AppDbContext db, int year, int month,
         string tab, int offset, int limit, CancellationToken cancellationToken)
     {

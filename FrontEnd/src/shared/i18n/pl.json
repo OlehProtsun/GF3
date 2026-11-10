@@ -1,4 +1,7 @@
 {
+  "New approval requests: {0}": "Nowe prośby do zatwierdzenia: {0}",
+  "{0} pending approval requests": "Oczekujące prośby do zatwierdzenia: {0}",
+  "{0} pending": "Oczekujące: {0}",
   "Choose a shop to manage vacation requests.": "Wybierz sklep, aby zarządzać wnioskami urlopowymi.",
   "Choose a shop": "Wybierz sklep",
   "View approved vacations and manage requests for each shop.": "Sprawdź zatwierdzone urlopy i zarządzaj wnioskami w poszczególnych sklepach.",
