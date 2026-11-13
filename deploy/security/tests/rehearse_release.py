@@ -175,7 +175,7 @@ def main():
 
             sql("CREATE TABLE rehearsal_marker(value TEXT)")
             sql(f"INSERT INTO rehearsal_marker VALUES ('{marker}')")
-            previous = release.STATE / "rollback-rehearsal"
+            previous = release.STATE / ("rollback-" + project)
             previous.mkdir()
             with patch.object(release, "safe_path"):
                 release.snapshot(previous, volume)
