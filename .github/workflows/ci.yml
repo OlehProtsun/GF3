@@ -5,6 +5,8 @@ on:
     branches:
       - main
       - master
+      - DEV2
+      - PROD2
   pull_request:
   workflow_dispatch:
 
@@ -38,6 +40,9 @@ jobs:
       - name: Test backend
         run: dotnet test GF3.Tests/GF3.Tests.csproj --configuration Release --no-restore --filter "Category!=LocalOnly"
 
+      - name: Test host guard
+        run: python3 -m unittest discover -s deploy/security/tests -v
+
       - name: Install frontend dependencies
         working-directory: FrontEnd
         run: npm ci
@@ -65,3 +70,339 @@ jobs:
 
       - name: Build image
         run: docker build -t gf3-web:ci .
+
+      - name: Pull stock Nginx image
+        run: |
+          docker pull nginx:stable-alpine
+          docker pull mirror.gcr.io/library/python:3.12-alpine
+
+      - name: Rehearse production cutover and rollback
+        run: python3 -u deploy/security/tests/rehearse_release.py
+
+      - name: Test isolated HTTP and HTTPS ingress
+        run: |
+          python3 - <<'PY'
+          import base64
+          from concurrent.futures import ThreadPoolExecutor
+          import hashlib
+          import http.client
+          import ipaddress
+          import json
+          import os
+          from pathlib import Path
+          import re
+          import secrets
+          import shutil
+          import socket
+          import ssl
+          import subprocess
+          import tempfile
+          import time
+
+          cert_context = ssl.create_default_context()
+          # The certificate and host bindings are disposable and local to this check.
+          cert_context.check_hostname = False
+          cert_context.verify_mode = ssl.CERT_NONE
+          project = "gf3-security-" + secrets.token_hex(5)
+          query_marker = "GF3_TEST_QUERY_" + secrets.token_hex(8)
+          header_marker = "GF3_TEST_HEADER_" + secrets.token_hex(8)
+          password = str(100000 + secrets.randbelow(900000))
+          auth = {"Content-Type": "application/json"}
+
+          def run(*args, capture=False, check=True):
+              result = subprocess.run(args, check=check, text=True, encoding="utf-8",
+                                      capture_output=capture, timeout=180)
+              return result.stdout if capture else result
+
+          def request(port, path, *, tls=False, method="GET", headers=None, body=None):
+              address = ("127.0.0.1", port)
+              connection = (http.client.HTTPSConnection(*address, context=cert_context, timeout=10)
+                            if tls else http.client.HTTPConnection(*address, timeout=10))
+              try:
+                  connection.request(method, path, body, {"Host": "localhost", **(headers or {})})
+                  result = connection.getresponse()
+                  return result.status, {name.lower(): value for name, value in result.getheaders()}, result.read()
+              finally:
+                  connection.close()
+
+          def expect(port, path, expected, **kwargs):
+              status, headers, body = request(port, path, **kwargs)
+              assert status in expected, (path.split("?")[0], status, expected)
+              return headers, body
+
+          def closed(port, host, tls, path="/"):
+              try:
+                  request(port, path, tls=tls, headers={"Host": host})
+              except (http.client.RemoteDisconnected, ConnectionResetError):
+                  return
+              raise AssertionError("unexpected host reached a virtual host")
+
+          def websocket(port, tls, token, connection_token):
+              stream = socket.create_connection(("127.0.0.1", port), timeout=10)
+              if tls:
+                  stream = cert_context.wrap_socket(stream, server_hostname="localhost")
+              key = base64.b64encode(os.urandom(16)).decode()
+              with stream, stream.makefile("rb") as reader:
+                  stream.sendall((
+                      f"GET /api/realtime/presence?id={connection_token}&access_token={token} HTTP/1.1\r\n"
+                      "Host: localhost\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"
+                      f"Sec-WebSocket-Key: {key}\r\nSec-WebSocket-Version: 13\r\n\r\n"
+                  ).encode())
+                  assert reader.readline().split()[1] == b"101", "WebSocket upgrade failed"
+                  headers = {}
+                  while line := reader.readline().strip():
+                      name, value = line.decode().split(":", 1)
+                      headers[name.lower()] = value.strip()
+                  expected = base64.b64encode(hashlib.sha1(
+                      (key + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11").encode()).digest()).decode()
+                  assert headers.get("sec-websocket-accept") == expected
+                  payload = b'{"protocol":"json","version":1}\x1e'
+                  mask = os.urandom(4)
+                  stream.sendall(bytes((0x81, 0x80 | len(payload))) + mask
+                                 + bytes(value ^ mask[index % 4] for index, value in enumerate(payload)))
+                  frame = reader.read(2)
+                  assert frame[0] == 0x81 and frame[1] < 126, "unexpected SignalR handshake frame"
+                  assert reader.read(frame[1]).split(b"\x1e")[0] == b"{}", "SignalR handshake failed"
+
+          def assert_throttle(headers, body):
+              assert headers["content-type"].split(";")[0] == "application/problem+json"
+              assert int(headers["retry-after"]) > 0
+              assert json.loads(body)["status"] == 429
+
+          def burst(port, tls, path, size):
+              def send(_):
+                  return request(port, path, tls=tls)
+              with ThreadPoolExecutor(max_workers=32) as workers:
+                  responses = list(workers.map(send, range(size)))
+              assert {row[0] for row in responses} == {200, 429}, path
+              for status, headers, body in responses:
+                  if status == 429:
+                      assert headers["x-content-type-options"] == "nosniff"
+                      assert headers["x-frame-options"] == "DENY"
+                      assert headers["referrer-policy"] == "strict-origin-when-cross-origin"
+                      assert ("strict-transport-security" in headers) == tls
+                      assert_throttle(headers, body)
+
+          def assert_logs(log, docker_log, tokens):
+              markers = [("query", query_marker), ("header", header_marker), ("token parameter", "access_token=")]
+              for label, marker in markers + [("bearer", token) for token in tokens]:
+                  assert marker not in log, f"{label} leaked into the access log"
+                  assert marker not in docker_log, f"{label} leaked into the Docker log"
+              entries = [json.loads(line) for line in log.splitlines()]
+              keys = {"ts", "ip", "method", "path", "status", "probe", "vhost", "request_time"}
+              assert entries and all(set(row) == keys for row in entries)
+              assert all(isinstance(row["status"], int) and row["probe"] in (0, 1) for row in entries)
+              assert all("?" not in row["path"] for row in entries)
+              assert any(row["status"] == 444 for row in entries)
+              assert any(row["path"] == "/api/realtime/presence" and row["status"] == 101 for row in entries)
+              assert any(row["path"] == "/.env" and row["status"] == 404 and row["probe"] == 1 for row in entries)
+              assert any(row["path"] == "/login" and row["probe"] == 0 for row in entries)
+              assert any(row["path"] == "/.well-known/gf3-test.txt" and row["probe"] == 0 for row in entries)
+              assert any(row["path"] == "/caf\u00e9.txt" for row in entries)
+              assert any(row["path"] == "<invalid-utf8>" for row in entries)
+              return entries
+
+          with tempfile.TemporaryDirectory(prefix=project) as temporary:
+              deploy = Path(temporary)
+              for name in ("docker-compose.yml", "docker-compose.https.yml"):
+                  shutil.copyfile(Path("deploy", name), deploy / name)
+              shutil.copytree("deploy/nginx", deploy / "nginx")
+              for name in ("nginx", "logs", "state"):
+                  (deploy / "security" / "runtime" / name).mkdir(parents=True)
+              certs = deploy / "certs"
+              certs.mkdir()
+              webroot = deploy / "certbot"
+              challenge = webroot / ".well-known" / "acme-challenge"
+              challenge.mkdir(parents=True)
+              (challenge / "gf3-ci").write_bytes(b"gf3-acme-ci\n")
+              run("openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "1",
+                  "-subj", "/CN=localhost", "-keyout", str(certs / "privkey.pem"),
+                  "-out", str(certs / "fullchain.pem"), capture=True)
+              env_file = deploy / ".env"
+              env = [
+                  "GF3_IMAGE=gf3-web:ci", "GF3_SERVER_NAME=localhost", "GF3_HTTP_PORT=127.0.0.1:0",
+                  "GF3_HTTPS_PORT=127.0.0.1:0", f"GF3_DATA_VOLUME={project}-data",
+                  f"GF3_ACME_WEBROOT={webroot.as_posix()}",
+                  "GF3_REQUIRE_EXISTING_DATABASE=false", f"Jwt__SigningKey={secrets.token_hex(48)}",
+                  "GF3_ADMIN_DEVELOPER_PASSWORD=" + secrets.token_hex(24),
+                  f"GF3_BOOTSTRAP_MANAGER_PASSWORD={password}",
+              ]
+              env_file.write_text("\n".join(env) + "\n", encoding="utf-8")
+              base = ("docker", "compose", "-p", project, "--env-file", str(env_file),
+                      "-f", str(deploy / "docker-compose.yml"))
+              https = (*base, "-f", str(deploy / "docker-compose.https.yml"))
+              geo_net = project + "-geo"
+              geo_created = False
+              geo_v6 = project + "-v6"
+              geo_v6_created = False
+              tokens = []
+              try:
+                  run(*base, "create", "--no-build", "--pull", "never")
+                  subnet = run("docker", "network", "inspect", project + "_gf3-internal", "--format",
+                               "{{range .IPAM.Config}}{{println .Subnet}}{{end}}", capture=True).strip()
+                  assert ipaddress.ip_network(subnet).version == 4
+                  env_file.write_text("\n".join([*env, f"GF3_TRUSTED_PROXY_CIDR={subnet}"]) + "\n", encoding="utf-8")
+                  for tls, compose in ((False, base), (True, https)):
+                      run(*compose, "config", "--quiet")
+                      run(*compose, "up", "-d", "--no-build", "--pull", "never", "--force-recreate",
+                          "--wait", "--wait-timeout", "120")
+                      run(*compose, "exec", "-T", "nginx", "nginx", "-t")
+                      port = int(run(*compose, "port", "nginx", "443" if tls else "80", capture=True).rsplit(":", 1)[1])
+                      if tls:
+                          http_port = int(run(*compose, "port", "nginx", "80", capture=True).rsplit(":", 1)[1])
+                          headers, _ = expect(http_port, "/login?from=ci", {301})
+                          assert headers["location"] == "https://localhost/login?from=ci"
+                          closed(http_port, "invalid.example", False)
+                          expect(http_port, "/.env", {404})
+                          headers, proof = expect(http_port, "/.well-known/acme-challenge/gf3-ci", {200})
+                          assert proof == b"gf3-acme-ci\n" and "location" not in headers
+                          expect(http_port, "/.well-known/acme-challenge/missing", {404})
+                          expect(http_port, "/.well-known/acme-challenge/.env", {404})
+                          expect(http_port, "/.well-known/acme-challenge/gf3-ci", {403}, method="POST")
+                      closed(port, "invalid.example", tls)
+                      closed(port, "127.0.0.1", tls)
+                      closed(port, "invalid.example", tls, "http://localhost/login")
+                      expect(port, "/", {405}, tls=tls, method="TRACE")
+                      headers, _ = expect(port, "/api/health", {405}, tls=tls, method="OPTIONS")
+                      assert "GET" in headers["allow"], "OPTIONS did not reach ASP.NET routing"
+                      probes = [
+                          "/.env", "/.ENV.production", "/tmp/%252eenv", "/.git/config", "/.svn/entries",
+                          "/.hg/hgrc", "/.ssh/authorized_keys", "/.aws/config", "/.npmrc",
+                          "/.circleci/config.yml", "/.gitlab-ci.yml", "/.htaccess", "/backup.sql",
+                          "/backup.tar.gz", "/backup.zip", "/dump.sql", "/export.sql", "/database.sql",
+                          "/app/config%252ejson", "/laradock/docker-compose.yml", "/tsconfig.json",
+                          "/info.php", "/app/config.php", "/phpinfo.php", "/host-info.php", "/parameters%252eyml",
+                          "/development.yml", "/wp-content/%252eenv", "/wp-admin/index", "/wp-includes/index",
+                          "/adminer", "/vendor/package", "/a%00b", "/a%2500b", "/MiXeD/%2eEnV",
+                          "/%2e%67%69%74/config", "/%77%70%2d%61%64%6d%69%6e/test",
+                          "/%252e%2545%254e%2556", "/archive%252esql", "/foo%2EPHP",
+                      ]
+                      for path in probes:
+                          expect(port, path, {400, 404}, tls=tls)
+                          if tls:
+                              expect(http_port, path, {400, 404})
+                      expect(port, "/.well-known/gf3-test.txt", {404}, tls=tls)
+                      expect(port, "/caf%C3%A9.txt", {404}, tls=tls)
+                      expect(port, "/invalid-%FF.txt", {400, 404}, tls=tls)
+                      for path in ("/", "/login", "/information", "/employee"):
+                          headers, index = expect(port, path, {200}, tls=tls)
+                          assert "text/html" in headers["content-type"]
+                          assert headers["x-frame-options"] == "DENY"
+                      asset = re.search(rb'["\x27](/assets/[^"\x27]+\.js)["\x27]', index)
+                      assert asset, "SPA asset URL missing"
+                      headers, _ = expect(port, asset[1].decode(), {200}, tls=tls)
+                      assert "javascript" in headers["content-type"]
+                      headers, _ = expect(port, "/sw.js", {200}, tls=tls)
+                      assert "javascript" in headers["content-type"]
+                      _, body = expect(port, "/version.json", {200}, tls=tls)
+                      assert isinstance(json.loads(body), dict)
+                      _, body = expect(port, "/api/health", {200}, tls=tls)
+                      assert json.loads(body)["canConnect"] is True
+                      expect(port, "/login?next=/.env&access_token=" + query_marker, {200}, tls=tls,
+                             headers={"Cookie": "synthetic=" + header_marker, "Referer": "https://test.invalid/" + header_marker,
+                                      "Authorization": "Bearer " + header_marker})
+                      _, body = expect(port, "/api/auth/login", {200}, tls=tls, method="POST", headers=auth,
+                                       body=json.dumps({"username": "manager", "password": password}))
+                      token = json.loads(body)["accessToken"]
+                      tokens.append(token)
+                      bearer = {"Authorization": "Bearer " + token}
+                      _, body = expect(port, "/api/auth/manager-mode", {200}, tls=tls, method="POST",
+                                       headers={**auth, **bearer}, body='{"mode":"pc"}')
+                      token = json.loads(body)["accessToken"]
+                      tokens.append(token)
+                      bearer = {"Authorization": "Bearer " + token}
+                      expect(port, "/api/auth/session", {200}, tls=tls, headers=bearer)
+                      _, body = expect(port, "/api/realtime/presence/negotiate?negotiateVersion=1", {200},
+                                       tls=tls, method="POST", headers=bearer, body=b"")
+                      websocket(port, tls, token, json.loads(body)["connectionToken"])
+                      for _ in range(12):
+                          expect(port, "/login", {200}, tls=tls)
+                      if not tls:
+                          # Stay below the Nginx API rate so .NET's shared IP budget is observable.
+                          for index in range(122):
+                              status, headers, body = request(port, "/api/health", headers={
+                                  "X-Forwarded-For": f"198.51.100.{index + 1}", "X-Forwarded-Proto": "https",
+                                  "X-Forwarded-Host": "invalid.example"})
+                              if status == 429:
+                                  assert 100 <= index < 120 and int(headers["retry-after"]) != 3
+                                  assert_throttle(headers, body)
+                                  break
+                              assert status == 200
+                              time.sleep(0.115)
+                          else:
+                              raise AssertionError("forged XFF bypassed the application quota")
+                          # The forwarded address must reach .NET, since both clients share the same Nginx hop.
+                          forwarded = run(*compose, "exec", "-T", "gf3-app", "curl", "-fsS",
+                                          "-H", "Host: localhost", "--max-time", "5",
+                                          "http://nginx/api/health", capture=True)
+                          assert json.loads(forwarded)["canConnect"] is True
+                      else:
+                          burst(port, tls, "/", 350)
+                          # Use an authenticated budget to distinguish Nginx 429 from .NET's 429.
+                          def api_request(_):
+                              return request(port, "/api/auth/session", tls=True, headers=bearer)
+                          with ThreadPoolExecutor(max_workers=32) as workers:
+                              responses = list(workers.map(api_request, range(150)))
+                          assert {row[0] for row in responses} == {200, 429}
+                          for status, headers, body in responses:
+                              if status == 429:
+                                  assert headers["retry-after"] == "3"
+                                  assert headers["strict-transport-security"]
+                                  assert_throttle(headers, body)
+                      log_dir = deploy / "security" / "runtime" / "logs"
+                      entries = assert_logs((log_dir / "access.jsonl").read_text(encoding="utf-8"),
+                                            run(*compose, "logs", "--no-color", "nginx", capture=True), tokens)
+                      assert not any(row["ip"].startswith("198.51.100.") for row in entries)
+
+                  # A synthetic TEST-NET peer reaches Nginx over an isolated Docker bridge.
+                  nginx_id = run(*https, "ps", "-q", "nginx", capture=True).strip()
+                  run("docker", "network", "create", "--internal", "--subnet", "203.0.113.0/28", geo_net)
+                  geo_created = True
+                  run("docker", "network", "connect", "--ip", "203.0.113.2", geo_net, nginx_id)
+                  geo = deploy / "security" / "runtime" / "nginx"
+
+                  def probe_geo(path, expected, spoof="198.51.100.77"):
+                      for _ in range(12):
+                          result = run("docker", "run", "--rm", "--network", geo_net, "--ip", "203.0.113.3",
+                                       "--entrypoint", "curl", "gf3-web:ci", "-ksS", "-o", "/dev/null", "-w", "%{http_code}",
+                                       "-H", "Host: localhost", "-H", f"X-Forwarded-For: {spoof}", "--max-time", "5",
+                                       "https://203.0.113.2" + path, capture=True)
+                          if result.strip() == expected:
+                              return
+                          time.sleep(0.5)
+                      raise AssertionError(("geo response", path, result, expected))
+
+                  def reload_nginx():
+                      workers = run(*https, "exec", "-T", "nginx", "ps", "-o", "pid,args", capture=True)
+                      assert re.search(r"^\s*\d+\s+nginx: worker process\s*$", workers, re.MULTILINE)
+                      run(*https, "exec", "-T", "nginx", "nginx", "-t")
+                      run(*https, "exec", "-T", "nginx", "nginx", "-s", "reload")
+
+                  (geo / "blocked-test.geo").write_text("203.0.113.3/32 1;\n198.51.100.77/32 1;\n", encoding="ascii")
+                  reload_nginx()
+                  probe_geo("/login", "403")
+                  probe_geo("/.env", "404")
+                  (geo / "allow-test.geo").write_text("203.0.113.3/32 1;\n", encoding="ascii")
+                  reload_nginx()
+                  probe_geo("/login", "200")
+                  probe_geo("/.env", "404")
+                  run("docker", "network", "create", "--internal", "--ipv6", "--subnet",
+                      "2001:db8:6766::/64", geo_v6)
+                  geo_v6_created = True
+                  run("docker", "network", "connect", "--ip6", "2001:db8:6766::2", geo_v6, nginx_id)
+                  result = run("docker", "run", "--rm", "--network", geo_v6, "--ip6", "2001:db8:6766::3",
+                               "--entrypoint", "curl", "gf3-web:ci", "-kfsS", "--max-time", "5",
+                               "-H", "Host: localhost", "https://[2001:db8:6766::2]/api/health", capture=True)
+                  assert json.loads(result)["canConnect"] is True
+                  assert any(row["ip"] == "2001:db8:6766::3" and row["path"] == "/api/health"
+                             for row in map(json.loads, (log_dir / "access.jsonl").read_text(encoding="utf-8").splitlines()))
+                  print("HTTP, HTTPS, ACME, SignalR, PWA, quotas, IPv4/IPv6, safe logs and geo checks passed")
+              finally:
+                  cleanup = run(*https, "down", "--volumes", "--remove-orphans", check=False)
+                  # The isolated bridge may not have been created if an earlier assertion failed.
+                  if geo_created:
+                      run("docker", "network", "rm", geo_net)
+                  if geo_v6_created:
+                      run("docker", "network", "rm", geo_v6)
+                  assert cleanup.returncode == 0, "failed to clean up disposable Compose project"
+          PY

@@ -413,3 +413,10 @@ tmp-schedule-profile.png
 *.db-wal
 *.sqlite
 *.sqlite3
+
+# Host-side Nginx guard
+!/deploy/security/runtime/logs/
+/deploy/security/runtime/*/*
+!/deploy/security/runtime/*/.gitkeep
+/deploy/security/*.local.*
+/ops/gfctl

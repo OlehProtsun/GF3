@@ -17,6 +17,7 @@ if (builder.Environment.IsProduction())
 builder.Services.AddWebApiCore(
     builder.Configuration,
     requireExplicitJwtSigningKey: builder.Environment.IsProduction());
+TrustedProxyConfiguration.Configure(builder.Services, builder.Configuration, builder.Environment.IsProduction());
 
 var app = builder.Build();
 
@@ -32,6 +33,11 @@ app.Run();
 /// </summary>
 static void ConfigureCommonMiddleware(WebApplication app)
 {
+    if (app.Environment.IsProduction())
+    {
+        app.UseForwardedHeaders();
+    }
+
     app.UseResponseCompression();
 
     if (app.Environment.IsDevelopment())
