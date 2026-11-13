@@ -21,6 +21,12 @@ public interface IAvailabilityGroupService : IBaseService<AvailabilityGroupModel
         IList<(int employeeId, IList<AvailabilityGroupDayModel> days)> payload,
         CancellationToken ct = default);
 
+    Task<AvailabilityGroupGraphSaveResult> SaveGraphAsync(
+        AvailabilityGroupModel group,
+        IList<(int employeeId, IList<AvailabilityGroupDayModel> days)> payload,
+        IReadOnlyList<AvailabilityGroupGraphTransferInstruction> transfers,
+        CancellationToken ct = default);
+
     /// <summary>
     /// Loads a fully expanded availability group aggregate for editing.
     /// </summary>

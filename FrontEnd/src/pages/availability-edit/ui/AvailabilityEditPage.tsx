@@ -4,7 +4,7 @@ import { buildEffectiveManagerAvailabilityCellMap, getAutomaticManagerEmployeeId
 import { useEmploymentContractSettingsQuery } from "@entities/employment-contracts";
 import { useLanguageRevision } from "@shared/i18n/useLanguageRevision";
 import { t } from "@shared/i18n";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   buildManagerEditLockMessage,
@@ -47,6 +47,7 @@ import {
 import type { AvailabilityPublicationStatus } from "@entities/availability-groups/model/types";
 import { useEmployeesListQuery } from "@entities/employees/api/queries";
 import { getEmployeeFullName } from "@entities/employees/model/presentation";
+import { ApiError } from "@shared/api/httpClient";
 import { stableSerialize } from "@shared/lib/stableSerialize";
 import { useSyncedDraft } from "@shared/lib/useSyncedDraft";
 import { useUnsavedChangesPrompt } from "@shared/lib/useUnsavedChangesPrompt";
@@ -455,6 +456,7 @@ export function AvailabilityEditPage() {
   const employeesQuery = useEmployeesListQuery({ refreshKey: location.key });
   const bindsQuery = useAvailabilityBindsListQuery();
   const saveMutation = useSaveAvailabilityGroupGraphMutation();
+  const saveInFlight = useRef(false);
   const createBindMutation = useCreateAvailabilityBindMutation();
   const updateBindMutation = useUpdateAvailabilityBindMutation();
   const deleteBindMutation = useDeleteAvailabilityBindMutation();
@@ -1025,6 +1027,7 @@ export function AvailabilityEditPage() {
   };
 
   const handleSave = () => {
+    if (saveMutation.isPending || saveInFlight.current) return;
     if (isPolicyLoading || hasPolicyError) return;
     if (editLockMessage) {
       setEditorState((current) => ({
@@ -1096,6 +1099,7 @@ export function AvailabilityEditPage() {
       editorError: undefined,
     }));
 
+    saveInFlight.current = true;
     saveMutation.mutate(
       {
         id: groupId,
@@ -1110,17 +1114,20 @@ export function AvailabilityEditPage() {
         employeeIds: selectedEmployeeIds,
         cellMap,
         transfers: stagedTransfers,
-        existingMembers: membersQuery.data ?? [],
-        existingSlots: slotsQuery.data ?? [],
       },
       {
         onSuccess: result => {
+          saveInFlight.current = false;
           runWithoutPrompt(() => navigate(`/availability/${result.id}`));
         },
         onError: error => {
+          saveInFlight.current = false;
+          const editorError = error instanceof ApiError && error.status === 429 && error.retryAfterMs !== undefined
+            ? t("Too many requests. Wait {0} s before saving again.", Math.max(1, Math.ceil(error.retryAfterMs / 1000)))
+            : toErrorMessage(error);
           setEditorState((current) => ({
             ...current,
-            editorError: toErrorMessage(error),
+            editorError,
           }));
         },
       }
@@ -1129,7 +1136,6 @@ export function AvailabilityEditPage() {
 
   return (
     <div className={styles.page}>
-      <p>{t("Automatic employment contract availability is read-only. Saved availability is restored when the rule is disabled.")}</p>
       {hasPolicyError ? <button type="button" onClick={() => { void contractSettingsQuery.refetch(); void queryClient.invalidateQueries({ queryKey: queryKeys.employees.all }); }}>{t("Retry")}</button> : null}
       <PageHeader
         title={isCreate ? t("Add Availability") : t("Availability Edit")}

@@ -7,11 +7,10 @@ import {
   parseAvailabilityCode,
   type AvailabilityMatrixCellMap,
 } from "@entities/availability-groups/model/editor";
-import type { AvailabilityGroupMember, AvailabilitySlot } from "@entities/availability-groups/model/types";
 import type { StagedAvailabilityTransfer } from "@entities/availability-groups/model/transfer";
 import { queryKeys } from "@shared/api/queryKeys";
 import { availabilityGroupsApi } from "./availabilityGroupsApi";
-import type { SaveAvailabilityGroupDto, SaveAvailabilityGroupMemberDto, SaveAvailabilitySlotDto } from "./dto";
+import type { SaveAvailabilityGroupDto, SaveAvailabilityGroupGraphResult, SaveAvailabilityGroupMemberDto, SaveAvailabilitySlotDto } from "./dto";
 
 export type SaveAvailabilityGroupGraphInput = {
   id: number | null;
@@ -19,13 +18,6 @@ export type SaveAvailabilityGroupGraphInput = {
   employeeIds: number[];
   cellMap: AvailabilityMatrixCellMap;
   transfers?: StagedAvailabilityTransfer[];
-  existingMembers?: AvailabilityGroupMember[];
-  existingSlots?: AvailabilitySlot[];
-};
-
-export type SaveAvailabilityGroupGraphResult = {
-  id: number;
-  sourceGroupIds: number[];
 };
 
 export const useAvailabilityGroupsListQuery = (refreshKey?: string) =>
@@ -57,165 +49,40 @@ async function syncAvailabilityGroupGraph({
   employeeIds,
   cellMap,
   transfers = [],
-  existingMembers = [],
-  existingSlots = [],
 }: SaveAvailabilityGroupGraphInput): Promise<SaveAvailabilityGroupGraphResult> {
-  const isCreate = id === null;
-  const groupPayload = {
-    ...payload,
-    name: getAvailabilityGroupNameForSave(payload.name, payload.month, payload.year, isCreate),
-  };
-
-  let groupId = id;
-
-  if (groupId === null) {
-    const created = await availabilityGroupsApi.create(groupPayload);
-    groupId = created.id;
-  } else {
-    await availabilityGroupsApi.update(groupId, groupPayload);
-  }
-
-  const selectedEmployeeIds = [...new Set(employeeIds)];
-  const displayOrderByEmployeeId = new Map(selectedEmployeeIds.map((employeeId, index) => [employeeId, index]));
-  const selectedEmployeeIdSet = new Set(selectedEmployeeIds);
-  const removedMembers = existingMembers.filter(member => !selectedEmployeeIdSet.has(member.employeeId));
-  const removedMemberIdSet = new Set(removedMembers.map(member => member.id));
-
-  const memberByEmployeeId = new Map(
-    existingMembers
-      .filter(member => !removedMemberIdSet.has(member.id))
-      .map(member => [member.employeeId, member] as const)
-  );
-
-  const membersToCreate = selectedEmployeeIds.filter(employeeId => !memberByEmployeeId.has(employeeId));
-  if (membersToCreate.length > 0) {
-    const createdMembers = await Promise.all(
-      membersToCreate.map(employeeId =>
-        availabilityGroupsApi.createMember(groupId as number, {
-          employeeId,
-          displayOrder: displayOrderByEmployeeId.get(employeeId) ?? 0,
-        } satisfies SaveAvailabilityGroupMemberDto)
-      )
-    );
-
-    createdMembers.forEach(member => {
-      memberByEmployeeId.set(member.employeeId, member);
-    });
-  }
-
-  const membersToUpdate = selectedEmployeeIds.flatMap(employeeId => {
-    const member = memberByEmployeeId.get(employeeId);
-    const displayOrder = displayOrderByEmployeeId.get(employeeId);
-
-    if (!member || displayOrder === undefined || member.displayOrder === displayOrder) {
-      return [];
-    }
-
-    return [
-      availabilityGroupsApi.updateMember(groupId as number, member.id, {
-        employeeId,
-        displayOrder,
-      } satisfies SaveAvailabilityGroupMemberDto),
-    ];
-  });
-
+  const selectedEmployees = new Set(employeeIds);
   const daysInMonth = new Date(payload.year, payload.month, 0).getDate();
-  const desiredSlots = selectedEmployeeIds.flatMap(employeeId => {
-    const member = memberByEmployeeId.get(employeeId);
-    if (!member) {
-      throw new Error(t("Employee #{0} could not be mapped to an availability member.", employeeId));
-    }
-
-    return Array.from({ length: daysInMonth }, (_, index) => {
+  const members = [...selectedEmployees].map(employeeId => ({
+    employeeId,
+    days: Array.from({ length: daysInMonth }, (_, index) => {
       const dayOfMonth = index + 1;
       const rawCode = cellMap[getAvailabilityCellKey(employeeId, dayOfMonth)] ?? AVAILABILITY_NONE_MARK;
       const parsedCode = parseAvailabilityCode(rawCode);
-
       if (!parsedCode.ok) {
         throw new Error(t("Employee #{0}, day {1}: {2}", employeeId, dayOfMonth, parsedCode.error));
       }
 
-      return {
-        key: `${member.id}:${dayOfMonth}`,
-        payload: {
-          availabilityGroupMemberId: member.id,
-          dayOfMonth,
-          kind: parsedCode.value.kind,
-          intervalStr: parsedCode.value.intervalStr,
-        } satisfies SaveAvailabilitySlotDto,
-      };
-    });
-  });
-
-  const desiredSlotKeys = new Set<string>(desiredSlots.map(slot => slot.key));
-
-  const slotsToDelete = existingSlots.filter(slot => !desiredSlotKeys.has(`${slot.availabilityGroupMemberId}:${slot.dayOfMonth}`));
-  if (slotsToDelete.length > 0) {
-    await Promise.all(slotsToDelete.map(slot => availabilityGroupsApi.removeSlot(groupId as number, slot.id)));
-  }
-
-  if (removedMembers.length > 0) {
-    await Promise.all(removedMembers.map(member => availabilityGroupsApi.removeMember(groupId as number, member.id)));
-  }
-
-  if (membersToUpdate.length > 0) {
-    await Promise.all(membersToUpdate);
-  }
+      return { dayOfMonth, kind: parsedCode.value.kind, intervalStr: parsedCode.value.intervalStr };
+    }),
+  }));
 
   const normalizedTransfers = transfers
     .filter(transfer =>
-      selectedEmployeeIdSet.has(transfer.employeeId) &&
-      transfer.sourceGroupId !== groupId &&
+      selectedEmployees.has(transfer.employeeId) &&
+      transfer.sourceGroupId !== id &&
       transfer.dayOfMonths.length > 0)
     .map(transfer => ({
       ...transfer,
       dayOfMonths: [...new Set(transfer.dayOfMonths)].sort((left, right) => left - right),
     }));
-  const sourceGroupIds = new Set<number>();
 
-  for (const transfer of normalizedTransfers) {
-    const member = memberByEmployeeId.get(transfer.employeeId);
-    if (!member) {
-      throw new Error(t("Employee #{0} could not be mapped to an availability member for CFA.", transfer.employeeId));
-    }
-
-    await availabilityGroupsApi.transferDays(groupId as number, member.id, {
-      sourceGroupId: transfer.sourceGroupId,
-      dayOfMonths: transfer.dayOfMonths,
-    });
-    sourceGroupIds.add(transfer.sourceGroupId);
-  }
-
-  const synchronizedExistingSlots = normalizedTransfers.length > 0
-    ? await availabilityGroupsApi.slots(groupId as number)
-    : existingSlots;
-  const existingSlotByKey = new Map<string, AvailabilitySlot>(
-    synchronizedExistingSlots.map(slot => [`${slot.availabilityGroupMemberId}:${slot.dayOfMonth}`, slot]),
-  );
-
-  const slotCreates: Promise<unknown>[] = [];
-  const slotUpdates: Promise<unknown>[] = [];
-
-  desiredSlots.forEach(slot => {
-    const existingSlot = existingSlotByKey.get(slot.key);
-    if (!existingSlot) {
-      slotCreates.push(availabilityGroupsApi.createSlot(groupId as number, slot.payload));
-      return;
-    }
-
-    const existingInterval = (existingSlot.intervalStr ?? "").trim() || null;
-    const nextInterval = (slot.payload.intervalStr ?? "").trim() || null;
-    const kindChanged = String(existingSlot.kind) !== String(slot.payload.kind);
-    const intervalChanged = existingInterval !== nextInterval;
-
-    if (kindChanged || intervalChanged) {
-      slotUpdates.push(availabilityGroupsApi.updateSlot(groupId as number, existingSlot.id, slot.payload));
-    }
+  return availabilityGroupsApi.saveGraph({
+    ...payload,
+    id,
+    name: getAvailabilityGroupNameForSave(payload.name, payload.month, payload.year, id === null),
+    members,
+    transfers: normalizedTransfers,
   });
-
-  await Promise.all([...slotCreates, ...slotUpdates]);
-
-  return { id: groupId as number, sourceGroupIds: [...sourceGroupIds] };
 }
 
 export function useCreateAvailabilityGroupMutation() {
@@ -246,18 +113,7 @@ export function useSaveAvailabilityGroupGraphMutation() {
 
   return useMutation({
     mutationFn: syncAvailabilityGroupGraph,
-    onSuccess: result => {
-      qc.invalidateQueries({ queryKey: queryKeys.availabilityGroups.all });
-      qc.invalidateQueries({ queryKey: queryKeys.availabilityGroups.byId(result.id) });
-      qc.invalidateQueries({ queryKey: queryKeys.availabilityGroups.items(result.id) });
-      qc.invalidateQueries({ queryKey: queryKeys.availabilityGroups.members(result.id) });
-      qc.invalidateQueries({ queryKey: queryKeys.availabilityGroups.slots(result.id) });
-      result.sourceGroupIds.forEach(sourceGroupId => {
-        qc.invalidateQueries({ queryKey: queryKeys.availabilityGroups.slots(sourceGroupId) });
-        qc.invalidateQueries({ queryKey: queryKeys.availabilityGroups.items(sourceGroupId) });
-        qc.invalidateQueries({ queryKey: queryKeys.availabilityGroups.transferHints(sourceGroupId) });
-      });
-    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.availabilityGroups.all }),
   });
 }
 

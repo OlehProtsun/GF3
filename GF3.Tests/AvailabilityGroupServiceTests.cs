@@ -1,4 +1,5 @@
 using BusinessLogicLayer.Common;
+using BusinessLogicLayer.Contracts.Availability;
 using BusinessLogicLayer.Contracts.Enums;
 using BusinessLogicLayer.Contracts.Models;
 using BusinessLogicLayer.Services;
@@ -11,6 +12,54 @@ namespace GF3.Tests;
 
 public sealed class AvailabilityGroupServiceTests
 {
+    [Fact]
+    public async Task SaveGraphAsync_RejectsInvalidFullMonthAndTransferPayloadsBeforeWriting()
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        await using var context = database.CreateContext();
+        var employee = TestDataFactory.CreateDalEmployee();
+        context.Employees.Add(employee);
+        await context.SaveChangesAsync();
+        var service = CreateService(context);
+        var group = TestDataFactory.CreateAvailabilityGroupModel(year: 2028, month: 2);
+        IList<AvailabilityGroupDayModel> Month() => Enumerable.Range(1, 29)
+            .Select(day => TestDataFactory.CreateAvailabilityDayModel(day, AvailabilityKind.NONE)).ToList();
+
+        var shortMonth = Month();
+        shortMonth.RemoveAt(28);
+        var duplicateDays = Month();
+        duplicateDays[28].DayOfMonth = 28;
+        var outOfMonth = Month();
+        outOfMonth[28].DayOfMonth = 30;
+        var invalidKind = Month();
+        invalidKind[0].Kind = (AvailabilityKind)99;
+        var invalidInterval = Month();
+        invalidInterval[0] = TestDataFactory.CreateAvailabilityDayModel(1, AvailabilityKind.INT, "25:00 - 28:00");
+
+        foreach (var days in new[] { shortMonth, duplicateDays, outOfMonth, invalidKind, invalidInterval })
+            await Assert.ThrowsAsync<ValidationException>(() => service.SaveGraphAsync(group, [(employee.Id, days)], []));
+        await Assert.ThrowsAsync<ValidationException>(() => service.SaveGraphAsync(group, [], []));
+        await Assert.ThrowsAsync<ValidationException>(() => service.SaveGraphAsync(group, [(employee.Id, Month()), (employee.Id, Month())], []));
+        await Assert.ThrowsAsync<System.ComponentModel.DataAnnotations.ValidationException>(() =>
+            service.SaveGraphAsync(group, [(9999, Month())], []));
+
+        foreach (var transfers in new AvailabilityGroupGraphTransferInstruction[][]
+        {
+            [new(999, 1, [1])],
+            [new(employee.Id, 1, [30])],
+            [new(employee.Id, 1, [1]), new(employee.Id, 2, [1])],
+        })
+            await Assert.ThrowsAsync<ValidationException>(() => service.SaveGraphAsync(group, [(employee.Id, Month())], transfers));
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            service.SaveGraphAsync(group, [(employee.Id, Month())], [new(employee.Id, 9999, [1])]));
+
+        group.Year = 10000;
+        await Assert.ThrowsAsync<ValidationException>(() => service.SaveGraphAsync(group, [(employee.Id, Month())], []));
+        Assert.Empty(await context.AvailabilityGroups.ToListAsync());
+        Assert.Empty(await context.AvailabilityGroupMembers.ToListAsync());
+        Assert.Empty(await context.AvailabilityGroupDays.ToListAsync());
+    }
+
     [Fact]
     public async Task CreateMemberAndSlot_ValidateUniquenessAndNormalizeAnyIntervals()
     {

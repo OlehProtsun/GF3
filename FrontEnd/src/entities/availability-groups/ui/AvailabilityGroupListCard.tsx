@@ -15,6 +15,11 @@ import { RecordTile } from "@shared/ui/components/RecordTile";
 import { PlusIcon } from "@shared/ui/icons";
 import styles from "./AvailabilityGroupListCard.module.css";
 
+const monthTintClasses = [
+  styles.january, styles.february, styles.march, styles.april, styles.may, styles.june,
+  styles.july, styles.august, styles.september, styles.october, styles.november, styles.december,
+];
+
 type AvailabilityGroupListCardProps = {
   groups: AvailabilityGroup[];
   error?: unknown;
@@ -59,6 +64,7 @@ export function AvailabilityGroupListCard({
       <RecordGrid>
         {sortedGroups.map(group => {
           const isPinned = pinnedIdSet.has(String(group.id));
+          const monthTint = Number.isInteger(group.month) ? monthTintClasses[group.month - 1] : undefined;
           const periodLabel = getAvailabilityGroupPeriodLabel(group);
           const windowStatusLabel = getAvailabilityWindowStatusLabel(group);
           const publicationStatusLabel = getAvailabilityPublicationStatusLabel(group.publicationStatus);
@@ -96,6 +102,7 @@ export function AvailabilityGroupListCard({
           return (
             <RecordTile
               key={group.id}
+              className={monthTint ? `${styles.monthTint} ${monthTint}` : undefined}
               title={group.name}
               description={t("Availability schedule for {0}", periodLabel)}
               badge={`ID ${group.id}`}

@@ -276,7 +276,9 @@ public sealed class AvailabilityGroupTransferRepository(AppDbContext db) : IAvai
         CancellationToken ct = default)
     {
         var normalizedDays = dayOfMonths.Distinct().OrderBy(day => day).ToList();
-        await using var transaction = await db.Database.BeginTransactionAsync(ct).ConfigureAwait(false);
+        await using var transaction = db.Database.CurrentTransaction is null
+            ? await db.Database.BeginTransactionAsync(ct).ConfigureAwait(false)
+            : null;
 
         var targetMember = await db.AvailabilityGroupMembers
             .Include(member => member.AvailabilityGroup)
@@ -387,7 +389,10 @@ public sealed class AvailabilityGroupTransferRepository(AppDbContext db) : IAvai
         }
 
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
-        await transaction.CommitAsync(ct).ConfigureAwait(false);
+        if (transaction is not null)
+        {
+            await transaction.CommitAsync(ct).ConfigureAwait(false);
+        }
         return BuildWriteResult(true, null, sourceMember, targetMember, normalizedDays);
     }
 

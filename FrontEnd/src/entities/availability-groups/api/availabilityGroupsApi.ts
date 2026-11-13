@@ -1,4 +1,5 @@
-import { request } from "@shared/api/httpClient";
+import { ApiError, request } from "@shared/api/httpClient";
+import { t } from "@shared/i18n";
 import type {
   AvailabilityTransferHint,
   AvailabilityTransferResult,
@@ -10,6 +11,8 @@ import type {
   AvailabilityGroupMemberDto,
   AvailabilitySlotDto,
   SaveAvailabilityGroupDto,
+  SaveAvailabilityGroupGraphDto,
+  SaveAvailabilityGroupGraphResult,
   SaveAvailabilityGroupMemberDto,
   SaveAvailabilitySlotDto,
 } from "./dto";
@@ -23,6 +26,22 @@ export const availabilityGroupsApi = {
   create: (payload: SaveAvailabilityGroupDto) => request<AvailabilityGroupDto>(endpoint, { method: "POST", body: payload }),
   update: (id: number, payload: SaveAvailabilityGroupDto) => request<void>(`${endpoint}/${id}`, { method: "PUT", body: payload }),
   remove: (id: number) => request<void>(`${endpoint}/${id}`, { method: "DELETE" }),
+  async saveGraph(payload: SaveAvailabilityGroupGraphDto): Promise<SaveAvailabilityGroupGraphResult> {
+    const unconfirmed = () => new Error(t("Availability save could not be confirmed. Check the Availability list before trying again."));
+    const result = await request<SaveAvailabilityGroupGraphResult>(`${endpoint}/save-graph`, { method: "POST", body: payload })
+      .catch((error: unknown) => {
+        if (error instanceof ApiError && error.status !== 502 && error.status !== 504) throw error;
+        throw unconfirmed();
+      });
+
+    if (!result || !Number.isInteger(result.id) || result.id <= 0 ||
+        (payload.id !== null && result.id !== payload.id) ||
+        !Array.isArray(result.sourceGroupIds) || typeof result.changed !== "boolean") {
+      throw unconfirmed();
+    }
+
+    return result;
+  },
 
   members: (groupId: number, signal?: AbortSignal) => request<AvailabilityGroupMemberDto[]>(`${endpoint}/${groupId}/members`, { signal }),
   createMember: (groupId: number, payload: SaveAvailabilityGroupMemberDto) =>

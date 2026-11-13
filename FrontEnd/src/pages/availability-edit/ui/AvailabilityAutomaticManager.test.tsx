@@ -76,6 +76,7 @@ test.each([AvailabilityProfilePage, ManagerPhoneAvailabilityDetailPage])("%s sho
 
 test("editor locks automatic cells and transfer handlers, edits ordinary employees and saves raw values", () => {
   const view = mount(<AvailabilityEditPage />);
+  expect(screen.queryByText("Automatic employment contract availability is read-only. Saved availability is restored when the rule is disabled.")).not.toBeInTheDocument();
   expect(screen.queryByRole("textbox", { name: "Ada Worker day 1", exact: true })).toBeNull();
   const auto = screen.getByRole("button", { name: "Ada Worker day 1", exact: true });
   expect(auto).toHaveTextContent("+");
@@ -89,6 +90,8 @@ test("editor locks automatic cells and transfer handlers, edits ordinary employe
   expect(mocks.editor!.assignedEmployees[0].label).toContain("read-only");
   fireEvent.change(screen.getByRole("textbox", { name: "Grace Worker day 1", exact: true }), { target: { value: "+" } });
   act(() => mocks.editor!.onSave());
+  act(() => mocks.editor!.onSave());
+  expect(mocks.save).toHaveBeenCalledTimes(1);
   const saved = mocks.save.mock.calls[0][0];
   expect(saved.cellMap).toEqual({ "1:1": "09:00 - 15:00", "1:5": "-", "2:1": "+" });
   expect(saved.transfers).toEqual([]);
@@ -168,9 +171,10 @@ test("editor preserves archived members on save and removes only the confirmed m
   expect(mocks.editor!.cellMap["1:7"]).toBeUndefined();
   act(() => mocks.editor!.onSave());
   expect(mocks.save.mock.calls[0][0]).toEqual(expect.objectContaining({
-    employeeIds: [1, 2], existingMembers: mocks.members, existingSlots: mocks.slots,
+    employeeIds: [1, 2],
     cellMap: { "1:1": "09:00 - 15:00", "1:5": "-", "2:1": "-" },
   }));
+  act(() => mocks.save.mock.calls[0][1].onError(new Error("Save was rejected")));
   act(() => mocks.editor!.onRemoveEmployee(1));
   const dialog = screen.getByRole("dialog", { name: "Remove employee" });
   expect(dialog).toHaveTextContent("Employee #1");
@@ -180,7 +184,7 @@ test("editor preserves archived members on save and removes only the confirmed m
   expect(view.container.querySelector("table")).toBeInTheDocument();
   act(() => mocks.editor!.onSave());
   expect(mocks.save.mock.calls[1][0]).toEqual(expect.objectContaining({
-    employeeIds: [2], existingMembers: mocks.members, existingSlots: mocks.slots,
+    employeeIds: [2],
     cellMap: { "2:1": "-" },
   }));
 });
