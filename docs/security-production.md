@@ -114,7 +114,7 @@ git merge-base --is-ancestor HEAD "$approved_sha"
 stage=$(mktemp -d /root/gf3-tool-upgrade.XXXXXXXX)
 backup=$(mktemp -d /root/gf3-tool-backup.XXXXXXXX)
 tool_dir=/usr/local/libexec/gf3
-unit=/etc/systemd/system/gf3-guard.timer
+unit_dir=/etc/systemd/system
 approval=/etc/gfctl/approved-release.conf
 exec 9>/run/lock/gf3-prod-deploy.lock
 flock -w 120 9
@@ -124,17 +124,17 @@ test "$(systemctl show gf3-guard.timer --property=UnitFileState --value)" = disa
 exec 8<>/opt/gf/deploy/security/runtime/state/guard.lock
 flock -w 120 8
 systemctl stop gf3-guard.service
-cp -p "$tool_dir"/{gf3_release.py,gf3_guard.py} "$unit" "$approval" "$backup/"
-(cd "$backup"; sha256sum gf3_release.py gf3_guard.py gf3-guard.timer approved-release.conf > SHA256SUMS)
-for file in gf3_release.py gf3_guard.py gf3-guard.timer; do
+cp -p "$tool_dir"/{gf3_release.py,gf3_guard.py} "$unit_dir"/gf3-guard.{timer,service} "$approval" "$backup/"
+(cd "$backup"; sha256sum gf3_release.py gf3_guard.py gf3-guard.{timer,service} approved-release.conf > SHA256SUMS)
+for file in gf3_release.py gf3_guard.py gf3-guard.timer gf3-guard.service; do
     git show "$approved_sha:deploy/security/$file" > "$stage/$file"
     test "$(git hash-object --no-filters "$stage/$file")" = "$(git rev-parse "$approved_sha:deploy/security/$file")"
 done
 python3 -m py_compile "$stage"/{gf3_release.py,gf3_guard.py}
-systemd-analyze verify "$stage/gf3-guard.timer" /etc/systemd/system/gf3-guard.service
+systemd-analyze verify "$stage"/gf3-guard.{timer,service}
 ```
 
-Stop if a command fails. Install by same-directory rename. If the process fails partway, restore the three saved files by the same method before retrying.
+Stop if a command fails. Install by same-directory rename. If the process fails partway, restore the four saved files by the same method before retrying.
 
 ```bash
 replace_file() {
@@ -144,18 +144,19 @@ replace_file() {
 }
 replace_file "$stage/gf3_guard.py" "$tool_dir/gf3_guard.py" 0644
 replace_file "$stage/gf3_release.py" "$tool_dir/gf3_release.py" 0644
-replace_file "$stage/gf3-guard.timer" "$unit" 0644
+replace_file "$stage/gf3-guard.timer" "$unit_dir/gf3-guard.timer" 0644
+replace_file "$stage/gf3-guard.service" "$unit_dir/gf3-guard.service" 0644
 systemctl daemon-reload
-for path in "$tool_dir/gf3_release.py" "$tool_dir/gf3_guard.py" "$unit"; do
+for path in "$tool_dir"/{gf3_release.py,gf3_guard.py} "$unit_dir"/gf3-guard.{timer,service}; do
     test "$(git hash-object --no-filters "$path")" = "$(git rev-parse "$approved_sha:deploy/security/${path##*/}")"
     stat -c '%a %U:%G %n' "$path"
 done
-systemctl show gf3-guard.timer --property=FragmentPath,DropInPaths,NeedDaemonReload,ActiveState,UnitFileState
+systemctl show gf3-guard.timer gf3-guard.service --property=FragmentPath,DropInPaths,NeedDaemonReload,ActiveState,UnitFileState
 ```
 
-Expect root-owned mode 0644, the approved fragment path, empty `DropInPaths`, `NeedDaemonReload=no`, `ActiveState=inactive` and `UnitFileState=disabled`. Verify the unchanged local menu reads `/etc/gfctl/approved-release.conf`, then edit the SHA value in that file using its existing key and quoting. Preserve the approved Nginx digest and other settings. The repository does not contain the local file, so confirm its actual key name in `gfctl` before editing. Check the file stays root-owned mode 0600 and that its new SHA equals `git rev-parse origin/PROD2`. Keep the backup path.
+Expect root-owned mode 0644, the approved fragment paths, empty `DropInPaths` and `NeedDaemonReload=no` for both units. The timer must be inactive and disabled. Verify the unchanged local menu reads `/etc/gfctl/approved-release.conf`, then edit the SHA value in that file using its existing key and quoting. Preserve the approved Nginx digest and other settings. The repository does not contain the local file, so confirm its actual key name in `gfctl` before editing. Check the file stays root-owned mode 0600 and that its new SHA equals `git rev-parse origin/PROD2`. Keep the backup path.
 
-Release the two locks before the preflight. Use a protected detached checkout for the approved SHA, with a private copy of the live `deploy/.env`. Run the installed preflight against that checkout and SHA as above. Expect `Preflight OK`. It verifies the installed Git blob hashes and the loaded timer fragment before permitting the retry. Review the HTTPS, ACME, Certbot and SSH checks before selecting `[11]`. During the retry, `guard-initial-run`, `guard-status`, `post-guard-health`, `guard-timer-enable`, `guard-timer-start` and `git-fast-forward` identify the final activation stages. Expect the deployed SHA in the success message and verify `git rev-parse HEAD`, the active bundle's `release.json`, and the enabled/active timer. On failure, retain the stage diagnostic and recovery bundle. Do not rerun blindly or reset Git.
+Release the two locks before the preflight. Use a protected detached checkout for the approved SHA, with a private copy of the live `deploy/.env`. Run the installed preflight against that checkout and SHA as above. Expect `Preflight OK`. It verifies the installed Git blob hashes and the loaded unit fragments before permitting the retry. Review the HTTPS, ACME, Certbot and SSH checks before selecting `[11]`. During the retry, `guard-initial-run`, `guard-status`, `post-guard-health`, `guard-timer-enable`, `guard-timer-start` and `git-fast-forward` identify the final activation stages. Expect the deployed SHA in the success message and verify `git rev-parse HEAD`, the active bundle's `release.json`, and the enabled/active timer. On failure, retain the stage diagnostic and recovery bundle. Do not rerun blindly or reset Git.
 
 ```bash
 flock -u 8
@@ -168,7 +169,7 @@ install -o root -g root -m 0600 deploy/.env "$release_dir/deploy/.env"
 /usr/bin/python3 "$tool_dir/gf3_release.py" preflight "$release_dir" "$approved_sha"
 ```
 
-To undo the host-tool update before another deployment, take the same locks while the timer is disabled, verify the backup with `(cd "$backup"; sha256sum -c SHA256SUMS)`, restore both Python files and the timer with `replace_file` as above, and restore `approved-release.conf` with mode 0600. Run `systemctl daemon-reload`. Check HTTPS and leave the existing recovery bundle active.
+To undo the host-tool update before another deployment, take the same locks while the timer is disabled, verify the backup with `(cd "$backup"; sha256sum -c SHA256SUMS)`, restore both Python files and both units with `replace_file` as above, and restore `approved-release.conf` with mode 0600. Run `systemctl daemon-reload`. Check HTTPS and leave the existing recovery bundle active.
 
 ## GO / NO-GO
 

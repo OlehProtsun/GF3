@@ -29,6 +29,7 @@ DOMAIN = "app-gf.com"
 PROJECT = "gf3"
 NETWORK = PROJECT + "_gf3-internal"
 GUARD_TIMER_UNIT = Path("/etc/systemd/system/gf3-guard.timer")
+GUARD_SERVICE_UNIT = Path("/etc/systemd/system/gf3-guard.service")
 CERT = "/etc/nginx/certs/fullchain.pem"
 KEY = "/etc/nginx/certs/privkey.pem"
 WEB = "/var/www/certbot"
@@ -706,15 +707,16 @@ def verify_backend_env(bundle):
 
 
 def verify_tooling(sha):
-    for path in (Path(__file__), Path(__file__).with_name("gf3_guard.py"), GUARD_TIMER_UNIT):
+    for path in (Path(__file__), Path(__file__).with_name("gf3_guard.py"), GUARD_TIMER_UNIT, GUARD_SERVICE_UNIT):
         safe_path(path)
         require(git("hash-object", "--no-filters", str(path)).strip() ==
                 git("rev-parse", f"{sha}:deploy/security/{path.name}").strip(),
                 f"Installed {path.name} differs from the approved release")
-    result = command("systemctl", "show", "gf3-guard.timer", "--property=NeedDaemonReload,FragmentPath,DropInPaths")
-    values = dict(line.split("=", 1) for line in result.splitlines() if "=" in line)
-    require(values.get("NeedDaemonReload") == "no" and values.get("FragmentPath") == str(GUARD_TIMER_UNIT)
-            and values.get("DropInPaths") == "", "Check the loaded Guard timer and drop-ins, then run daemon-reload")
+    for unit in (GUARD_TIMER_UNIT, GUARD_SERVICE_UNIT):
+        result = command("systemctl", "show", unit.name, "--property=NeedDaemonReload,FragmentPath,DropInPaths")
+        values = dict(line.split("=", 1) for line in result.splitlines() if "=" in line)
+        require(values.get("NeedDaemonReload") == "no" and values.get("FragmentPath") == str(unit)
+                and values.get("DropInPaths") == "", f"Check {unit.name} and its drop-ins, then run daemon-reload")
 
 
 def deploy(sha, nginx_image):
