@@ -28,11 +28,17 @@ if os.name == "nt":
 
 
 def diagnostic_command(*args, cwd=None, timeout=120, capture=True, check=True, data=None, extra_env=None):
+    if args[0] == "git":
+        return production_command(*args, cwd=cwd, timeout=timeout, capture=capture, check=check,
+                                  data=data, extra_env=extra_env)
     result = subprocess.run(args, cwd=cwd, env={**release.ENV, **(extra_env or {})}, timeout=timeout, text=True, input=data,
                             capture_output=capture)
     if check and result.returncode:
         raise release.ReleaseError(f"{args[0]} {args[1]} failed (exit {result.returncode}): {result.stderr or ''}")
     return result.stdout if capture else ""
+
+
+production_command = release.command
 
 
 def free_port():
@@ -112,6 +118,8 @@ def main():
         git_dir = root / "checkout"
         git_dir.mkdir()
         release.git("init", "-b", "PROD2", root=git_dir)
+        (git_dir / "release-marker").write_text("original\n")
+        release.git("add", "release-marker", root=git_dir)
         release.git("-c", "user.name=GF3 Fixture", "-c", "user.email=gf3@example.test",
                     "commit", "--allow-empty", "-m", "before", root=git_dir)
         before = release.git("rev-parse", "HEAD", root=git_dir).strip()
@@ -123,6 +131,33 @@ def main():
         sha = release.git("rev-parse", "HEAD", root=git_dir).strip()
         release.git("switch", "PROD2", root=git_dir)
         real_git = release.git
+        if os.name != "nt":
+            # A read-only status must not write the index or run its local hook.
+            hooks = git_dir / ".git/hooks"
+            hook = hooks / "post-index-change"
+            hook.write_text("#!/bin/sh\n"
+                            "if test -f .git/fixture-armed; then\n"
+                            "  rm .git/fixture-armed\n"
+                            "  printf 'temporary\\n' > release-marker\n"
+                            "fi\n")
+            hook.chmod(0o755)
+            armed = git_dir / ".git/fixture-armed"
+            armed.touch()
+            os.utime(git_dir / "release-marker", (1000000000, 1000000000))
+            assert not real_git("status", "--porcelain", root=git_dir)
+            try:
+                real_git("merge", "--ff-only", sha, root=git_dir)
+            except release.GitMergeError as error:
+                assert error.reason == "tracked changes would be overwritten"
+            else:
+                raise AssertionError("Index refresh hook did not reproduce Git rejection")
+            (git_dir / "release-marker").write_text("original\n")
+            armed.touch()
+            assert not release.git_status("--porcelain", root=git_dir)
+            assert armed.is_file() and (git_dir / "release-marker").read_text() == "original\n"
+            armed.unlink()
+            hook.unlink()
+            print("Rehearsal passed: read-only status prevents index-refresh hook side effects")
         try:
             release.command(*base, "create", "--no-build", "--pull", "never", capture=False)
             bridge, = release.docker_json("network", "inspect", network)
@@ -169,7 +204,7 @@ def main():
                 assert backup.execute("SELECT value FROM rehearsal_marker").fetchall() == [(marker,)]
 
             template = deploy / "nginx/https-templates/gf3.conf.template"
-            for scenario in ("nginx-syntax", "https-failure", "activation-failure", "success"):
+            for scenario in ("nginx-syntax", "https-failure", "activation-failure", "transient-worktree", "success"):
                 candidate = release.STATE / f"release-{scenario}"
                 candidate.mkdir()
                 config = release.render(root)
@@ -249,16 +284,30 @@ def main():
                                         return updater.execute(guard.arguments(args))
                                 return updater.execute(guard.arguments(args))
 
-                            def git(*args):
+                            def git(*args, root=None):
                                 if args[0] == "fetch":
                                     return ""
                                 if args == ("rev-parse", "refs/remotes/origin/PROD2"):
                                     return sha
-                                return real_git(*args, root=git_dir)
+                                is_merge = "merge" in args
+                                if is_merge and scenario == "transient-worktree":
+                                    path = git_dir / "release-marker"
+                                    # Simulate a writer after the clean pre-merge observation.
+                                    path.write_text("temporary synthetic value\n")
+                                    try:
+                                        return real_git(*args, root=git_dir)
+                                    finally:
+                                        path.write_text("original\n")
+                                return real_git(*args, root=root or git_dir)
 
                             def cutover(*_):
                                 release.cutover(candidate, previous, baseline)
                                 return candidate, previous, baseline
+
+                            def recover_with_audit(bundle, acme):
+                                audit = json.loads((candidate / "git-activation.json").read_text())
+                                assert audit["result"] == "failed"
+                                real_recover(bundle, acme)
 
                             def current_bundle():
                                 if os.name == "nt":
@@ -268,6 +317,7 @@ def main():
                             if scenario == "activation-failure":
                                 index_lock = git_dir / ".git/index.lock"
                                 index_lock.touch()
+                            real_recover = release.recover
                             with (patch.object(release, "command", activation_command),
                                   patch.object(release, "git", git), patch.object(release, "verify_tooling"),
                                   patch.object(release, "deploy", cutover),
@@ -275,22 +325,36 @@ def main():
                                   patch.object(release, "lock", side_effect=lambda path:
                                                nullcontext() if os.name == "nt" else real_lock(path)),
                                   patch.object(release, "active_bundle", current_bundle)):
-                                if scenario == "activation-failure":
+                                if scenario in ("activation-failure", "transient-worktree"):
                                     try:
-                                        release.deploy_and_activate(sha, "fixture")
+                                        with patch.object(release, "recover", recover_with_audit):
+                                            release.deploy_and_activate(sha, "fixture")
                                     except release.ReleaseError as error:
                                         assert "git-fast-forward:" in str(error) and "prior release restored" in str(error)
                                     else:
-                                        raise AssertionError("Git index lock passed activation")
+                                        raise AssertionError("Unsafe Git update passed activation")
                                     finally:
-                                        index_lock.unlink()
+                                        if scenario == "activation-failure":
+                                            index_lock.unlink()
                                     assert real_git("rev-parse", "HEAD", root=git_dir).strip() == before
+                                    assert not real_git("--no-optional-locks", "status", "--porcelain", root=git_dir)
                                     assert not any(timer.values()) and not geo.exists()
+                                    audit_path = candidate / "git-activation.json"
+                                    audit = json.loads(audit_path.read_text())
+                                    assert audit["result"] == "failed" and not audit["before"]["tracked"]
+                                    if os.name != "nt":
+                                        assert audit_path.stat().st_mode & 0o777 == 0o600
+                                    if scenario == "transient-worktree":
+                                        assert audit["failure"]["reason"] == "tracked changes would be overwritten"
+                                        assert audit["failure"]["reported_paths"] == ["release-marker"]
+                                        assert not audit["after_failure"]["tracked"]
+                                        assert "temporary synthetic value" not in audit_path.read_text()
                                 else:
                                     release.deploy_and_activate(sha, "fixture")
                                     assert real_git("rev-parse", "HEAD", root=git_dir).strip() == sha
                                     assert (git_dir / "release-marker").read_text() == marker
                                     assert all(timer.values()) and geo.is_file()
+                                    assert json.loads((candidate / "git-activation.json").read_text())["result"] == "merged"
                                 assert runs == [("run", "--require-lock")]
                                 assert current_bundle() == (candidate if scenario == "success" else previous)
                                 with patch.dict(os.environ, {"RENEWED_LINEAGE": "/etc/letsencrypt/live/app-gf.com"}):

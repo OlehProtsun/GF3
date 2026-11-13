@@ -62,6 +62,7 @@ class ActivationTests(unittest.TestCase):
                           patch.object(release, "deploy", return_value=(candidate, previous, baseline)),
                           patch.object(release, "run_initial_guard", side_effect=lambda _: check("initial")),
                           patch.object(release, "approve_guard", side_effect=lambda *_: check("status")),
+                          patch.object(release, "finalize_git", side_effect=lambda *_: check("merge")),
                           patch.object(release, "verify_web", side_effect=lambda _: check("health")),
                           patch.object(release, "topology", return_value=baseline),
                           patch.object(release, "STATE", Path("nonexistent-gf3-test-state")),
@@ -102,6 +103,37 @@ class ActivationTests(unittest.TestCase):
                 lock_file.touch()
                 with self.assertRaisesRegex(release.ReleaseError, "identify its owner"):
                     release.check_git_write_ready()
+
+    def test_git_audit_keeps_paths_and_safe_diagnostics_before_recovery(self):
+        before = {"head": "a" * 40, "branch": "PROD2", "tracked": [], "untracked_count": 0,
+                  "index": {"flagged_paths": []}}
+        after = {**before, "tracked": [{"path": "deploy/example.conf", "staged": "M", "unstaged": "M"}]}
+        error = release.GitMergeError(1, "tracked changes would be overwritten",
+                                      ["deploy/example.conf", "secret-stderr-content"])
+        with tempfile.TemporaryDirectory() as directory:
+            bundle = Path(directory)
+            with (patch.object(release, "git_activation_state", side_effect=[before, after]),
+                  patch.object(release, "git", side_effect=["deploy/example.conf\0", "deploy/example.conf\n", "", error]),
+                  contextlib.redirect_stderr(io.StringIO())):
+                with self.assertRaises(release.GitMergeError):
+                    release.finalize_git(bundle, "b" * 40)
+            contents = (bundle / "git-activation.json").read_text()
+            self.assertIn('"after_failure"', contents)
+            self.assertIn("deploy/example.conf", contents)
+            self.assertNotIn("secret-stderr-content", contents)
+
+    def test_git_audit_records_dirty_checkout_without_attempting_merge(self):
+        before = {"head": "a" * 40, "branch": "PROD2", "untracked_count": 0, "index": {"flagged_paths": []},
+                  "tracked": [{"path": "deploy/dirty.conf", "staged": "M", "unstaged": "."}]}
+        with tempfile.TemporaryDirectory() as directory:
+            bundle = Path(directory)
+            with (patch.object(release, "git_activation_state", return_value=before),
+                  patch.object(release, "git", side_effect=["deploy/dirty.conf\0", "deploy/dirty.conf\n"]) as git,
+                  contextlib.redirect_stderr(io.StringIO())):
+                with self.assertRaisesRegex(release.ReleaseError, "checkout is dirty"):
+                    release.finalize_git(bundle, "b" * 40)
+            self.assertEqual(git.call_count, 2)
+            self.assertIn("deploy/dirty.conf", (bundle / "git-activation.json").read_text())
 
     def test_failed_automatic_recovery_retains_bundle_and_original_stage(self):
         with (patch.object(release, "git", return_value="a" * 40), patch.object(release, "verify_tooling"),

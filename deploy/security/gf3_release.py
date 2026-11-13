@@ -3,6 +3,7 @@
 
 import argparse
 from contextlib import closing, contextmanager
+from datetime import datetime, timezone
 import hashlib
 import ipaddress
 import io
@@ -48,17 +49,30 @@ class ReleaseError(Exception):
     pass
 
 
+class GitMergeError(ReleaseError):
+    def __init__(self, code, reason, reported_paths):
+        super().__init__(f"git merge --ff-only failed (exit {code}): {reason}")
+        self.code = code
+        self.reason = reason
+        self.reported_paths = reported_paths
+
+
 def require(condition, message):
     if not condition:
         raise ReleaseError(message)
 
 
 def command(*args, cwd=None, timeout=120, capture=True, check=True, data=None, extra_env=None):
-    result = subprocess.run(args, cwd=cwd, env={**ENV, **(extra_env or {})}, timeout=timeout, text=True,
+    is_git = args[0] == "git"
+    result = subprocess.run(args, cwd=cwd, env={**ENV, **(extra_env or {})}, timeout=timeout, text=not is_git,
                             input=data, capture_output=capture)
+    stdout, stderr = result.stdout, result.stderr
+    if is_git:
+        stdout = stdout.decode("utf-8", "surrogateescape") if isinstance(stdout, bytes) else stdout
+        stderr = stderr.decode("utf-8", "surrogateescape") if isinstance(stderr, bytes) else stderr
     if check and result.returncode:
-        if args[0] == "git" and "merge" in args:
-            diagnostic = (result.stderr or "").lower()
+        if is_git and "merge" in args:
+            diagnostic = (stderr or "").lower()
             reasons = (
                 ("index.lock", "Git index lock or another writer"),
                 ("cannot lock ref", "Git ref lock or another writer"),
@@ -70,26 +84,35 @@ def command(*args, cwd=None, timeout=120, capture=True, check=True, data=None, e
             )
             reason = next((message for token, message in reasons if token in diagnostic),
                           "check branch, checkout status and Git write access")
-            raise ReleaseError(f"git merge --ff-only failed (exit {result.returncode}): {reason}")
+            # Only paths also present in the incoming Git diff are retained in the audit.
+            reported = [line[1:] for line in (stderr or "").split("\n") if line.startswith("\t")]
+            raise GitMergeError(result.returncode, reason, reported)
         if args[0] == "systemctl":
             unit = next((arg for arg in args if arg in ("gf3-guard.timer", "gf3-guard.service")), "")
             raise ReleaseError(f"systemctl {args[1]} {unit} failed (exit {result.returncode}); "
                                "check systemctl status and the unit journal")
         if args[0] == "/usr/bin/python3":
             hint = ("Guard lock is busy; let the other Guard command finish"
-                    if (result.stderr or "").strip() == "GF3 guard: Deployment guard could not acquire its lock"
+                    if (stderr or "").strip() == "GF3 guard: Deployment guard could not acquire its lock"
                     else "check Guard state, filesystem permissions and the active Nginx configuration")
             raise ReleaseError(f"Guard {args[2]} failed (exit {result.returncode}); {hint}")
         raise ReleaseError(f"{Path(args[0]).name} {args[1]} failed (exit {result.returncode})")
-    return result.stdout if capture else ""
+    return stdout if capture else ""
 
 
 def docker_json(*args):
     return json.loads(command("docker", *args))
 
 
-def git(*args, root=ROOT):
-    return command("git", "-c", f"safe.directory={root}", *args, cwd=root, timeout=180)
+def git(*args, root=None):
+    root = ROOT if root is None else root
+    return command("git", "-c", f"safe.directory={root}", *args, cwd=root, timeout=180,
+                   extra_env={"LC_ALL": "C"})
+
+
+def git_status(*args, root=None):
+    # Status is a read-only gate. An optional index refresh can invoke post-index-change.
+    return git("--no-optional-locks", "status", *args, root=root)
 
 
 def safe_path(path, private=False):
@@ -105,7 +128,7 @@ def safe_path(path, private=False):
 
 def verified_checkout(source, revision):
     require(git("rev-parse", "HEAD", root=source).strip() == revision, "Candidate checkout is at a different revision")
-    require(not git("status", "--porcelain", root=source), "Candidate checkout is dirty")
+    require(not git_status("--porcelain", "--untracked-files=all", root=source), "Candidate checkout is dirty")
 
 
 def write(path, contents):
@@ -580,13 +603,89 @@ def verify_guard_quiet():
 
 def check_git_target(sha):
     require(git("branch", "--show-current").strip() == "PROD2", "Expected PROD2 checkout")
-    require(not git("status", "--porcelain"), "Production checkout is dirty")
+    require(not git_status("--porcelain", "--untracked-files=all"), "Production checkout is dirty")
     git("merge-base", "--is-ancestor", "HEAD", sha)
 
 
 def check_git_write_ready():
     index_lock = Path(git("rev-parse", "--path-format=absolute", "--git-path", "index.lock").strip())
     require(not os.path.lexists(index_lock), "Git index lock exists; identify its owner before retrying")
+
+
+def git_activation_state():
+    index = Path(git("rev-parse", "--path-format=absolute", "--git-path", "index").rstrip("\n"))
+    metadata = index.stat()
+    entries = []
+    untracked = 0
+    for entry in git_status("--porcelain=v2", "-z", "--no-renames", "--untracked-files=all").split("\0"):
+        if entry.startswith("1 "):
+            _, xy, submodule, head, staged, worktree, _, _, path = entry.split(" ", 8)
+            entries.append({"path": path, "staged": xy[0], "unstaged": xy[1], "submodule": submodule,
+                            "modes": {"head": head, "index": staged, "worktree": worktree}})
+        elif entry.startswith("u "):
+            fields = entry.split(" ", 10)
+            entries.append({"path": fields[-1], "conflict": fields[1], "stage_modes": fields[3:7]})
+        elif entry.startswith("? "):
+            untracked += 1
+        elif entry:
+            raise ReleaseError("Unexpected Git status record")
+    flagged = [{"flag": entry[0], "path": entry[2:]} for entry in git("ls-files", "-v", "-z").split("\0")
+               if entry and (entry[0] == "S" or entry[0].islower())]
+    return {"head": git("rev-parse", "HEAD").strip(), "branch": git("branch", "--show-current").strip(),
+            "tracked": entries, "untracked_count": untracked,
+            "index": {"size": metadata.st_size, "mtime_ns": metadata.st_mtime_ns, "inode": metadata.st_ino,
+                      "lock_present": os.path.lexists(index.with_name(index.name + ".lock")), "flagged_paths": flagged}}
+
+
+def finalize_git(candidate, sha):
+    path = candidate / "git-activation.json"
+    audit = {"at_utc": datetime.now(timezone.utc).isoformat(), "target": sha, "result": "pending"}
+    reported_paths = {}
+    try:
+        before = git_activation_state()
+        audit["before"] = before
+        diff = ("-c", "core.quotePath=false", "diff", "--no-renames", "--name-only")
+        revisions = (before["head"], sha, "--")
+        incoming = git(*diff, "-z", *revisions).split("\0")[:-1]
+        quoted = git(*diff, *revisions).split("\n")[:-1]
+        reported_paths = dict(zip(quoted, incoming, strict=True))
+        audit["incoming_paths"] = incoming
+        store(path, audit)
+        require(before["branch"] == "PROD2", "Expected PROD2 checkout")
+        require(not before["index"]["flagged_paths"], "Checkout uses assume-unchanged or skip-worktree flags")
+        require(not before["tracked"] and not before["untracked_count"],
+                "Production checkout is dirty; inspect the protected Git activation audit")
+        git("merge-base", "--is-ancestor", before["head"], sha)
+        # Keep Git's overwrite checks, including for ignored host-local files.
+        git("-c", "core.quotePath=false", "merge", "--ff-only", "--no-autostash", "--no-overwrite-ignore", sha)
+    except (Exception, KeyboardInterrupt) as failure:
+        audit["result"] = "failed"
+        if isinstance(failure, GitMergeError):
+            audit["failure"] = {"exit_code": failure.code, "reason": failure.reason,
+                                "reported_paths": sorted({reported_paths[path] for path in failure.reported_paths
+                                                          if path in reported_paths})}
+        elif isinstance(failure, ReleaseError):
+            audit["failure"] = {"reason": str(failure)}
+        else:
+            audit["failure"] = {"type": type(failure).__name__}
+        try:
+            audit["after_failure"] = git_activation_state()
+        except (OSError, ReleaseError, ValueError, subprocess.TimeoutExpired):
+            audit["after_failure"] = {"unavailable": True}
+        try:
+            store(path, audit)
+        except OSError:
+            print("Unable to save the Git activation failure audit; check release directory permissions and space",
+                  file=sys.stderr)
+        else:
+            print(f"Git activation audit: {path}", file=sys.stderr)
+        raise
+    audit["result"] = "merged"
+    try:
+        store(path, audit)
+    except OSError:
+        # Git has already advanced. An audit write error cannot undo that commit point.
+        print("Git fast-forward succeeded; the audit could not be finalized", file=sys.stderr)
 
 
 @contextmanager
@@ -619,8 +718,7 @@ def finish_activation(candidate, baseline, sha):
         command("systemctl", "start", "gf3-guard.timer")
         require(timer_state() == (True, True), "Guard timer is not enabled and active")
     with activation_stage("git-fast-forward"):
-        check_git_target(sha)
-        git("merge", "--ff-only", sha)
+        finalize_git(candidate, sha)
 
 
 def deploy_and_activate(sha, nginx_image):
@@ -740,7 +838,7 @@ def deploy(sha, nginx_image):
     nginx_test(previous)
     verify_web(previous)
     backup(previous, baseline[2])
-    require(not git("status", "--porcelain"), "Production checkout changed during staging")
+    require(not git_status("--porcelain", "--untracked-files=all"), "Production checkout changed during staging")
     require(topology() == baseline, "Production network or volume changed during staging")
     store(candidate / "release.json", {"sha": sha, "previous": str(previous), "baseline": baseline})
     if previous_active is None:

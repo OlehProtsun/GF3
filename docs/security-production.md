@@ -97,6 +97,18 @@ The old catch covered the initial service start, Guard lock acquisition, HTTPS/T
 
 The fixed preflight rejects an existing Git index lock before staging. The final Git check still handles a lock or checkout change that appears during deployment.
 
+### Git rejection in release `021eaefc92ce03879ddb07b3ef16b6a047fdbb1d`
+
+The second incident reached the actual merge. The immediately preceding status check reported a clean checkout. The staged build uses a detached worktree. Candidate Nginx reads the copied template from the release directory, while Guard writes runtime files outside the tracked set at the rollback revision. The repository does not include the production `gfctl`, local Git hooks or host logs.
+
+One operation in the affected window can cause a tracked write as a side effect. Ordinary `git status` can write the refreshed index and invoke the checkout's `post-index-change` hook after computing the status. In disposable Linux, touching only the tracked file's mtime forced the refresh. Status returned empty, the hook changed the file, and Git returned exit 1 with “tracked changes would be overwritten.” The fixture could then restore the file and show a clean checkout, matching the observations after recovery. The fixed release uses `git --no-optional-locks status` for all deployment cleanliness checks. The same fixture confirms it leaves the index-refresh hook untriggered. The actual merge keeps Git's overwrite protection and disables automatic stashing and overwriting ignored files. An independent writer or a host hook remains possible. The old output cannot establish which process or path was involved on production. [Git status background refresh](https://git-scm.com/docs/git-status#_background_refresh) · [Git post-index-change hook](https://git-scm.com/docs/githooks#_post_index_change)
+
+Before the next Git fast-forward, the tool writes a mode-0600 `git-activation.json` into that attempt's private `/var/lib/gf3-deploy/release-*` directory. It records the branch and revisions, exact tracked paths, staged and unstaged status, file modes, index metadata and flags, and a count of untracked paths. If the command fails, it adds a second observation and the sanitized exit code, reason and Git-reported incoming conflict paths before recovery starts. It excludes diff contents, untracked filenames, raw stderr and environment data. The transient Docker/Git test verifies that the audit retains the reported conflict path even if both observations are clean, and that recovery still restores HTTPS, the prior active bundle and timer state without changing SQLite.
+
+Keep the current recovery bundle and timer state. Wait for review, merge and CI on the new PROD2 SHA. Before considering another deployment, inspect local Git hooks and any checkout-writing jobs on the host. If the index-refresh hook or another writer is identified, confirm that its behavior is safe for the deployment checkout. A clean status after rollback alone is insufficient. Preserve the audit and stop if an unexpected writer remains or the release fails again.
+
+For an existing installation on the previous activation fix, only `/usr/local/libexec/gf3/gf3_release.py` changes in this hotfix. Use the locked backup and atomic replacement below for that file. Verify the already-installed `gf3_guard.py` and both systemd units against the new approved commit as well. Leave those files untouched if their hashes match. Keep the existing Certbot hook, timer and `gfctl`. Update only the approved SHA in `/etc/gfctl/approved-release.conf` after verification, then run the documented preflight. Do not rerun the installer.
+
 On the host as root, use the same shell for the maintenance steps. Check the live HTTPS/ACME baseline and confirm `readlink -f /var/lib/gf3-deploy/active` returns the expected recovery bundle. Do not edit files inside that bundle.
 
 ```bash
@@ -108,7 +120,7 @@ approved_sha='<full reviewed and tested PROD2 SHA>'
 git fetch origin PROD2
 test "$(git rev-parse origin/PROD2)" = "$approved_sha"
 test "$(git branch --show-current)" = PROD2
-test -z "$(git status --porcelain)"
+test -z "$(git --no-optional-locks status --porcelain --untracked-files=all)"
 test ! -e "$(git rev-parse --git-path index.lock)"
 git merge-base --is-ancestor HEAD "$approved_sha"
 stage=$(mktemp -d /root/gf3-tool-upgrade.XXXXXXXX)
@@ -142,10 +154,11 @@ replace_file() {
     tmp=$(mktemp "${dst%/*}/.gf3-update.XXXXXXXX") || return
     install -o root -g root -m "$mode" "$src" "$tmp" && mv -fT -- "$tmp" "$dst"
 }
-replace_file "$stage/gf3_guard.py" "$tool_dir/gf3_guard.py" 0644
-replace_file "$stage/gf3_release.py" "$tool_dir/gf3_release.py" 0644
-replace_file "$stage/gf3-guard.timer" "$unit_dir/gf3-guard.timer" 0644
-replace_file "$stage/gf3-guard.service" "$unit_dir/gf3-guard.service" 0644
+for path in "$tool_dir"/{gf3_release.py,gf3_guard.py} "$unit_dir"/gf3-guard.{timer,service}; do
+    if ! cmp -s "$stage/${path##*/}" "$path"; then
+        replace_file "$stage/${path##*/}" "$path" 0644
+    fi
+done
 systemctl daemon-reload
 for path in "$tool_dir"/{gf3_release.py,gf3_guard.py} "$unit_dir"/gf3-guard.{timer,service}; do
     test "$(git hash-object --no-filters "$path")" = "$(git rev-parse "$approved_sha:deploy/security/${path##*/}")"
