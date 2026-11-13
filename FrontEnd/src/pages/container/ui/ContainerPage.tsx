@@ -1,6 +1,14 @@
+import { useLanguageRevision } from "@shared/i18n/useLanguageRevision";
+import { t } from "@shared/i18n";
+import { graphDateRange, useApprovedUrlopQuery } from "@entities/urlop";
 import { startTransition, useDeferredValue, useEffect, useMemo, useState, type FormEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import {
+  buildManagerEditLockMessage,
+  managerEditResourceTypes,
+  useManagerEditLocks,
+} from "@app/providers/PresenceProvider";
 import type { ContainerGraphRecords, Graph } from "@entities/containers";
 import {
   ContainerDetailsForm,
@@ -9,6 +17,7 @@ import {
   buildGraphSessionSearch,
   buildContainerGraphSummaries,
   buildContainerStatistics,
+  createContainerFormState,
   filterGraphSummaries,
   containersApi,
   matchesContainerSearch,
@@ -32,8 +41,13 @@ import {
 } from "@entities/exports";
 import { useShopsListQuery } from "@entities/shops/api/queries";
 import { ApiError } from "@shared/api/httpClient";
+import { queryKeys } from "@shared/api/queryKeys";
 import { usePageScrollbarHidden } from "@shared/lib/usePageScrollbarHidden";
+import { stableSerialize } from "@shared/lib/stableSerialize";
+import { useUnsavedChangesPrompt } from "@shared/lib/useUnsavedChangesPrompt";
 import { ConfirmDialog } from "@shared/ui/ConfirmDialog";
+import { ManagerEditLockDialog } from "@shared/ui/ManagerEditLockDialog";
+import { SavingOverlay } from "@shared/ui/SavingOverlay";
 import { ErrorBanner } from "@shared/ui/components/ErrorBanner";
 import { IosButton } from "@shared/ui/components/IosButton";
 import { PlusIcon } from "@shared/ui/icons";
@@ -60,7 +74,7 @@ function useContainerGraphRecords(containerId: number | null, graphs: Graph[], e
   );
 
   const recordsQuery = useQuery({
-    queryKey: ["containers", containerId ?? 0, "graphRecords", graphIdsKey],
+    queryKey: queryKeys.containers.graphRecords(containerId ?? 0, graphIdsKey),
     enabled: enabled && containerId !== null && graphs.length > 0,
     cancelOnUnmount: true,
     staleTime: 30_000,
@@ -107,6 +121,7 @@ function useContainerGraphRecords(containerId: number | null, graphs: Graph[], e
 }
 
 export function ContainerPage() {
+  const language = useLanguageRevision();
   const navigate = useNavigate();
   const location = useLocation();
   const [mode, setMode] = useState<ContainerPageMode>("list");
@@ -136,6 +151,20 @@ export function ContainerPage() {
   const profileContainerId = mode === "profile" ? selectedContainerId : null;
   const editContainerId = mode === "edit" && editingContainerId !== null ? editingContainerId : null;
   const profileQueriesEnabled = mode === "profile" && !deleteMutation.isPending;
+  const editLockTargets = useMemo(
+    () => editContainerId !== null
+      ? [{
+        resourceType: managerEditResourceTypes.container,
+        resourceId: String(editContainerId),
+      }]
+      : [],
+    [editContainerId],
+  );
+  const { lockedByOtherState, isCheckingLocks } = useManagerEditLocks(editLockTargets);
+  const editLockMessage = lockedByOtherState
+    ? buildManagerEditLockMessage(lockedByOtherState, t("This container"))
+    : null;
+  const canEdit = !editLockMessage && !isCheckingLocks;
 
   const profileContainerQuery = useContainerByIdQuery(profileContainerId, profileQueriesEnabled);
   const editContainerQuery = useContainerByIdQuery(editContainerId);
@@ -171,6 +200,8 @@ export function ContainerPage() {
   );
 
   const graphs = useMemo(() => graphsQuery.data ?? [], [graphsQuery.data]);
+  const urlopRange = graphDateRange(graphs);
+  const urlop = useApprovedUrlopQuery(urlopRange.from, urlopRange.to, undefined, mode === "profile" && graphs.length > 0);
   const sanitizedSelectedGraphIds = useMemo(
     () => sanitizeSelectedGraphIds(selectedGraphIds, graphs),
     [graphs, selectedGraphIds],
@@ -179,7 +210,8 @@ export function ContainerPage() {
 
   const graphSummaries = useMemo(
     () => buildContainerGraphSummaries(graphs, graphRecordsState.recordsByGraphId, shopsById),
-    [graphRecordsState.recordsByGraphId, graphs, shopsById],
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- Translation helpers read the current language internally.
+    [graphRecordsState.recordsByGraphId, graphs, shopsById, language],
   );
   const filteredGraphSummaries = useMemo(
     () => filterGraphSummaries(graphSummaries, deferredGraphSearchQuery),
@@ -188,12 +220,14 @@ export function ContainerPage() {
   const statistics = useMemo(
     () =>
       buildContainerStatistics({
+        approvedUrlopDays: urlop.data,
         graphs,
         graphRecordsById: graphRecordsState.recordsByGraphId,
         employeesById,
         shopsById,
       }),
-    [employeesById, graphRecordsState.recordsByGraphId, graphs, shopsById],
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- Translation helpers read the current language internally.
+    [employeesById, graphRecordsState.recordsByGraphId, graphs, shopsById, language, urlop.data],
   );
 
   const isSaving = createMutation.isPending || updateMutation.isPending;
@@ -216,6 +250,33 @@ export function ContainerPage() {
     !editingContainer &&
     !isEditLoading &&
     (editContainerQuery.isError || Boolean(editContainerQuery.error));
+  const initialFormSnapshot = useMemo(
+    () => stableSerialize(createContainerFormState(editingContainer)),
+    [editingContainer],
+  );
+  const currentFormSnapshot = useMemo(() => stableSerialize(form), [form]);
+  const hasUnsavedChanges = useMemo(() => {
+    if (mode !== "edit" || isEditLoading || hasEditLoadError) {
+      return false;
+    }
+
+    if (isCreateMode) {
+      return currentFormSnapshot !== initialFormSnapshot;
+    }
+
+    return Boolean(editingContainer) && currentFormSnapshot !== initialFormSnapshot;
+  }, [
+    currentFormSnapshot,
+    editingContainer,
+    hasEditLoadError,
+    initialFormSnapshot,
+    isCreateMode,
+    isEditLoading,
+    mode,
+  ]);
+  const { confirmIfNeeded, dialog: unsavedChangesDialog, runWithoutPrompt } = useUnsavedChangesPrompt({
+    when: hasUnsavedChanges && !isSaving,
+  });
 
   useEffect(() => {
     if (location.pathname !== "/container") {
@@ -318,16 +379,33 @@ export function ContainerPage() {
   };
 
   const handleCancelEdit = () => {
-    setSubmitError(null);
+    confirmIfNeeded(() => {
+      setSubmitError(null);
 
-    if (editingContainerId !== null) {
+      if (editingContainerId !== null) {
+        setProfileExportError(null);
+        setMode("profile");
+        return;
+      }
+
       setProfileExportError(null);
-      setMode("profile");
-      return;
-    }
+      setMode("list");
+    });
+  };
 
-    setProfileExportError(null);
-    setMode("list");
+  const handleEditLockDialogClose = () => {
+    runWithoutPrompt(() => {
+      setSubmitError(null);
+
+      if (editingContainerId !== null) {
+        setProfileExportError(null);
+        setMode("profile");
+        return;
+      }
+
+      setProfileExportError(null);
+      setMode("list");
+    });
   };
 
   const handleMutationError = (error: unknown) => {
@@ -337,12 +415,22 @@ export function ContainerPage() {
       return;
     }
 
-    setSubmitError("Could not save container.");
+    setSubmitError(t("Could not save container."));
   };
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setSubmitError(null);
+
+    if (editLockMessage) {
+      setSubmitError(editLockMessage);
+      return;
+    }
+
+    if (isCheckingLocks) {
+      setSubmitError(t("Checking edit access. Please wait a moment."));
+      return;
+    }
 
     if (!validate()) {
       return;
@@ -413,7 +501,7 @@ export function ContainerPage() {
       const file = await runMutation(exportContainerExcelMutation.mutate, { containerId: profileContainer.id });
       downloadExportFile(file, buildContainerExportFallbackFilename("excel", profileContainer.name));
     } catch (error) {
-      setProfileExportError(getExportErrorMessage(error, "Could not export this container to Excel."));
+      setProfileExportError(getExportErrorMessage(error, t("Could not export this container to Excel.")));
     }
   };
 
@@ -428,7 +516,7 @@ export function ContainerPage() {
       const file = await runMutation(exportContainerSqlMutation.mutate, { containerId: profileContainer.id });
       downloadExportFile(file, buildContainerExportFallbackFilename("sql", profileContainer.name));
     } catch (error) {
-      setProfileExportError(getExportErrorMessage(error, "Could not export this container to code."));
+      setProfileExportError(getExportErrorMessage(error, t("Could not export this container to code.")));
     }
   };
 
@@ -436,8 +524,8 @@ export function ContainerPage() {
     if (mode === "edit") {
       return (
         <PageHeader
-          title={isCreateMode ? "Add Container" : "Edit Container"}
-          subtitle={isCreateMode ? "Create a new container workspace" : "Update container information"}
+          title={isCreateMode ? t("Add Container") : t("Edit Container")}
+          subtitle={isCreateMode ? t("Create a new container workspace") : t("Update container information")}
           onBack={handleCancelEdit}
         />
       );
@@ -446,8 +534,8 @@ export function ContainerPage() {
     if (mode === "profile") {
       return (
         <PageHeader
-          title="Container Profile"
-          subtitle="View container details, schedules and aggregate workload statistics"
+          title={t("Container Profile")}
+          subtitle={t("View container details, schedules and aggregate workload statistics")}
           onBack={handleBackFromProfile}
           rightSlot={
             profileContainer ? (
@@ -466,16 +554,16 @@ export function ContainerPage() {
 
     return (
       <PageHeader
-        title="Container List"
-        subtitle="Browse containers and open their schedule workspaces"
+        title={t("Container List")}
+        subtitle={t("Browse containers and open their schedule workspaces")}
         backTo="/"
-        rightSlot={<IosButton label="Add New" icon={<PlusIcon size={18} />} onClick={handleStartCreate} />}
-        searchMeta={`Total: ${filteredContainers.length}`}
+        rightSlot={<IosButton label={t("Add New")} icon={<PlusIcon size={18} />} onClick={handleStartCreate} />}
+        searchMeta={t("Total: {0}", filteredContainers.length)}
         search={{
           value: listSearchQuery,
           onChange: setListSearchQuery,
-          placeholder: "Search container",
-          ariaLabel: "Search container",
+          placeholder: t("Search container"),
+          ariaLabel: t("Search container"),
         }}
       />
     );
@@ -483,7 +571,7 @@ export function ContainerPage() {
 
   const contentClassName = [
     styles.content,
-    mode === "profile" ? styles.contentWide : styles.contentNarrow,
+    mode === "profile" ? styles.contentWide : mode === "list" ? styles.contentFolders : styles.contentNarrow,
   ].join(" ");
 
   return (
@@ -500,22 +588,42 @@ export function ContainerPage() {
             onClearSearch={() => setListSearchQuery("")}
             onAddContainer={handleStartCreate}
             onContainerOpen={handleOpenProfile}
+            onGraphOpen={(containerId, graphId) => navigate(`/container/${containerId}/graphs/${graphId}`)}
           />
         ) : null}
 
         {mode === "edit" ? (
           <div className={styles.editShell}>
-            <ContainerDetailsForm
-              form={form}
-              errors={errors}
-              isLoading={isEditLoading}
-              hasLoadError={Boolean(hasEditLoadError)}
-              isSaving={isSaving}
-              submitError={submitError}
-              onFieldChange={handleFieldChange}
-              onCancel={handleCancelEdit}
-              onSubmit={handleSubmit}
-            />
+            {isCheckingLocks ? (
+              <ManagerEditLockDialog
+                open
+                title={t("Checking edit access")}
+                message={t("Please wait while we check whether this container can be edited.")}
+              />
+            ) : null}
+
+            {editLockMessage ? (
+              <ManagerEditLockDialog
+                open
+                message={editLockMessage}
+                actionText={t("Back to container")}
+                onClose={handleEditLockDialogClose}
+              />
+            ) : null}
+
+            {canEdit ? (
+              <ContainerDetailsForm
+                form={form}
+                errors={errors}
+                isLoading={isEditLoading}
+                hasLoadError={Boolean(hasEditLoadError)}
+                isSaving={isSaving}
+                submitError={submitError}
+                onFieldChange={handleFieldChange}
+                onCancel={handleCancelEdit}
+                onSubmit={handleSubmit}
+              />
+            ) : null}
           </div>
         ) : null}
 
@@ -532,7 +640,7 @@ export function ContainerPage() {
               hasLoadError={Boolean(hasProfileLoadError)}
               isDeleting={deleteMutation.isPending}
               isGraphsLoading={graphsQuery.isLoading || graphRecordsState.isLoading}
-              hasGraphsError={graphsQuery.isError || Boolean(graphsQuery.error) || Boolean(graphRecordsState.error)}
+              hasGraphsError={graphsQuery.isError || Boolean(graphsQuery.error) || Boolean(graphRecordsState.error) || urlop.isError}
               graphSearchQuery={graphSearchQuery}
               isMultiOpenEnabled={isMultiOpenEnabled}
               selectedGraphIds={sanitizedSelectedGraphIds}
@@ -575,12 +683,15 @@ export function ContainerPage() {
 
       <ConfirmDialog
         open={isDeleteOpen}
-        title="Delete container"
-        message="Are you sure you want to delete this container? This action cannot be undone."
+        title={t("Delete container")}
+        message={t("Are you sure you want to delete this container? This action cannot be undone.")}
         onCancel={() => setIsDeleteOpen(false)}
         onConfirm={handleDeleteConfirm}
-        confirmText={deleteMutation.isPending ? "Deleting..." : "Delete"}
+        confirmText={deleteMutation.isPending ? t("Deleting...") : t("Delete")}
       />
+
+      <SavingOverlay active={mode === "edit" && isSaving} />
+      {unsavedChangesDialog}
     </div>
   );
 }

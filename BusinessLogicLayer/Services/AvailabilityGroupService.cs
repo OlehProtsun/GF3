@@ -1,4 +1,6 @@
+using BusinessLogicLayer.Availability;
 using BusinessLogicLayer.Common;
+using BusinessLogicLayer.Contracts.Availability;
 using BusinessLogicLayer.Contracts.Enums;
 using BusinessLogicLayer.Contracts.Models;
 using BusinessLogicLayer.Mappers;
@@ -20,15 +22,18 @@ public class AvailabilityGroupService : IAvailabilityGroupService
     private readonly IAvailabilityGroupRepository _groupRepo;
     private readonly IAvailabilityGroupMemberRepository _memberRepo;
     private readonly IAvailabilityGroupDayRepository _dayRepo;
+    private readonly IAvailabilityGroupTransferRepository? _transferRepo;
 
     public AvailabilityGroupService(
         IAvailabilityGroupRepository groupRepo,
         IAvailabilityGroupMemberRepository memberRepo,
-        IAvailabilityGroupDayRepository dayRepo)
+        IAvailabilityGroupDayRepository dayRepo,
+        IAvailabilityGroupTransferRepository? transferRepo = null)
     {
         _groupRepo = groupRepo;
         _memberRepo = memberRepo;
         _dayRepo = dayRepo;
+        _transferRepo = transferRepo;
     }
 
     public async Task<AvailabilityGroupModel?> GetAsync(int id, CancellationToken ct = default)
@@ -76,6 +81,80 @@ public class AvailabilityGroupService : IAvailabilityGroupService
         return (full.ToContract(), members, days);
     }
 
+    public async Task<List<EmployeeAvailabilityModel>> GetPublishedForEmployeeAsync(
+        int employeeId,
+        DateTimeOffset nowUtc,
+        CancellationToken ct = default)
+    {
+        ValidateEmployeeId(employeeId);
+
+        var groups = await _groupRepo
+            .GetPublishedForEmployeeAsync(employeeId, nowUtc.ToUniversalTime(), ServiceMappingHelper.NormalizeReadCancellationToken(ct))
+            .ConfigureAwait(false);
+
+        return groups
+            .Select(group => MapEmployeeAvailability(group, employeeId, nowUtc))
+            .ToList();
+    }
+
+    public async Task<EmployeeAvailabilityModel> GetPublishedForEmployeeByIdAsync(
+        int employeeId,
+        int groupId,
+        DateTimeOffset nowUtc,
+        CancellationToken ct = default)
+    {
+        ValidateEmployeeId(employeeId);
+
+        var group = await _groupRepo
+            .GetPublishedForEmployeeByIdAsync(groupId, employeeId, nowUtc.ToUniversalTime(), ServiceMappingHelper.NormalizeReadCancellationToken(ct))
+            .ConfigureAwait(false)
+            ?? throw new KeyNotFoundException($"Published availability group with id {groupId} was not found for the current employee.");
+
+        return MapEmployeeAvailability(group, employeeId, nowUtc);
+    }
+
+    public async Task<EmployeeAvailabilityModel> SaveEmployeeAvailabilityAsync(
+        int employeeId,
+        int groupId,
+        IList<AvailabilityGroupDayModel> days,
+        DateTimeOffset nowUtc,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(days);
+
+        var published = await GetPublishedForEmployeeByIdAsync(employeeId, groupId, nowUtc, ct).ConfigureAwait(false);
+        if (!published.CanSubmit)
+        {
+            ThrowClosedEmployeeAvailabilityWindow(published.Group, nowUtc);
+        }
+
+        var normalizedDays = NormalizeEmployeeDays(days, published.Group);
+        if (_transferRepo is not null)
+        {
+            var transferredDays = await _transferRepo
+                .GetOutgoingDayNumbersAsync(published.Member.Id, ct)
+                .ConfigureAwait(false);
+            foreach (var transferredDay in normalizedDays.Where(day => transferredDays.Contains(day.DayOfMonth)))
+            {
+                transferredDay.Kind = AvailabilityKind.NONE;
+                transferredDay.IntervalStr = null;
+            }
+        }
+        await ReplaceMemberDaysAsync(published.Member.Id, normalizedDays, ct).ConfigureAwait(false);
+
+        var stampedMember = new AvailabilityGroupMemberModel
+        {
+            Id = published.Member.Id,
+            AvailabilityGroupId = published.Member.AvailabilityGroupId,
+            EmployeeId = published.Member.EmployeeId,
+            DisplayOrder = published.Member.DisplayOrder,
+            EmployeeLastModifiedAtUtc = nowUtc.ToUniversalTime(),
+        };
+        await _memberRepo.UpdateAsync(stampedMember.ToDal(), ct).ConfigureAwait(false);
+
+        return await GetPublishedForEmployeeByIdAsync(employeeId, groupId, nowUtc, ct).ConfigureAwait(false);
+    }
+
     public async Task<List<AvailabilityGroupMemberModel>> GetMembersAsync(int groupId, CancellationToken ct = default)
     {
         var readCt = ServiceMappingHelper.NormalizeReadCancellationToken(ct);
@@ -102,8 +181,12 @@ public class AvailabilityGroupService : IAvailabilityGroupService
         await EnsureMemberBelongsToGroupAsync(groupId, memberId, ct).ConfigureAwait(false);
         await EnsureUniqueMemberAsync(groupId, model.EmployeeId, memberId, ct).ConfigureAwait(false);
 
+        var existing = await _memberRepo.GetByIdAsync(memberId, ct).ConfigureAwait(false)
+            ?? throw new KeyNotFoundException($"Availability group member with id {memberId} was not found.");
+
         model.Id = memberId;
         model.AvailabilityGroupId = groupId;
+        model.EmployeeLastModifiedAtUtc = existing.EmployeeLastModifiedAtUtc;
         await _memberRepo.UpdateAsync(model.ToDal(), ct).ConfigureAwait(false);
     }
 
@@ -172,107 +255,91 @@ public class AvailabilityGroupService : IAvailabilityGroupService
         ArgumentNullException.ThrowIfNull(payload);
 
         await ValidateGroupAsync(group, group.Id == 0 ? null : group.Id, ct).ConfigureAwait(false);
-        var normalizedPayload = NormalizePayload(payload);
-        var groupId = await UpsertGroupAsync(group, ct).ConfigureAwait(false);
-        var memberByEmployee = await LoadMembersByEmployeeAsync(groupId, ct).ConfigureAwait(false);
-
-        await RemoveMembersMissingFromPayloadAsync(memberByEmployee.Values, normalizedPayload, ct).ConfigureAwait(false);
-        await UpsertMembersAndDaysAsync(groupId, normalizedPayload, memberByEmployee, ct).ConfigureAwait(false);
+        var saved = await SaveSnapshotAsync(group, NormalizePayload(payload), [], ct).ConfigureAwait(false);
+        group.Id = saved.Id;
     }
 
-    private async Task<int> UpsertGroupAsync(AvailabilityGroupModel group, CancellationToken ct)
+    public async Task<AvailabilityGroupGraphSaveResult> SaveGraphAsync(
+        AvailabilityGroupModel group,
+        IList<(int employeeId, IList<AvailabilityGroupDayModel> days)> payload,
+        IReadOnlyList<AvailabilityGroupGraphTransferInstruction> transfers,
+        CancellationToken ct = default)
     {
-        if (group.Id == 0)
+        ArgumentNullException.ThrowIfNull(group);
+        ArgumentNullException.ThrowIfNull(payload);
+        ArgumentNullException.ThrowIfNull(transfers);
+
+        if (group.Id < 0)
+            throw ValidationException.ForField(nameof(group.Id), "Invalid availability group ID.");
+        if (group.Year is < 1 or > 9999)
+            throw ValidationException.ForField(nameof(group.Year), "Year must be between 1 and 9999.");
+        if (!Enum.IsDefined(group.PublicationStatus))
+            throw ValidationException.ForField(nameof(group.PublicationStatus), "Publication status must be private or public.");
+
+        await ValidateGroupAsync(group, group.Id == 0 ? null : group.Id, ct).ConfigureAwait(false);
+        var normalized = NormalizePayload(payload);
+        if (normalized.Count == 0)
+            throw ValidationException.ForField("members", "Add at least one employee to the group.");
+
+        var daysInMonth = DateTime.DaysInMonth(group.Year, group.Month);
+        foreach (var member in normalized)
         {
-            var created = await _groupRepo.AddAsync(group.ToDal(), ct).ConfigureAwait(false);
-            group.Id = created.Id;
-        }
-        else
-        {
-            await _groupRepo.UpdateAsync(group.ToDal(), ct).ConfigureAwait(false);
-        }
+            if (member.Days.Count != daysInMonth || member.Days.Any(day => day.DayOfMonth > daysInMonth))
+                throw ValidationException.ForField(nameof(AvailabilityGroupDayModel.DayOfMonth),
+                    "Each employee must have exactly one entry for each day of the availability month.");
 
-        return group.Id;
-    }
-
-    private async Task<Dictionary<int, DataAccessLayer.Models.AvailabilityGroupMemberModel>> LoadMembersByEmployeeAsync(int groupId, CancellationToken ct)
-    {
-        var existingMembers = await _memberRepo.GetByGroupIdAsync(groupId, ct).ConfigureAwait(false);
-        return existingMembers.ToDictionary(member => member.EmployeeId);
-    }
-
-    private async Task RemoveMembersMissingFromPayloadAsync(
-        IEnumerable<DataAccessLayer.Models.AvailabilityGroupMemberModel> existingMembers,
-        IReadOnlyList<SaveGroupPayloadItem> normalizedPayload,
-        CancellationToken ct)
-    {
-        var desiredEmployeeIds = normalizedPayload.Select(item => item.EmployeeId).ToHashSet();
-
-        foreach (var member in existingMembers)
-        {
-            if (!desiredEmployeeIds.Contains(member.EmployeeId))
+            foreach (var day in member.Days)
             {
-                await _memberRepo.DeleteAsync(member.Id, ct).ConfigureAwait(false);
+                if (!Enum.IsDefined(day.Kind))
+                    throw ValidationException.ForField(nameof(day.Kind), "Invalid availability kind.");
+
+                if (day.Kind == AvailabilityKind.INT)
+                {
+                    if (!AvailabilityCodeParser.TryNormalizeInterval(day.IntervalStr!, out var interval))
+                        throw ValidationException.ForField(nameof(day.IntervalStr), "Availability must use a valid HH:mm - HH:mm interval.");
+                    day.IntervalStr = interval;
+                }
             }
         }
+
+        var selectedEmployees = normalized.Select(member => member.EmployeeId).ToHashSet();
+        var selectedTransferDays = new HashSet<(int employeeId, int day)>();
+        var normalizedTransfers = new List<AvailabilityGroupSnapshotTransfer>(transfers.Count);
+        foreach (var transfer in transfers)
+        {
+            if (!selectedEmployees.Contains(transfer.EmployeeId))
+                throw ValidationException.ForField("transfers", "Transfer employees must be assigned to the availability group.");
+            if (transfer.SourceGroupId <= 0 || transfer.SourceGroupId == group.Id)
+                throw ValidationException.ForField("transfers", "Select a different source availability group.");
+
+            var days = transfer.DayOfMonths.Distinct().Order().ToArray();
+            if (days.Length == 0 || days.Any(day => day < 1 || day > daysInMonth))
+                throw ValidationException.ForField("dayOfMonths", "Select at least one valid day from this availability month.");
+            if (days.Any(day => !selectedTransferDays.Add((transfer.EmployeeId, day))))
+                throw ValidationException.ForField("dayOfMonths", "Each employee's day can only be transferred once per save.");
+
+            normalizedTransfers.Add(new AvailabilityGroupSnapshotTransfer(transfer.EmployeeId, transfer.SourceGroupId, days));
+        }
+
+        foreach (var sourceId in normalizedTransfers.Select(transfer => transfer.SourceGroupId).Distinct())
+        {
+            var source = await _groupRepo.GetByIdAsync(sourceId, ct).ConfigureAwait(false)
+                ?? throw new KeyNotFoundException($"Availability group with id {sourceId} was not found.");
+            if (source.Year != group.Year || source.Month != group.Month)
+                throw ValidationException.ForField("transfers", "Availability can only be moved between different groups in the same month.");
+        }
+
+        var saved = await SaveSnapshotAsync(group, normalized, normalizedTransfers, ct).ConfigureAwait(false);
+        return new AvailabilityGroupGraphSaveResult(saved.Id, saved.SourceGroupIds, saved.Changed);
     }
 
-    /// <summary>
-    /// SaveGroup is intentionally destructive for day slots: the incoming payload is the source of truth.
-    /// That keeps the update algorithm predictable for the client, because it does not have to calculate
-    /// fine-grained add/update/delete patches for nested day entries.
-    /// </summary>
-    private async Task UpsertMembersAndDaysAsync(
-        int groupId,
-        IReadOnlyList<SaveGroupPayloadItem> normalizedPayload,
-        Dictionary<int, DataAccessLayer.Models.AvailabilityGroupMemberModel> memberByEmployee,
+    private Task<AvailabilityGroupSnapshotWriteResult> SaveSnapshotAsync(
+        AvailabilityGroupModel group,
+        IReadOnlyList<SaveGroupPayloadItem> payload,
+        IReadOnlyList<AvailabilityGroupSnapshotTransfer> transfers,
         CancellationToken ct)
-    {
-        foreach (var (item, displayOrder) in normalizedPayload.Select((value, index) => (value, index)))
-        {
-            var member = await UpsertMemberAsync(groupId, item.EmployeeId, displayOrder, memberByEmployee, ct).ConfigureAwait(false);
-            await ReplaceMemberDaysAsync(member.Id, item.Days, ct).ConfigureAwait(false);
-        }
-    }
-
-    private async Task<DataAccessLayer.Models.AvailabilityGroupMemberModel> UpsertMemberAsync(
-        int groupId,
-        int employeeId,
-        int displayOrder,
-        IDictionary<int, DataAccessLayer.Models.AvailabilityGroupMemberModel> memberByEmployee,
-        CancellationToken ct)
-    {
-        if (!memberByEmployee.TryGetValue(employeeId, out var member))
-        {
-            member = await _memberRepo.AddAsync(new DataAccessLayer.Models.AvailabilityGroupMemberModel
-            {
-                Id = 0,
-                AvailabilityGroupId = groupId,
-                EmployeeId = employeeId,
-                DisplayOrder = displayOrder,
-            }, ct).ConfigureAwait(false);
-
-            memberByEmployee[employeeId] = member;
-            return member;
-        }
-
-        if (member.DisplayOrder == displayOrder)
-        {
-            return member;
-        }
-
-        member = new DataAccessLayer.Models.AvailabilityGroupMemberModel
-        {
-            Id = member.Id,
-            AvailabilityGroupId = groupId,
-            EmployeeId = employeeId,
-            DisplayOrder = displayOrder,
-        };
-
-        memberByEmployee[employeeId] = member;
-        await _memberRepo.UpdateAsync(member, ct).ConfigureAwait(false);
-        return member;
-    }
+        => _groupRepo.SaveSnapshotAsync(group.ToDal(), payload.Select(item => new AvailabilityGroupSnapshotMember(
+            item.EmployeeId, item.Days.Select(day => day.ToDal()).ToList())).ToList(), transfers, ct);
 
     private async Task ReplaceMemberDaysAsync(int memberId, IReadOnlyList<AvailabilityGroupDayModel> days, CancellationToken ct)
     {
@@ -294,6 +361,7 @@ public class AvailabilityGroupService : IAvailabilityGroupService
     private async Task ValidateGroupAsync(AvailabilityGroupModel entity, int? excludeId, CancellationToken ct)
     {
         entity.Name = (entity.Name ?? string.Empty).Trim();
+        NormalizePublication(entity);
 
         if (string.IsNullOrWhiteSpace(entity.Name))
             throw ValidationException.ForField(nameof(AvailabilityGroupModel.Name), "Availability group name is required.");
@@ -301,8 +369,147 @@ public class AvailabilityGroupService : IAvailabilityGroupService
         if (entity.Month is < 1 or > 12)
             throw ValidationException.ForField(nameof(AvailabilityGroupModel.Month), "Month must be between 1 and 12.");
 
+        ValidatePublication(entity);
+
         if (await _groupRepo.ExistsByNameAsync(entity.Name, entity.Year, entity.Month, excludeId, ct).ConfigureAwait(false))
             throw ValidationException.ForField(nameof(AvailabilityGroupModel.Name), "An availability group with the same name already exists for this month.");
+    }
+
+    private static void NormalizePublication(AvailabilityGroupModel entity)
+    {
+        entity.VisibleFromUtc = NormalizeUtc(entity.VisibleFromUtc);
+        entity.VisibleToUtc = NormalizeUtc(entity.VisibleToUtc);
+    }
+
+    private static DateTimeOffset? NormalizeUtc(DateTimeOffset? value)
+        => value?.ToUniversalTime();
+
+    private static void ValidatePublication(AvailabilityGroupModel entity)
+    {
+        if (entity.VisibleFromUtc.HasValue &&
+            entity.VisibleToUtc.HasValue &&
+            entity.VisibleFromUtc.Value > entity.VisibleToUtc.Value)
+        {
+            throw ValidationException.ForField(
+                nameof(AvailabilityGroupModel.VisibleToUtc),
+                "Publication end must be after publication start.");
+        }
+
+        if (entity.PublicationStatus != AvailabilityPublicationStatus.Public)
+        {
+            return;
+        }
+
+        if (!entity.VisibleFromUtc.HasValue)
+        {
+            throw ValidationException.ForField(nameof(AvailabilityGroupModel.VisibleFromUtc), "Publication start is required before making availability public.");
+        }
+
+        if (!entity.VisibleToUtc.HasValue)
+        {
+            throw ValidationException.ForField(nameof(AvailabilityGroupModel.VisibleToUtc), "Publication end is required before making availability public.");
+        }
+    }
+
+    private static void ValidateEmployeeId(int employeeId)
+    {
+        if (employeeId <= 0)
+        {
+            throw ValidationException.ForField("employeeId", "Employee is required.");
+        }
+    }
+
+    private static void ThrowClosedEmployeeAvailabilityWindow(AvailabilityGroupModel group, DateTimeOffset nowUtc)
+    {
+        var normalizedNowUtc = nowUtc.ToUniversalTime();
+
+        if (group.VisibleToUtc.HasValue && group.VisibleToUtc.Value < normalizedNowUtc)
+        {
+            throw ValidationException.ForField(
+                nameof(AvailabilityGroupModel.VisibleToUtc),
+                "The time for editing this availability has expired.");
+        }
+
+        if (group.VisibleFromUtc.HasValue && group.VisibleFromUtc.Value > normalizedNowUtc)
+        {
+            throw ValidationException.ForField(
+                nameof(AvailabilityGroupModel.VisibleFromUtc),
+                "This availability is not open for editing yet.");
+        }
+
+        throw ValidationException.ForField(
+            nameof(AvailabilityGroupModel.VisibleToUtc),
+            "This availability is closed for editing.");
+    }
+
+    private static EmployeeAvailabilityModel MapEmployeeAvailability(
+        DataAccessLayer.Models.AvailabilityGroupModel group,
+        int employeeId,
+        DateTimeOffset nowUtc)
+    {
+        var member = group.Members
+            .FirstOrDefault(item => item.EmployeeId == employeeId)
+            ?? throw new KeyNotFoundException($"Availability group with id {group.Id} is not assigned to the current employee.");
+
+        var contractGroup = group.ToContract();
+        var contractMember = member.ToContract();
+        var days = member.Days?
+            .OrderBy(day => day.DayOfMonth)
+            .Select(day => day.ToContract())
+            .ToList() ?? [];
+        var normalizedNowUtc = nowUtc.ToUniversalTime();
+
+        return new EmployeeAvailabilityModel
+        {
+            Group = contractGroup,
+            PublishedAtUtc = group.PublishedAtUtc,
+            NotificationId = DataAccessLayer.Models.AvailabilityNotificationTiming.Id(group),
+            NotificationOccurredAtUtc = DataAccessLayer.Models.AvailabilityNotificationTiming.OccurredAt(group, member),
+            Member = contractMember,
+            Days = days,
+            CanSubmit = (!contractGroup.VisibleFromUtc.HasValue || contractGroup.VisibleFromUtc.Value <= normalizedNowUtc) &&
+                (!contractGroup.VisibleToUtc.HasValue || normalizedNowUtc <= contractGroup.VisibleToUtc.Value),
+        };
+    }
+
+    private static List<AvailabilityGroupDayModel> NormalizeEmployeeDays(
+        IEnumerable<AvailabilityGroupDayModel> days,
+        AvailabilityGroupModel group)
+    {
+        var daysInMonth = DateTime.DaysInMonth(group.Year, group.Month);
+        var seenDays = new HashSet<int>();
+        var normalizedDays = new List<AvailabilityGroupDayModel>();
+
+        foreach (var day in days)
+        {
+            ArgumentNullException.ThrowIfNull(day);
+
+            var normalizedDay = new AvailabilityGroupDayModel
+            {
+                Id = 0,
+                AvailabilityGroupMemberId = 0,
+                DayOfMonth = day.DayOfMonth,
+                Kind = day.Kind,
+                IntervalStr = day.IntervalStr,
+            };
+
+            NormalizeDayModel(normalizedDay);
+            ValidateDayModel(normalizedDay);
+
+            if (normalizedDay.DayOfMonth > daysInMonth)
+            {
+                throw ValidationException.ForField(nameof(AvailabilityGroupDayModel.DayOfMonth), "Day of month is outside the availability month.");
+            }
+
+            if (!seenDays.Add(normalizedDay.DayOfMonth))
+            {
+                throw ValidationException.ForField(nameof(AvailabilityGroupDayModel.DayOfMonth), "A slot for this day already exists for the current employee.");
+            }
+
+            normalizedDays.Add(normalizedDay);
+        }
+
+        return normalizedDays;
     }
 
     private async Task EnsureUniqueMemberAsync(int groupId, int employeeId, int? excludeMemberId, CancellationToken ct)

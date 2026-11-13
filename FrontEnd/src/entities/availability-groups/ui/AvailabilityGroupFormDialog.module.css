@@ -1,4 +1,5 @@
 .overlay {
+  composes: overlay from "../../../shared/ui/ViewportOverlay.module.css";
   position: fixed;
   inset: 0;
   z-index: 1300;
@@ -11,6 +12,7 @@
 }
 
 .dialog {
+  composes: surface from "../../../shared/ui/ViewportOverlay.module.css";
   width: min(560px, 100%);
   border-radius: 28px;
   border: 1px solid rgba(113, 113, 122, 0.16);
@@ -133,4 +135,9 @@
     width: 100%;
     justify-content: center;
   }
+}
+
+.dialog > * {
+  flex-shrink: 0;
+  min-width: 0;
 }

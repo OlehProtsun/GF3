@@ -2,6 +2,12 @@ using DataAccessLayer.Models;
 
 namespace DataAccessLayer.Repositories.Abstractions;
 
+public sealed record AvailabilityGroupSnapshotMember(int EmployeeId, IReadOnlyList<AvailabilityGroupDayModel> Days);
+
+public sealed record AvailabilityGroupSnapshotTransfer(int EmployeeId, int SourceGroupId, IReadOnlyList<int> DayOfMonths);
+
+public sealed record AvailabilityGroupSnapshotWriteResult(int Id, IReadOnlyList<int> SourceGroupIds, bool Changed);
+
 /// <summary>
 /// Persistence contract for availability groups and their richer read models.
 /// </summary>
@@ -18,7 +24,23 @@ public interface IAvailabilityGroupRepository : IBaseRepository<AvailabilityGrou
     Task<AvailabilityGroupModel?> GetFullByIdAsync(int id, CancellationToken ct = default);
 
     /// <summary>
+    /// Returns employee-visible published groups that include the supplied employee.
+    /// </summary>
+    Task<List<AvailabilityGroupModel>> GetPublishedForEmployeeAsync(int employeeId, DateTimeOffset nowUtc, CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns one employee-visible published group that includes the supplied employee.
+    /// </summary>
+    Task<AvailabilityGroupModel?> GetPublishedForEmployeeByIdAsync(int id, int employeeId, DateTimeOffset nowUtc, CancellationToken ct = default);
+
+    /// <summary>
     /// Returns whether another group already uses the same normalized name within the same month.
     /// </summary>
     Task<bool> ExistsByNameAsync(string name, int year, int month, int? excludeId = null, CancellationToken ct = default);
+
+    Task<AvailabilityGroupSnapshotWriteResult> SaveSnapshotAsync(
+        AvailabilityGroupModel group,
+        IReadOnlyList<AvailabilityGroupSnapshotMember> members,
+        IReadOnlyList<AvailabilityGroupSnapshotTransfer> transfers,
+        CancellationToken ct = default);
 }

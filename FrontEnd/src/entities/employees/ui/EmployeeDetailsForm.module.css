@@ -1,1 +1,27 @@
+.fields {
+  display: grid;
+  gap: 0.9rem;
+  width: 100%;
+  max-width: 760px;
+}
 
+.compactRow {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+
+@media (max-width: 760px) {
+  .fields {
+    max-width: 100%;
+  }
+
+  .compactRow {
+    grid-template-columns: 1fr;
+  }
+}
+
+.contractSelector { border:0; padding:0; margin:0; display:flex; flex-wrap:wrap; gap:16px; }
+.contractSelector legend { margin-bottom:10px; font-weight:600; }
+.contractSelector label { display:flex; gap:8px; align-items:center; }

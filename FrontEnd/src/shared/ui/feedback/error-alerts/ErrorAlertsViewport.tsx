@@ -1,3 +1,4 @@
+import { t } from "@shared/i18n";
 import { useEffect, useState } from "react";
 import { CloseIcon, ErrorIcon } from "@shared/ui/icons";
 import { dismissErrorAlert, subscribeToErrorAlerts, type ErrorAlert } from "./errorAlerts";
@@ -28,7 +29,7 @@ export function ErrorAlertsViewport() {
           <button
             type="button"
             className={styles.closeButton}
-            aria-label="Close error alert"
+            aria-label={t("Close error alert")}
             onClick={() => dismissErrorAlert(alert.id)}
           >
             <CloseIcon size={14} />

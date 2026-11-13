@@ -1,0 +1,159 @@
+.overlay {
+  composes: overlay from "../../../shared/ui/ViewportOverlay.module.css";
+  position: fixed;
+  inset: 0;
+  z-index: 1760;
+  display: grid;
+  place-items: center;
+  padding: 28px 18px 32px;
+  background: rgba(15, 23, 42, 0.4);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.dialog {
+  composes: surface from "../../../shared/ui/ViewportOverlay.module.css";
+  width: min(1560px, calc(100vw - 24px));
+  max-height: calc(100dvh - 60px);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 16px;
+  padding: 20px;
+  box-sizing: border-box;
+  border: 1px solid rgba(255, 255, 255, 0.58);
+  border-radius: 28px;
+  background: rgba(248, 250, 252, 0.985);
+  box-shadow: 0 34px 80px rgba(15, 23, 42, 0.24);
+  overflow: hidden;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.titleBlock {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #2563eb;
+  font-size: 0.76rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.title {
+  margin: 0;
+  color: #0f172a;
+  font-size: 1.24rem;
+  font-weight: 900;
+  overflow-wrap: anywhere;
+}
+
+.description {
+  margin: 0;
+  color: rgba(15, 23, 42, 0.68);
+  font-size: 0.93rem;
+  line-height: 1.5;
+}
+
+.closeButton {
+  width: 42px;
+  height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.9);
+  color: rgba(15, 23, 42, 0.8);
+  cursor: pointer;
+}
+
+.closeButton:hover {
+  border-color: rgba(96, 165, 250, 0.3);
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.closeButton:focus-visible {
+  outline: 3px solid rgba(37, 99, 235, 0.16);
+}
+
+.matrixGrid {
+  align-items: start;
+  grid-auto-rows: max-content;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  padding: 10px 20px 36px;
+  box-sizing: border-box;
+  overflow: auto;
+}
+
+.matrixCard {
+  --matrix-scroll-max-height: clamp(180px, calc(100dvh - 360px), 480px);
+  --matrix-day-column-width: 56px;
+  --matrix-cell-min-width: 112px;
+  --matrix-cell-min-height: 28px;
+  --matrix-card-padding-bottom: 18px;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+}
+
+.emptyComparison {
+  display: grid;
+  place-items: center;
+  min-height: 180px;
+  padding: 24px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.78);
+  color: #64748b;
+  font-size: 0.94rem;
+  font-weight: 800;
+  text-align: center;
+}
+
+@media (max-width: 1180px) {
+  .matrixGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 760px) {
+  .overlay {
+    padding: 10px;
+  }
+
+  .dialog {
+    width: 100%;
+    max-height: calc(100dvh - 20px);
+    padding: 16px;
+    border-radius: 20px;
+  }
+
+  .header {
+    align-items: flex-start;
+  }
+
+  .matrixGrid {
+    padding-inline: 0;
+  }
+
+  .matrixCard {
+    --matrix-scroll-max-height: clamp(120px, calc(100dvh - 460px), 360px);
+  }
+
+}

@@ -1,11 +1,12 @@
+import { t } from "@shared/i18n";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { GraphEmployee, GraphSlot } from "@entities/containers/model/types";
-import {
-  buildGraphDraftSlots,
-  type GraphMatrixCellMap,
-} from "@entities/containers/model/graphWorkspace";
+import type { Graph, GraphEmployee, GraphSlot } from "@entities/containers/model/types";
+import { buildGraphWorkspaceSaveSlots, graphSaveFields, normalizeGraphSlots } from "@entities/containers/model/graphSaveIntegrity";
+import { stableSerialize } from "@shared/lib/stableSerialize";
+import type { GraphMatrixCellMap } from "@entities/containers/model/graphWorkspace";
 import { queryKeys } from "@shared/api/queryKeys";
-import { containersApi } from "./containersApi";
+import { graphEditorSaveMutationKey, isGraphSaveTrafficActive } from "@shared/api/graphSaveTraffic";
+import { containersApi, managerGraphFillColorBindsApi, managerGraphTextColorBindsApi } from "./containersApi";
 import type {
   GenerateGraphRequestDto,
   GenerateGraphPreviewRequestDto,
@@ -14,10 +15,62 @@ import type {
   SaveGraphEmployeeDto,
   SaveGraphSlotDto,
   SaveSchedulePresetDto,
+  SaveManagerGraphFillColorBindDto,
+  SaveManagerGraphTextColorBindDto,
   UpsertGraphCellStyleDto,
+  UpdateGraphsPublicationDto,
 } from "./dto";
 
+export const useManagerGraphFillColorBindsQuery = () =>
+  useQuery({
+    queryKey: queryKeys.managerGraphFillColorBinds.current(),
+    queryFn: ({ signal }) => managerGraphFillColorBindsApi.list(signal),
+  });
+
+export function useUpsertManagerGraphFillColorBindMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: SaveManagerGraphFillColorBindDto) => managerGraphFillColorBindsApi.upsert(payload),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.managerGraphFillColorBinds.current() }),
+  });
+}
+
+export function useDeleteManagerGraphFillColorBindMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: number) => managerGraphFillColorBindsApi.remove(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.managerGraphFillColorBinds.current() }),
+  });
+}
+
+export const useManagerGraphTextColorBindsQuery = () =>
+  useQuery({
+    queryKey: queryKeys.managerGraphTextColorBinds.current(),
+    queryFn: ({ signal }) => managerGraphTextColorBindsApi.list(signal),
+  });
+
+export function useUpsertManagerGraphTextColorBindMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: SaveManagerGraphTextColorBindDto) => managerGraphTextColorBindsApi.upsert(payload),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.managerGraphTextColorBinds.current() }),
+  });
+}
+
+export function useDeleteManagerGraphTextColorBindMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: number) => managerGraphTextColorBindsApi.remove(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.managerGraphTextColorBinds.current() }),
+  });
+}
+
 export type SaveGraphWorkspaceEmployeeAssignment = {
+  isPriority: boolean;
   id: number | null;
   employeeId: number;
   minHoursMonth?: number | null;
@@ -29,8 +82,11 @@ export type SaveGraphWorkspaceInput = {
   payload: SaveGraphDto;
   employeeAssignments: SaveGraphWorkspaceEmployeeAssignment[];
   cellMap: GraphMatrixCellMap;
+  existingGraph?: Graph;
   existingEmployees?: GraphEmployee[];
   existingSlots?: GraphSlot[];
+  signal?: AbortSignal;
+  runSaveRequest?: <T>(send: () => Promise<T>) => Promise<T>;
 };
 
 export type SaveGraphWorkspaceResult = {
@@ -39,22 +95,42 @@ export type SaveGraphWorkspaceResult = {
 
 export type GraphSlotsBatchResult = Record<number, GraphSlot[]>;
 
+async function mapInPairs<T, R>(items: readonly T[], run: (item: T) => Promise<R>, signal?: AbortSignal): Promise<R[]> {
+  const results: R[] = [];
+  for (let i = 0; i < items.length; i += 2) {
+    signal?.throwIfAborted();
+    const pair = await Promise.allSettled(items.slice(i, i + 2).map(run));
+    for (const result of pair) {
+      if (result.status === "rejected") throw result.reason;
+      results.push(result.value);
+    }
+  }
+  return results;
+}
+
 async function syncGraphWorkspace({
   containerId,
   graphId,
   payload,
   employeeAssignments,
   cellMap,
+  existingGraph,
   existingEmployees = [],
   existingSlots = [],
-}: SaveGraphWorkspaceInput): Promise<SaveGraphWorkspaceResult> {
+  signal,
+  runSaveRequest = send => send(),
+}: SaveGraphWorkspaceInput): Promise<SaveGraphWorkspaceResult & { changed: boolean }> {
+  signal?.throwIfAborted();
   let resolvedGraphId = graphId;
+  const graphChanged = !existingGraph ||
+    stableSerialize(graphSaveFields({ ...existingGraph, ...payload, note: payload.note })) !==
+    stableSerialize(graphSaveFields(existingGraph));
 
   if (resolvedGraphId === null) {
-    const createdGraph = await containersApi.createGraph(containerId, payload);
+    const createdGraph = await runSaveRequest(() => containersApi.createGraph(containerId, payload));
     resolvedGraphId = createdGraph.id;
-  } else {
-    await containersApi.updateGraph(containerId, resolvedGraphId, payload);
+  } else if (graphChanged) {
+    await runSaveRequest(() => containersApi.updateGraph(containerId, resolvedGraphId as number, payload));
   }
 
   const uniqueAssignments = [...employeeAssignments]
@@ -79,14 +155,13 @@ async function syncGraphWorkspace({
   const employeesToRemove = existingEmployees.filter(employee => !selectedEmployeeIdSet.has(employee.employeeId));
 
   if (employeesToCreate.length > 0) {
-    const createdEmployees = await Promise.all(
-      employeesToCreate.map(employee =>
-        containersApi.createGraphEmployee(containerId, resolvedGraphId as number, {
-          employeeId: employee.employeeId,
-          minHoursMonth: employee.minHoursMonth ?? null,
-          displayOrder: displayOrderByEmployeeId.get(employee.employeeId) ?? 0,
-        }),
-      ),
+    const createdEmployees = await mapInPairs(employeesToCreate, employee =>
+      runSaveRequest(() => containersApi.createGraphEmployee(containerId, resolvedGraphId as number, {
+        employeeId: employee.employeeId,
+        minHoursMonth: employee.minHoursMonth ?? null,
+        isPriority: employee.isPriority,
+        displayOrder: displayOrderByEmployeeId.get(employee.employeeId) ?? 0,
+      })), signal,
     );
 
     createdEmployees.forEach(employee => {
@@ -105,7 +180,7 @@ async function syncGraphWorkspace({
     const minHoursChanged = (existingEmployee.minHoursMonth ?? null) !== (assignment.minHoursMonth ?? null);
     const displayOrderChanged = existingEmployee.displayOrder !== displayOrder;
 
-    if (!minHoursChanged && !displayOrderChanged) {
+    if (!minHoursChanged && !displayOrderChanged && (existingEmployee.isPriority ?? false) === assignment.isPriority) {
       return [];
     }
 
@@ -113,50 +188,57 @@ async function syncGraphWorkspace({
   });
 
   if (employeesToUpdate.length > 0) {
-    await Promise.all(
-      employeesToUpdate.map(({ assignment, existingEmployee, displayOrder }) => {
-        return containersApi.updateGraphEmployee(containerId, resolvedGraphId as number, existingEmployee.id, {
-          employeeId: assignment.employeeId,
-          minHoursMonth: assignment.minHoursMonth ?? null,
-          displayOrder,
-        });
-      }),
+    await mapInPairs(employeesToUpdate, ({ assignment, existingEmployee, displayOrder }) =>
+      runSaveRequest(() => containersApi.updateGraphEmployee(containerId, resolvedGraphId as number, existingEmployee.id, {
+        employeeId: assignment.employeeId,
+        minHoursMonth: assignment.minHoursMonth ?? null,
+        isPriority: assignment.isPriority,
+        displayOrder,
+      })), signal,
     );
   }
 
-  const draft = buildGraphDraftSlots({
+  const draft = buildGraphWorkspaceSaveSlots({
     scheduleId: resolvedGraphId as number,
     existingSlots,
     employeeIds: selectedEmployeeIds,
     year: payload.year,
     month: payload.month,
     cellMap,
-  });
+  }, Boolean(existingGraph));
 
   if (Object.keys(draft.errors).length > 0) {
-    throw new Error(Object.values(draft.errors)[0] ?? "The schedule matrix contains invalid time ranges.");
+    throw new Error(Object.values(draft.errors)[0] ?? t("The schedule matrix contains invalid time ranges."));
   }
 
-  await containersApi.replaceGraphSlots(containerId, resolvedGraphId as number, {
-    slots: draft.slots.map(slot => ({
-      dayOfMonth: slot.dayOfMonth,
-      slotNo: slot.slotNo,
-      fromTime: slot.fromTime,
-      toTime: slot.toTime,
-      employeeId: slot.employeeId ?? null,
-      status: slot.status,
-    })),
-  });
+  const slotsChanged = graphId === null || !existingGraph ||
+    stableSerialize(normalizeGraphSlots(draft.slots)) !== stableSerialize(normalizeGraphSlots(existingSlots));
+  signal?.throwIfAborted();
+  if (slotsChanged) {
+    await runSaveRequest(() => containersApi.replaceGraphSlots(containerId, resolvedGraphId as number, {
+      slots: draft.slots.map(slot => ({
+        dayOfMonth: slot.dayOfMonth,
+        slotNo: slot.slotNo,
+        fromTime: slot.fromTime,
+        toTime: slot.toTime,
+        employeeId: slot.employeeId ?? null,
+        status: slot.status,
+      })),
+    }));
+  }
 
   if (employeesToRemove.length > 0) {
-    await Promise.all(
-      employeesToRemove.map(employee =>
-        containersApi.removeGraphEmployee(containerId, resolvedGraphId as number, employee.id),
-      ),
+    await mapInPairs(employeesToRemove, employee =>
+      runSaveRequest(() => containersApi.removeGraphEmployee(containerId, resolvedGraphId as number, employee.id)), signal,
     );
   }
 
-  return { graphId: resolvedGraphId as number };
+  signal?.throwIfAborted();
+  return {
+    graphId: resolvedGraphId as number,
+    changed: graphId === null || graphChanged || slotsChanged ||
+      employeesToCreate.length > 0 || employeesToUpdate.length > 0 || employeesToRemove.length > 0,
+  };
 }
 
 export const useContainersListQuery = (refreshKey?: string) =>
@@ -205,7 +287,7 @@ export function useDeleteContainerMutation() {
       qc.invalidateQueries({ queryKey: queryKeys.containers.all });
       qc.invalidateQueries({ queryKey: queryKeys.containers.byId(id) });
       qc.invalidateQueries({ queryKey: queryKeys.containers.graphs(id) });
-      qc.invalidateQueries({ queryKey: queryKeys.containers.schedulePresets(id) });
+      qc.invalidateQueries({ queryKey: queryKeys.containers.schedulePresets() });
     },
   });
 }
@@ -220,8 +302,8 @@ export const useContainerGraphsQuery = (containerId: number | null, enabled = tr
 
 export const useSchedulePresetsQuery = (containerId: number | null, enabled = true) =>
   useQuery({
-    queryKey: queryKeys.containers.schedulePresets(containerId ?? 0),
-    enabled: enabled && containerId !== null,
+    queryKey: queryKeys.containers.schedulePresets(),
+    enabled: enabled && Number.isInteger(containerId) && containerId !== null && containerId > 0,
     cancelOnUnmount: true,
     queryFn: ({ signal }) => containersApi.listSchedulePresets(containerId as number, signal),
   });
@@ -232,8 +314,8 @@ export function useCreateSchedulePresetMutation() {
   return useMutation({
     mutationFn: ({ containerId, payload }: { containerId: number; payload: SaveSchedulePresetDto }) =>
       containersApi.createSchedulePreset(containerId, payload),
-    onSuccess: (_, variables) => {
-      qc.invalidateQueries({ queryKey: queryKeys.containers.schedulePresets(variables.containerId) });
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.containers.schedulePresets() });
     },
   });
 }
@@ -287,12 +369,41 @@ export function useSaveGraphWorkspaceMutation() {
   const qc = useQueryClient();
 
   return useMutation({
-    mutationFn: syncGraphWorkspace,
-    onSuccess: (result, variables) => {
+    mutationKey: graphEditorSaveMutationKey,
+    mutationFn: async (variables: SaveGraphWorkspaceInput): Promise<SaveGraphWorkspaceResult> => {
+      const { graphId, changed } = await syncGraphWorkspace(variables);
+      const { containerId } = variables;
+      if (changed && !isGraphSaveTrafficActive(qc, containerId)) {
+        const { containers } = queryKeys;
+        if (!variables.existingGraph) {
+          qc.invalidateQueries({ queryKey: containers.list() });
+          qc.invalidateQueries({ queryKey: containers.byId(containerId), exact: true });
+        }
+        qc.invalidateQueries({ queryKey: containers.graphs(containerId), exact: true });
+        for (const key of [containers.graphById, containers.graphEmployees, containers.graphSlots, containers.graphCellStyles, containers.graphVersions]) {
+          qc.invalidateQueries({ queryKey: key(containerId, graphId), exact: true });
+        }
+        const batches = containers.graphSlotsBatches(containerId);
+        qc.invalidateQueries({ queryKey: batches, predicate: ({ queryKey }) => queryKey.slice(batches.length).includes(graphId) });
+        qc.invalidateQueries({ queryKey: containers.graphRecordsPrefix(containerId) });
+        qc.invalidateQueries({ queryKey: queryKeys.employeeSchedules.all });
+        qc.invalidateQueries({ queryKey: queryKeys.shiftSwaps.all });
+      }
+      return { graphId };
+    },
+  });
+}
+
+export function useUpdateGraphsPublicationMutation() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ containerId, payload }: { containerId: number; payload: UpdateGraphsPublicationDto }) =>
+      containersApi.updateGraphsPublication(containerId, payload),
+    onSuccess: (_, variables) => {
       qc.invalidateQueries({ queryKey: queryKeys.containers.graphs(variables.containerId) });
-      qc.invalidateQueries({ queryKey: queryKeys.containers.graphById(variables.containerId, result.graphId) });
-      qc.invalidateQueries({ queryKey: queryKeys.containers.graphEmployees(variables.containerId, result.graphId) });
-      qc.invalidateQueries({ queryKey: queryKeys.containers.graphSlots(variables.containerId, result.graphId) });
+      qc.invalidateQueries({ queryKey: queryKeys.employeeSchedules.all });
+      qc.invalidateQueries({ queryKey: queryKeys.shiftSwaps.all });
     },
   });
 }
@@ -317,6 +428,47 @@ export const useGraphSlotsQuery = (containerId: number | null, graphId: number |
     queryFn: ({ signal }) => containersApi.listGraphSlots(containerId as number, graphId as number, signal),
   });
 
+export const useGraphVersionsQuery = (
+  containerId: number | null,
+  graphId: number | null,
+  enabled = true,
+) => useQuery({
+  queryKey: queryKeys.containers.graphVersions(containerId ?? 0, graphId ?? 0),
+  enabled: enabled && containerId !== null && graphId !== null,
+  queryFn: ({ signal }) => containersApi.listGraphVersions(containerId as number, graphId as number, signal),
+});
+
+export function useCheckoutGraphVersionMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ containerId, graphId, versionId }: { containerId: number; graphId: number; versionId: number }) =>
+      containersApi.checkoutGraphVersion(containerId, graphId, versionId),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.containers.graphVersions(variables.containerId, variables.graphId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.containers.graphs(variables.containerId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.containers.graphById(variables.containerId, variables.graphId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.containers.graphEmployees(variables.containerId, variables.graphId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.containers.graphSlots(variables.containerId, variables.graphId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.containers.graphCellStyles(variables.containerId, variables.graphId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.employeeSchedules.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.shiftSwaps.all });
+    },
+  });
+}
+
+export function useDeleteGraphVersionMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ containerId, graphId, versionId }: { containerId: number; graphId: number; versionId: number }) =>
+      containersApi.removeGraphVersion(containerId, graphId, versionId),
+    onSuccess: (_, variables) => queryClient.invalidateQueries({
+      queryKey: queryKeys.containers.graphVersions(variables.containerId, variables.graphId),
+    }),
+  });
+}
+
 export const useGraphSlotsBatchQuery = (containerId: number | null, graphIds: number[], enabled = true) => {
   const normalizedGraphIds = [...new Set(
     graphIds.filter(graphId => Number.isInteger(graphId) && graphId > 0),
@@ -328,11 +480,8 @@ export const useGraphSlotsBatchQuery = (containerId: number | null, graphIds: nu
     cancelOnUnmount: true,
     staleTime: 30_000,
     queryFn: async ({ signal }) => {
-      const slotEntries = await Promise.all(
-        normalizedGraphIds.map(async graphId => (
-          [graphId, await containersApi.listGraphSlots(containerId as number, graphId, signal)] as const
-        )),
-      );
+      const slotEntries = await mapInPairs(normalizedGraphIds, async graphId =>
+        [graphId, await containersApi.listGraphSlots(containerId as number, graphId, signal)] as const, signal);
 
       return slotEntries.reduce<GraphSlotsBatchResult>((accumulator, [graphId, slots]) => {
         accumulator[graphId] = slots;

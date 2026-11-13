@@ -1,4 +1,5 @@
 .overlay {
+  composes: overlay from "../../../shared/ui/ViewportOverlay.module.css";
   position: fixed;
   inset: 0;
   z-index: 1700;
@@ -11,6 +12,7 @@
 }
 
 .dialog {
+  composes: surface from "../../../shared/ui/ViewportOverlay.module.css";
   width: min(680px, calc(100vw - 28px));
   display: grid;
   gap: 18px;
@@ -221,9 +223,64 @@
 
 .footer {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
+  align-items: flex-end;
   gap: 10px;
   flex-wrap: wrap;
+}
+
+.footerActions,
+.bindActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.bindBlock {
+  display: grid;
+  gap: 7px;
+}
+
+button.bindButton {
+  --btn-bg: rgba(248, 250, 252, 0.82);
+  --btn-bg-hover: #ffffff;
+  --btn-border: rgba(148, 163, 184, 0.3);
+  --btn-shadow: transparent;
+  --btn-focus: rgba(37, 99, 235, 0.16);
+  --ios-button-height: 33px;
+  --ios-button-padding-inline: 0.68rem;
+  --ios-button-gap: 6px;
+  --ios-button-font-size: 0.78rem;
+  --ios-button-radius: 10px;
+  color: #475569;
+  box-shadow: none;
+}
+
+button.bindButton:hover:not(:disabled) {
+  color: #0f172a;
+  box-shadow: 0 3px 10px rgba(15, 23, 42, 0.07);
+}
+
+button.bindButtonCapturing {
+  --btn-bg: rgba(239, 246, 255, 0.94);
+  --btn-border: rgba(59, 130, 246, 0.38);
+  color: #1d4ed8;
+}
+
+.bindHint,
+.bindError {
+  max-width: 390px;
+  font-size: 0.76rem;
+  line-height: 1.4;
+}
+
+.bindHint {
+  color: rgba(71, 85, 105, 0.74);
+}
+
+.bindError {
+  color: #b91c1c;
 }
 
 @media (max-width: 720px) {
@@ -258,5 +315,11 @@
   .footer :global(button) {
     width: 100%;
     justify-content: center;
+  }
+
+  .footerActions,
+  .bindActions,
+  .bindBlock {
+    width: 100%;
   }
 }

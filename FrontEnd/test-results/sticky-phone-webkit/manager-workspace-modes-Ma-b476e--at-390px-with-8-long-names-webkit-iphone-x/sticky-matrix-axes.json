@@ -1,0 +1,40 @@
+{
+  "before": {
+    "height": 550,
+    "scrollHeight": 1032,
+    "width": 338,
+    "scrollWidth": 1494
+  },
+  "geometry": {
+    "left": 1156,
+    "top": 482,
+    "box": {
+      "x": 26.03125,
+      "y": 190,
+      "width": 337.9375,
+      "height": 550,
+      "top": 190,
+      "right": 363.96875,
+      "bottom": 740,
+      "left": 26.03125
+    }
+  },
+  "cornerBox": {
+    "x": 26.03125,
+    "y": 190,
+    "width": 96,
+    "height": 62.40625
+  },
+  "headerBox": {
+    "x": 214.03125,
+    "y": 190,
+    "width": 150,
+    "height": 62.40625
+  },
+  "dayBox": {
+    "x": 26.03125,
+    "y": 710.171875,
+    "width": 96,
+    "height": 30
+  }
+}

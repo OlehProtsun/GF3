@@ -1,3 +1,4 @@
+import { t } from "@shared/i18n";
 import type { ReactNode } from "react";
 import { ArrowIcon } from "@shared/ui/icons";
 import styles from "./AvailabilitySidebarSection.module.css";
@@ -5,7 +6,10 @@ import styles from "./AvailabilitySidebarSection.module.css";
 type AvailabilitySidebarSectionProps = {
   label: string;
   collapsed: boolean;
+  collapsedIcon?: ReactNode;
   collapsedOffset?: "default" | "compact" | "flush";
+  attention?: boolean;
+  preserveCollapsedOnMobile?: boolean;
   onExpand: () => void;
   children: ReactNode;
 };
@@ -22,7 +26,10 @@ function joinClassNames(...values: Array<string | undefined | false>) {
 export function AvailabilitySidebarSection({
   label,
   collapsed,
+  collapsedIcon,
   collapsedOffset = "default",
+  attention = false,
+  preserveCollapsedOnMobile = false,
   onExpand,
   children,
 }: AvailabilitySidebarSectionProps) {
@@ -38,16 +45,18 @@ export function AvailabilitySidebarSection({
       className={joinClassNames(
         styles.sectionShell,
         collapsed ? collapsedClassName : styles.sectionShellExpanded,
+        collapsed && attention ? styles.sectionShellAttention : undefined,
+        preserveCollapsedOnMobile ? styles.sectionShellPreserveCollapsed : undefined,
       )}
     >
       <button
         type="button"
         className={styles.sectionExpandButton}
         onClick={onExpand}
-        aria-label={`Expand ${label}`}
-        title={`Expand ${label}`}
+        aria-label={t("Expand {0}", label)}
+        title={t("Expand {0}", label)}
       >
-        <ArrowIcon size={16} className={styles.sectionExpandArrow} />
+        {collapsedIcon ?? <ArrowIcon size={16} className={styles.sectionExpandArrow} />}
       </button>
 
       <div className={styles.sectionCardWrap}>{children}</div>
@@ -64,8 +73,8 @@ export function AvailabilitySidebarCollapseButton({
       type="button"
       className={styles.sectionCollapseButton}
       onClick={onCollapse}
-      aria-label={`Collapse ${label}`}
-      title={`Collapse ${label}`}
+      aria-label={t("Collapse {0}", label)}
+      title={t("Collapse {0}", label)}
     >
       <ArrowIcon size={16} className={styles.sectionCollapseArrow} />
     </button>

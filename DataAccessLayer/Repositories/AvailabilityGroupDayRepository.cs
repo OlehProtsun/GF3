@@ -27,18 +27,10 @@ public class AvailabilityGroupDayRepository : GenericRepository<AvailabilityGrou
     /// <inheritdoc />
     public async Task DeleteByMemberIdAsync(int memberId, CancellationToken ct = default)
     {
-        var rows = await _set
+        await _set
             .Where(day => day.AvailabilityGroupMemberId == memberId)
-            .ToListAsync(ct)
+            .ExecuteDeleteAsync(ct)
             .ConfigureAwait(false);
-
-        if (rows.Count == 0)
-        {
-            return;
-        }
-
-        _set.RemoveRange(rows);
-        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -58,7 +50,14 @@ public class AvailabilityGroupDayRepository : GenericRepository<AvailabilityGrou
     {
         ArgumentNullException.ThrowIfNull(days);
 
-        await _set.AddRangeAsync(days, ct).ConfigureAwait(false);
+        var dayList = days.ToList();
+        if (dayList.Count == 0)
+        {
+            return;
+        }
+
+        await _set.AddRangeAsync(dayList, ct).ConfigureAwait(false);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        _db.ChangeTracker.Clear();
     }
 }

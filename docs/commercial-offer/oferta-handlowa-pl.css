@@ -1,0 +1,530 @@
+@page {
+  size: A4;
+  margin: 0;
+}
+
+:root {
+  --ink: #172033;
+  --muted: #637083;
+  --line: #dfe5ec;
+  --surface: #f4f6f8;
+  --surface-blue: #f1f8ff;
+  --blue: #168ff5;
+  --blue-dark: #0873d1;
+  --white: #ffffff;
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: var(--ink);
+  background: #e9edf2;
+  font-synthesis: none;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  padding: 20px;
+  background: #e9edf2;
+  -webkit-font-smoothing: antialiased;
+}
+
+.offer-sheet {
+  width: 210mm;
+  min-height: 297mm;
+  margin: 0 auto;
+  padding: 11.5mm 12.5mm 10.5mm;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 91% 4%, rgba(22, 143, 245, 0.09), transparent 25%),
+    var(--white);
+  box-shadow: 0 20px 60px rgba(31, 45, 66, 0.17);
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+h1,
+h2,
+h3,
+strong {
+  letter-spacing: -0.025em;
+}
+
+.hero {
+  padding-bottom: 5.5mm;
+  border-bottom: 1px solid var(--line);
+}
+
+.brand-row,
+.hero-grid,
+.section-heading,
+.cta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.brand-row {
+  gap: 5mm;
+  margin-bottom: 4.5mm;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 2.2mm;
+  font-size: 18px;
+  font-weight: 780;
+  letter-spacing: -0.04em;
+}
+
+.brand img {
+  width: 10mm;
+  height: 10mm;
+  border-radius: 2.4mm;
+}
+
+.category,
+.section-note {
+  color: var(--muted);
+  font-size: 9.4px;
+  font-weight: 650;
+  letter-spacing: 0.035em;
+  text-transform: uppercase;
+}
+
+.category {
+  padding: 2mm 3mm;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.74);
+}
+
+.hero-grid {
+  align-items: stretch;
+  gap: 7mm;
+}
+
+.hero-copy {
+  flex: 1;
+  padding-top: 1.5mm;
+}
+
+.eyebrow,
+.section-kicker,
+.price-label {
+  color: var(--blue-dark);
+  font-size: 9px;
+  font-weight: 780;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.hero h1 {
+  max-width: 118mm;
+  margin: 2.2mm 0 2.7mm;
+  font-size: 30px;
+  line-height: 1.02;
+  letter-spacing: -0.055em;
+}
+
+.lead {
+  max-width: 116mm;
+  color: var(--muted);
+  font-size: 11.2px;
+  line-height: 1.48;
+}
+
+.price-card {
+  flex: 0 0 63mm;
+  padding: 4mm 4.5mm;
+  border: 1px solid #cfe6fa;
+  border-radius: 5mm;
+  background: linear-gradient(145deg, #f7fbff, #edf7ff);
+  box-shadow: 0 4mm 9mm rgba(8, 115, 209, 0.09);
+}
+
+.price {
+  display: flex;
+  align-items: baseline;
+  gap: 1.7mm;
+  margin: 1.5mm 0 1mm;
+}
+
+.price strong {
+  font-size: 27px;
+  line-height: 1;
+  color: var(--ink);
+}
+
+.price span,
+.price-card > p {
+  color: var(--muted);
+  font-size: 9.4px;
+}
+
+.included-list,
+.benefit-list,
+.process-list {
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.included-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.2mm 3mm;
+  margin-top: 2.6mm;
+}
+
+.included-list li {
+  position: relative;
+  padding-left: 3.2mm;
+  color: #405065;
+  font-size: 8.7px;
+  line-height: 1.28;
+}
+
+.included-list li::before {
+  content: "";
+  position: absolute;
+  top: 0.9mm;
+  left: 0;
+  width: 1.6mm;
+  height: 1.6mm;
+  border-radius: 50%;
+  background: var(--blue);
+  box-shadow: 0 0 0 1mm rgba(22, 143, 245, 0.1);
+}
+
+.problem-solution {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4mm;
+  margin-top: 5mm;
+}
+
+.problem-solution article {
+  min-height: 31mm;
+  padding: 4mm 4.5mm;
+  border: 1px solid var(--line);
+  border-radius: 4mm;
+  background: var(--white);
+}
+
+.problem-solution .solution-card {
+  border-color: #cfe6fa;
+  background: var(--surface-blue);
+}
+
+.problem-solution h2,
+.outcomes-process h2,
+.cta h2 {
+  margin: 1.4mm 0 1.4mm;
+  font-size: 14.6px;
+  line-height: 1.12;
+}
+
+.problem-solution article > p:last-child,
+.cta-copy > p:last-child {
+  color: var(--muted);
+  font-size: 9.4px;
+  line-height: 1.43;
+}
+
+.capabilities {
+  margin-top: 5mm;
+}
+
+.section-heading {
+  align-items: end;
+  margin-bottom: 3mm;
+}
+
+.section-heading h2 {
+  margin-top: 1mm;
+  font-size: 17px;
+  line-height: 1.1;
+}
+
+.section-note {
+  color: #738094;
+}
+
+.feature-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 3mm;
+}
+
+.feature-card {
+  min-height: 27.2mm;
+  padding: 3.2mm 3.5mm;
+  border: 1px solid var(--line);
+  border-radius: 3.5mm;
+  background: var(--surface);
+}
+
+.feature-index {
+  color: var(--blue);
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.feature-card h3 {
+  margin: 1mm 0 1.1mm;
+  font-size: 11.3px;
+  line-height: 1.15;
+}
+
+.feature-card p {
+  color: var(--muted);
+  font-size: 8.7px;
+  line-height: 1.36;
+}
+
+.outcomes-process {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4mm;
+  margin-top: 5mm;
+}
+
+.outcomes-process > article {
+  padding: 4mm 4.5mm;
+  border-radius: 4mm;
+}
+
+.benefits-card {
+  border: 1px solid var(--line);
+}
+
+.process-card {
+  border: 1px solid #dce4ed;
+  background: #f7f9fb;
+}
+
+.benefit-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2mm 3.5mm;
+  margin-top: 2.3mm;
+}
+
+.benefit-list li {
+  padding-left: 2.7mm;
+  border-left: 1.2mm solid #c8e5fc;
+}
+
+.benefit-list strong,
+.benefit-list span {
+  display: block;
+}
+
+.benefit-list strong {
+  margin-bottom: 0.4mm;
+  font-size: 9px;
+}
+
+.benefit-list span {
+  color: var(--muted);
+  font-size: 8px;
+  line-height: 1.25;
+}
+
+.process-list {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2mm;
+  margin-top: 2.1mm;
+}
+
+.process-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 1.5mm;
+}
+
+.process-list li > span {
+  display: grid;
+  flex: 0 0 5.2mm;
+  width: 5.2mm;
+  height: 5.2mm;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--white);
+  background: var(--blue);
+  font-size: 8px;
+  font-weight: 800;
+}
+
+.process-list strong,
+.process-list small {
+  display: block;
+}
+
+.process-list strong {
+  font-size: 8.5px;
+  line-height: 1.2;
+}
+
+.process-list small {
+  margin-top: 0.5mm;
+  color: var(--muted);
+  font-size: 7.6px;
+  line-height: 1.23;
+}
+
+.process-note {
+  margin-top: 2.2mm;
+  color: var(--blue-dark);
+  font-size: 7.9px;
+  font-weight: 650;
+}
+
+.cta {
+  gap: 8mm;
+  margin-top: 5mm;
+  padding: 4mm 5mm;
+  border-radius: 4mm;
+  color: var(--white);
+  background: var(--ink);
+}
+
+.cta-copy {
+  flex: 1;
+}
+
+.cta .section-kicker {
+  color: #7ac8ff;
+}
+
+.cta h2 {
+  margin-bottom: 0.8mm;
+  font-size: 15.5px;
+  color: var(--white);
+}
+
+.cta-copy > p:last-child {
+  color: #b8c2cf;
+}
+
+.contact-grid {
+  display: grid;
+  flex: 0 0 69mm;
+  grid-template-columns: 1fr 1fr;
+  gap: 2mm 4mm;
+  padding-left: 5mm;
+  border-left: 1px solid #3b4659;
+  font-style: normal;
+}
+
+.contact-grid span {
+  color: #e5ebf2;
+  font-size: 8.6px;
+  line-height: 1.25;
+}
+
+@media screen and (max-width: 850px) {
+  body {
+    padding: 0;
+    background: var(--white);
+  }
+
+  .offer-sheet {
+    width: 100%;
+    min-height: 100vh;
+    box-shadow: none;
+  }
+}
+
+@media screen and (max-width: 620px) {
+  .offer-sheet {
+    padding: 24px 18px;
+    overflow: visible;
+  }
+
+  .brand-row,
+  .hero-grid,
+  .cta {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .category {
+    align-self: flex-start;
+  }
+
+  .hero h1 {
+    font-size: 36px;
+  }
+
+  .price-card,
+  .contact-grid {
+    flex-basis: auto;
+  }
+
+  .problem-solution,
+  .feature-grid,
+  .outcomes-process,
+  .benefit-list {
+    grid-template-columns: 1fr;
+  }
+
+  .contact-grid {
+    padding: 4mm 0 0;
+    border-top: 1px solid #3b4659;
+    border-left: 0;
+  }
+}
+
+@media print {
+  html,
+  body {
+    width: 210mm;
+    height: 297mm;
+    min-height: 0;
+    padding: 0;
+    overflow: hidden;
+    background: var(--white);
+  }
+
+  body {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .offer-sheet {
+    width: 210mm;
+    height: 297mm;
+    min-height: 297mm;
+    margin: 0;
+    overflow: hidden;
+    box-shadow: none;
+  }
+
+  .hero,
+  .problem-solution,
+  .capabilities,
+  .outcomes-process,
+  .cta,
+  .feature-card,
+  .price-card {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}

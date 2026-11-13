@@ -1,0 +1,13 @@
+.shot { position: relative; width: 100%; height: 100%; overflow: hidden; border: 1px solid #dbe2ee; border-radius: 26px; background: #f3f4f6; box-shadow: 0 28px 80px #0f172a16; }
+.state { position: absolute; inset: 0; display: flex; justify-content: center; align-items: center; overflow: hidden; border-radius: 26px; background: #f3f4f6; }
+.state > img { max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; }
+.modal > img { border-radius: 28px; }
+.shot { overflow: visible; transform-style: preserve-3d; }
+.fragments { position: absolute; inset: 0; pointer-events: none; transform-style: preserve-3d; }
+.fragment { position: absolute; overflow: hidden; border-radius: 10px; background: white; box-shadow: 0 16px 40px #0f172a25; transform-origin: center; }
+.fragment img { position: absolute; max-width: none; }
+.cursor { position: absolute; width: 32px; height: 40px; pointer-events: none; filter: drop-shadow(0 3px 4px #0f172a33); }
+.touch { position: absolute; width: 36px; height: 36px; margin: -18px; border: 2px solid #2563eb; border-radius: 50%; pointer-events: none; }
+.mount { width: 1440px; min-height: 900px; padding: 50px 100px; background: #f3f4f6; color: #0f172a; font: 16px Inter, system-ui, sans-serif; }
+.mount > section { height: 780px; }
+.captureTitle { font-size: 30px; margin: 0 0 24px; }

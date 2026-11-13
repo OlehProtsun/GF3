@@ -25,4 +25,20 @@ public sealed class CreateAvailabilityGroupRequest
     /// </summary>
     [Range(1, 12)]
     public int Month { get; set; }
+
+    /// <summary>
+    /// Publication state. Supported values are private and public.
+    /// </summary>
+    public string? PublicationStatus { get; set; } = "private";
+
+    /// <summary>
+    /// UTC moment when assigned employees can start seeing this group.
+    /// </summary>
+    public DateTimeOffset? VisibleFromUtc { get; set; }
+
+    /// <summary>
+    /// UTC moment after which assigned employees no longer see this group.
+    /// </summary>
+    public DateTimeOffset? VisibleToUtc { get; set; }
+
 }

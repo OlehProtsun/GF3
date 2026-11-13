@@ -1,3 +1,4 @@
+import { t } from "@shared/i18n";
 import { useMemo } from "react";
 import type { ChangeEvent } from "react";
 import { useSyncedDraft } from "@shared/lib/useSyncedDraft";
@@ -12,7 +13,7 @@ export type ContainerFormErrors = Partial<Record<keyof ContainerFormState, strin
 
 export type ContainerFormFieldElement = HTMLInputElement | HTMLTextAreaElement;
 
-function buildInitialState(container?: Container | null): ContainerFormState {
+export function createContainerFormState(container?: Container | null): ContainerFormState {
   return {
     name: container?.name ?? "",
     note: container?.note ?? "",
@@ -23,7 +24,7 @@ function buildValidationErrors(form: ContainerFormState): ContainerFormErrors {
   const nextErrors: ContainerFormErrors = {};
 
   if (!form.name.trim()) {
-    nextErrors.name = "Container name is required.";
+    nextErrors.name = t("Container name is required.");
   }
 
   return nextErrors;
@@ -39,7 +40,7 @@ export function useContainerForm(container?: Container | null, isCreate = false)
   );
   const initialDraft = useMemo(
     () => ({
-      form: buildInitialState(container),
+      form: createContainerFormState(container),
       errors: {} as ContainerFormErrors,
     }),
     [container],
@@ -103,7 +104,7 @@ export function useContainerForm(container?: Container | null, isCreate = false)
 
   const reset = (nextContainer?: Container | null) => {
     setDraft({
-      form: buildInitialState(nextContainer),
+      form: createContainerFormState(nextContainer),
       errors: {},
     });
   };

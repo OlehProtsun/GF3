@@ -1,10 +1,15 @@
 ﻿.field {
   display: flex;
   flex-direction: column;
+  min-width: 0;
   gap: 6px;
 }
 
 .label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 0.85rem;
   font-weight: 800;
   color: #000000;
@@ -13,6 +18,8 @@
 
 .input,
 .textArea {
+  min-width: 0;
+  max-width: 100%;
   box-sizing: border-box;
   border-radius: 16px;
   border: 1px solid #e5e5ea;
@@ -44,10 +51,13 @@
 }
 
 .fieldError {
-  display: inline-flex;
-  align-items: center;
+  display: flex;
+  align-items: flex-start;
   gap: 8px;
 
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
   margin-top: 6px;
   padding: 6px 10px;
   border-radius: 12px;
@@ -58,7 +68,8 @@
 
   font-size: 0.82rem;
   font-weight: 800;
-  line-height: 1.15;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
 
   box-shadow:
     0 10px 20px rgba(0, 0, 0, 0.08),
@@ -76,6 +87,7 @@
 
   width: 18px;
   height: 18px;
+  flex: 0 0 18px;
   border-radius: 999px;
 
   background: rgba(255, 59, 48, 0.18);
