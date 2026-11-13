@@ -51,8 +51,8 @@ def require(condition, message):
         raise ReleaseError(message)
 
 
-def command(*args, cwd=None, timeout=120, capture=True, check=True, data=None):
-    result = subprocess.run(args, cwd=cwd, env=ENV, timeout=timeout, text=True,
+def command(*args, cwd=None, timeout=120, capture=True, check=True, data=None, extra_env=None):
+    result = subprocess.run(args, cwd=cwd, env={**ENV, **(extra_env or {})}, timeout=timeout, text=True,
                             input=data, capture_output=capture)
     if check and result.returncode:
         raise ReleaseError(f"{args[0]} {args[1]} failed (exit {result.returncode})")
@@ -280,7 +280,9 @@ def current_config():
             if live["Config"]["User"]:
                 service["user"] = live["Config"]["User"]
         live_logging = live["HostConfig"]["LogConfig"]
-        service["logging"] = {"driver": live_logging["Type"], "options": live_logging["Config"]}
+        service["logging"] = {"driver": live_logging["Type"]}
+        if live_logging["Config"]:
+            service["logging"]["options"] = live_logging["Config"]
     return config
 
 
@@ -319,6 +321,15 @@ def snapshot(bundle, volume):
     for name in config["services"]:
         config["services"][name]["image"] = local_image(container(name)["Image"], f"gf3-{name}:{bundle.name}")
     nginx = config["services"]["nginx"]
+    live_mounts = mounts(nginx)
+    for target, filename in ((CERT, "fullchain.pem"), (KEY, "privkey.pem")):
+        if target in live_mounts:
+            expected = Path("/etc/letsencrypt/live") / DOMAIN / filename
+            if DOMAIN == "app-gf.com":
+                require(Path(live_mounts[target]["source"]).resolve() == expected.resolve(),
+                        f"Saved TLS mount does not use the active lineage: {target}")
+                # Docker may report the resolved inode of a file bind. Rebind through the renewing lineage.
+                live_mounts[target]["source"] = str(expected)
     source = bundle / "nginx-config"
     source.mkdir()
     require(all(row["target"] != CONFIG for row in nginx["volumes"]),
@@ -490,6 +501,12 @@ def recover(bundle, acme):
     activate(bundle)
 
 
+def approve_guard():
+    result = command("/usr/bin/python3", str(Path(__file__).with_name("gf3_guard.py")), "status",
+                     extra_env={"GF3_GUARD_ROOT": str(ROOT), "GF3_GUARD_RUNTIME": str(RUNTIME)})
+    require(not json.loads(result).get("last_error"), "GF3 guard reports a rule activation error")
+
+
 def verify_ssh_and_certbot():
     command("fail2ban-client", "status", "sshd")
     command("systemctl", "is-active", "--quiet", "snap.certbot.renew.timer")
@@ -605,6 +622,8 @@ def main():
                     verified_checkout(args.source, args.sha)
                     safe_path(args.source / "deploy/.env", private=True)
                     validate(render(args.source), baseline[1], baseline[2])
+                    command("systemd-analyze", "verify", "/etc/systemd/system/gf3-guard.service",
+                            "/etc/systemd/system/gf3-guard.timer")
                     print(f"Preflight OK: {baseline[1]}, volume {baseline[2]}")
                 elif args.action == "deploy":
                     candidate, previous, baseline = deploy(args.sha, args.nginx_image)
@@ -632,6 +651,7 @@ def main():
                     command("systemctl", "start", "gf3-guard.service", timeout=380)
                     with lock(RUNTIME / "state/guard.lock"):
                         verify_web(candidate)
+                        approve_guard()
                         require(topology() == baseline, "Network or database changed after guard activation")
                         command("systemctl", "enable", "--now", "gf3-guard.timer")
                         git("merge", "--ff-only", args.sha)

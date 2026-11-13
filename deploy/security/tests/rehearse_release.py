@@ -23,8 +23,8 @@ if os.name == "nt":
     release.ENV.pop("DOCKER_HOST", None)
 
 
-def diagnostic_command(*args, cwd=None, timeout=120, capture=True, check=True, data=None):
-    result = subprocess.run(args, cwd=cwd, env=release.ENV, timeout=timeout, text=True, input=data,
+def diagnostic_command(*args, cwd=None, timeout=120, capture=True, check=True, data=None, extra_env=None):
+    result = subprocess.run(args, cwd=cwd, env={**release.ENV, **(extra_env or {})}, timeout=timeout, text=True, input=data,
                             capture_output=capture)
     if check and result.returncode:
         raise release.ReleaseError(f"{args[0]} {args[1]} failed (exit {result.returncode}): {result.stderr or ''}")
