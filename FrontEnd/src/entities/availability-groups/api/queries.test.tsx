@@ -1,274 +1,114 @@
-import { render, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, test, vi } from "vitest";
+import { act, renderHook, waitFor } from "@testing-library/react";
+import type { PropsWithChildren } from "react";
+import { beforeEach, expect, test, vi } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { queryKeys } from "@shared/api/queryKeys";
-import { getAvailabilityCellKey } from "../model/editor";
-import type { AvailabilityGroupMember, AvailabilitySlot } from "../model/types";
-import { useSaveAvailabilityGroupGraphMutation } from "./queries";
+import type { SaveAvailabilityGroupGraphDto } from "./dto";
+import { useSaveAvailabilityGroupGraphMutation, type SaveAvailabilityGroupGraphInput } from "./queries";
 
-const apiMocks = vi.hoisted(() => ({
+const api = vi.hoisted(() => ({
+  saveGraph: vi.fn<(payload: SaveAvailabilityGroupGraphDto) => Promise<{ id: number; sourceGroupIds: number[]; changed: boolean }>>(),
   create: vi.fn(),
   update: vi.fn(),
-  remove: vi.fn(),
-  list: vi.fn(),
-  byId: vi.fn(),
-  items: vi.fn(),
-  members: vi.fn(),
-  slots: vi.fn(),
   createMember: vi.fn(),
   updateMember: vi.fn(),
   removeMember: vi.fn(),
   createSlot: vi.fn(),
   updateSlot: vi.fn(),
   removeSlot: vi.fn(),
+  slots: vi.fn(),
   transferDays: vi.fn(),
 }));
-
-vi.mock("./availabilityGroupsApi", () => ({
-  availabilityGroupsApi: apiMocks,
-}));
-
-function SaveGraphHarness({ mode }: { mode: "create" | "update" | "transfer" }) {
-  const saveGraph = useSaveAvailabilityGroupGraphMutation();
-
-  return (
-    <button
-      type="button"
-      onClick={() => saveGraph.mutate(
-        mode === "create" ? createInput() : mode === "transfer" ? transferInput() : updateInput(),
-      )}
-    >
-      save graph
-    </button>
-  );
-}
-
-function renderHarness(client: QueryClient, mode: "create" | "update" | "transfer") {
-  return render(
-    <QueryClientProvider client={client}>
-      <SaveGraphHarness mode={mode} />
-    </QueryClientProvider>,
-  );
-}
-
-function createInput() {
-  return {
-    id: null,
-    payload: {
-      name: "Summer availability",
-      year: 2026,
-      month: 2,
-      publicationStatus: "private" as const,
-    },
-    employeeIds: [7, 5, 7],
-    cellMap: {
-      [getAvailabilityCellKey(7, 1)]: "+",
-      [getAvailabilityCellKey(5, 2)]: "9:00-13:30",
-    },
-  };
-}
-
-function transferInput() {
-  return {
-    ...createInput(),
-    employeeIds: [7],
-    cellMap: {
-      [getAvailabilityCellKey(7, 1)]: "09:00 - 15:00",
-    },
-    transfers: [{
-      employeeId: 7,
-      sourceGroupId: 35,
-      dayOfMonths: [1],
-    }],
-  };
-}
-
-function updateInput() {
-  const existingMembers: AvailabilityGroupMember[] = [
-    { id: 10, availabilityGroupId: 44, employeeId: 7, displayOrder: 0 },
-    { id: 11, availabilityGroupId: 44, employeeId: 5, displayOrder: 1 },
-    { id: 12, availabilityGroupId: 44, employeeId: 9, displayOrder: 2 },
-  ];
-  const existingSlots: AvailabilitySlot[] = [
-    ...buildMonthSlots(existingMembers[0], 2026, 2, 1, null),
-    ...buildMonthSlots(existingMembers[1], 2026, 2, 1, null),
-    { id: 900, availabilityGroupMemberId: 12, dayOfMonth: 1, kind: 0, intervalStr: null },
-  ];
-
-  return {
-    id: 44,
-    payload: {
-      name: "  Updated availability  ",
-      year: 2026,
-      month: 2,
-      publicationStatus: "public" as const,
-    },
-    employeeIds: [5, 7],
-    cellMap: {
-      [getAvailabilityCellKey(5, 1)]: "+",
-      [getAvailabilityCellKey(7, 2)]: "08:15 - 12:45",
-    },
-    existingMembers,
-    existingSlots,
-  };
-}
-
-function buildMonthSlots(
-  member: AvailabilityGroupMember,
-  year: number,
-  month: number,
-  kind: AvailabilitySlot["kind"],
-  intervalStr: string | null,
-): AvailabilitySlot[] {
-  const daysInMonth = new Date(year, month, 0).getDate();
-
-  return Array.from({ length: daysInMonth }, (_, index) => ({
-    id: member.id * 100 + index + 1,
-    availabilityGroupMemberId: member.id,
-    dayOfMonth: index + 1,
-    kind,
-    intervalStr,
-  }));
-}
+vi.mock("./availabilityGroupsApi", () => ({ availabilityGroupsApi: api }));
 
 beforeEach(() => {
-  Object.values(apiMocks).forEach(mock => mock.mockReset());
-  apiMocks.create.mockResolvedValue({ id: 44 });
-  apiMocks.update.mockResolvedValue(undefined);
-  apiMocks.remove.mockResolvedValue(undefined);
-  apiMocks.createMember.mockImplementation(async (_groupId: number, payload: { employeeId: number; displayOrder: number }) => ({
-    id: payload.employeeId === 7 ? 70 : 50,
-    availabilityGroupId: 44,
-    employeeId: payload.employeeId,
-    displayOrder: payload.displayOrder,
-  }));
-  apiMocks.updateMember.mockResolvedValue(undefined);
-  apiMocks.removeMember.mockResolvedValue(undefined);
-  apiMocks.createSlot.mockResolvedValue({});
-  apiMocks.updateSlot.mockResolvedValue(undefined);
-  apiMocks.removeSlot.mockResolvedValue(undefined);
-  apiMocks.slots.mockResolvedValue([]);
-  apiMocks.transferDays.mockResolvedValue({});
+  vi.resetAllMocks();
+  api.saveGraph.mockResolvedValue({ id: 44, sourceGroupIds: [], changed: true });
 });
 
-describe("availability group graph query mutation", () => {
-  test("creates a group, de-duplicates employees, materializes every day slot, and invalidates the saved graph", async () => {
-    const user = userEvent.setup();
-    const client = new QueryClient();
-    const invalidateSpy = vi.spyOn(client, "invalidateQueries");
-    renderHarness(client, "create");
+function save(input: SaveAvailabilityGroupGraphInput) {
+  const client = new QueryClient({ defaultOptions: { mutations: { retry: 3 } } });
+  const invalidate = vi.spyOn(client, "invalidateQueries");
+  const success = vi.fn();
+  const failure = vi.fn();
+  const { result } = renderHook(useSaveAvailabilityGroupGraphMutation, {
+    wrapper: ({ children }: PropsWithChildren) => <QueryClientProvider client={client}>{children}</QueryClientProvider>,
+  });
+  act(() => result.current.mutate(input, { onSuccess: success, onError: failure }));
+  return { invalidate, success, failure };
+}
 
-    await user.click(screen.getByRole("button", { name: "save graph" }));
+function expectSingleWrite() {
+  const { saveGraph, ...granular } = api;
+  expect(saveGraph).toHaveBeenCalledTimes(1);
+  for (const request of Object.values(granular)) expect(request).not.toHaveBeenCalled();
+}
 
-    await waitFor(() => {
-      expect(apiMocks.create).toHaveBeenCalledWith({
-        name: "Summer availability : 02.2026",
-        year: 2026,
-        month: 2,
-        publicationStatus: "private",
-      });
-      expect(apiMocks.createSlot).toHaveBeenCalledTimes(56);
+test.each([[2026, 2, 28], [2028, 2, 29], [2026, 11, 30], [2026, 12, 31]])(
+  "creates %i/%i with %i days for each employee in one request", async (year, month, days) => {
+    const { invalidate, success } = save({
+      id: null,
+      payload: { name: "  Availability  ", year, month, publicationStatus: "private" },
+      employeeIds: [7, 5, 7, 3, 2, 1],
+      cellMap: { "7:1": "+", "5:2": "9:00-13:30", "3:3": "Training" },
     });
 
-    expect(apiMocks.createMember).toHaveBeenNthCalledWith(1, 44, { employeeId: 7, displayOrder: 0 });
-    expect(apiMocks.createMember).toHaveBeenNthCalledWith(2, 44, { employeeId: 5, displayOrder: 1 });
-    expect(apiMocks.createSlot).toHaveBeenCalledWith(44, {
-      availabilityGroupMemberId: 70,
-      dayOfMonth: 1,
-      kind: 0,
-      intervalStr: null,
+    await waitFor(() => expect(success).toHaveBeenCalledWith({ id: 44, sourceGroupIds: [], changed: true }));
+    expectSingleWrite();
+    const [payload] = api.saveGraph.mock.calls[0];
+    expect(payload).toMatchObject({
+      id: null, name: `Availability : ${String(month).padStart(2, "0")}.${year}`, year, month, publicationStatus: "private", transfers: [],
     });
-    expect(apiMocks.createSlot).toHaveBeenCalledWith(44, {
-      availabilityGroupMemberId: 50,
-      dayOfMonth: 2,
-      kind: 2,
-      intervalStr: "09:00 - 13:30",
-    });
-    expect(invalidateSpy.mock.calls.map(([filters]) => filters)).toEqual([
-      { queryKey: queryKeys.availabilityGroups.all },
-      { queryKey: queryKeys.availabilityGroups.byId(44) },
-      { queryKey: queryKeys.availabilityGroups.items(44) },
-      { queryKey: queryKeys.availabilityGroups.members(44) },
-      { queryKey: queryKeys.availabilityGroups.slots(44) },
-    ]);
+    expect(payload.members.map(member => member.employeeId)).toEqual([7, 5, 3, 2, 1]);
+    for (const member of payload.members) {
+      expect(member.days.map(day => day.dayOfMonth)).toEqual(Array.from({ length: days }, (_, index) => index + 1));
+      expect(member.days.at(-1)).toEqual({ dayOfMonth: days, kind: 1, intervalStr: null });
+    }
+    expect(payload.members[0].days[0]).toEqual({ dayOfMonth: 1, kind: 0, intervalStr: null });
+    expect(payload.members[1].days[1]).toEqual({ dayOfMonth: 2, kind: 2, intervalStr: "09:00 - 13:30" });
+    expect(payload.members[2].days[2]).toEqual({ dayOfMonth: 3, kind: 1, intervalStr: "Training" });
+    expect(invalidate).toHaveBeenCalledExactlyOnceWith({ queryKey: queryKeys.availabilityGroups.all });
+  },
+);
+
+test("edits metadata, selected employees and staged CFA using only semantic identities", async () => {
+  api.saveGraph.mockResolvedValue({ id: 44, sourceGroupIds: [35], changed: true });
+  const publication = {
+    publicationStatus: "public" as const,
+    visibleFromUtc: "2026-12-01T00:00:00Z",
+    visibleToUtc: "2026-12-31T23:00:00Z",
+  };
+  const { invalidate, success } = save({
+    id: 44,
+    payload: { name: " Updated availability ", year: 2026, month: 12, ...publication },
+    employeeIds: [5, 7],
+    cellMap: { "5:1": "+", "7:2": "08:15 - 12:45", "7:3": "+", "9:1": "Removed" },
+    transfers: [{ employeeId: 7, sourceGroupId: 35, dayOfMonths: [3, 2, 3] }],
   });
 
-  test("applies staged CFA only during save, refreshes transferred slots, and avoids duplicate slot creation", async () => {
-    const user = userEvent.setup();
-    const client = new QueryClient();
-    apiMocks.slots.mockResolvedValue([{
-      id: 7001,
-      availabilityGroupMemberId: 70,
-      dayOfMonth: 1,
-      kind: 2,
-      intervalStr: "09:00 - 15:00",
-    }]);
-    renderHarness(client, "transfer");
-
-    await user.click(screen.getByRole("button", { name: "save graph" }));
-
-    await waitFor(() => {
-      expect(apiMocks.transferDays).toHaveBeenCalledWith(44, 70, {
-        sourceGroupId: 35,
-        dayOfMonths: [1],
-      });
-      expect(apiMocks.slots).toHaveBeenCalledWith(44);
-      expect(apiMocks.createSlot).toHaveBeenCalledTimes(27);
-    });
-
-    expect(apiMocks.createSlot).not.toHaveBeenCalledWith(44, expect.objectContaining({
-      availabilityGroupMemberId: 70,
-      dayOfMonth: 1,
-    }));
-    expect(apiMocks.createMember.mock.invocationCallOrder[0]).toBeLessThan(apiMocks.transferDays.mock.invocationCallOrder[0]);
-    expect(apiMocks.transferDays.mock.invocationCallOrder[0]).toBeLessThan(apiMocks.slots.mock.invocationCallOrder[0]);
-    expect(apiMocks.slots.mock.invocationCallOrder[0]).toBeLessThan(apiMocks.createSlot.mock.invocationCallOrder[0]);
+  await waitFor(() => expect(success).toHaveBeenCalledWith({ id: 44, sourceGroupIds: [35], changed: true }));
+  expectSingleWrite();
+  const [payload] = api.saveGraph.mock.calls[0];
+  expect(payload).toMatchObject({
+    id: 44, name: "Updated availability", ...publication,
+    transfers: [{ employeeId: 7, sourceGroupId: 35, dayOfMonths: [2, 3] }],
   });
+  expect(payload.members.map(member => member.employeeId)).toEqual([5, 7]);
+  expect(payload.members[1].days.slice(1, 3)).toEqual([
+    { dayOfMonth: 2, kind: 2, intervalStr: "08:15 - 12:45" },
+    { dayOfMonth: 3, kind: 0, intervalStr: null },
+  ]);
+  expect(invalidate).toHaveBeenCalledExactlyOnceWith({ queryKey: queryKeys.availabilityGroups.all });
+});
 
-  test("updates an existing graph by reordering members, deleting removed records, and only updating changed slots", async () => {
-    const user = userEvent.setup();
-    const client = new QueryClient();
-    const invalidateSpy = vi.spyOn(client, "invalidateQueries");
-    renderHarness(client, "update");
-
-    await user.click(screen.getByRole("button", { name: "save graph" }));
-
-    await waitFor(() => {
-      expect(apiMocks.update).toHaveBeenCalledWith(44, {
-        name: "Updated availability",
-        year: 2026,
-        month: 2,
-        publicationStatus: "public",
-      });
-      expect(apiMocks.removeMember).toHaveBeenCalledWith(44, 12);
-    });
-
-    expect(apiMocks.create).not.toHaveBeenCalled();
-    expect(apiMocks.createMember).not.toHaveBeenCalled();
-    expect(apiMocks.createSlot).not.toHaveBeenCalled();
-    expect(apiMocks.removeSlot).toHaveBeenCalledWith(44, 900);
-    expect(apiMocks.updateMember).toHaveBeenCalledWith(44, 11, { employeeId: 5, displayOrder: 0 });
-    expect(apiMocks.updateMember).toHaveBeenCalledWith(44, 10, { employeeId: 7, displayOrder: 1 });
-    expect(apiMocks.updateSlot).toHaveBeenCalledTimes(2);
-    expect(apiMocks.updateSlot).toHaveBeenCalledWith(44, 1101, {
-      availabilityGroupMemberId: 11,
-      dayOfMonth: 1,
-      kind: 0,
-      intervalStr: null,
-    });
-    expect(apiMocks.updateSlot).toHaveBeenCalledWith(44, 1002, {
-      availabilityGroupMemberId: 10,
-      dayOfMonth: 2,
-      kind: 2,
-      intervalStr: "08:15 - 12:45",
-    });
-    expect(invalidateSpy.mock.calls.map(([filters]) => filters)).toEqual([
-      { queryKey: queryKeys.availabilityGroups.all },
-      { queryKey: queryKeys.availabilityGroups.byId(44) },
-      { queryKey: queryKeys.availabilityGroups.items(44) },
-      { queryKey: queryKeys.availabilityGroups.members(44) },
-      { queryKey: queryKeys.availabilityGroups.slots(44) },
-    ]);
+test("does not replay or invalidate a rejected save", async () => {
+  const error = new Error("Save was rejected");
+  api.saveGraph.mockRejectedValue(error);
+  const { invalidate, success, failure } = save({
+    id: null, payload: { name: "Availability", year: 2026, month: 12 }, employeeIds: [1], cellMap: {},
   });
+  await waitFor(() => expect(failure).toHaveBeenCalledExactlyOnceWith(error));
+  expectSingleWrite();
+  expect(invalidate).not.toHaveBeenCalled();
+  expect(success).not.toHaveBeenCalled();
 });

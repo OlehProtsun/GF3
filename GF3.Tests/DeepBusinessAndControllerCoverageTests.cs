@@ -823,6 +823,13 @@ public sealed class DeepBusinessAndControllerCoverageTests
         public Task<List<AvailabilityGroupModel>> GetByValueAsync(string value, CancellationToken ct = default)
             => Task.FromResult(new List<AvailabilityGroupModel>());
 
+        public Task<AvailabilityGroupGraphSaveResult> SaveGraphAsync(
+            AvailabilityGroupModel group,
+            IList<(int employeeId, IList<AvailabilityGroupDayModel> days)> payload,
+            IReadOnlyList<AvailabilityGroupGraphTransferInstruction> transfers,
+            CancellationToken ct = default)
+            => throw new NotSupportedException();
+
         public Task SaveGroupAsync(AvailabilityGroupModel group, IList<(int employeeId, IList<AvailabilityGroupDayModel> days)> payload, CancellationToken ct = default)
             => Task.CompletedTask;
 

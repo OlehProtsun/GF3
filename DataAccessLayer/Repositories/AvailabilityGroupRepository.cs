@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+using System.Globalization;
 using DataAccessLayer.Models;
 using DataAccessLayer.Models.DataBaseContext;
 using DataAccessLayer.Models.Enums;
@@ -13,9 +15,12 @@ namespace DataAccessLayer.Repositories;
 /// </summary>
 public class AvailabilityGroupRepository : GenericRepository<AvailabilityGroupModel>, IAvailabilityGroupRepository
 {
-    public AvailabilityGroupRepository(AppDbContext db)
+    private readonly IAvailabilityGroupTransferRepository? _transferRepository;
+
+    public AvailabilityGroupRepository(AppDbContext db, IAvailabilityGroupTransferRepository? transferRepository = null)
         : base(db)
     {
+        _transferRepository = transferRepository;
     }
 
     /// <inheritdoc />
@@ -101,6 +106,166 @@ public class AvailabilityGroupRepository : GenericRepository<AvailabilityGroupMo
             group.Name.ToLower().Trim() == normalized,
             ct);
     }
+
+    public async Task<AvailabilityGroupSnapshotWriteResult> SaveSnapshotAsync(
+        AvailabilityGroupModel group,
+        IReadOnlyList<AvailabilityGroupSnapshotMember> members,
+        IReadOnlyList<AvailabilityGroupSnapshotTransfer> transfers,
+        CancellationToken ct = default)
+    {
+        await using var transaction = await _db.Database.BeginTransactionAsync(ct).ConfigureAwait(false);
+        try
+        {
+            var target = group;
+            if (group.Id > 0)
+            {
+                target = await _set.Include(item => item.Members)
+                    .SingleOrDefaultAsync(item => item.Id == group.Id, ct).ConfigureAwait(false)
+                    ?? throw new KeyNotFoundException($"Availability group with id {group.Id} was not found.");
+            }
+
+            // Repeat the name check under the write transaction so concurrent creates cannot bypass it.
+            if (await ExistsByNameAsync(group.Name, group.Year, group.Month, group.Id, ct).ConfigureAwait(false))
+                throw InvalidSnapshot(nameof(group.Name), "An availability group with the same name already exists for this month.");
+
+            var requestedEmployeeIds = members.Select(member => member.EmployeeId).ToHashSet();
+            var employeeCount = await _db.Employees.CountAsync(employee => requestedEmployeeIds.Contains(employee.Id), ct)
+                .ConfigureAwait(false);
+            if (employeeCount != requestedEmployeeIds.Count)
+                throw InvalidSnapshot(nameof(AvailabilityGroupMemberModel.EmployeeId), "One or more selected employees were not found.");
+
+            if (group.Id == 0)
+            {
+                _set.Add(target);
+            }
+            else
+            {
+                target.Name = group.Name;
+                target.Year = group.Year;
+                target.Month = group.Month;
+                target.PublicationStatus = group.PublicationStatus;
+                target.VisibleFromUtc = group.VisibleFromUtc;
+                target.VisibleToUtc = group.VisibleToUtc;
+            }
+
+            var membersByEmployee = target.Members.ToDictionary(member => member.EmployeeId);
+            for (var displayOrder = 0; displayOrder < members.Count; displayOrder++)
+            {
+                var employeeId = members[displayOrder].EmployeeId;
+                if (!membersByEmployee.TryGetValue(employeeId, out var member))
+                {
+                    member = new AvailabilityGroupMemberModel { EmployeeId = employeeId };
+                    target.Members.Add(member);
+                    membersByEmployee.Add(employeeId, member);
+                }
+
+                member.DisplayOrder = displayOrder;
+            }
+
+            var changed = await _db.SaveChangesAsync(ct).ConfigureAwait(false) > 0;
+            var sourceGroupIds = await ApplySnapshotTransfersAsync(target.Id, transfers, membersByEmployee, ct)
+                .ConfigureAwait(false);
+
+            var targetDays = await _db.AvailabilityGroupDays
+                .Where(day => day.AvailabilityGroupMember.AvailabilityGroupId == target.Id)
+                .ToListAsync(ct).ConfigureAwait(false);
+            var daysByKey = targetDays.ToDictionary(day => (day.AvailabilityGroupMemberId, day.DayOfMonth));
+
+            var transferredDays = transfers.SelectMany(transfer =>
+                transfer.DayOfMonths.Select(day => (transfer.EmployeeId, DayOfMonth: day))).ToHashSet();
+            foreach (var member in members)
+            {
+                var memberId = membersByEmployee[member.EmployeeId].Id;
+                foreach (var day in member.Days)
+                {
+                    var found = daysByKey.Remove((memberId, day.DayOfMonth), out var existing);
+                    if (transferredDays.Contains((member.EmployeeId, day.DayOfMonth)) &&
+                        (!found || !MatchesTransferredDay(existing!, day)))
+                    {
+                        throw InvalidSnapshot("dayOfMonths", "The selected source availability changed. Review the transfer before saving.");
+                    }
+
+                    if (!found)
+                    {
+                        day.AvailabilityGroupMemberId = memberId;
+                        _db.AvailabilityGroupDays.Add(day);
+                    }
+                    else
+                    {
+                        existing!.Kind = day.Kind;
+                        existing.IntervalStr = day.IntervalStr;
+                    }
+                }
+            }
+
+            _db.AvailabilityGroupDays.RemoveRange(daysByKey.Values);
+            _db.AvailabilityGroupMembers.RemoveRange(
+                membersByEmployee.Values.Where(member => !requestedEmployeeIds.Contains(member.EmployeeId)));
+            changed |= await _db.SaveChangesAsync(ct).ConfigureAwait(false) > 0;
+
+            await transaction.CommitAsync(ct).ConfigureAwait(false);
+            return new AvailabilityGroupSnapshotWriteResult(target.Id, sourceGroupIds, changed || sourceGroupIds.Count > 0);
+        }
+        catch
+        {
+            // Earlier SaveChanges calls may have accepted rows that the transaction will roll back.
+            _db.ChangeTracker.Clear();
+            throw;
+        }
+    }
+
+    private async Task<List<int>> ApplySnapshotTransfersAsync(
+        int targetGroupId,
+        IReadOnlyList<AvailabilityGroupSnapshotTransfer> transfers,
+        IReadOnlyDictionary<int, AvailabilityGroupMemberModel> membersByEmployee,
+        CancellationToken ct)
+    {
+        var sourceGroupIds = transfers.Select(transfer => transfer.SourceGroupId).Distinct().ToList();
+        if (sourceGroupIds.Count == 0)
+            return sourceGroupIds;
+
+        var transferRepository = _transferRepository
+            ?? throw new InvalidOperationException("Availability graph transfers require a transfer repository.");
+        var existingSourceIds = await _set.Where(group => sourceGroupIds.Contains(group.Id))
+            .Select(group => group.Id).ToListAsync(ct).ConfigureAwait(false);
+        foreach (var sourceId in sourceGroupIds.Except(existingSourceIds))
+            throw new KeyNotFoundException($"Availability group with id {sourceId} was not found.");
+
+        foreach (var transfer in transfers)
+        {
+            var result = await transferRepository.TransferDaysAsync(
+                targetGroupId, membersByEmployee[transfer.EmployeeId].Id, transfer.SourceGroupId,
+                transfer.DayOfMonths, DateTimeOffset.UtcNow, ct).ConfigureAwait(false);
+            if (!result.Succeeded)
+                throw InvalidSnapshot("dayOfMonths", result.Error ?? "The selected availability days could not be moved.");
+        }
+
+        return sourceGroupIds;
+    }
+
+    private static bool MatchesTransferredDay(AvailabilityGroupDayModel actual, AvailabilityGroupDayModel requested)
+    {
+        if (actual.Kind != requested.Kind)
+            return false;
+        if (actual.IntervalStr == requested.IntervalStr)
+            return true;
+        if (actual.Kind != AvailabilityKind.INT || actual.IntervalStr is null || requested.IntervalStr is null)
+            return false;
+
+        // Older granular writes can store the same times with different spacing or hour padding.
+        var actualTimes = actual.IntervalStr.Split('-', StringSplitOptions.TrimEntries);
+        var requestedTimes = requested.IntervalStr.Split('-', StringSplitOptions.TrimEntries);
+        return actualTimes.Length == 2 && requestedTimes.Length == 2 &&
+            SameTime(actualTimes[0], requestedTimes[0]) && SameTime(actualTimes[1], requestedTimes[1]);
+    }
+
+    private static bool SameTime(string actual, string requested)
+        => TimeOnly.TryParseExact(actual, ["H:mm", "HH:mm"], CultureInfo.InvariantCulture, DateTimeStyles.None, out var actualTime) &&
+            TimeOnly.TryParseExact(requested, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var requestedTime) &&
+            actualTime == requestedTime;
+
+    private static ValidationException InvalidSnapshot(string field, string message)
+        => new(new ValidationResult(message, [field]), null, null);
 
     private IQueryable<AvailabilityGroupModel> CreateListQuery()
         => _set

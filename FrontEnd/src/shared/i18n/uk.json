@@ -2315,6 +2315,8 @@
   "Request a shift on this day": "Подати запит на зміну в цей день",
   "You already work on this date in another schedule.": "У цей день ви вже працюєте в іншому графіку.",
   "Too many requests. Please try again later.": "Забагато запитів. Спробуйте пізніше.",
+  "Too many requests. Wait {0} s before saving again.": "Забагато запитів. Спробуйте зберегти ще раз через {0} с.",
+  "Availability save could not be confirmed. Check the Availability list before trying again.": "Не вдалося підтвердити збереження доступності. Перевірте список доступності, перш ніж повторити спробу.",
   "Choose either an assigned shift or a day off.": "Оберіть призначену зміну або вихідний.",
   "Choose a valid day of this month.": "Оберіть дійсний день цього місяця.",
   "This date is not a day off. You already have an assigned shift.": "Це не вихідний. Ви вже маєте призначену зміну.",
