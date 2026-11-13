@@ -78,7 +78,7 @@ for file in "${files[@]}"; do
 done
 [[ $(git -C "$root" hash-object "$0") = $(git -C "$root" rev-parse "$sha:deploy/security/install-gf3-security.sh") ]]
 grep -Fxq 'WorkingDirectory=/opt/gf' "$source_dir/deploy/security/gf3-guard.service"
-grep -Fxq 'ExecStart=/usr/bin/python3 /usr/local/libexec/gf3/gf3_guard.py run' "$source_dir/deploy/security/gf3-guard.service"
+grep -Fxq 'ExecStart=/usr/bin/flock --nonblock --conflict-exit-code 0 /run/lock/gf3-prod-deploy.lock /usr/bin/python3 /usr/local/libexec/gf3/gf3_guard.py run' "$source_dir/deploy/security/gf3-guard.service"
 grep -Fxq 'Environment=GF3_GUARD_ACTIVE_COMPOSE=/var/lib/gf3-deploy/active/compose.json' "$source_dir/deploy/security/gf3-guard.service"
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s "$source_dir/deploy/security/tests" -v
 

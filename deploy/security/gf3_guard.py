@@ -18,6 +18,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import uuid
 from urllib.parse import urlsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 import zlib
@@ -465,8 +466,13 @@ class Guard:
             directory.mkdir(mode=0o700, parents=True, exist_ok=True)
         with guard_lock(self.private / "guard.lock") as acquired:
             if not acquired:
+                if getattr(args, "require_lock", False):
+                    raise GuardError("Deployment guard could not acquire its lock")
                 return {"status": "another guard run holds the lock"}
-            return self.update(args, read_only=False)
+            result = self.update(args, read_only=False)
+            if args.command == "run":
+                result["outcome"] = "completed"
+            return result
 
     def update(self, args, read_only):
         prior = self.state()
@@ -509,6 +515,8 @@ class Guard:
         else:
             try:
                 state["last_error"] = None
+                if args.command == "run":
+                    state["last_run_id"] = uuid.uuid4().hex
                 result["reloaded"] = self.apply(candidates, state)
             except (OSError, GuardError) as error:
                 prior["attempts"] = state["attempts"]
@@ -517,6 +525,7 @@ class Guard:
                 raise
         result["last_success"] = state["last_success"]
         result["last_error"] = state["last_error"]
+        result["last_run_id"] = state.get("last_run_id")
         return result
 
 
@@ -528,7 +537,9 @@ def arguments(argv=None):
         command.add_argument("--compose-files", nargs="+", default=[BASE_COMPOSE, HTTPS_COMPOSE],
                              choices=(BASE_COMPOSE, HTTPS_COMPOSE))
         if name == "run":
-            command.add_argument("--dry-run", action="store_true")
+            run_mode = command.add_mutually_exclusive_group()
+            run_mode.add_argument("--dry-run", action="store_true")
+            run_mode.add_argument("--require-lock", action="store_true")
         if name in ("ban", "unban"):
             command.add_argument("ip")
         if name == "ban":

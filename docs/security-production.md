@@ -85,6 +85,92 @@ Expected health is `{"status":"ok","canConnect":true}`. Certbot should report a 
 
 Use the bundle printed by the failed or successful deployment. The command checks the recorded network and volume, restores the snapshot, and verifies HTTPS and HTTP-01. After manual rollback the Git checkout may still contain the promoted revision. The active manifest remains authoritative for the guard and Certbot. Verify the active release before another promotion. Keep the database backup off-host. Restoration of SQLite is a separate operator decision that requires a tested restore and explicit accounting for writes since the backup.
 
+## Upgrade tools already installed on the host
+
+Use this procedure for the activation fix after its PR is reviewed and merged and CI passes on the resulting PROD2 SHA. The original installer refuses to replace installed files. The steps below preserve the current stack, the active recovery bundle and the existing `gfctl` menu. Keep the Guard timer disabled throughout this maintenance. The installer-owned Certbot hook continues to invoke `gf3_release.py renew`. It shares the deployment lock and uses the active manifest for both deployed and recovered stacks.
+
+### Incident finding
+
+Release `79133621dc6960d1114b37330e00c7b4f0268238` started a Guard oneshot, took the Guard file lock, then enabled and started the timer under that lock before the Git fast-forward. On a host already up for five minutes, the old timer's `OnBootSec=5min` can fire immediately. The extra Guard process exits successfully with a lock-contention summary. It cannot throw into the deploy process, and the old deploy code did not read that summary. If the journal entry came from that timer start, the timer stage was reached and Git is the next failure candidate. The message alone does not establish the second job's origin, the timer command's exit code or a Git failure.
+
+The old catch covered the initial service start, Guard lock acquisition, HTTPS/TLS/ACME recheck, Guard status, Docker topology, timer enable/start and Git fast-forward. It suppressed the stage and failing command on each path. The original failed stage is therefore undetermined from the supplied evidence. A disposable run reproduced a late Git write failure despite a clean fast-forwardable checkout, and a second run reached the approved Git revision. Check Git write permissions and any existing Git locks before retrying. Preserve the original journal. Do not delete a lock file without establishing which process owns it.
+
+The fixed preflight rejects an existing Git index lock before staging. The final Git check still handles a lock or checkout change that appears during deployment.
+
+On the host as root, use the same shell for the maintenance steps. Check the live HTTPS/ACME baseline and confirm `readlink -f /var/lib/gf3-deploy/active` returns the expected recovery bundle. Do not edit files inside that bundle.
+
+```bash
+cd /opt/gf
+set -euo pipefail
+umask 077
+approved_sha='<full reviewed and tested PROD2 SHA>'
+[[ "$approved_sha" =~ ^[0-9a-f]{40}$ ]]
+git fetch origin PROD2
+test "$(git rev-parse origin/PROD2)" = "$approved_sha"
+test "$(git branch --show-current)" = PROD2
+test -z "$(git status --porcelain)"
+test ! -e "$(git rev-parse --git-path index.lock)"
+git merge-base --is-ancestor HEAD "$approved_sha"
+stage=$(mktemp -d /root/gf3-tool-upgrade.XXXXXXXX)
+backup=$(mktemp -d /root/gf3-tool-backup.XXXXXXXX)
+tool_dir=/usr/local/libexec/gf3
+unit_dir=/etc/systemd/system
+approval=/etc/gfctl/approved-release.conf
+exec 9>/run/lock/gf3-prod-deploy.lock
+flock -w 120 9
+systemctl show gf3-guard.timer --property=ActiveState,UnitFileState
+test "$(systemctl show gf3-guard.timer --property=ActiveState --value)" = inactive
+test "$(systemctl show gf3-guard.timer --property=UnitFileState --value)" = disabled
+exec 8<>/opt/gf/deploy/security/runtime/state/guard.lock
+flock -w 120 8
+systemctl stop gf3-guard.service
+cp -p "$tool_dir"/{gf3_release.py,gf3_guard.py} "$unit_dir"/gf3-guard.{timer,service} "$approval" "$backup/"
+(cd "$backup"; sha256sum gf3_release.py gf3_guard.py gf3-guard.{timer,service} approved-release.conf > SHA256SUMS)
+for file in gf3_release.py gf3_guard.py gf3-guard.timer gf3-guard.service; do
+    git show "$approved_sha:deploy/security/$file" > "$stage/$file"
+    test "$(git hash-object --no-filters "$stage/$file")" = "$(git rev-parse "$approved_sha:deploy/security/$file")"
+done
+python3 -m py_compile "$stage"/{gf3_release.py,gf3_guard.py}
+systemd-analyze verify "$stage"/gf3-guard.{timer,service}
+```
+
+Stop if a command fails. Install by same-directory rename. If the process fails partway, restore the four saved files by the same method before retrying.
+
+```bash
+replace_file() {
+    local src=$1 dst=$2 mode=$3 tmp
+    tmp=$(mktemp "${dst%/*}/.gf3-update.XXXXXXXX") || return
+    install -o root -g root -m "$mode" "$src" "$tmp" && mv -fT -- "$tmp" "$dst"
+}
+replace_file "$stage/gf3_guard.py" "$tool_dir/gf3_guard.py" 0644
+replace_file "$stage/gf3_release.py" "$tool_dir/gf3_release.py" 0644
+replace_file "$stage/gf3-guard.timer" "$unit_dir/gf3-guard.timer" 0644
+replace_file "$stage/gf3-guard.service" "$unit_dir/gf3-guard.service" 0644
+systemctl daemon-reload
+for path in "$tool_dir"/{gf3_release.py,gf3_guard.py} "$unit_dir"/gf3-guard.{timer,service}; do
+    test "$(git hash-object --no-filters "$path")" = "$(git rev-parse "$approved_sha:deploy/security/${path##*/}")"
+    stat -c '%a %U:%G %n' "$path"
+done
+systemctl show gf3-guard.timer gf3-guard.service --property=FragmentPath,DropInPaths,NeedDaemonReload,ActiveState,UnitFileState
+```
+
+Expect root-owned mode 0644, the approved fragment paths, empty `DropInPaths` and `NeedDaemonReload=no` for both units. The timer must be inactive and disabled. Verify the unchanged local menu reads `/etc/gfctl/approved-release.conf`, then edit the SHA value in that file using its existing key and quoting. Preserve the approved Nginx digest and other settings. The repository does not contain the local file, so confirm its actual key name in `gfctl` before editing. Check the file stays root-owned mode 0600 and that its new SHA equals `git rev-parse origin/PROD2`. Keep the backup path.
+
+Release the two locks before the preflight. Use a protected detached checkout for the approved SHA, with a private copy of the live `deploy/.env`. Run the installed preflight against that checkout and SHA as above. Expect `Preflight OK`. It verifies the installed Git blob hashes and the loaded unit fragments before permitting the retry. Review the HTTPS, ACME, Certbot and SSH checks before selecting `[11]`. During the retry, `guard-initial-run`, `guard-status`, `post-guard-health`, `guard-timer-enable`, `guard-timer-start` and `git-fast-forward` identify the final activation stages. Expect the deployed SHA in the success message and verify `git rev-parse HEAD`, the active bundle's `release.json`, and the enabled/active timer. On failure, retain the stage diagnostic and recovery bundle. Do not rerun blindly or reset Git.
+
+```bash
+flock -u 8
+exec 8>&-
+flock -u 9
+exec 9>&-
+release_dir="$stage/checkout"
+git worktree add --detach "$release_dir" "$approved_sha"
+install -o root -g root -m 0600 deploy/.env "$release_dir/deploy/.env"
+/usr/bin/python3 "$tool_dir/gf3_release.py" preflight "$release_dir" "$approved_sha"
+```
+
+To undo the host-tool update before another deployment, take the same locks while the timer is disabled, verify the backup with `(cd "$backup"; sha256sum -c SHA256SUMS)`, restore both Python files and both units with `replace_file` as above, and restore `approved-release.conf` with mode 0600. Run `systemctl daemon-reload`. Check HTTPS and leave the existing recovery bundle active.
+
 ## GO / NO-GO
 
 - GO only with green CI for the final PROD2 SHA, a reviewed image digest, a clean compatible checkout, and a tested previous image/config/volume bundle.
