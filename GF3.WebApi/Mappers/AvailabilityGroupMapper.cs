@@ -1,6 +1,7 @@
 using BusinessLogicLayer.Contracts.Models;
 using BusinessLogicLayer.Contracts.Enums;
 using BusinessLogicLayer.Common;
+using BusinessLogicLayer.Contracts.Availability;
 using WebApi.Contracts.AvailabilityGroups;
 
 namespace WebApi.Mappers;
@@ -39,6 +40,36 @@ public static class AvailabilityGroupMapper
             request.VisibleFromUtc,
             request.VisibleToUtc,
             id);
+
+    public static AvailabilityGroupModel ToGraphModel(this SaveAvailabilityGroupGraphRequest request)
+        => MapAvailabilityGroupModel(
+            request.Name, request.Year, request.Month, request.PublicationStatus,
+            request.VisibleFromUtc, request.VisibleToUtc, request.Id ?? 0);
+
+    public static List<(int employeeId, IList<AvailabilityGroupDayModel> days)> ToGraphMembers(
+        this SaveAvailabilityGroupGraphRequest request)
+    {
+        if (request.Members.Any(member => member is null || member.Days.Any(day => day is null)))
+            throw ValidationException.ForField(nameof(request.Members), "Members and days must contain valid entries.");
+
+        return request.Members.Select(member => (
+            member.EmployeeId,
+            (IList<AvailabilityGroupDayModel>)member.Days.Select(day => new AvailabilityGroupDayModel
+            {
+                DayOfMonth = day.DayOfMonth,
+                Kind = day.Kind,
+                IntervalStr = day.IntervalStr,
+            }).ToList())).ToList();
+    }
+
+    public static List<AvailabilityGroupGraphTransferInstruction> ToGraphTransfers(this SaveAvailabilityGroupGraphRequest request)
+    {
+        if (request.Transfers.Any(transfer => transfer is null))
+            throw ValidationException.ForField(nameof(request.Transfers), "Transfers must contain valid entries.");
+
+        return request.Transfers.Select(transfer => new AvailabilityGroupGraphTransferInstruction(
+            transfer.EmployeeId, transfer.SourceGroupId, transfer.DayOfMonths)).ToList();
+    }
 
     /// <summary>
     /// Flattens group members and their day entries into the compact list shape used by the API.

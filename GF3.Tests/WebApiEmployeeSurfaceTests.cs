@@ -984,6 +984,13 @@ public sealed class WebApiEmployeeSurfaceTests
         public Task UpdateAsync(AvailabilityGroupModel entity, CancellationToken ct = default)
             => throw new NotSupportedException();
 
+        public Task<AvailabilityGroupGraphSaveResult> SaveGraphAsync(
+            AvailabilityGroupModel group,
+            IList<(int employeeId, IList<AvailabilityGroupDayModel> days)> payload,
+            IReadOnlyList<AvailabilityGroupGraphTransferInstruction> transfers,
+            CancellationToken ct = default)
+            => throw new NotSupportedException();
+
         public Task SaveGroupAsync(
             AvailabilityGroupModel group,
             IList<(int employeeId, IList<AvailabilityGroupDayModel> days)> payload,

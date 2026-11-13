@@ -20,3 +20,32 @@ export type SaveAvailabilitySlotDto = {
   kind: number | string;
   intervalStr?: string | null;
 };
+
+export type SaveAvailabilityGroupGraphDayDto = {
+  dayOfMonth: number;
+  kind: number;
+  intervalStr: string | null;
+};
+
+export type SaveAvailabilityGroupGraphMemberDto = {
+  employeeId: number;
+  days: SaveAvailabilityGroupGraphDayDto[];
+};
+
+export type SaveAvailabilityGroupGraphTransferDto = {
+  employeeId: number;
+  sourceGroupId: number;
+  dayOfMonths: number[];
+};
+
+export type SaveAvailabilityGroupGraphDto = SaveAvailabilityGroupDto & {
+  id: number | null;
+  members: SaveAvailabilityGroupGraphMemberDto[];
+  transfers: SaveAvailabilityGroupGraphTransferDto[];
+};
+
+export type SaveAvailabilityGroupGraphResult = {
+  id: number;
+  sourceGroupIds: number[];
+  changed: boolean;
+};

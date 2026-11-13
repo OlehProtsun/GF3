@@ -12,6 +12,39 @@ namespace GF3.Tests;
 public sealed class AvailabilityGroupTransferServiceTests
 {
     [Fact]
+    public async Task TransferDaysAsync_LeavesAnExistingTransactionOpenAndUncommitted()
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        await using var context = database.CreateContext();
+        var employee = TestDataFactory.CreateDalEmployee();
+        var source = new AvailabilityGroupModel { Name = "Source", Year = 2026, Month = 12 };
+        var target = new AvailabilityGroupModel { Name = "Target", Year = 2026, Month = 12 };
+        var sourceMember = new AvailabilityGroupMemberModel { AvailabilityGroup = source, Employee = employee };
+        var targetMember = new AvailabilityGroupMemberModel { AvailabilityGroup = target, Employee = employee };
+        context.AddRange(sourceMember, targetMember, new AvailabilityGroupDayModel
+        {
+            AvailabilityGroupMember = sourceMember,
+            DayOfMonth = 3,
+            Kind = DalAvailabilityKind.ANY,
+        });
+        await context.SaveChangesAsync();
+
+        await using var transaction = await context.Database.BeginTransactionAsync();
+        var repository = new AvailabilityGroupTransferRepository(context);
+        Assert.True((await repository.TransferDaysAsync(target.Id, targetMember.Id, source.Id, [3], DateTimeOffset.UtcNow)).Succeeded);
+        Assert.Same(transaction, context.Database.CurrentTransaction);
+        Assert.False((await repository.TransferDaysAsync(target.Id, targetMember.Id, source.Id, [3], DateTimeOffset.UtcNow)).Succeeded);
+        Assert.Same(transaction, context.Database.CurrentTransaction);
+        await transaction.RollbackAsync();
+
+        await using var verification = database.CreateContext();
+        var unchanged = Assert.Single(await verification.AvailabilityGroupDays.ToListAsync());
+        Assert.Equal(sourceMember.Id, unchanged.AvailabilityGroupMemberId);
+        Assert.Equal(DalAvailabilityKind.ANY, unchanged.Kind);
+        Assert.Empty(await verification.AvailabilityGroupDayTransfers.ToListAsync());
+    }
+
+    [Fact]
     public async Task GetPreviewSourcesAsync_FindsExistingMonthAvailability_WithoutPersistedTarget()
     {
         await using var database = await SqliteTestDatabase.CreateAsync();

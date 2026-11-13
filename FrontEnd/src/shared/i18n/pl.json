@@ -2315,6 +2315,8 @@
   "Request a shift on this day": "Poproś o zmianę w tym dniu",
   "You already work on this date in another schedule.": "W tym dniu pracujesz już w innym grafiku.",
   "Too many requests. Please try again later.": "Zbyt wiele żądań. Spróbuj ponownie później.",
+  "Too many requests. Wait {0} s before saving again.": "Zbyt wiele żądań. Spróbuj ponownie zapisać za {0} s.",
+  "Availability save could not be confirmed. Check the Availability list before trying again.": "Nie udało się potwierdzić zapisu dyspozycyjności. Sprawdź listę dyspozycyjności przed ponowną próbą.",
   "Choose either an assigned shift or a day off.": "Wybierz przypisaną zmianę lub dzień wolny.",
   "Choose a valid day of this month.": "Wybierz prawidłowy dzień tego miesiąca.",
   "This date is not a day off. You already have an assigned shift.": "To nie jest dzień wolny. Masz już przypisaną zmianę.",

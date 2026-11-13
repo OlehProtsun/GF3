@@ -1,3 +1,21 @@
+article.monthTint,
+article.monthTint:is(:hover, :active, :focus-visible) {
+  background: var(--availability-month-surface);
+}
+
+.january { --availability-month-surface: #f1efff; }
+.february { --availability-month-surface: #fcebf3; }
+.march { --availability-month-surface: #e7f7f2; }
+.april { --availability-month-surface: #fff6de; }
+.may { --availability-month-surface: #f0f9e5; }
+.june { --availability-month-surface: #e7f7fb; }
+.july { --availability-month-surface: #fff0e5; }
+.august { --availability-month-surface: #f7edfa; }
+.september { --availability-month-surface: #eef1ff; }
+.october { --availability-month-surface: #fff2e4; }
+.november { --availability-month-surface: #e8f6ed; }
+.december { --availability-month-surface: #e8f2ff; }
+
 .selectedTile {
   border-color: rgba(37, 99, 235, 0.24);
   background:

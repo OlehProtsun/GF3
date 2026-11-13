@@ -1,5 +1,6 @@
 using BusinessLogicLayer.Services.Abstractions;
 using BusinessLogicLayer.Contracts.Enums;
+using BusinessLogicLayer.Contracts.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using WebApi.Auth;
@@ -180,6 +181,61 @@ public class AvailabilityGroupsController(
         return NoContent();
     }
 
+    [HttpPost("save-graph")]
+    [ProducesResponseType(typeof(SaveAvailabilityGroupGraphResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status429TooManyRequests)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
+    public async Task<ActionResult<SaveAvailabilityGroupGraphResponse>> SaveGraph(
+        [FromBody] SaveAvailabilityGroupGraphRequest request,
+        CancellationToken cancellationToken)
+    {
+        AvailabilityGroupModel? existing = null;
+        if (request.Id is { } id)
+        {
+            existing = await RequireGroupAsync(id, cancellationToken).ConfigureAwait(false);
+            if (CreateEditLockConflictResult(id) is { } targetConflict)
+                return targetConflict;
+        }
+
+        var group = request.ToGraphModel();
+        var members = request.ToGraphMembers();
+        var transfers = request.ToGraphTransfers();
+        foreach (var sourceId in transfers.Select(transfer => transfer.SourceGroupId).Distinct())
+        {
+            if (CreateEditLockConflictResult(sourceId, "The source availability") is { } sourceConflict)
+            {
+                _ = await RequireGroupAsync(sourceId, cancellationToken).ConfigureAwait(false);
+                return sourceConflict;
+            }
+        }
+
+        var saved = await availabilityGroupService.SaveGraphAsync(group, members, transfers, cancellationToken)
+            .ConfigureAwait(false);
+        if (saved.Changed)
+        {
+            var published = group.PublicationStatus == AvailabilityPublicationStatus.Public &&
+                existing?.PublicationStatus != AvailabilityPublicationStatus.Public;
+            var (action, reason) = published ? ("Published", "manager-availability-published")
+                : existing is null ? ("Created", "manager-availability-created")
+                : ("Updated", "manager-availability-updated");
+
+            await PostCommitActions.RunAsync(HttpContext, () =>
+                LogManagerActionAsync($"{action} {DescribeAvailability(group)}.", CancellationToken.None)).ConfigureAwait(false);
+            await PostCommitActions.RunAsync(HttpContext, () =>
+                NotifyAvailabilityChangedAsync(saved.Id, reason)).ConfigureAwait(false);
+            foreach (var sourceId in saved.SourceGroupIds)
+            {
+                await PostCommitActions.RunAsync(HttpContext, () =>
+                    NotifyAvailabilityChangedAsync(sourceId, "manager-availability-days-transferred")).ConfigureAwait(false);
+            }
+        }
+
+        return Ok(new SaveAvailabilityGroupGraphResponse(saved.Id, saved.SourceGroupIds.ToList(), saved.Changed));
+    }
+
     [HttpPost]
     [ProducesResponseType(typeof(AvailabilityGroupDto), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
@@ -245,12 +301,12 @@ public class AvailabilityGroupsController(
         return NoContent();
     }
 
-    private ActionResult? CreateEditLockConflictResult(int groupId)
+    private ActionResult? CreateEditLockConflictResult(int groupId, string resourceLabel = "This availability group")
         => ManagerEditLockHttp.CreateConflictResult(
             this,
             editLockService,
             ManagerEditLockTargets.AvailabilityGroup(groupId),
-            "This availability group");
+            resourceLabel);
 
     private Task NotifyAvailabilityChangedAsync(int groupId, string reason)
         => realtimeNotifier?.NotifyManagerDataChangedAsync(
