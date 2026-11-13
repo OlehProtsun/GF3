@@ -3,6 +3,7 @@ import io
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -92,6 +93,15 @@ class ActivationTests(unittest.TestCase):
             with self.assertRaisesRegex(release.ReleaseError, "Git index lock") as failure:
                 release.git("merge", "--ff-only", "a" * 40)
         self.assertNotIn("secret-token", str(failure.exception))
+
+    def test_preflight_rejects_existing_git_index_lock(self):
+        with tempfile.TemporaryDirectory() as directory:
+            lock_file = Path(directory) / "index.lock"
+            with patch.object(release, "git", return_value=str(lock_file)):
+                release.check_git_write_ready()
+                lock_file.touch()
+                with self.assertRaisesRegex(release.ReleaseError, "identify its owner"):
+                    release.check_git_write_ready()
 
     def test_failed_automatic_recovery_retains_bundle_and_original_stage(self):
         with (patch.object(release, "git", return_value="a" * 40), patch.object(release, "verify_tooling"),

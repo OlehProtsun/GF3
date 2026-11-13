@@ -95,6 +95,8 @@ Release `79133621dc6960d1114b37330e00c7b4f0268238` started a Guard oneshot, took
 
 The old catch covered the initial service start, Guard lock acquisition, HTTPS/TLS/ACME recheck, Guard status, Docker topology, timer enable/start and Git fast-forward. It suppressed the stage and failing command on each path. The original failed stage is therefore undetermined from the supplied evidence. A disposable run reproduced a late Git write failure despite a clean fast-forwardable checkout, and a second run reached the approved Git revision. Check Git write permissions and any existing Git locks before retrying. Preserve the original journal. Do not delete a lock file without establishing which process owns it.
 
+The fixed preflight rejects an existing Git index lock before staging. The final Git check still handles a lock or checkout change that appears during deployment.
+
 On the host as root, use the same shell for the maintenance steps. Check the live HTTPS/ACME baseline and confirm `readlink -f /var/lib/gf3-deploy/active` returns the expected recovery bundle. Do not edit files inside that bundle.
 
 ```bash

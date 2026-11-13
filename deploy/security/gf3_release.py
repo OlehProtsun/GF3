@@ -583,6 +583,11 @@ def check_git_target(sha):
     git("merge-base", "--is-ancestor", "HEAD", sha)
 
 
+def check_git_write_ready():
+    index_lock = Path(git("rev-parse", "--path-format=absolute", "--git-path", "index.lock").strip())
+    require(not os.path.lexists(index_lock), "Git index lock exists; identify its owner before retrying")
+
+
 @contextmanager
 def activation_stage(name):
     print(f"[{name}]")
@@ -715,6 +720,7 @@ def verify_tooling(sha):
 def deploy(sha, nginx_image):
     require(IMAGE_DIGEST.fullmatch(nginx_image), "Approved Nginx digest required")
     check_git_target(sha)
+    check_git_write_ready()
     safe_path(ROOT / "deploy/.env", private=True)
     before = git("rev-parse", "HEAD").strip()
     previous_active = active_bundle() if (STATE / "active").exists() else None
@@ -786,6 +792,8 @@ def main():
                             and git("rev-parse", "refs/remotes/origin/PROD2").strip() == args.sha,
                             "Expected the full approved PROD2 SHA")
                     verified_checkout(args.source, args.sha)
+                    check_git_target(args.sha)
+                    check_git_write_ready()
                     safe_path(args.source / "deploy/.env", private=True)
                     verify_tooling(args.sha)
                     validate(render(args.source), baseline[1], baseline[2])
