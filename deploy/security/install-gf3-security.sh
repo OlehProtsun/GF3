@@ -97,6 +97,20 @@ for path in "${destinations[@]}"; do
     fi
 done
 test -d /etc/letsencrypt/renewal-hooks/deploy
+exclude=$(git -C "$root" rev-parse --path-format=absolute --git-path info/exclude)
+[[ ! -L "$exclude" && ! -L "${exclude%/*}" && $(stat -c %u "${exclude%/*}") = 0 ]]
+if [[ -e "$exclude" ]]; then
+    [[ -f "$exclude" && $(stat -c %u "$exclude") = 0 ]]
+fi
+patterns=('/deploy/security/runtime/nginx/*' '/deploy/security/runtime/logs/*' '/deploy/security/runtime/state/*')
+for pattern in "${patterns[@]}"; do
+    if ! grep -Fxq "$pattern" "$exclude" 2>/dev/null; then
+        printf '\n%s\n' "$pattern" >> "$exclude"
+    fi
+done
+if ! grep -Fxq '!/deploy/security/runtime/*/.gitkeep' "$exclude" 2>/dev/null; then
+    printf '%s\n' '!/deploy/security/runtime/*/.gitkeep' >> "$exclude"
+fi
 install -d -o root -g root -m 0700 /var/lib/gf3-deploy /usr/local/libexec/gf3 \
     "$root"/deploy/security/runtime/{nginx,logs,state}
 install -d -m 0755 /var/www/certbot/.well-known/acme-challenge
@@ -104,6 +118,9 @@ for path in "$root"/deploy/security/runtime/{logs/access.jsonl,state/guard.lock}
     touch "$path"
     chmod 0600 "$path"
 done
+git -C "$root" check-ignore --quiet deploy/security/runtime/logs/access.jsonl
+git -C "$root" check-ignore --quiet deploy/security/runtime/state/guard.lock
+[[ -z $(git -C "$root" status --porcelain) ]]
 
 created=()
 pending=
