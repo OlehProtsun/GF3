@@ -1,7 +1,7 @@
 """Disposable deployment/recovery exercise. Run only on a local or CI Docker engine."""
 
 import importlib.util
-from contextlib import closing
+from contextlib import closing, nullcontext
 import json
 import os
 from pathlib import Path
@@ -11,6 +11,7 @@ import socket
 import sqlite3
 import subprocess
 import tempfile
+import time
 from unittest.mock import patch
 
 
@@ -18,6 +19,9 @@ HERE = Path(__file__).resolve().parents[1]
 spec = importlib.util.spec_from_file_location("gf3_release", HERE / "gf3_release.py")
 release = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(release)
+spec = importlib.util.spec_from_file_location("gf3_guard", HERE / "gf3_guard.py")
+guard = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(guard)
 if os.name == "nt":
     release.ENV = dict(os.environ)
     release.ENV.pop("DOCKER_HOST", None)
@@ -104,6 +108,21 @@ def main():
         activated = []
         real_activate = release.activate
         real_command = release.command
+        real_lock = release.lock
+        git_dir = root / "checkout"
+        git_dir.mkdir()
+        release.git("init", "-b", "PROD2", root=git_dir)
+        release.git("-c", "user.name=GF3 Fixture", "-c", "user.email=gf3@example.test",
+                    "commit", "--allow-empty", "-m", "before", root=git_dir)
+        before = release.git("rev-parse", "HEAD", root=git_dir).strip()
+        release.git("switch", "-c", "candidate", root=git_dir)
+        (git_dir / "release-marker").write_text(marker)
+        release.git("add", "release-marker", root=git_dir)
+        release.git("-c", "user.name=GF3 Fixture", "-c", "user.email=gf3@example.test",
+                    "commit", "-m", "candidate", root=git_dir)
+        sha = release.git("rev-parse", "HEAD", root=git_dir).strip()
+        release.git("switch", "PROD2", root=git_dir)
+        real_git = release.git
         try:
             release.command(*base, "create", "--no-build", "--pull", "never", capture=False)
             bridge, = release.docker_json("network", "inspect", network)
@@ -150,7 +169,7 @@ def main():
                 assert backup.execute("SELECT value FROM rehearsal_marker").fetchall() == [(marker,)]
 
             template = deploy / "nginx/https-templates/gf3.conf.template"
-            for scenario in ("nginx-syntax", "https-failure", "success"):
+            for scenario in ("nginx-syntax", "https-failure", "activation-failure", "success"):
                 candidate = release.STATE / f"release-{scenario}"
                 candidate.mkdir()
                 config = release.render(root)
@@ -168,6 +187,7 @@ def main():
                 variant.write_text(data)
                 release.mounts(config["services"]["nginx"])[release.TEMPLATE]["source"] = str(variant)
                 release.save_compose(candidate, config)
+                (candidate / "guard-enabled").touch()
                 if os.name != "nt":
                     release.activate(previous)
                 if scenario == "nginx-syntax":
@@ -183,13 +203,105 @@ def main():
                     with patch.object(release, "verify_web", verify), patch.object(
                             release, "activate", side_effect=lambda bundle: activated.append(bundle)
                             if os.name == "nt" else real_activate(bundle)):
-                        try:
-                            release.cutover(candidate, previous, baseline)
-                        except release.ReleaseError as error:
-                            assert scenario == "https-failure" and "prior release restored" in str(error)
+                        if scenario == "https-failure":
+                            try:
+                                release.cutover(candidate, previous, baseline)
+                            except release.ReleaseError as error:
+                                assert "prior release restored" in str(error)
+                            else:
+                                raise AssertionError("HTTP 503 passed the cutover")
                         else:
-                            assert scenario == "success"
-                            release.recover(previous, acme=True)
+                            timer = {"enabled": False, "active": False}
+                            runs = []
+                            geo = release.RUNTIME / "nginx/blocked-compiled.geo"
+
+                            def activation_command(*args, **kwargs):
+                                if args[0] == "systemctl":
+                                    if args[1] == "show":
+                                        if args[2] == "gf3-guard.service":
+                                            return "inactive\n"
+                                        return ("ActiveState=" + ("active" if timer["active"] else "inactive")
+                                                + "\nUnitFileState=" + ("enabled" if timer["enabled"] else "disabled"))
+                                    if args[-1] == "gf3-guard.timer":
+                                        if args[1] in ("enable", "disable"):
+                                            timer["enabled"] = args[1] == "enable"
+                                        else:
+                                            timer["active"] = args[1] == "start"
+                                    return ""
+                                return real_command(*args, **kwargs)
+
+                            def fixture_feed(_):
+                                raise OSError("offline synthetic fixture")
+
+                            def guard_result(bundle, *args):
+                                updater = guard.Guard(release.RUNTIME, root, fetch=fixture_feed,
+                                                      run_command=lambda args, **options:
+                                                      subprocess.run(args, env=release.ENV, **options))
+                                updater.compose = ["docker", *release.compose_args(), "-f", str(bundle / "compose.json"),
+                                                   "exec", "-T", "nginx"]
+                                if args[0] == "run":
+                                    runs.append(args)
+                                    state = updater.state()
+                                    state["bans"]["8.8.8.8"] = {"expires": time.time() + 3600, "reason": "manual"}
+                                    updater.save_state(state)
+                                if os.name == "nt":
+                                    with patch.object(guard, "guard_lock", return_value=nullcontext(True)):
+                                        return updater.execute(guard.arguments(args))
+                                return updater.execute(guard.arguments(args))
+
+                            def git(*args):
+                                if args[0] == "fetch":
+                                    return ""
+                                if args == ("rev-parse", "refs/remotes/origin/PROD2"):
+                                    return sha
+                                return real_git(*args, root=git_dir)
+
+                            def cutover(*_):
+                                release.cutover(candidate, previous, baseline)
+                                return candidate, previous, baseline
+
+                            def current_bundle():
+                                if os.name == "nt":
+                                    return activated[-1] if activated else previous
+                                return (release.STATE / "active").resolve(strict=True)
+
+                            if scenario == "activation-failure":
+                                index_lock = git_dir / ".git/index.lock"
+                                index_lock.touch()
+                            with (patch.object(release, "command", activation_command),
+                                  patch.object(release, "git", git), patch.object(release, "verify_tooling"),
+                                  patch.object(release, "deploy", cutover),
+                                  patch.object(release, "guard_result", guard_result),
+                                  patch.object(release, "lock", side_effect=lambda path:
+                                               nullcontext() if os.name == "nt" else real_lock(path)),
+                                  patch.object(release, "active_bundle", current_bundle)):
+                                if scenario == "activation-failure":
+                                    try:
+                                        release.deploy_and_activate(sha, "fixture")
+                                    except release.ReleaseError as error:
+                                        assert "git-fast-forward:" in str(error) and "prior release restored" in str(error)
+                                    else:
+                                        raise AssertionError("Git index lock passed activation")
+                                    finally:
+                                        index_lock.unlink()
+                                    assert real_git("rev-parse", "HEAD", root=git_dir).strip() == before
+                                    assert not any(timer.values()) and not geo.exists()
+                                else:
+                                    release.deploy_and_activate(sha, "fixture")
+                                    assert real_git("rev-parse", "HEAD", root=git_dir).strip() == sha
+                                    assert (git_dir / "release-marker").read_text() == marker
+                                    assert all(timer.values()) and geo.is_file()
+                                assert runs == [("run", "--require-lock")]
+                                assert current_bundle() == (candidate if scenario == "success" else previous)
+                                with patch.dict(os.environ, {"RENEWED_LINEAGE": "/etc/letsencrypt/live/app-gf.com"}):
+                                    if os.name == "nt":
+                                        # Windows cannot create the privileged directory symlink used by production.
+                                        with patch.object(Path, "exists", side_effect=lambda: True):
+                                            release.renew()
+                                    else:
+                                        release.renew()
+                                if scenario == "success":
+                                    release.recover(previous, acme=True)
                 assert release.topology() == baseline
                 if os.name != "nt":
                     assert (release.STATE / "active").resolve() == previous

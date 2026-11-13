@@ -2,9 +2,8 @@
 Description=Refresh GF3 Nginx scanner defenses every five minutes
 
 [Timer]
-OnBootSec=5min
-OnUnitActiveSec=5min
-Persistent=true
+OnActiveSec=5min
+OnUnitInactiveSec=5min
 Unit=gf3-guard.service
 
 [Install]
