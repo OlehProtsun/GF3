@@ -24,3 +24,7 @@ FrontEnd/test-results
 .env.*
 !*.env.example
 deploy/.env
+deploy/security/runtime/
+deploy/security/*.local.*
+deploy/security/**/__pycache__
+ops/gfctl

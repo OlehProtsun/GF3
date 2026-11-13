@@ -1,0 +1,18 @@
+[Unit]
+Description=Refresh GF3 Nginx scanner defenses
+After=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/gf
+Environment=GF3_GUARD_ROOT=/opt/gf
+Environment=GF3_GUARD_RUNTIME=/opt/gf/deploy/security/runtime
+Environment=GF3_GUARD_ACTIVE_COMPOSE=/var/lib/gf3-deploy/active/compose.json
+ExecStart=/usr/bin/python3 /usr/local/libexec/gf3/gf3_guard.py run
+ExecCondition=/usr/bin/test -f /var/lib/gf3-deploy/active/guard-enabled
+UMask=0077
+TimeoutStartSec=6min
+MemoryMax=256M
+TasksMax=64
+NoNewPrivileges=true
+PrivateTmp=true

@@ -42,43 +42,55 @@ The frontend is not served by Vite in production. During Docker build:
 - `.github/workflows/ci.yml` - backend/frontend verification and Docker image build.
 - `.github/workflows/docker-publish.yml` - manual GHCR Docker image publishing.
 
+Follow the [ingress hardening runbook](security-hardening.md) for production preflight, guard installation, validation and rollback.
+
 ## 3. Local Docker smoke test
 
 From the repository root:
 
 ```powershell
-Copy-Item deploy\.env.example deploy\.env
+if (-not (Test-Path deploy\.env)) { Copy-Item deploy\.env.example deploy\.env }
 ```
 
 Edit `deploy/.env`:
 
 ```env
-GF3_SERVER_NAME=_
+GF3_SERVER_NAME=localhost
 GF3_HTTP_PORT=8088
+GF3_DATA_VOLUME=gf3-local-smoke-data
 Jwt__SigningKey=replace_with_a_long_local_test_secret_at_least_64_chars
 GF3_ADMIN_ENABLED=false
 GF3_ADMIN_ALLOW_REMOTE=false
 GF3_ADMIN_ALLOW_WRITE=false
 GF3_REQUIRE_EXISTING_DATABASE=false
+GF3_ADMIN_DEVELOPER_PASSWORD=<synthetic local password>
+GF3_BOOTSTRAP_MANAGER_PASSWORD=<unique six-digit test password>
 ```
 
-Build and start:
+Create the local Compose project and inspect its bridge before starting:
 
 ```powershell
-docker compose --env-file deploy/.env -f deploy/docker-compose.yml up --build -d
+docker compose -p gf3-local-smoke --env-file deploy/.env -f deploy/docker-compose.yml create --build
+docker network inspect gf3-local-smoke_gf3-internal --format '{{range .IPAM.Config}}{{println .Subnet}}{{end}}'
+```
+
+Set `GF3_TRUSTED_PROXY_CIDR` in `deploy/.env` to the private IPv4 CIDR returned for this bridge, then recreate and start:
+
+```powershell
+docker compose -p gf3-local-smoke --env-file deploy/.env -f deploy/docker-compose.yml up -d
 ```
 
 Check containers:
 
 ```powershell
-docker compose --env-file deploy/.env -f deploy/docker-compose.yml ps
-docker compose --env-file deploy/.env -f deploy/docker-compose.yml logs -f --tail=100
+docker compose -p gf3-local-smoke --env-file deploy/.env -f deploy/docker-compose.yml ps
+docker compose -p gf3-local-smoke --env-file deploy/.env -f deploy/docker-compose.yml logs -f --tail=100
 ```
 
 Smoke-check API health:
 
 ```powershell
-curl http://localhost:8088/api/health
+curl.exe http://localhost:8088/api/health
 ```
 
 Expected response shape:
@@ -99,21 +111,21 @@ http://localhost:8088
 Useful local checks:
 
 ```powershell
-curl -I http://localhost:8088
-curl -I http://localhost:8088/assets/
-curl http://localhost:8088/api/health
+curl.exe --resolve localhost:8088:127.0.0.1 http://localhost:8088/api/health
+curl.exe --path-as-is http://localhost:8088/tmp/%252eenv
+curl.exe -I -H "Host: unknown.example" http://127.0.0.1:8088/
 ```
 
 Stop local deployment:
 
 ```powershell
-docker compose --env-file deploy/.env -f deploy/docker-compose.yml down
+docker compose -p gf3-local-smoke --env-file deploy/.env -f deploy/docker-compose.yml down
 ```
 
 Remove the local SQLite volume only when you intentionally want to delete local deployment data:
 
 ```powershell
-docker volume rm gf3-data
+docker volume rm gf3-local-smoke-data
 ```
 
 ## 4. Required production settings
@@ -125,6 +137,7 @@ Minimum production values:
 ```env
 GF3_IMAGE=gf3-web:local
 GF3_SERVER_NAME=your-domain.com
+GF3_TRUSTED_PROXY_CIDR=<verified dedicated Docker IPv4 subnet>
 GF3_HTTP_PORT=80
 GF3_HTTPS_PORT=443
 GF3_DATA_VOLUME=gf3-data
@@ -136,6 +149,8 @@ Jwt__SigningKey=CHANGE_THIS_TO_A_LONG_RANDOM_SECRET
 GF3_ADMIN_ENABLED=false
 GF3_ADMIN_ALLOW_REMOTE=false
 GF3_ADMIN_ALLOW_WRITE=false
+GF3_ADMIN_DEVELOPER_PASSWORD=<unique strong password>
+GF3_BOOTSTRAP_MANAGER_PASSWORD=<unique six-digit password>
 ```
 
 Generate a JWT secret on Linux:
@@ -201,11 +216,12 @@ Set at least:
 
 ```env
 GF3_SERVER_NAME=your-domain.com
+GF3_TRUSTED_PROXY_CIDR=<verified dedicated Docker IPv4 subnet>
 GF3_REQUIRE_EXISTING_DATABASE=false
 Jwt__SigningKey=<generated secret>
 ```
 
-Start HTTP deployment:
+Inspect the bridge using the [runbook](security-hardening.md#prepare-the-staged-release) before starting. Use HTTP for local or isolated staging, and the HTTPS overlay for public production.
 
 ```bash
 docker compose --env-file deploy/.env -f deploy/docker-compose.yml up --build -d
@@ -216,7 +232,7 @@ Check:
 ```bash
 docker compose --env-file deploy/.env -f deploy/docker-compose.yml ps
 docker compose --env-file deploy/.env -f deploy/docker-compose.yml logs -f --tail=100
-curl http://127.0.0.1/api/health
+curl --resolve your-domain.com:80:127.0.0.1 http://your-domain.com/api/health
 ```
 
 From your browser:
@@ -402,6 +418,8 @@ Before first public launch:
 - `Jwt__SigningKey` is long and random.
 - `GF3_ADMIN_ENABLED=false` unless you are in a short trusted maintenance window.
 - `GF3_SERVER_NAME` matches the real domain.
+- `GF3_TRUSTED_PROXY_CIDR` matches the inspected dedicated Docker IPv4 bridge.
+- Both `nginx -t` and the [ingress verification checklist](security-hardening.md#deploy-and-verify) pass.
 - `GF3_DATA_VOLUME` matches the existing production volume exactly.
 - `GF3_REQUIRE_EXISTING_DATABASE=true` for every update of an existing installation.
 - A fresh off-server volume archive exists before deployment.

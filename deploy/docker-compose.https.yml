@@ -5,5 +5,21 @@ services:
       - "${GF3_HTTPS_PORT:-443}:443"
     volumes:
       - ./nginx/https-templates/gf3.conf.template:/etc/nginx/templates/default.conf.template:ro
-      - ${GF3_TLS_CERT_PATH:-./certs/fullchain.pem}:/etc/nginx/certs/fullchain.pem:ro
-      - ${GF3_TLS_KEY_PATH:-./certs/privkey.pem}:/etc/nginx/certs/privkey.pem:ro
+      - type: bind
+        source: ${GF3_TLS_CERT_PATH:-./certs/fullchain.pem}
+        target: /etc/nginx/certs/fullchain.pem
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${GF3_TLS_KEY_PATH:-./certs/privkey.pem}
+        target: /etc/nginx/certs/privkey.pem
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${GF3_ACME_WEBROOT:-/var/www/certbot}
+        target: /var/www/certbot
+        read_only: true
+        bind:
+          create_host_path: false

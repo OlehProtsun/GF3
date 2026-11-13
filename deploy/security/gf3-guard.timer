@@ -1,0 +1,11 @@
+[Unit]
+Description=Refresh GF3 Nginx scanner defenses every five minutes
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=5min
+Persistent=true
+Unit=gf3-guard.service
+
+[Install]
+WantedBy=timers.target
