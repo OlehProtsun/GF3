@@ -50,7 +50,7 @@ fail2ban-client status sshd
 systemctl is-active snap.certbot.renew.timer
 ```
 
-Expected output includes `Installed GF3 host integration ... Guard remains disabled`, `Preflight OK`, and `disabled` for the guard timer. The installer refuses existing conflicting files and removes files it installed on a handled failure. An abrupt interruption may leave private preparation directories or installed files. Inspect those before retrying. The installer leaves running services and firewall rules alone.
+Expected output includes `Installed GF3 host integration ... Guard remains disabled`, `Preflight OK`, and `disabled` for the guard timer. The installer adds local Git excludes so generated logs and state remain ignored even before the hardening commit reaches the live checkout. It refuses conflicting files and removes installed unit and hook files on a handled failure. An abrupt interruption may leave private preparation directories or installed files. Inspect those before retrying. The installer leaves running services and firewall rules alone.
 
 ## Integrate the local menu
 
