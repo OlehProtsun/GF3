@@ -116,8 +116,9 @@ public sealed class EmploymentContractEmployeeTests
         var workspace=new DataAccessLayer.Administration.SqliteDatabaseWorkspace(copyPath);
         var migration=await WebApi.Infrastructure.DatabaseMigrationStartup.ApplyAsync(copy,workspace,true,true,Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance);
         Assert.NotNull(migration.BackupPath); Assert.True(File.Exists(migration.BackupPath));
-        Assert.Equal(6,migration.AppliedMigrations.Count);
+        Assert.Equal(7,migration.AppliedMigrations.Count);
         Assert.Contains("20261101190152_AddDayOffShiftCorrectionRequests",migration.AppliedMigrations);
+        Assert.Contains("20261114225324_AddShiftCorrectionComment",migration.AppliedMigrations);
         await WebApi.Infrastructure.DatabaseMigrationStartup.ApplyAsync(copy,workspace,true,true,Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance);
         Assert.All(await copy.Employees.AsNoTracking().ToListAsync(),employee=>Assert.Equal("zlecenie",employee.ContractType));
         Assert.Equal(history,(await copy.ShiftSwapHistories.AsNoTracking().SingleAsync()).AfterSnapshotJson);
