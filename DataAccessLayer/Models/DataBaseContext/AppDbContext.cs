@@ -1021,6 +1021,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, TimeProvider? 
             entity.Property(request => request.OriginalToTime).IsRequired(false).HasMaxLength(5);
             entity.Property(request => request.RequestedFromTime).IsRequired().HasMaxLength(5);
             entity.Property(request => request.RequestedToTime).IsRequired().HasMaxLength(5);
+            entity.Property(request => request.Comment).IsRequired(false).HasMaxLength(1000);
             entity.Property(request => request.Status)
                 .HasConversion<string>()
                 .HasDefaultValue(ShiftCorrectionStatus.Pending);

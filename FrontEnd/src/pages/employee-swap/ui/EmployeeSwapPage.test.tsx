@@ -20,6 +20,9 @@ const mocks = vi.hoisted(() => ({
   acceptMutate: vi.fn(),
   cancelMutate: vi.fn(),
   setPinMutate: vi.fn(),
+  approvalsQuery: vi.fn(),
+  cancelApprovalMutation: vi.fn(),
+  cancelApproval: vi.fn(),
   initialPinnedSwapIds: [] as number[],
   mutationState: {
     createPending: false,
@@ -40,6 +43,12 @@ vi.mock("@app/providers/AuthProvider", () => ({
 
 vi.mock("@entities/employee-schedule", () => ({
   useEmployeeScheduleListQuery: () => mocks.schedulesQuery(),
+}));
+
+vi.mock("@entities/shift-swap-approvals", async importOriginal => ({
+  ...await importOriginal<typeof import("@entities/shift-swap-approvals")>(),
+  useEmployeeContractApprovalsQuery: () => mocks.approvalsQuery(),
+  useCancelContractApprovalMutation: () => mocks.cancelApprovalMutation(),
 }));
 
 vi.mock("@entities/employee-ui-state", async () => {
@@ -209,6 +218,9 @@ beforeEach(() => {
   mocks.swapsQuery.mockReset();
   mocks.employeesQuery.mockReset();
   mocks.createMutate.mockReset();
+  mocks.approvalsQuery.mockReset().mockReturnValue({ data: [], error: null });
+  mocks.cancelApproval.mockReset();
+  mocks.cancelApprovalMutation.mockReset().mockReturnValue({ mutate: mocks.cancelApproval, isPending: false, error: null });
   mocks.preview.mockImplementation((payload: { fromTime: string; toTime: string; targetEmployeeId?: number; scheduleSlotId: number } | null) => ({
     data: payload ? { requestKind: "give", targetEmployeeId: payload.targetEmployeeId, targetEmployeeName: payload.targetEmployeeId ? "Target Worker" : "Everyone",
       source: { slotId: payload.scheduleSlotId, scheduleId: 10, scheduleName: "May Schedule", shopName: "Central Shop", year: 2026, month: 5, dayOfMonth: 1,
@@ -884,6 +896,48 @@ describe("EmployeeSwapPage", () => {
     expect(panel).not.toHaveTextContent("undefined");
     if (valid) expect(panel).toHaveTextContent("4.25h"); else expect(within(panel).queryByText(/Shift hours/)).not.toBeInTheDocument();
     expect(panel).not.toHaveTextContent("Central Shop");
+  });
+
+  test("History places swaps directly after the header when approvals are empty", async () => {
+    mocks.swapsQuery.mockReturnValue({ data: [createSwap({ status: "accepted" })], error: null });
+    renderPage();
+    await userEvent.click(screen.getByRole("button", { name: "Swap history" }));
+    const history = within(screen.getByRole("dialog", { name: "Recent swap activity" }));
+    expect(history.queryByRole("region", { name: "My approval requests" })).not.toBeInTheDocument();
+    const offers = history.getByRole("region", { name: "Swap history" });
+    expect(offers.previousElementSibling).toContainElement(history.getByRole("heading"));
+    expect(offers).toHaveTextContent("May Schedule");
+  });
+
+  test("History retains pending and reviewed approvals and cancellation without a heading", async () => {
+    const shift = { scheduleName: "May Schedule", dayOfMonth: 8, month: 5, year: 2026, fromTime: "09:00", toTime: "15:00" };
+    mocks.approvalsQuery.mockReturnValue({ data: [
+      { ...shift, id: 8, kind: "claim", status: "pending" },
+      { ...shift, id: 9, kind: "below_minimum_give", status: "rejected", failureReason: "Manager declined." },
+    ] });
+    renderPage();
+    await userEvent.click(screen.getByRole("button", { name: "Swap history" }));
+    const history = within(screen.getByRole("dialog", { name: "Recent swap activity" }));
+    const requests = within(history.getByRole("region", { name: "My approval requests" }));
+    expect(requests.queryByRole("heading")).not.toBeInTheDocument();
+    expect(requests.getByText("Shift pickup approval")).toBeVisible();
+    expect(requests.getByText("Monthly minimum exception")).toBeVisible();
+    expect(requests.getByText("Pending")).toBeVisible();
+    expect(requests.getByText("Rejected")).toBeVisible();
+    expect(requests.getByText("Manager declined.")).toBeVisible();
+    await userEvent.click(requests.getByRole("button", { name: "Cancel request" }));
+    expect(mocks.cancelApproval).toHaveBeenCalledExactlyOnceWith(8, expect.anything());
+  });
+
+  test("History shows approval load and cancellation errors even with an empty list", async () => {
+    mocks.approvalsQuery.mockReturnValue({ data: [], error: new Error("Could not retrieve approvals.") });
+    mocks.cancelApprovalMutation.mockReturnValue({ error: new Error("Could not cancel this request.") });
+    renderPage();
+    await userEvent.click(screen.getByRole("button", { name: "Swap history" }));
+    const history = within(screen.getByRole("dialog", { name: "Recent swap activity" }));
+    expect(history.getByText("Could not retrieve approvals.")).toBeVisible();
+    expect(history.getByText("Could not cancel this request.")).toBeVisible();
+    expect(history.queryByRole("heading", { name: "My approval requests" })).not.toBeInTheDocument();
   });
 
   test("History locks independent root scrolling, preserves nested locks and restores focus and styles", async () => {

@@ -2,7 +2,7 @@
 .settings > div { flex: 1 1 220px; min-width: 0; }
 .settings p { margin: 6px 0; font-size: .85rem; }
 .settings small { display: block; color: #52647c; line-height: 1.45; }
-.settings button { border: 1px solid #c6d7ef; border-radius: 10px; padding: 10px 14px; background: #edf4ff; color: #174c9b; cursor: pointer; }
+.settings button { min-height: 44px; border: 1px solid #c6d7ef; border-radius: 10px; padding: 10px 14px; background: #edf4ff; color: #174c9b; cursor: pointer; }
 .settings button:disabled { opacity: .6; cursor: default; }
 .settings button:focus-visible { outline: 2px solid #246bff; outline-offset: 3px; }
 

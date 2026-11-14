@@ -1,5 +1,12 @@
 import { expect, test, type Page } from "@playwright/test";
 
+const correctionComment = "Zażółć 🌙\nДругий рядок <strong>literal</strong> " + "W".repeat(70);
+const commentLabels = {
+  en: { detail: "Comment", input: "Comment (optional)" },
+  pl: { detail: "Komentarz", input: "Komentarz (opcjonalnie)" },
+  uk: { detail: "Коментар", input: "Коментар (необов’язково)" },
+};
+
 async function correctionFixture(page: Page, language: string) {
   await page.addInitScript(() => localStorage.setItem("gf3.auth.access-token", "correction-ui-test"));
   const graph = { id: 3, containerId: 1, shopId: 4, name: "Schedule", note: "", year: 2026, month: 10,
@@ -12,6 +19,7 @@ async function correctionFixture(page: Page, language: string) {
     year: 2026, month: 10, dayOfMonth: 21, originalFromTime: "15:00", originalToTime: "22:00",
     requestedFromTime: "14:00", requestedToTime: "22:00", createdAtUtc: "2026-10-21T12:26:00Z",
     status: index < 2 ? "pending" : index % 2 ? "approved" : "rejected", reviewedByManagerName: "Ada Manager",
+    comment: index === 0 || index === 2 ? correctionComment : null,
   }));
   await page.route("**/api/**", async route => {
     const path = new URL(route.request().url()).pathname;
@@ -60,6 +68,11 @@ for (const language of ["en", "pl", "uk"] as const) {
       await page.keyboard.press("Enter");
       const article = list.locator("article");
       await expect(article).toBeVisible();
+      const comment = article.getByText(commentLabels[language].detail, { exact: true }).locator("..").locator("p");
+      expect(await comment.textContent()).toBe(correctionComment);
+      await expect(comment.locator("strong")).toHaveCount(0);
+      await expect(comment).toHaveCSS("white-space", "pre-wrap");
+      expect(await comment.evaluate(element => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
       await expect(article.locator("svg")).toHaveCount(10);
       for (const icon of await article.locator("svg").all()) {
         await expect(icon).toBeVisible();
@@ -93,9 +106,10 @@ for (const language of ["en", "pl", "uk"] as const) {
       await list.getByRole("listitem").nth(index).focus();
       await page.keyboard.press("Enter");
       await expect(list.locator("article em")).toBeVisible();
+      await expect(list.locator("article").getByText(commentLabels[language].detail, { exact: true })).toHaveCount(index === 2 ? 1 : 0);
       await expect(list.locator("article svg")).toHaveCount(9);
       await expect(list.locator("article p svg")).toBeVisible();
-      await expect(list.locator("article p")).toContainText("Ada Manager");
+      await expect(list.locator("article p:has(svg)")).toContainText("Ada Manager");
       expect(await list.locator("article button").count()).toBe(1);
       await list.locator("article").screenshot({ path: info.outputPath(`resolved-${index}.png`) });
       await list.locator("article button").focus();
@@ -125,13 +139,16 @@ for (const language of ["en", "pl", "uk"] as const) {
 for (const [width, language] of [[320, "en"], [375, "pl"], [390, "uk"]] as const) {
   test(`employee requests a day-off shift at ${width}px in ${language}`, async ({ page, isMobile }, info) => {
     test.setTimeout(60_000);
+    await page.clock.setFixedTime(new Date("2026-08-12T10:00:00Z"));
     await page.setViewportSize({ width, height: 812 });
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.addInitScript(() => localStorage.setItem("gf3.auth.access-token", "day-off-fixture"));
     const requests: Record<string, unknown>[] = [];
     let submitted: unknown;
+    let attempts = 0;
     await page.route("**/api/**", async route => {
       const path = new URL(route.request().url()).pathname;
+      if (!path.startsWith("/api/")) return route.continue();
       let body: unknown = [];
       if (path === "/api/auth/session") body = { role: "employee", employeeId: 12, userName: "worker", displayName: "Worker" };
       else if (path === "/api/account-language") body = { language };
@@ -147,9 +164,14 @@ for (const [width, language] of [[320, "en"], [375, "pl"], [390, "uk"]] as const
       }];
       else if (path === "/api/employee-shift-corrections") {
         if (route.request().method() === "POST") {
-          submitted = route.request().postDataJSON();
-          requests.push({ ...(submitted as object), id: 1, containerId: 2, employeeId: 12, year: 2026, month: 8,
-            scheduleSlotId: null, originalFromTime: null, originalToTime: null, isDayOffRequest: true, status: "pending" });
+          const request = route.request().postDataJSON();
+          submitted = request;
+          if (++attempts === 1 && language === "en") {
+            return route.fulfill({ status: 503, json: { detail: "Could not send this test request." } });
+          }
+          requests.push({ ...request, id: 1, containerId: 2, employeeId: 12, year: 2026, month: 8,
+            scheduleSlotId: null, originalFromTime: null, originalToTime: null, isDayOffRequest: true, status: "pending",
+            comment: request.comment ?? null });
           return route.fulfill({ status: 201, json: requests[0] });
         }
         body = requests;
@@ -181,14 +203,25 @@ for (const [width, language] of [[320, "en"], [375, "pl"], [390, "uk"]] as const
     await expect(send).toBeDisabled();
     await inputs.first().fill("08:15"); await expect(send).toBeDisabled();
     await inputs.last().fill("16:45"); await expect(send).toBeEnabled();
+    const comment = dialog.getByRole("textbox", { name: commentLabels[language].input });
+    const draft = "  " + correctionComment + "  ";
+    await comment.fill(draft);
+    await expect(comment).toHaveValue(draft);
+    await expect(send).toBeInViewport();
     expect(await dialog.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
     const surface = dialog.locator('div').first();
     expect(await surface.evaluate(element => { const rect = element.getBoundingClientRect(); return element.scrollWidth <= element.clientWidth && rect.left >= 0 && rect.right <= innerWidth; })).toBe(true);
     await dialog.screenshot({ path: info.outputPath(`day-off-${width}-${language}.png`) });
     await send.click();
+    if (language === "en") {
+      await expect(dialog.getByText("Could not send this test request.")).toBeVisible();
+      await expect(comment).toHaveValue(draft);
+      await send.click();
+    }
     await expect(dialog).toHaveCount(0);
-    expect(submitted).toEqual({ scheduleId: 10, dayOfMonth: 13, requestedFromTime: "08:15", requestedToTime: "16:45" });
+    expect(submitted).toEqual({ scheduleId: 10, dayOfMonth: 13, requestedFromTime: "08:15", requestedToTime: "16:45", comment: correctionComment });
     await adjust.click(); await selectDay(12);
+    await expect(comment).toHaveValue("");
     await expect(dialog.locator('input[type="time"]').first()).toBeDisabled();
     await expect(dialog.getByRole("button").last()).toBeDisabled();
   });

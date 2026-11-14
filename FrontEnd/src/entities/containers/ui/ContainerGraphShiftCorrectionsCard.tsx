@@ -165,6 +165,12 @@ export function ContainerGraphShiftCorrectionsCard({
         </> : null}
         <strong className={requestedDuration === originalDuration ? styles.deltaNeutral : styles.deltaDuration}><StatisticsIcon size={15} />{t("Duration")} {formatDelta(requestedDuration - originalDuration)}</strong>
       </div>
+      {selected.comment?.trim() ? (
+        <div className={styles.comment}>
+          <strong>{t("Comment")}</strong>
+          <p>{selected.comment}</p>
+        </div>
+      ) : null}
       {selected.status === "pending" ? (
         <>
           {hasUnsavedChanges ? <p className={styles.saveHint}>{t("Save your current schedule edits before approving.")}</p> : null}

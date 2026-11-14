@@ -1,24 +1,40 @@
 import { dateTimeFormat, t } from "@shared/i18n";
 import type { RegulationAcceptance } from "@entities/regulations";
 import { regulationsApi } from "@entities/regulations";
-import { AccountSettingsIcon } from "@shared/ui/icons";
+import { AccountSettingsIcon, LockIcon } from "@shared/ui/icons";
 import styles from "./RegulationHistoryCard.module.css";
 
 const dateFormatter = dateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" });
 
 export function RegulationHistoryCard({
-  acceptances,
-  isLoading,
+  acceptances = [],
+  isLoading = false,
   title = t("Regulation history"),
   className,
   appearance = "default",
 }: {
-  acceptances: RegulationAcceptance[];
-  isLoading: boolean;
   title?: string;
   className?: string;
-  appearance?: "default" | "profile" | "manager-profile";
-}) {
+} & (
+  | { appearance: "temporarily-closed"; acceptances?: RegulationAcceptance[]; isLoading?: boolean }
+  | { appearance?: "default" | "profile" | "manager-profile"; acceptances: RegulationAcceptance[]; isLoading: boolean }
+)) {
+  if (appearance === "temporarily-closed") {
+    const status = t("Temporarily closed");
+    return (
+      <section className={[styles.card, styles.profile, styles.closed, className].filter(Boolean).join(" ")} aria-label={title}>
+        <div className={`${styles.header} ${styles.closedHeader}`}>
+          <span className={styles.icon}><AccountSettingsIcon name="document" /></span>
+          <div>
+            <h2>{title}</h2>
+            <p>{t("Recorded versions and acceptance dates.")}</p>
+          </div>
+          <span className={styles.closedBadge}><LockIcon size={14} />{status}</span>
+        </div>
+      </section>
+    );
+  }
+
   const download = async (acceptance: RegulationAcceptance) => {
     const file = await regulationsApi.downloadPdf(acceptance.regulationDocumentId);
     const url = URL.createObjectURL(file.blob);

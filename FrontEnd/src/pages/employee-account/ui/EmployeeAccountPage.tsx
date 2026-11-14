@@ -17,7 +17,6 @@ import { pushErrorAlertFromError } from "@shared/ui/feedback/error-alerts/errorA
 import { AccountSettingsIcon, CheckIcon, ChevronRightIcon, EmployeeIcon, LogoutIcon, SaveIcon } from "@shared/ui/icons";
 import sharedStyles from "@pages/shared/EmployeeWorkspacePage.module.css";
 import styles from "./EmployeeAccountPage.module.css";
-import { useMyRegulationHistoryQuery } from "@entities/regulations";
 import { RegulationHistoryCard } from "@entities/regulations/ui/RegulationHistoryCard";
 
 function getFallbackInitials(value?: string | null) {
@@ -54,7 +53,6 @@ export function EmployeeAccountPage() {
   const updateProfileMutation = useUpdateEmployeeProfileMutation();
   const sendPasswordCodeMutation = useSendEmployeePasswordResetCodeMutation();
   const confirmPasswordMutation = useConfirmEmployeePasswordResetMutation();
-  const regulationHistoryQuery = useMyRegulationHistoryQuery(`employee:${session?.employeeId ?? 0}`);
 
   const profile = profileQuery.data;
   const displayName = profile?.displayName ?? session?.displayName ?? t("Employee");
@@ -402,11 +400,7 @@ export function EmployeeAccountPage() {
         {profile ? <EmployeePushSettings employeeId={profile.employeeId} appearance="profile" /> : null}
 
         {profile ? (
-          <RegulationHistoryCard
-            appearance="profile"
-            acceptances={regulationHistoryQuery.data ?? []}
-            isLoading={regulationHistoryQuery.isLoading}
-          />
+          <RegulationHistoryCard appearance="temporarily-closed" />
         ) : null}
 
         {profile ? (

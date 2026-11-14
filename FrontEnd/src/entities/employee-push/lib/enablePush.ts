@@ -1,21 +1,22 @@
-import { getAuthAccessToken } from "@shared/api/httpClient";
 import { employeePushApi } from "../api/employeePushApi";
-import { ensureSubscription, rememberPushAccount, serializeSubscription } from "./pushSubscription";
+import { ensureSubscription, pushSessionGuard, rememberPushAccount, serializeSubscription } from "./pushSubscription";
 
 export async function enableEmployeePush(employeeId: number, publicKey: string, signal: AbortSignal): Promise<NotificationPermission> {
-  const token = getAuthAccessToken();
+  const isCurrent = pushSessionGuard(signal);
   const checkSession = () => {
-    if (signal.aborted || getAuthAccessToken() !== token) throw new DOMException("Session changed", "AbortError");
+    if (!isCurrent()) throw new DOMException("Session changed", "AbortError");
   };
   checkSession();
   // This runs synchronously in the Enable click, before any network or worker await.
-  const permission = await (Notification.permission === "granted" ? Promise.resolve("granted" as const) : Notification.requestPermission());
+  const permission = await (Notification.permission === "default" ? Notification.requestPermission() : Notification.permission);
   checkSession();
   if (permission !== "granted") return permission;
-  const subscription = await ensureSubscription(publicKey);
+  const subscription = await ensureSubscription(publicKey, isCurrent);
   checkSession();
+  if (Notification.permission !== "granted") return Notification.permission;
   await employeePushApi.upsertSubscription(serializeSubscription(subscription), signal);
   checkSession();
+  if (Notification.permission !== "granted") return Notification.permission;
   rememberPushAccount(employeeId);
   return permission;
 }

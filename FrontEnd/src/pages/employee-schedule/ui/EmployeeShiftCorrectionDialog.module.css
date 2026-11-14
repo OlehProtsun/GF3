@@ -112,7 +112,8 @@
   gap: 2px;
 }
 
-.stepHeader strong {
+.stepHeader strong,
+.stepHeader label {
   color: #0f172a;
   font-size: 0.82rem;
   font-weight: 900;
@@ -396,11 +397,33 @@
   gap: 8px;
 }
 
+.commentInput {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  padding: 9px 11px;
+  border: 1px solid #c9d6e7;
+  border-radius: 14px;
+  background: #fff;
+  color: #0f172a;
+  font: inherit;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  resize: vertical;
+}
+
+.commentCount {
+  justify-self: end;
+  color: #64748b;
+  font-size: .72rem;
+}
+
 .closeButton:focus-visible,
 .dayList button:focus-visible,
 .boundaryChoices button:focus-visible,
 .timeEditor button:focus-visible,
-.timeEditor input:focus-visible {
+.timeEditor input:focus-visible,
+.commentInput:focus-visible {
   outline: none;
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18);
 }

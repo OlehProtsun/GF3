@@ -38,6 +38,52 @@ function createSyntheticPdf() {
 }
 
 test.describe("employee critical pages", () => {
+  test("daily schedule uses only selected-schedule assignments and keeps the rounded PDF controls", async ({ page }, info) => {
+    await page.clock.setFixedTime(new Date("2026-08-12T10:00:00Z"));
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.addInitScript(() => localStorage.setItem("gf3.auth.access-token", "daily-schedule-fixture"));
+    await page.route("**/api/**", route => {
+      const path = new URL(route.request().url()).pathname;
+      if (!path.startsWith("/api/")) return route.continue();
+      let body: unknown = [];
+      if (path === "/api/auth/session") body = { role: "employee", employeeId: 1, userName: "zoe", displayName: "Zoe Young" };
+      else if (path === "/api/account-language") body = { language: "en" };
+      else if (path === "/api/employee-ui-state") body = { scheduleColumnOrders: {}, readNotificationIds: [] };
+      else if (path === "/api/employee-urlop/approved") body = [{ shopId: 1, employeeId: 3, employeeName: "Vera Away", date: "2026-08-12" }];
+      else if (path === "/api/employee-schedules") body = [{
+        id: 1, containerId: 1, containerName: "Synthetic", shopId: 1, shopName: "Central",
+        name: "Selected graph", year: 2026, month: 8, publicationStatus: "public",
+        employees: [["Zoe", "Young"], ["Casey", "Outside"], ["Vera", "Away"]].map(([firstName, lastName], index) => ({
+          id: index + 1, employeeId: index + 1, firstName, lastName, displayName: firstName + " " + lastName, displayOrder: index,
+        })),
+        slots: [{ id: 1, employeeId: 1, dayOfMonth: 12, slotNo: 1, fromTime: "08:00", toTime: "12:00", status: "ASSIGNED" }],
+        relatedScheduleAssignments: [[1, 12], [2, 12], [1, 13]].map(([employeeId, dayOfMonth]) => ({
+          employeeId, dayOfMonth, scheduleId: 2, scheduleName: "Alternate graph",
+        })),
+      }];
+      else if (path.includes("negotiate")) return route.fulfill({ status: 503 });
+      return route.fulfill({ json: body });
+    });
+    await page.goto("/schedule");
+    await expect(page.getByText("Alternate graph", { exact: true }).first()).toBeVisible();
+    const eye = page.getByRole("button", { name: "Show daily schedule view" });
+    await expect(eye).toHaveCSS("border-top-left-radius", "999px");
+    await expect(page.getByRole("button", { name: "Export schedule to PDF" })).toHaveCSS("border-top-left-radius", "999px");
+    await eye.click();
+    const workers = page.getByRole("tabpanel", { name: "Wednesday 12" });
+    await expect(workers.getByRole("article")).toHaveCount(1);
+    await expect(workers.getByRole("article")).toHaveText("Zoe Young08:00 - 12:00");
+    await expect(workers.getByText(/Vera Away|Casey Outside|Alternate graph|^UR$/)).toHaveCount(0);
+    await workers.screenshot({ path: info.outputPath("daily-selected-workers.png") });
+    await page.getByRole("tab", { name: "Thursday 13, day off" }).click();
+    await expect(page.getByText("No one is scheduled.")).toBeVisible();
+    const showMatrix = page.getByRole("button", { name: "Show schedule matrix view" });
+    await expect(showMatrix).toHaveAttribute("aria-pressed", "true");
+    await showMatrix.click();
+    await expect(page.getByText("Alternate graph", { exact: true }).first()).toBeVisible();
+    await expect(eye).toBeFocused();
+  });
+
   for (const fileAction of ["share", "download", "activation"] as const) {
     test(`employee PDF ${fileAction} stays on the schedule without a preview`, async ({ page, request }) => {
       await page.addInitScript(action => {

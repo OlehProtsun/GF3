@@ -55,6 +55,7 @@ function persistAccessToken(token: string | null) {
 export function AuthProvider({ children }: PropsWithChildren) {
   const [status, setStatus] = useState<AuthStatus>("loading");
   const [session, setSession] = useState<AuthSession | null>(null);
+  const [sessionGeneration, setSessionGeneration] = useState(0);
   const [bootstrapError, setBootstrapError] = useState<string | null>(null);
   const [passwordChanged, setPasswordChanged] = useState(false);
 
@@ -63,13 +64,15 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const pushSyncController = useRef<AbortController | null>(null);
   const pushEmployeeId = status === "authenticated" && session?.role === "employee" ? session.employeeId : null;
   useEffect(() => {
-    if (!pushEmployeeId) return;
+    if (!pushEmployeeId || sessionGeneration !== generation.current || !getAuthAccessToken()) return;
     const controller = new AbortController();
-    const pushGeneration = generation.current;
     pushSyncController.current = controller;
-    void syncPushSubscription(pushEmployeeId, controller.signal, () => generation.current === pushGeneration).catch(() => { /* Profile provides explicit retry. */ });
-    return () => controller.abort();
-  }, [pushEmployeeId]);
+    void syncPushSubscription(pushEmployeeId, controller.signal, () => generation.current === sessionGeneration).catch(() => { /* Profile provides explicit retry. */ });
+    return () => {
+      controller.abort();
+      if (pushSyncController.current === controller) pushSyncController.current = null;
+    };
+  }, [pushEmployeeId, sessionGeneration]);
 
   const applyUnauthenticatedState = useCallback((nextBootstrapError: string | null = null) => {
     startTransition(() => {
@@ -81,15 +84,18 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   const storeAccessToken = useCallback((token: string | null) => {
     const normalizedToken = token && token.trim().length > 0 ? token.trim() : null;
+    if (getAuthAccessToken() !== normalizedToken) pushSyncController.current?.abort();
     setAuthAccessToken(normalizedToken);
     persistAccessToken(normalizedToken);
     return normalizedToken;
   }, []);
 
   const applyAuthenticatedState = useCallback((nextSession: AuthSession) => {
+    const nextGeneration = generation.current;
     startTransition(() => {
       setPasswordChanged(false);
       setSession(nextSession);
+      setSessionGeneration(nextGeneration);
       setStatus("authenticated");
       setBootstrapError(null);
     });

@@ -9,6 +9,7 @@ import { CheckIcon, CloseIcon, ScheduleIcon } from "@shared/ui/icons";
 import styles from "./EmployeeShiftCorrectionDialog.module.css";
 
 type Boundary = { slotId: number; edge: "start" | "end" };
+const commentMaxLength = 1000;
 
 type EmployeeShiftCorrectionDialogProps = {
   open: boolean;
@@ -65,6 +66,8 @@ export function EmployeeShiftCorrectionDialog({
   onSubmit,
 }: EmployeeShiftCorrectionDialogProps) {
   const titleId = useId();
+  const commentId = useId();
+  const commentHelpId = useId();
   const dialogRef = useRef<HTMLDialogElement>(null);
   useSwapModalEnvironment(dialogRef, undefined, open && Boolean(schedule));
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
@@ -72,6 +75,7 @@ export function EmployeeShiftCorrectionDialog({
   const [adjustmentMinutes, setAdjustmentMinutes] = useState(0);
   const [dayOffFrom, setDayOffFrom] = useState("");
   const [dayOffTo, setDayOffTo] = useState("");
+  const [comment, setComment] = useState("");
 
   const slotsByDay = useMemo(() => {
     const map = new Map<number, EmployeeScheduleSlot[]>();
@@ -102,6 +106,10 @@ export function EmployeeShiftCorrectionDialog({
     setDayOffFrom("");
     setDayOffTo("");
   }, [days, open, schedule?.id, slotsByDay]);
+
+  useEffect(() => {
+    if (open) setComment("");
+  }, [open, schedule?.id]);
 
   useEffect(() => {
     if (open) dialogRef.current?.querySelector('[role="tab"][aria-selected="true"]')
@@ -283,6 +291,26 @@ export function EmployeeShiftCorrectionDialog({
           ) : <p className={styles.hint}>{t("Select a Start or End time above to continue.")}</p>}
         </section>
         </>}
+        <section className={styles.stepSection}>
+          <div className={styles.stepHeader}>
+            <span className={styles.stepNumber}>{isDayOff ? 3 : 4}</span>
+            <div>
+              <label htmlFor={commentId}>{t("Comment (optional)")}</label>
+              <small id={commentHelpId}>{t("Add any details your manager should know.")}</small>
+            </div>
+          </div>
+          <textarea
+            id={commentId}
+            className={styles.commentInput}
+            aria-describedby={commentHelpId}
+            maxLength={commentMaxLength}
+            rows={3}
+            value={comment}
+            disabled={isSending}
+            onChange={event => setComment(event.target.value)}
+          />
+          <small className={styles.commentCount}>{t("{0} / {1} characters", comment.length, commentMaxLength)}</small>
+        </section>
         {errorMessage ? <p className={styles.validation}>{errorMessage}</p> : null}
 
         </div>
@@ -292,8 +320,10 @@ export function EmployeeShiftCorrectionDialog({
             disabled={!isValid || isSending}
             onClick={() => {
               if (!isValid || isSending) return;
-              if (isDayOff && selectedDay !== null) onSubmit({ scheduleId: schedule.id, dayOfMonth: selectedDay, requestedFromTime: dayOffFrom, requestedToTime: dayOffTo });
-              else if (selectedSlot) onSubmit({ scheduleId: schedule.id, scheduleSlotId: selectedSlot.id, requestedFromTime: requestedFrom, requestedToTime: requestedTo });
+              const trimmedComment = comment.trim();
+              const request = { scheduleId: schedule.id, ...(trimmedComment ? { comment: trimmedComment } : {}) };
+              if (isDayOff && selectedDay !== null) onSubmit({ ...request, dayOfMonth: selectedDay, requestedFromTime: dayOffFrom, requestedToTime: dayOffTo });
+              else if (selectedSlot) onSubmit({ ...request, scheduleSlotId: selectedSlot.id, requestedFromTime: requestedFrom, requestedToTime: requestedTo });
             }} />
         </footer>
       </div>

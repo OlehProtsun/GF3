@@ -1,11 +1,17 @@
+using System.Net;
+using System.Net.Http.Json;
 using System.Security.Claims;
+using System.Text.Json;
 using BusinessLogicLayer.Common;
 using DataAccessLayer.Models;
+using DataAccessLayer.Models.DataBaseContext;
 using DataAccessLayer.Models.Enums;
 using GF3.Tests.Infrastructure;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using WebApi.Auth;
 using WebApi.Contracts.ShiftCorrections;
 using WebApi.Controllers;
@@ -15,6 +21,139 @@ namespace GF3.Tests;
 
 public sealed class ShiftCorrectionControllerTests
 {
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task Comment_RoundTripsThroughBothReadersAndReview(bool dayOff, bool reject)
+    {
+        const string comment = "Zażółć 🌙\n  Другий рядок <strong>literal</strong>";
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        await using var createContext = database.CreateContext();
+        var fixture = await SeedAsync(createContext);
+        var createdResult = await EmployeeController(createContext, fixture).Create(new CreateShiftCorrectionRequest
+        {
+            ScheduleId = fixture.ScheduleId,
+            ScheduleSlotId = dayOff ? null : fixture.MorningSlotId,
+            DayOfMonth = dayOff ? 13 : null,
+            RequestedFromTime = "08:00",
+            RequestedToTime = "12:30",
+            Comment = " \r\n" + comment + "  ",
+        }, default);
+        var created = Assert.IsType<ShiftCorrectionRequestDto>(Assert.IsType<CreatedAtActionResult>(createdResult.Result).Value);
+        Assert.Equal(comment, created.Comment);
+
+        await using var reviewContext = database.CreateContext();
+        var employee = EmployeeController(reviewContext, fixture);
+        var manager = ManagerController(reviewContext, fixture);
+        var mine = await employee.GetMine(default);
+        var graph = await manager.GetGraphRequests(fixture.ContainerId, fixture.ScheduleId, default);
+        Assert.Equal(comment, Assert.Single(Assert.IsAssignableFrom<IEnumerable<ShiftCorrectionRequestDto>>(
+            Assert.IsType<OkObjectResult>(mine.Result).Value)).Comment);
+        Assert.Equal(comment, Assert.Single(Assert.IsAssignableFrom<IEnumerable<ShiftCorrectionRequestDto>>(
+            Assert.IsType<OkObjectResult>(graph.Result).Value)).Comment);
+
+        var review = reject ? await manager.Reject(fixture.ContainerId, fixture.ScheduleId, created.Id, default)
+            : await manager.Approve(fixture.ContainerId, fixture.ScheduleId, created.Id, new ApproveShiftCorrectionRequest(), default);
+        var reviewed = Assert.IsType<ShiftCorrectionRequestDto>(Assert.IsType<OkObjectResult>(review.Result).Value);
+        Assert.Equal(reject ? "rejected" : "approved", reviewed.Status);
+        Assert.Equal(comment, reviewed.Comment);
+        await using var persisted = database.CreateContext();
+        Assert.Equal(comment, (await persisted.ShiftCorrectionRequests.SingleAsync()).Comment);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(1000)]
+    public async Task Comment_AcceptsBoundariesAndNormalizesEmptyText(int? length)
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        await using var db = database.CreateContext();
+        var fixture = await SeedAsync(db);
+        var expected = length is > 0 ? new string('ż', length.Value) : null;
+        var response = await EmployeeController(db, fixture).Create(new CreateShiftCorrectionRequest
+        {
+            ScheduleId = fixture.ScheduleId,
+            DayOfMonth = 13,
+            RequestedFromTime = "08:00",
+            RequestedToTime = "16:00",
+            Comment = length == 0 ? "  \n\t " : expected,
+        }, default);
+        Assert.Equal(expected, Assert.IsType<ShiftCorrectionRequestDto>(Assert.IsType<CreatedAtActionResult>(response.Result).Value).Comment);
+        await using var persisted = database.CreateContext();
+        Assert.Equal(expected, (await persisted.ShiftCorrectionRequests.SingleAsync()).Comment);
+    }
+
+    [Fact]
+    public async Task Comment_OverlongHttpRequestReturns400AndOmittedCommentStillCreatesRequest()
+    {
+        await using var host = await ManagerWorkspaceTestHost.CreateAsync();
+        ScheduleSlotModel slot;
+        await using (var setup = host.Database.CreateContext())
+        {
+            var schedule = await setup.Schedules.SingleAsync();
+            var employee = await setup.Employees.SingleAsync();
+            schedule.PublicationStatus = SchedulePublicationStatus.Public;
+            setup.ScheduleEmployees.Add(new ScheduleEmployeeModel { ScheduleId = schedule.Id, EmployeeId = employee.Id });
+            slot = TestDataFactory.CreateDalSlot(schedule.Id, 12, 1, employee.Id, "08:00", "12:00");
+            setup.ScheduleSlots.Add(slot);
+            await setup.SaveChangesAsync();
+        }
+        await host.Login("employee");
+        var invalid = await host.Client.PostAsJsonAsync("/api/employee-shift-corrections", new
+        {
+            slot.ScheduleId,
+            ScheduleSlotId = slot.Id,
+            RequestedFromTime = "08:00",
+            RequestedToTime = "12:30",
+            Comment = string.Concat(Enumerable.Repeat("🌙", 501)),
+        });
+        Assert.Equal(HttpStatusCode.BadRequest, invalid.StatusCode);
+        var error = await invalid.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.True(error.GetProperty("errors").TryGetProperty(nameof(CreateShiftCorrectionRequest.Comment), out _));
+        await using (var rejected = host.Database.CreateContext())
+            Assert.Empty(await rejected.ShiftCorrectionRequests.ToListAsync());
+        var valid = await host.Client.PostAsJsonAsync("/api/employee-shift-corrections", new
+        {
+            slot.ScheduleId,
+            ScheduleSlotId = slot.Id,
+            RequestedFromTime = "08:00",
+            RequestedToTime = "12:30",
+        });
+        Assert.Equal(HttpStatusCode.Created, valid.StatusCode);
+        var created = await valid.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(JsonValueKind.Null, created.GetProperty("comment").ValueKind);
+    }
+
+    [Fact]
+    public async Task Comment_MigrationKeepsPriorRowsReadable()
+    {
+        await using var workspace = await SqliteTestDatabase.CreateAsync();
+        var options = new DbContextOptionsBuilder<AppDbContext>()
+            .UseSqlite($"Data Source={Path.Combine(workspace.RootPath, "upgrade.db")}")
+            .Options;
+        await using (var old = new AppDbContext(options))
+        {
+            await old.GetService<IMigrator>().MigrateAsync("20261101190152_AddDayOffShiftCorrectionRequests");
+            var fixture = await SeedAsync(old);
+            await old.Database.ExecuteSqlInterpolatedAsync($"""
+                INSERT INTO shift_correction_request
+                    (schedule_id, day_of_month, employee_id, requested_from_time, requested_to_time, status, created_at_utc)
+                VALUES ({fixture.ScheduleId}, 13, {fixture.EmployeeId}, '08:00', '16:00', 'Pending', {DateTimeOffset.UtcNow});
+                """);
+        }
+
+        await using var upgraded = new AppDbContext(options);
+        await upgraded.Database.MigrateAsync();
+        var legacy = await upgraded.ShiftCorrectionRequests.AsNoTracking().SingleAsync();
+        Assert.Equal(13, legacy.DayOfMonth);
+        Assert.Equal(("08:00", "16:00"), (legacy.RequestedFromTime, legacy.RequestedToTime));
+        Assert.Null(legacy.Comment);
+    }
+
     [Theory]
     [InlineData(2026, 2, 28, true)]
     [InlineData(2028, 2, 29, true)]

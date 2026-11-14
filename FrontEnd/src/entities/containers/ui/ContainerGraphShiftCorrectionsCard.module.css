@@ -67,6 +67,8 @@
 .deltaRow .deltaStart { background:linear-gradient(135deg,#fff8ef,#fff0df); color:#b65c10; }
 .deltaRow .deltaNeutral { background:linear-gradient(135deg,#f5f8fc,#eaf0f7); color:#687b96; }
 .deltaRow .deltaDuration { background:linear-gradient(135deg,#edf5ff,#deebff); color:#2563eb; }
+.comment { min-width:0; padding:8px 10px; border-radius:12px; background:#edf2f8; color:#334155; font-size:.75rem; line-height:1.45; }
+.comment p { margin:3px 0 0; white-space:pre-wrap; overflow-wrap:anywhere; }
 .actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); grid-auto-rows:42px; gap:6px; }
 /* Override IosButton's inline vertical padding only inside correction actions. */
 .actions :global(button) { width:100%; min-width:0; height:42px; min-height:42px; padding-block:0 !important; padding-inline:5px; gap:3px; font-size:.68rem; line-height:1.15; justify-content:center; box-shadow:0 2px 5px var(--btn-shadow); }

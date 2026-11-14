@@ -1918,6 +1918,11 @@ namespace DataAccessLayer.Migrations
                         .HasColumnType("INTEGER")
                         .HasColumnName("id");
 
+                    b.Property<string>("Comment")
+                        .HasMaxLength(1000)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("comment");
+
                     b.Property<DateTimeOffset>("CreatedAtUtc")
                         .HasColumnType("TEXT")
                         .HasColumnName("created_at_utc");

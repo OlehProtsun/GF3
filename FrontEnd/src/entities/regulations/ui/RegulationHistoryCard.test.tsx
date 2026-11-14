@@ -11,6 +11,18 @@ beforeEach(() => setLanguage("en"));
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.useRealTimers(); });
 const acceptance: RegulationAcceptance = { id: 1, regulationDocumentId: 4, regulationTitle: "Employee rules", regulationVersion: "v2", pdfSha256: "0123456789abcdef", accountRole: "employee", accountId: 1, username: "worker", displayName: "Worker", acceptedAtUtc: "2026-10-01T12:00:00Z" };
 
+test("the temporarily closed profile card shows only its document, copy and locked status", () => {
+  render(<RegulationHistoryCard appearance="temporarily-closed" acceptances={[acceptance]} isLoading />);
+  const card = screen.getByRole("region", { name: "Regulation history" });
+  expect(card).toHaveClass(styles.closed);
+  expect(card.querySelectorAll("svg")).toHaveLength(2);
+  expect(card).toHaveTextContent("Recorded versions and acceptance dates.");
+  expect(screen.getByText("Temporarily closed")).toBeVisible();
+  expect(card).not.toHaveTextContent(/Employee rules|Loading history/);
+  expect(screen.queryByText("1")).not.toBeInTheDocument();
+  expect(screen.queryByRole("button")).not.toBeInTheDocument();
+});
+
 test("profile shows zero count, empty and loading states", () => {
   const { rerender } = render(<RegulationHistoryCard appearance="profile" acceptances={[]} isLoading={false} />);
   expect(screen.getByRole("region")).toHaveClass(styles.profile);

@@ -1490,6 +1490,36 @@
   padding: 3px;
 }
 .historyPanel .offerCard { flex: none; }
+.approvalRequests { flex: none; display: grid; gap: 6px; min-width: 0; }
+.approvalRequest {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid #e5ecf5;
+  border-radius: 12px;
+  background: #f8faff;
+  color: #475569;
+  font-size: .78rem;
+  overflow-wrap: anywhere;
+}
+.approvalRequest strong { color: #0f172a; }
+.approvalRequest p { margin: 0; }
+.approvalRequest > span { font-weight: 700; }
+.approvalRequest button {
+  justify-self: start;
+  min-height: 36px;
+  margin-top: 3px;
+  padding: 4px 10px;
+  border: 1px solid #dbe5f2;
+  border-radius: 999px;
+  background: #fff;
+  color: #334155;
+  font: inherit;
+  cursor: pointer;
+}
+.approvalRequest button:disabled { opacity: .6; cursor: default; }
+.approvalRequest button:focus-visible { outline: 2px solid #246bff; outline-offset: 2px; }
 .historyPanel .offerOpenButton .offerBadges { justify-content: flex-start; align-items: center; flex-wrap: wrap; gap: 5px; }
 .historyPanel .badge { gap: 4px; }
 .historyPanel .badge > svg { flex: none; }

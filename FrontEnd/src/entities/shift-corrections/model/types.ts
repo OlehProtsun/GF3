@@ -17,6 +17,7 @@ export type ShiftCorrectionRequest = {
   originalToTime: string | null;
   requestedFromTime: string;
   requestedToTime: string;
+  comment: string | null;
   status: ShiftCorrectionStatus;
   createdAtUtc: string;
   reviewedAtUtc?: string | null;
@@ -27,6 +28,7 @@ export type CreateShiftCorrectionInput = {
   scheduleId: number;
   requestedFromTime: string;
   requestedToTime: string;
+  comment?: string | null;
 } & ({ scheduleSlotId: number; dayOfMonth?: never } | { dayOfMonth: number; scheduleSlotId?: never });
 
 export type ShiftCorrectionSetting = {

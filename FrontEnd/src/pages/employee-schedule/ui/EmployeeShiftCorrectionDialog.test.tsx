@@ -64,7 +64,7 @@ describe("EmployeeShiftCorrectionDialog", () => {
       existingRequests={reason === "pending" ? [{ id: 1, containerId: 2, scheduleId: 9, scheduleSlotId: null,
         isDayOffRequest: true, scheduleName: "August", shopName: "Central", year: 2026, month: 8,
         dayOfMonth: 1, employeeId: 7, employeeName: "Zoe", originalFromTime: null, originalToTime: null,
-        requestedFromTime: "08:00", requestedToTime: "16:00", status: "pending", createdAtUtc: "2026-08-01T00:00:00Z" }] : []}
+        requestedFromTime: "08:00", requestedToTime: "16:00", comment: null, status: "pending", createdAtUtc: "2026-08-01T00:00:00Z" }] : []}
       isSending={reason === "sending"} onCancel={vi.fn()} onSubmit={vi.fn()} />);
     expect(screen.getAllByRole("tab")[0]).toHaveAttribute("aria-selected", "true");
     expect(screen.getByLabelText("New start time")).toBeDisabled();
@@ -119,6 +119,34 @@ describe("EmployeeShiftCorrectionDialog", () => {
     });
   });
 
+  test("retains the optional draft after a failed send and clears it when reopened", async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+    const props = { open: true, schedule, employeeId: 7, existingRequests: [], isSending: false, onCancel: vi.fn(), onSubmit };
+    const { rerender } = render(<EmployeeShiftCorrectionDialog {...props} />);
+    const comment = screen.getByRole("textbox", { name: "Comment (optional)" });
+    expect(comment).toHaveAttribute("maxLength", "1000");
+    expect(comment.closest("section")).toHaveTextContent("4");
+    const draft = "  Pierwszy wiersz\nДругий рядок 🌙  ";
+    fireEvent.change(comment, { target: { value: draft } });
+    expect(screen.getByText(`${draft.length} / 1000 characters`)).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Change end time from 12:00" }));
+    await user.click(screen.getByRole("button", { name: "Move selected time 30 minutes later" }));
+    expect(comment).toHaveValue(draft);
+    await user.click(screen.getByRole("button", { name: "Send request" }));
+    rerender(<EmployeeShiftCorrectionDialog {...props} isSending />);
+    expect(comment).toBeDisabled();
+    rerender(<EmployeeShiftCorrectionDialog {...props} errorMessage="Network unavailable." />);
+    expect(comment).toHaveValue(draft);
+    await user.click(screen.getByRole("button", { name: "Send request" }));
+    expect(onSubmit).toHaveBeenCalledTimes(2);
+    expect(onSubmit).toHaveBeenLastCalledWith({ scheduleId: 9, scheduleSlotId: 21, requestedFromTime: "08:00",
+      requestedToTime: "12:30", comment: draft.trim() });
+    rerender(<EmployeeShiftCorrectionDialog {...props} open={false} />);
+    rerender(<EmployeeShiftCorrectionDialog {...props} />);
+    expect(screen.getByRole("textbox", { name: "Comment (optional)" })).toHaveValue("");
+  });
+
   test("disables a shift that already has a pending request", () => {
     render(
       <EmployeeShiftCorrectionDialog open schedule={schedule} employeeId={7} isSending={false}
@@ -126,7 +154,7 @@ describe("EmployeeShiftCorrectionDialog", () => {
           id: 1, containerId: 2, scheduleId: 9, scheduleSlotId: 21, isDayOffRequest: false, scheduleName: "August", shopName: "Central",
           year: 2026, month: 8, dayOfMonth: 12, employeeId: 7, employeeName: "Zoe Young",
           originalFromTime: "08:00", originalToTime: "12:00", requestedFromTime: "08:00", requestedToTime: "12:30",
-          status: "pending", createdAtUtc: "2026-08-19T12:00:00Z",
+          comment: null, status: "pending", createdAtUtc: "2026-08-19T12:00:00Z",
         }]}
         onCancel={() => undefined} onSubmit={() => undefined} />,
     );

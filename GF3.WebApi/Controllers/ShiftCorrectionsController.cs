@@ -75,6 +75,9 @@ public sealed class EmployeeShiftCorrectionsController(
         var requestedFromTime = ShiftCorrectionRules.NormalizeTime(request.RequestedFromTime, nameof(request.RequestedFromTime));
         var requestedToTime = ShiftCorrectionRules.NormalizeTime(request.RequestedToTime, nameof(request.RequestedToTime));
         ShiftCorrectionRules.ValidatePeriod(requestedFromTime, requestedToTime);
+        var comment = string.IsNullOrWhiteSpace(request.Comment) ? null : request.Comment.Trim();
+        if (comment is { Length: > 1000 })
+            throw ValidationException.ForField(nameof(request.Comment), "The comment must be at most 1000 characters.");
 
         ScheduleSlotModel? slot = null;
         int day;
@@ -122,6 +125,7 @@ public sealed class EmployeeShiftCorrectionsController(
             OriginalToTime = slot?.ToTime,
             RequestedFromTime = requestedFromTime,
             RequestedToTime = requestedToTime,
+            Comment = comment,
             Status = ShiftCorrectionStatus.Pending,
             CreatedAtUtc = DateTimeOffset.UtcNow,
         };
@@ -520,6 +524,7 @@ internal static class ShiftCorrectionRules
         OriginalToTime = model.OriginalToTime,
         RequestedFromTime = model.RequestedFromTime,
         RequestedToTime = model.RequestedToTime,
+        Comment = model.Comment,
         Status = model.Status.ToString().ToLowerInvariant(),
         CreatedAtUtc = model.CreatedAtUtc,
         ReviewedAtUtc = model.ReviewedAtUtc,

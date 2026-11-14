@@ -102,6 +102,8 @@ export function EmployeeNotificationsPage() {
   const newsUnreadCount = newsItems.filter(item => !item.isRead).length;
   const activeUnreadCount = activeTab === "inbox" ? unreadCount : newsUnreadCount;
   const activeItemCount = activeTab === "inbox" ? notificationItems.length : newsItems.length;
+  const badgeCount = activeUnreadCount || activeItemCount;
+  const badgeLabel = t(activeUnreadCount > 0 ? "{0} unread" : "{0} read", badgeCount);
   const queryError = swapsQuery.error ?? schedulesQuery.error ?? availabilityQuery.error ?? newsQuery.error ?? markNewsRead.error ?? markAllNewsRead.error;
   const queryErrorMessage = queryError ? getErrorMessage(queryError, t("Could not load notifications.")) : null;
 
@@ -161,8 +163,8 @@ export function EmployeeNotificationsPage() {
                   <button type="button" role="tab" aria-selected={activeTab === "inbox"} className={activeTab === "inbox" ? styles.inboxTabActive : ""} onClick={() => setActiveTab("inbox")}>{t("Inbox")}{unreadCount > 0 ? <span>{unreadCount}</span> : null}</button>
                   <button type="button" role="tab" aria-selected={activeTab === "news"} className={activeTab === "news" ? styles.inboxTabActive : ""} onClick={() => setActiveTab("news")}>{t("News")}{newsUnreadCount > 0 ? <span>{newsUnreadCount}</span> : null}</button>
                 </div>
-                <span className={`${styles.countBadge} ${activeUnreadCount > 0 ? styles.countBadgeUnread : ""}`}>
-                  {activeUnreadCount > 0 ? t("{0} unread", activeUnreadCount) : activeItemCount}
+                <span className={`${styles.countBadge} ${activeUnreadCount > 0 ? styles.countBadgeUnread : ""}`} role="status" aria-label={badgeLabel} title={badgeLabel}>
+                  {badgeCount > 99 ? "99+" : badgeCount}
                 </span>
               </div>
             </div>

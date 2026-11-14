@@ -3,23 +3,29 @@ import { setLanguage as setTestLanguage } from "@shared/i18n";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { EmployeePushSettings } from "./EmployeePushSettings";
+import { setAuthAccessToken } from "@shared/api/httpClient";
 
 beforeEnglishTest(() => setTestLanguage("en"));
 
-const mocks = vi.hoisted(() => ({ getConfig: vi.fn(), upsertSubscription: vi.fn(), support: vi.fn(), getSubscription: vi.fn(), account: vi.fn(), ensure: vi.fn(), remember: vi.fn(), disable: vi.fn() }));
+const mocks = vi.hoisted(() => ({ getConfig: vi.fn(), upsertSubscription: vi.fn(), support: vi.fn(), getSubscription: vi.fn(), associated: vi.fn(), ensure: vi.fn(), remember: vi.fn(), sync: vi.fn() }));
 vi.mock("../api/employeePushApi", () => ({ employeePushApi: { getConfig: mocks.getConfig, upsertSubscription: mocks.upsertSubscription } }));
-vi.mock("../lib/pushSubscription", () => ({ pushSupport: mocks.support, getBrowserSubscription: mocks.getSubscription, pushAccount: mocks.account,
-  employeePushStateChanged: "gf3:employee-push-state-changed",
-  registerWorker: () => Promise.resolve({}), ensureSubscription: mocks.ensure, rememberPushAccount: mocks.remember,
-  serializeSubscription: (value: unknown) => value, disableForDevice: mocks.disable }));
+vi.mock("../lib/pushSubscription", async importOriginal => ({
+  ...await importOriginal<typeof import("../lib/pushSubscription")>(),
+  configuredPushKey: ({ enabled, publicKey }: { enabled: boolean; publicKey: string | null }) => enabled ? publicKey : null,
+  pushSupport: mocks.support, getBrowserSubscription: mocks.getSubscription, isPushAssociated: mocks.associated,
+  ensureSubscription: mocks.ensure, rememberPushAccount: mocks.remember, syncPushSubscription: mocks.sync,
+  serializeSubscription: (value: unknown) => value,
+}));
 beforeEach(() => {
   vi.clearAllMocks();
+  setAuthAccessToken("employee-token");
   mocks.getConfig.mockResolvedValue({ enabled: true, publicKey: "key" }); mocks.upsertSubscription.mockResolvedValue(undefined);
-  mocks.support.mockReturnValue("supported"); mocks.getSubscription.mockResolvedValue(null); mocks.account.mockReturnValue(null);
-  mocks.ensure.mockResolvedValue({ endpoint: "test" }); mocks.disable.mockResolvedValue(undefined);
-  vi.stubGlobal("Notification", { permission: "default", requestPermission: vi.fn().mockResolvedValue("granted") });
+  mocks.support.mockReturnValue("supported"); mocks.getSubscription.mockResolvedValue(null); mocks.associated.mockReturnValue(false);
+  mocks.ensure.mockResolvedValue({ endpoint: "test" }); mocks.sync.mockResolvedValue("enabled");
+  const notification = { permission: "default", requestPermission: vi.fn(async () => { notification.permission = "granted"; return "granted"; }) };
+  vi.stubGlobal("Notification", notification);
 });
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => { setAuthAccessToken(null); vi.unstubAllGlobals(); });
 
 describe("push Profile settings", () => {
   test.each(["default", "profile"] as const)("%s requests permission only on click and enables only after server acknowledgement", async appearance => {
@@ -32,20 +38,23 @@ describe("push Profile settings", () => {
     expect(screen.queryByText("Enabled on this device")).not.toBeInTheDocument();
     acknowledge(); expect(await screen.findByText("Enabled on this device")).toBeVisible();
     expect(mocks.remember).toHaveBeenCalledWith(7);
-    fireEvent.click(screen.getByRole("button", { name: "Disable notifications" }));
-    await waitFor(() => expect(mocks.disable).toHaveBeenCalledOnce());
+    expect(screen.queryByRole("button", { name: "Disable notifications" })).not.toBeInTheDocument();
   });
   test.each(["default", "profile"] as const)("%s server rejection is retryable and never claims enabled", async appearance => {
     mocks.upsertSubscription.mockRejectedValue(new Error("Offline"));
     render(<EmployeePushSettings employeeId={7} appearance={appearance} />);
     const button = await screen.findByRole("button", { name: "Enable notifications" }); await waitFor(() => expect(button).toBeEnabled()); fireEvent.click(button);
     expect(await screen.findByRole("alert")).toHaveTextContent("Could not update notifications");
-    expect(screen.queryByText("Enabled on this device")).not.toBeInTheDocument(); expect(button).toBeEnabled();
+    expect(screen.queryByText("Enabled on this device")).not.toBeInTheDocument();
+    expect(button).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(await screen.findByText("Enabled on this device")).toBeVisible();
+    expect(Notification.requestPermission).toHaveBeenCalledOnce();
   });
   test.each([["unsupported", "Push unavailable on this browser"], ["install-ios", "Install GF on Home Screen to enable notifications on iPhone"]])("explains %s without permission prompts", async (support, message) => {
     mocks.support.mockReturnValue(support); render(<EmployeePushSettings employeeId={7} />);
     expect(screen.getByText(message)).toBeVisible(); expect(Notification.requestPermission).not.toHaveBeenCalled();
-    await waitFor(() => expect(mocks.getConfig).toHaveBeenCalled());
+    expect(mocks.sync).not.toHaveBeenCalled();
     expect(screen.queryByRole("button", { name: "Enable notifications" })).not.toBeInTheDocument();
   });
   test("shows OS denial and does not prompt again", async () => {
@@ -57,19 +66,30 @@ describe("push Profile settings", () => {
     mocks.getConfig.mockResolvedValue({ enabled: false, publicKey: null }); render(<EmployeePushSettings employeeId={7} />);
     expect(await screen.findByText("Push is not configured on the server")).toBeVisible();
   });
-  test("still allows current-device cleanup when server push is disabled", async () => {
-    mocks.getConfig.mockResolvedValue({ enabled: false, publicKey: null }); mocks.getSubscription.mockResolvedValue({}); mocks.account.mockReturnValue(7);
+  test("checks current server configuration even after a successful association", async () => {
+    vi.stubGlobal("Notification", { permission: "granted", requestPermission: vi.fn() });
+    mocks.associated.mockReturnValue(true);
+    mocks.getConfig.mockResolvedValue({ enabled: false, publicKey: null });
     render(<EmployeePushSettings employeeId={7} />);
-    fireEvent.click(await screen.findByRole("button", { name: "Disable notifications" }));
-    await waitFor(() => expect(mocks.disable).toHaveBeenCalledOnce());
+    expect(await screen.findByText("Push is not configured on the server")).toBeVisible();
+    expect(screen.queryByText("Enabled on this device")).not.toBeInTheDocument();
+  });
+  test("granted permission automatically rebinds with no prompt or toggle", async () => {
+    vi.stubGlobal("Notification", { permission: "granted", requestPermission: vi.fn() });
+    render(<EmployeePushSettings employeeId={7} />);
+    expect(await screen.findByText("Enabled on this device")).toBeVisible();
+    expect(mocks.sync).toHaveBeenCalledWith(7, expect.any(AbortSignal), expect.any(Function));
+    expect(Notification.requestPermission).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
   test("refreshes Profile after push is enabled in the welcome dialog", async () => {
     render(<EmployeePushSettings employeeId={7} />);
     await screen.findByRole("button", { name: "Enable notifications" });
-    mocks.getSubscription.mockResolvedValue({}); mocks.account.mockReturnValue(7);
+    vi.stubGlobal("Notification", { permission: "granted", requestPermission: vi.fn() });
+    mocks.associated.mockReturnValue(true);
     fireEvent(window, new Event("gf3:employee-push-state-changed"));
-    expect(await screen.findByRole("button", { name: "Disable notifications" })).toBeEnabled();
     expect(screen.getByText("Enabled on this device")).toBeVisible();
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
 });
 

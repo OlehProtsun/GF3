@@ -222,6 +222,7 @@ export function EmployeeSwapPage() {
   const profileQuery = useEmployeeProfileQuery();
   const contractSettingsQuery = useEmploymentContractSettingsQuery();
   const approvalsQuery = useEmployeeContractApprovalsQuery();
+  const approvals = approvalsQuery.data ?? [];
   const claimApprovalMutation = useCreateContractClaimMutation();
   const exceptionMutation = useCreateGiveawayExceptionMutation();
   const cancelApprovalMutation = useCancelContractApprovalMutation();
@@ -560,21 +561,28 @@ export function EmployeeSwapPage() {
             </div>
             <button type="button" className={styles.dialogCloseButton} aria-label={t("Close")} onClick={() => setIsHistoryExpanded(false)}><CloseIcon size={20} /></button>
           </div>
-          <section aria-label={t("My approval requests")}>
-            <h3>{t("My approval requests")}</h3>
-            {approvalsQuery.error ? <ErrorBanner dismissible={false}>{getErrorMessage(approvalsQuery.error, t("Could not load approval requests."))}</ErrorBanner> : null}
-            {approvalsQuery.data?.map(item => <article key={item.id}>
-              <strong>{t(item.kind === "claim" ? "Shift pickup approval" : "Monthly minimum exception")}</strong>
-              <p>{item.scheduleName} · {item.dayOfMonth}.{item.month}.{item.year} · {item.fromTime}–{item.toTime}</p>
-              <span>{({ pending: t("Pending"), approved: t("Approved"), rejected: t("Rejected"), cancelled: t("Cancelled"), expired: t("Expired") } as const)[item.status]}</span>
-              {item.failureReason ? <p>{translateServerMessage(item.failureReason)}</p> : null}
-              {item.status === "pending" ? <><p>{t(item.kind === "claim" ? "The offer is reserved while this pickup request awaits manager approval." : "Monthly minimum exception required.")}</p>
-                <button type="button" disabled={cancelApprovalMutation.isPending} onClick={() => cancelApprovalMutation.mutate(item.id, {
-                  onError: error => setActionError(getErrorMessage(error, t("Could not cancel this request."))),
-                })}>{t("Cancel request")}</button></> : null}
-            </article>)}
-          </section>
-          <div ref={historyListRef} data-swap-history-scroll role="region" aria-label={t("Swap history")} tabIndex={0} data-motion-list className={[styles.offerList, swapHistory.length >= 5 ? styles.offerListScrollable : ""].filter(Boolean).join(" ")}>
+          <div ref={historyListRef} data-swap-history-scroll role="region" aria-label={t("Swap history")} tabIndex={0} data-motion-list className={[styles.offerList, swapHistory.length + approvals.length >= 5 ? styles.offerListScrollable : ""].filter(Boolean).join(" ")}>
+            {approvals.length > 0 || approvalsQuery.error || cancelApprovalMutation.error ? (
+              <section className={styles.approvalRequests} aria-label={t("My approval requests")}>
+                {approvalsQuery.error ? <ErrorBanner dismissible={false}>{getErrorMessage(approvalsQuery.error, t("Could not load approval requests."))}</ErrorBanner> : null}
+                {cancelApprovalMutation.error ? <ErrorBanner dismissible={false}>{getErrorMessage(cancelApprovalMutation.error, t("Could not cancel this request."))}</ErrorBanner> : null}
+                {approvals.map(item => <article key={item.id} className={styles.approvalRequest}>
+                  <strong>{t(item.kind === "claim" ? "Shift pickup approval" : "Monthly minimum exception")}</strong>
+                  <p>{item.scheduleName} · {item.dayOfMonth}.{item.month}.{item.year} · {item.fromTime}–{item.toTime}</p>
+                  <span>{({ pending: t("Pending"), approved: t("Approved"), rejected: t("Rejected"), cancelled: t("Cancelled"), expired: t("Expired") } as const)[item.status]}</span>
+                  {item.failureReason ? <p>{translateServerMessage(item.failureReason)}</p> : null}
+                  {item.status === "pending" ? <>
+                    <p>{t(item.kind === "claim" ? "The offer is reserved while this pickup request awaits manager approval." : "Monthly minimum exception required.")}</p>
+                    <button type="button" disabled={cancelApprovalMutation.isPending} onClick={() => {
+                      setActionError(null);
+                      cancelApprovalMutation.mutate(item.id, {
+                        onError: error => setActionError(getErrorMessage(error, t("Could not cancel this request."))),
+                      });
+                    }}>{t("Cancel request")}</button>
+                  </> : null}
+                </article>)}
+              </section>
+            ) : null}
             {swapHistory.length === 0 ? (
               <p className={styles.emptyText}>{t("Accepted and cancelled swaps will appear here.")}</p>
             ) : swapHistory.map(swap => (

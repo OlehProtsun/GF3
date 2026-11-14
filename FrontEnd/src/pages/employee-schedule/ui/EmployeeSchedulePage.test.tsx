@@ -14,7 +14,7 @@ import { publicHolidaySettingsApi } from "@entities/public-holidays/api/publicHo
 
 beforeEnglishTest(() => setTestLanguage("en"));
 vi.mock("@entities/urlop", async importOriginal => ({ ...await importOriginal<typeof import("@entities/urlop")>(),
-  useEmployeeApprovedUrlopQuery: () => ({ data: [], error: null }),
+  useEmployeeApprovedUrlopQuery: () => ({ data: mocks.approvedUrlop(), error: null }),
 }));
 
 const mocks = vi.hoisted(() => ({
@@ -23,6 +23,7 @@ const mocks = vi.hoisted(() => ({
   downloadPdf: vi.fn(),
   matrix: vi.fn(),
   scrollIntoView: vi.fn(),
+  approvedUrlop: vi.fn(),
   uiStateQuery: {
     data: { scheduleColumnOrders: {}, readNotificationIds: [] },
     refetch: vi.fn(),
@@ -204,6 +205,7 @@ beforeEach(() => {
   Object.defineProperty(navigator, "canShare", { configurable: true, value: undefined });
   mocks.matrix.mockClear();
   mocks.scrollIntoView.mockClear();
+  mocks.approvedUrlop.mockReset().mockReturnValue([]);
   Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
     configurable: true,
     value: mocks.scrollIntoView,
@@ -457,6 +459,7 @@ describe("EmployeeSchedulePage", () => {
       ...schedules[0],
       relatedScheduleAssignments: [
         ...(schedules[0].relatedScheduleAssignments ?? []),
+        { employeeId: 7, dayOfMonth: 10, scheduleId: 35, scheduleName: "F35" },
         { employeeId: 12, dayOfMonth: 14, scheduleId: 35, scheduleName: "F35" },
       ],
       employees: [
@@ -468,9 +471,12 @@ describe("EmployeeSchedulePage", () => {
         ...schedules[0].slots,
         { id: 20, dayOfMonth: 10, slotNo: 1, employeeId: 5, fromTime: "00:00", toTime: "00:00", status: "ASSIGNED" },
         { id: 21, dayOfMonth: 10, slotNo: 1, employeeId: 9, fromTime: "18:00", toTime: "22:00", status: "ASSIGNED" },
+        { id: 22, dayOfMonth: 10, slotNo: 7, employeeId: 12, fromTime: "14:00", toTime: "15:00", status: "ASSIGNED" },
+        { id: 23, dayOfMonth: 14, slotNo: 2, employeeId: null, fromTime: "08:00", toTime: "12:00", status: "UNASSIGNED" },
       ],
     };
     mocks.scheduleQuery.mockReturnValue({ data: [dailySchedule], isLoading: false, error: null });
+    mocks.approvedUrlop.mockReturnValue([{ shopId: 4, employeeId: 7, employeeName: "Adam Blue", date: "2026-05-10" }]);
 
     renderPage();
     const viewToggle = screen.getByRole("button", { name: "Show daily schedule view" });
@@ -496,7 +502,7 @@ describe("EmployeeSchedulePage", () => {
 
     const workerCards = within(screen.getByRole("tabpanel", { name: "Sunday 10" })).getAllByRole("article");
     expect(workerCards.map(card => card.textContent)).toEqual([
-      expect.stringContaining("Zoe Young08:00 - 12:00, Late May Schedule, Second May Schedule"),
+      "Zoe Young08:00 - 12:00, 14:00 - 15:00",
       expect.stringContaining("Alex All DayAll day"),
       expect.stringContaining("Liam Late18:00 - 22:00"),
     ]);
@@ -504,14 +510,18 @@ describe("EmployeeSchedulePage", () => {
     await user.click(dayOff);
     expect(screen.getByText("No one is scheduled.")).toBeInTheDocument();
 
-    const relatedOnlyDay = screen.getByRole("tab", { name: "Thursday 14, working day" });
-    expect(relatedOnlyDay).toHaveClass(styles.dailyScheduleDayWorking);
+    const relatedOnlyDay = screen.getByRole("tab", { name: "Thursday 14, day off" });
+    expect(relatedOnlyDay).toHaveClass(styles.dailyScheduleDayOff);
     await user.click(relatedOnlyDay);
-    expect(within(screen.getByRole("tabpanel", { name: "Thursday 14" })).getByRole("article"))
-      .toHaveTextContent("Zoe YoungF35");
+    const relatedOnlyPanel = within(screen.getByRole("tabpanel", { name: "Thursday 14" }));
+    expect(relatedOnlyPanel.getByText("No one is scheduled.")).toBeVisible();
+    expect(relatedOnlyPanel.queryByRole("article")).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Show schedule matrix view" }));
     expect(screen.getByTestId("schedule-matrix")).toBeInTheDocument();
+    const matrix = mocks.matrix.mock.calls.at(-1)?.[0];
+    expect(matrix.mutedSuffixMap["12:14"]).toBe("F35");
+    expect(matrix.urlopCellKeys).toContain("7:10");
     expect(screen.getByRole("button", { name: "Show daily schedule view" })).toHaveFocus();
   });
 
@@ -531,7 +541,13 @@ describe("EmployeeSchedulePage", () => {
     expect(within(dialog).getByText("Adam Blue")).toBeInTheDocument();
     expect(within(dialog).getByText("Zoe Young")).toBeInTheDocument();
 
-    await user.click(within(dialog).getByRole("button", { name: "Move Zoe Young left" }));
+    within(dialog).getAllByRole("listitem").forEach((row, index) => {
+      vi.spyOn(row, "getBoundingClientRect").mockReturnValue(DOMRect.fromRect({ x: 0, y: index * 60, width: 280, height: 52 }));
+    });
+    within(dialog).getByRole("button", { name: "Reorder Zoe Young" }).focus();
+    await user.keyboard("[Space]");
+    await user.keyboard("[ArrowUp]");
+    await user.keyboard("[Space]");
     await user.click(within(dialog).getByRole("button", { name: "Apply" }));
 
     const latestMatrixProps = mocks.matrix.mock.calls.at(-1)?.[0];

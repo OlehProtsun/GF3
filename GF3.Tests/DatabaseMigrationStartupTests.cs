@@ -22,8 +22,17 @@ public sealed class DatabaseMigrationStartupTests
         await db.GetService<IMigrator>().MigrateAsync("20261031083410_AddUrlop");
         var (employee, _, schedule, slot) = await EmployeePushNotificationSourceTests.Seed(db);
         foreach (var status in new[] { ShiftCorrectionStatus.Pending, ShiftCorrectionStatus.Approved, ShiftCorrectionStatus.Rejected })
-            db.ShiftCorrectionRequests.Add(Correction(status));
-        await db.SaveChangesAsync();
+        {
+            var legacy = Correction(status);
+            await db.Database.ExecuteSqlInterpolatedAsync($"""
+                INSERT INTO shift_correction_request
+                    (schedule_id, employee_id, schedule_slot_id, day_of_month, original_from_time, original_to_time,
+                     requested_from_time, requested_to_time, status, created_at_utc)
+                VALUES ({legacy.ScheduleId}, {legacy.EmployeeId}, {legacy.ScheduleSlotId}, {legacy.DayOfMonth},
+                        {legacy.OriginalFromTime}, {legacy.OriginalToTime}, {legacy.RequestedFromTime},
+                        {legacy.RequestedToTime}, {legacy.Status.ToString()}, {legacy.CreatedAtUtc});
+                """);
+        }
         db.ChangeTracker.Clear();
         var workspace = new SqliteDatabaseWorkspace(database.DatabasePath);
         var result = await DatabaseMigrationStartup.ApplyAsync(db, workspace, true, true, NullLogger.Instance);
@@ -102,7 +111,9 @@ public sealed class DatabaseMigrationStartupTests
         var error = await Assert.ThrowsAsync<SqliteException>(() => db.GetService<IMigrator>().MigrateAsync("20261031083410_AddUrlop"));
         Assert.Contains("Rollback blocked", error.Message);
         db.ChangeTracker.Clear();
-        var preserved = await db.ShiftCorrectionRequests.SingleAsync();
+        var preserved = await db.ShiftCorrectionRequests
+            .Select(item => new { item.Status, item.OriginalFromTime, item.OriginalToTime })
+            .SingleAsync();
         Assert.Equal(status, preserved.Status); Assert.Null(preserved.OriginalFromTime); Assert.Null(preserved.OriginalToTime);
         Assert.Contains("20261101190152_AddDayOffShiftCorrectionRequests", await db.Database.GetAppliedMigrationsAsync());
     }

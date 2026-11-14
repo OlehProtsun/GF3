@@ -1,9 +1,10 @@
 .inboxPanel {
+  min-width: 0;
   align-content: start;
 }
-.headingCopy { min-width: 0; display: grid; gap: 5px; }
-.tabsSummaryRow { min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.inboxTabs { display: inline-flex; width: fit-content; gap: 4px; padding: 3px; border: 1px solid rgba(148, 163, 184, 0.18); border-radius: 999px; background: rgba(241, 245, 249, 0.8); }
+.headingCopy { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 5px; }
+.tabsSummaryRow { min-width: 0; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 10px; }
+.inboxTabs { display: inline-flex; flex-wrap: wrap; box-sizing: border-box; width: fit-content; min-width: 0; max-width: 100%; gap: 4px; padding: 3px; border: 1px solid rgba(148, 163, 184, 0.18); border-radius: 999px; background: rgba(241, 245, 249, 0.8); }
 .inboxTabs button { min-width: 76px; height: 31px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 12px; border: 0; border-radius: 999px; background: transparent; color: #64748b; font: inherit; font-size: 0.75rem; font-weight: 850; cursor: pointer; }
 .inboxTabs button span { min-width: 17px; height: 17px; display: grid; place-items: center; border-radius: 999px; background: #ef4444; color: #fff; font-size: 0.6rem; }
 .inboxTabs .inboxTabActive { background: #fff; color: #1d4ed8; box-shadow: 0 3px 10px rgba(15, 23, 42, 0.08); }
@@ -67,6 +68,8 @@
 
 .sectionHeader {
   display: flex;
+  flex-wrap: wrap;
+  min-width: 0;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
@@ -100,6 +103,7 @@
 
 .inboxHeaderActions {
   display: flex;
+  min-width: 0;
   flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
@@ -107,6 +111,7 @@
 }
 
 .countBadge {
+  flex: 0 0 auto;
   min-width: 34px;
   height: 34px;
   padding: 0 10px;
@@ -118,6 +123,8 @@
   color: #1d4ed8;
   font-size: 0.82rem;
   font-weight: 900;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 .countBadgeUnread {
@@ -330,7 +337,6 @@
   }
 
   .inboxHeaderActions {
-    flex-wrap: nowrap;
     justify-content: flex-end;
     gap: 6px;
   }
@@ -342,11 +348,9 @@
   }
 
   .countBadge {
-    flex: 0 0 auto;
     height: 32px;
     padding: 0 9px;
     font-size: 0.78rem;
-    white-space: nowrap;
   }
 
   .notificationList {
