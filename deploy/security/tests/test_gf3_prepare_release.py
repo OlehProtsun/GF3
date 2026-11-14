@@ -66,7 +66,6 @@ class ManagedDeploymentTests(unittest.TestCase):
         if os.name == "nt":
             # Windows runners may lack the privilege to create symlinks.
             self.enterContext(patch.object(release, "active_bundle", side_effect=lambda: self.active_directory))
-        self.set_active(self.previous)
         self.target = self.current
         self.status = "completed"
         self.conclusion = "success"
@@ -93,6 +92,7 @@ class ManagedDeploymentTests(unittest.TestCase):
                                          safe_path=self.check_fixture_path, docker_json=self.docker,
                                          curl=lambda *_: '{"status":"ok","canConnect":true}', command=self.command,
                                          verify_tooling=lambda _: None, lock=self.lock))
+        self.set_active(self.previous)
         self.engine = self.enterContext(patch.object(prepare, "engine", side_effect=self.engine_call))
         self.api = self.enterContext(patch.object(prepare, "github", side_effect=self.github))
         self.confirm = self.enterContext(patch.object(prepare, "confirm", side_effect=lambda sha: self.do_confirm(sha)))
