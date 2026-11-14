@@ -3,6 +3,7 @@
 
 import argparse
 from contextlib import closing, contextmanager
+from datetime import datetime, timezone
 import hashlib
 import ipaddress
 import io
@@ -28,6 +29,8 @@ RUNTIME = ROOT / "deploy/security/runtime"
 DOMAIN = "app-gf.com"
 PROJECT = "gf3"
 NETWORK = PROJECT + "_gf3-internal"
+GUARD_TIMER_UNIT = Path("/etc/systemd/system/gf3-guard.timer")
+GUARD_SERVICE_UNIT = Path("/etc/systemd/system/gf3-guard.service")
 CERT = "/etc/nginx/certs/fullchain.pem"
 KEY = "/etc/nginx/certs/privkey.pem"
 WEB = "/var/www/certbot"
@@ -46,25 +49,70 @@ class ReleaseError(Exception):
     pass
 
 
+class GitMergeError(ReleaseError):
+    def __init__(self, code, reason, reported_paths):
+        super().__init__(f"git merge --ff-only failed (exit {code}): {reason}")
+        self.code = code
+        self.reason = reason
+        self.reported_paths = reported_paths
+
+
 def require(condition, message):
     if not condition:
         raise ReleaseError(message)
 
 
 def command(*args, cwd=None, timeout=120, capture=True, check=True, data=None, extra_env=None):
-    result = subprocess.run(args, cwd=cwd, env={**ENV, **(extra_env or {})}, timeout=timeout, text=True,
+    is_git = args[0] == "git"
+    result = subprocess.run(args, cwd=cwd, env={**ENV, **(extra_env or {})}, timeout=timeout, text=not is_git,
                             input=data, capture_output=capture)
+    stdout, stderr = result.stdout, result.stderr
+    if is_git:
+        stdout = stdout.decode("utf-8", "surrogateescape") if isinstance(stdout, bytes) else stdout
+        stderr = stderr.decode("utf-8", "surrogateescape") if isinstance(stderr, bytes) else stderr
     if check and result.returncode:
-        raise ReleaseError(f"{args[0]} {args[1]} failed (exit {result.returncode})")
-    return result.stdout if capture else ""
+        if is_git and "merge" in args:
+            diagnostic = (stderr or "").lower()
+            reasons = (
+                ("index.lock", "Git index lock or another writer"),
+                ("cannot lock ref", "Git ref lock or another writer"),
+                ("untracked working tree", "untracked files would be overwritten"),
+                ("local changes", "tracked changes would be overwritten"),
+                ("permission denied", "check checkout and Git metadata permissions"),
+                ("not possible to fast-forward", "checkout no longer fast-forwards"),
+                ("dubious ownership", "check Git checkout ownership"),
+            )
+            reason = next((message for token, message in reasons if token in diagnostic),
+                          "check branch, checkout status and Git write access")
+            # Only paths also present in the incoming Git diff are retained in the audit.
+            reported = [line[1:] for line in (stderr or "").split("\n") if line.startswith("\t")]
+            raise GitMergeError(result.returncode, reason, reported)
+        if args[0] == "systemctl":
+            unit = next((arg for arg in args if arg in ("gf3-guard.timer", "gf3-guard.service")), "")
+            raise ReleaseError(f"systemctl {args[1]} {unit} failed (exit {result.returncode}); "
+                               "check systemctl status and the unit journal")
+        if args[0] == "/usr/bin/python3":
+            hint = ("Guard lock is busy; let the other Guard command finish"
+                    if (stderr or "").strip() == "GF3 guard: Deployment guard could not acquire its lock"
+                    else "check Guard state, filesystem permissions and the active Nginx configuration")
+            raise ReleaseError(f"Guard {args[2]} failed (exit {result.returncode}); {hint}")
+        raise ReleaseError(f"{Path(args[0]).name} {args[1]} failed (exit {result.returncode})")
+    return stdout if capture else ""
 
 
 def docker_json(*args):
     return json.loads(command("docker", *args))
 
 
-def git(*args, root=ROOT):
-    return command("git", "-c", f"safe.directory={root}", *args, cwd=root, timeout=180)
+def git(*args, root=None):
+    root = ROOT if root is None else root
+    return command("git", "-c", f"safe.directory={root}", *args, cwd=root, timeout=180,
+                   extra_env={"LC_ALL": "C"})
+
+
+def git_status(*args, root=None):
+    # Status is a read-only gate. An optional index refresh can invoke post-index-change.
+    return git("--no-optional-locks", "status", *args, root=root)
 
 
 def safe_path(path, private=False):
@@ -80,7 +128,7 @@ def safe_path(path, private=False):
 
 def verified_checkout(source, revision):
     require(git("rev-parse", "HEAD", root=source).strip() == revision, "Candidate checkout is at a different revision")
-    require(not git("status", "--porcelain", root=source), "Candidate checkout is dirty")
+    require(not git_status("--porcelain", "--untracked-files=all", root=source), "Candidate checkout is dirty")
 
 
 def write(path, contents):
@@ -501,10 +549,224 @@ def recover(bundle, acme):
     activate(bundle)
 
 
-def approve_guard():
-    result = command("/usr/bin/python3", str(Path(__file__).with_name("gf3_guard.py")), "status",
-                     extra_env={"GF3_GUARD_ROOT": str(ROOT), "GF3_GUARD_RUNTIME": str(RUNTIME)})
-    require(not json.loads(result).get("last_error"), "GF3 guard reports a rule activation error")
+def guard_result(bundle, *args):
+    result = command("/usr/bin/python3", str(Path(__file__).with_name("gf3_guard.py")), *args, timeout=380,
+                     extra_env={"GF3_GUARD_ROOT": str(ROOT), "GF3_GUARD_RUNTIME": str(RUNTIME),
+                                "GF3_GUARD_ACTIVE_COMPOSE": str(bundle / "compose.json")})
+    try:
+        result = json.loads(result)
+    except ValueError:
+        raise ReleaseError("Guard returned invalid JSON") from None
+    require(isinstance(result, dict), "Guard returned an invalid result")
+    return result
+
+
+def run_initial_guard(bundle):
+    require((bundle / "guard-enabled").is_file(), "Active release is missing the Guard marker")
+    result = guard_result(bundle, "run", "--require-lock")
+    run_id = result.get("last_run_id")
+    require(result.get("outcome") == "completed" and isinstance(run_id, str)
+            and re.fullmatch(r"[0-9a-f]{32}", run_id) and result.get("last_error") is None,
+            "Guard did not report a completed initial run")
+    return run_id
+
+
+def approve_guard(bundle, run_id):
+    result = guard_result(bundle, "status")
+    require(result.get("last_run_id") == run_id and "last_error" in result and result["last_error"] is None,
+            "Persisted Guard status does not confirm this activation run")
+
+
+def timer_state():
+    result = command("systemctl", "show", "gf3-guard.timer", "--property=ActiveState,UnitFileState")
+    values = dict(line.split("=", 1) for line in result.splitlines() if "=" in line)
+    require(values.get("UnitFileState") in ("enabled", "disabled")
+            and values.get("ActiveState") in ("active", "inactive"),
+            "Guard timer must be enabled or disabled and active or inactive; inspect its unit state")
+    return values["UnitFileState"] == "enabled", values["ActiveState"] == "active"
+
+
+def restore_timer(previous):
+    enabled, active = previous
+    if not active:
+        command("systemctl", "stop", "gf3-guard.timer")
+    command("systemctl", "enable" if enabled else "disable", "gf3-guard.timer")
+    if active:
+        command("systemctl", "start", "gf3-guard.timer")
+    require(timer_state() == previous, "Guard timer state was not restored")
+
+
+def verify_guard_quiet():
+    state = command("systemctl", "show", "gf3-guard.service", "--property=ActiveState", "--value").strip()
+    require(state in ("inactive", "failed"), "Guard service did not drain")
+
+
+def check_git_target(sha):
+    require(git("branch", "--show-current").strip() == "PROD2", "Expected PROD2 checkout")
+    require(not git_status("--porcelain", "--untracked-files=all"), "Production checkout is dirty")
+    git("merge-base", "--is-ancestor", "HEAD", sha)
+
+
+def check_git_write_ready():
+    index_lock = Path(git("rev-parse", "--path-format=absolute", "--git-path", "index.lock").strip())
+    require(not os.path.lexists(index_lock), "Git index lock exists; identify its owner before retrying")
+
+
+def git_activation_state():
+    index = Path(git("rev-parse", "--path-format=absolute", "--git-path", "index").rstrip("\n"))
+    metadata = index.stat()
+    entries = []
+    untracked = 0
+    for entry in git_status("--porcelain=v2", "-z", "--no-renames", "--untracked-files=all").split("\0"):
+        if entry.startswith("1 "):
+            _, xy, submodule, head, staged, worktree, _, _, path = entry.split(" ", 8)
+            entries.append({"path": path, "staged": xy[0], "unstaged": xy[1], "submodule": submodule,
+                            "modes": {"head": head, "index": staged, "worktree": worktree}})
+        elif entry.startswith("u "):
+            fields = entry.split(" ", 10)
+            entries.append({"path": fields[-1], "conflict": fields[1], "stage_modes": fields[3:7]})
+        elif entry.startswith("? "):
+            untracked += 1
+        elif entry:
+            raise ReleaseError("Unexpected Git status record")
+    flagged = [{"flag": entry[0], "path": entry[2:]} for entry in git("ls-files", "-v", "-z").split("\0")
+               if entry and (entry[0] == "S" or entry[0].islower())]
+    return {"head": git("rev-parse", "HEAD").strip(), "branch": git("branch", "--show-current").strip(),
+            "tracked": entries, "untracked_count": untracked,
+            "index": {"size": metadata.st_size, "mtime_ns": metadata.st_mtime_ns, "inode": metadata.st_ino,
+                      "lock_present": os.path.lexists(index.with_name(index.name + ".lock")), "flagged_paths": flagged}}
+
+
+def finalize_git(candidate, sha):
+    path = candidate / "git-activation.json"
+    audit = {"at_utc": datetime.now(timezone.utc).isoformat(), "target": sha, "result": "pending"}
+    reported_paths = {}
+    try:
+        before = git_activation_state()
+        audit["before"] = before
+        diff = ("-c", "core.quotePath=false", "diff", "--no-renames", "--name-only")
+        revisions = (before["head"], sha, "--")
+        incoming = git(*diff, "-z", *revisions).split("\0")[:-1]
+        quoted = git(*diff, *revisions).split("\n")[:-1]
+        reported_paths = dict(zip(quoted, incoming, strict=True))
+        audit["incoming_paths"] = incoming
+        store(path, audit)
+        require(before["branch"] == "PROD2", "Expected PROD2 checkout")
+        require(not before["index"]["flagged_paths"], "Checkout uses assume-unchanged or skip-worktree flags")
+        require(not before["tracked"] and not before["untracked_count"],
+                "Production checkout is dirty; inspect the protected Git activation audit")
+        git("merge-base", "--is-ancestor", before["head"], sha)
+        # Keep Git's overwrite checks, including for ignored host-local files.
+        git("-c", "core.quotePath=false", "merge", "--ff-only", "--no-autostash", "--no-overwrite-ignore", sha)
+    except (Exception, KeyboardInterrupt) as failure:
+        audit["result"] = "failed"
+        if isinstance(failure, GitMergeError):
+            audit["failure"] = {"exit_code": failure.code, "reason": failure.reason,
+                                "reported_paths": sorted({reported_paths[path] for path in failure.reported_paths
+                                                          if path in reported_paths})}
+        elif isinstance(failure, ReleaseError):
+            audit["failure"] = {"reason": str(failure)}
+        else:
+            audit["failure"] = {"type": type(failure).__name__}
+        try:
+            audit["after_failure"] = git_activation_state()
+        except (OSError, ReleaseError, ValueError, subprocess.TimeoutExpired):
+            audit["after_failure"] = {"unavailable": True}
+        try:
+            store(path, audit)
+        except OSError:
+            print("Unable to save the Git activation failure audit; check release directory permissions and space",
+                  file=sys.stderr)
+        else:
+            print(f"Git activation audit: {path}", file=sys.stderr)
+        raise
+    audit["result"] = "merged"
+    try:
+        store(path, audit)
+    except OSError:
+        # Git has already advanced. An audit write error cannot undo that commit point.
+        print("Git fast-forward succeeded; the audit could not be finalized", file=sys.stderr)
+
+
+@contextmanager
+def activation_stage(name):
+    print(f"[{name}]")
+    try:
+        yield
+    except (Exception, KeyboardInterrupt) as error:
+        if isinstance(error, ReleaseError):
+            detail = str(error)
+        elif isinstance(error, subprocess.TimeoutExpired):
+            detail = "command timed out; inspect the corresponding unit or service"
+        else:
+            detail = f"{type(error).__name__}; inspect local service and Git state"
+        raise ReleaseError(f"{name}: {detail}") from None
+
+
+def finish_activation(candidate, baseline, sha):
+    with activation_stage("guard-initial-run"):
+        run_id = run_initial_guard(candidate)
+    with activation_stage("guard-activation-lock"), lock(RUNTIME / "state/guard.lock"):
+        with activation_stage("guard-status"):
+            approve_guard(candidate, run_id)
+        with activation_stage("post-guard-health"):
+            verify_web(candidate)
+            require(topology() == baseline, "Network or database changed after Guard activation")
+    with activation_stage("guard-timer-enable"):
+        command("systemctl", "enable", "gf3-guard.timer")
+    with activation_stage("guard-timer-start"):
+        command("systemctl", "start", "gf3-guard.timer")
+        require(timer_state() == (True, True), "Guard timer is not enabled and active")
+    with activation_stage("git-fast-forward"):
+        finalize_git(candidate, sha)
+
+
+def deploy_and_activate(sha, nginx_image):
+    with activation_stage("approved-tooling"):
+        require(SHA.fullmatch(sha), "Full approved SHA required")
+        git("fetch", "origin", "refs/heads/PROD2:refs/remotes/origin/PROD2")
+        require(git("rev-parse", "refs/remotes/origin/PROD2").strip() == sha,
+                "Approved SHA is not the current PROD2 tip")
+        verify_tooling(sha)
+    with activation_stage("guard-timer-state"):
+        previous_timer = timer_state()
+    candidate = None
+    previous_active = None
+    try:
+        with activation_stage("guard-timer-pause"):
+            command("systemctl", "stop", "gf3-guard.timer")
+        with lock(RUNTIME / "state/guard.lock"):
+            # Drain an in-flight Guard before stopping any queued oneshot.
+            with activation_stage("guard-service-drain"):
+                command("systemctl", "stop", "gf3-guard.service")
+                verify_guard_quiet()
+            if (STATE / "active").exists():
+                previous_active = active_bundle()
+            with activation_stage("stage-and-cutover"):
+                candidate, previous, baseline = deploy(sha, nginx_image)
+        finish_activation(candidate, baseline, sha)
+    except (Exception, KeyboardInterrupt) as failure:
+        if candidate is not None:
+            try:
+                with activation_stage("activation-restore"):
+                    command("systemctl", "stop", "gf3-guard.timer")
+                    with lock(RUNTIME / "state/guard.lock"):
+                        command("systemctl", "stop", "gf3-guard.service")
+                        recover(previous, acme=True)
+                        require(topology() == baseline, "Recovered network or data volume differs from baseline")
+                        if previous_active is not None:
+                            activate(previous_active)
+            except ReleaseError as recovery:
+                raise ReleaseError(f"{failure}; {recovery}. Retained bundle: {previous}") from None
+        try:
+            with activation_stage("guard-timer-restore"):
+                restore_timer(previous_timer)
+        except ReleaseError as recovery:
+            raise ReleaseError(f"{failure}; {recovery}") from None
+        if candidate is not None:
+            raise ReleaseError(f"{failure}; prior release restored. Retained bundle: {previous}") from None
+        raise
+    print(f"Deployed PROD2 {sha}; guard active; recovery bundle {previous}")
 
 
 def verify_ssh_and_certbot():
@@ -512,7 +774,7 @@ def verify_ssh_and_certbot():
     command("systemctl", "is-active", "--quiet", "snap.certbot.renew.timer")
 
 
-def cutover(candidate, previous, baseline):
+def cutover(candidate, previous, baseline, previous_active=None):
     try:
         backend(candidate)
         verify_backend_env(candidate)
@@ -525,6 +787,8 @@ def cutover(candidate, previous, baseline):
         try:
             recover(previous, acme=True)
             require(topology() == baseline, "Recovery network or volume differs from baseline")
+            if previous_active is not None:
+                activate(previous_active)
         except (Exception, KeyboardInterrupt) as rollback:
             raise ReleaseError(f"Automatic recovery failed. Retained bundle: {previous}") from rollback
         raise ReleaseError("Cutover failed; prior release restored") from failure
@@ -540,25 +804,29 @@ def verify_backend_env(bundle):
             and not live.get("FORWARDEDHEADERS_ENABLED"), "Live proxy environment differs from the approved candidate")
 
 
+def verify_tooling(sha):
+    for path in (Path(__file__), Path(__file__).with_name("gf3_guard.py"), GUARD_TIMER_UNIT, GUARD_SERVICE_UNIT):
+        safe_path(path)
+        require(git("hash-object", "--no-filters", str(path)).strip() ==
+                git("rev-parse", f"{sha}:deploy/security/{path.name}").strip(),
+                f"Installed {path.name} differs from the approved release")
+    for unit in (GUARD_TIMER_UNIT, GUARD_SERVICE_UNIT):
+        result = command("systemctl", "show", unit.name, "--property=NeedDaemonReload,FragmentPath,DropInPaths")
+        values = dict(line.split("=", 1) for line in result.splitlines() if "=" in line)
+        require(values.get("NeedDaemonReload") == "no" and values.get("FragmentPath") == str(unit)
+                and values.get("DropInPaths") == "", f"Check {unit.name} and its drop-ins, then run daemon-reload")
+
+
 def deploy(sha, nginx_image):
-    require(SHA.fullmatch(sha) and IMAGE_DIGEST.fullmatch(nginx_image), "Full approved SHA and Nginx digest required")
-    require(git("branch", "--show-current").strip() == "PROD2", "Expected PROD2 checkout")
-    require(not git("status", "--porcelain"), "Production checkout is dirty")
+    require(IMAGE_DIGEST.fullmatch(nginx_image), "Approved Nginx digest required")
+    check_git_target(sha)
+    check_git_write_ready()
     safe_path(ROOT / "deploy/.env", private=True)
-    git("fetch", "origin", "refs/heads/PROD2:refs/remotes/origin/PROD2")
-    require(git("rev-parse", "refs/remotes/origin/PROD2").strip() == sha, "Approved SHA is not the current PROD2 tip")
     before = git("rev-parse", "HEAD").strip()
-    if (STATE / "active/release.json").is_file():
-        before = json.loads((STATE / "active/release.json").read_text())["sha"]
-    git("merge-base", "--is-ancestor", "HEAD", sha)
+    previous_active = active_bundle() if (STATE / "active").exists() else None
+    if previous_active is not None and (previous_active / "release.json").is_file():
+        before = json.loads((previous_active / "release.json").read_text())["sha"]
     git("merge-base", "--is-ancestor", before, sha)
-    require(git("hash-object", __file__).strip() ==
-            git("rev-parse", f"{sha}:deploy/security/gf3_release.py").strip(),
-            "Installed deployment entrypoint differs from the approved release; update it explicitly")
-    guard = Path(__file__).with_name("gf3_guard.py")
-    safe_path(guard)
-    require(git("hash-object", str(guard)).strip() == git("rev-parse", f"{sha}:deploy/security/gf3_guard.py").strip(),
-            "Installed guard differs from the approved release")
     baseline = topology()
     verify_ipv6()
     verify_ssh_and_certbot()
@@ -570,11 +838,12 @@ def deploy(sha, nginx_image):
     nginx_test(previous)
     verify_web(previous)
     backup(previous, baseline[2])
-    require(not git("status", "--porcelain"), "Production checkout changed during staging")
+    require(not git_status("--porcelain", "--untracked-files=all"), "Production checkout changed during staging")
     require(topology() == baseline, "Production network or volume changed during staging")
     store(candidate / "release.json", {"sha": sha, "previous": str(previous), "baseline": baseline})
-    activate(previous)
-    cutover(candidate, previous, baseline)
+    if previous_active is None:
+        activate(previous)
+    cutover(candidate, previous, baseline, previous_active)
     return candidate, previous, baseline
 
 
@@ -610,6 +879,9 @@ def main():
         safe_path(STATE, private=True)
         safe_path(RUNTIME / "state/guard.lock", private=True)
         with lock(Path("/run/lock/gf3-prod-deploy.lock")):
+            if args.action == "deploy":
+                deploy_and_activate(args.sha, args.nginx_image)
+                return 0
             with lock(RUNTIME / "state/guard.lock"):
                 if args.action == "preflight":
                     baseline = topology()
@@ -620,13 +892,14 @@ def main():
                             and git("rev-parse", "refs/remotes/origin/PROD2").strip() == args.sha,
                             "Expected the full approved PROD2 SHA")
                     verified_checkout(args.source, args.sha)
+                    check_git_target(args.sha)
+                    check_git_write_ready()
                     safe_path(args.source / "deploy/.env", private=True)
+                    verify_tooling(args.sha)
                     validate(render(args.source), baseline[1], baseline[2])
                     command("systemd-analyze", "verify", "/etc/systemd/system/gf3-guard.service",
                             "/etc/systemd/system/gf3-guard.timer")
                     print(f"Preflight OK: {baseline[1]}, volume {baseline[2]}")
-                elif args.action == "deploy":
-                    candidate, previous, baseline = deploy(args.sha, args.nginx_image)
                 elif args.action == "renew":
                     renew()
                 else:
@@ -643,28 +916,10 @@ def main():
                     require(topology() == tuple(recorded), "Recovered topology differs from backup")
                     if not (args.bundle / "guard-enabled").is_file():
                         command("systemctl", "disable", "--now", "gf3-guard.timer")
-            # A guard job takes its own lock. The deployment lock still excludes Certbot.
-            if args.action == "deploy":
-                timer_active = subprocess.run(["systemctl", "is-active", "--quiet", "gf3-guard.timer"],
-                                              env=ENV, check=False).returncode == 0
-                try:
-                    command("systemctl", "start", "gf3-guard.service", timeout=380)
-                    with lock(RUNTIME / "state/guard.lock"):
-                        verify_web(candidate)
-                        approve_guard()
-                        require(topology() == baseline, "Network or database changed after guard activation")
-                        command("systemctl", "enable", "--now", "gf3-guard.timer")
-                        git("merge", "--ff-only", args.sha)
-                except (Exception, KeyboardInterrupt) as failure:
-                    with lock(RUNTIME / "state/guard.lock"):
-                        recover(previous, acme=True)
-                    if not timer_active:
-                        command("systemctl", "disable", "--now", "gf3-guard.timer")
-                    raise ReleaseError("Activation failed; prior release restored") from failure
-                print(f"Deployed PROD2 {args.sha}; guard active; recovery bundle {previous}")
     except (ReleaseError, OSError, ValueError, KeyError, subprocess.TimeoutExpired, sqlite3.Error, tarfile.TarError,
             KeyboardInterrupt) as error:
-        print(f"GF3 release: {error}", file=sys.stderr)
+        detail = str(error) if isinstance(error, ReleaseError) else f"{type(error).__name__}; check local release state"
+        print(f"GF3 release: {detail}", file=sys.stderr)
         return 1
     return 0
 

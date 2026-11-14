@@ -1,0 +1,34 @@
+--- a/gfctl
++++ b/gfctl
+@@ -381,30 +381 @@
+-    local approval="/etc/gfctl/approved-release.conf"
+-    require_file "$approval"
+-
+-    if [[ -L "$approval" ||
+-          "$(stat -c '%u:%a' "$approval")" != "0:600" ]]; then
+-        fail "Invalid release approval permissions."
+-    fi
+-
+-    local approved_sha nginx_image
+-
+-    approved_sha=$(sed -n 's/^APPROVED_SHA=//p' "$approval")
+-    nginx_image=$(sed -n 's/^NGINX_IMAGE=//p' "$approval")
+-
+-    if [[ ! "$approved_sha" =~ ^[0-9a-f]{40}$ ]]; then
+-        fail "Invalid approved release SHA."
+-    fi
+-
+-    if [[ ! "$nginx_image" =~ ^nginx@sha256:[0-9a-f]{64}$ ]]; then
+-        fail "Invalid Nginx image digest."
+-    fi
+-
+-    echo "Approved release: $approved_sha"
+-    echo "Nginx image: $nginx_image"
+-
+-    if ! /usr/bin/python3 /usr/local/libexec/gf3/gf3_release.py deploy "$approved_sha" "$nginx_image"; then
+-        warn "Managed deployment failed. Review recovery output."
+-        return 1
+-    fi
+-
+-    success "Managed PROD2 deployment completed."
++    /usr/bin/python3 -I /usr/local/libexec/gf3/gf3_prepare_release.py

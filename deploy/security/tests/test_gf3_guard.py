@@ -271,6 +271,8 @@ class GuardTests(unittest.TestCase):
         self.execute("run")
         with guard.guard_lock(self.guard.private / "guard.lock"):
             self.assertIn("holds the lock", self.execute("ban", "45.10.1.1")["status"])
+            with self.assertRaisesRegex(guard.GuardError, "could not acquire"):
+                self.execute("run", "--require-lock")
         with patch.object(self.guard, "run_command", side_effect=FileNotFoundError):
             with self.assertRaisesRegex(guard.GuardError, "Docker CLI unavailable"):
                 self.execute("ban", "45.10.1.1")
