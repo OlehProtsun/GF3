@@ -1,5 +1,4 @@
 import { t } from "@shared/i18n";
-import { EmployeePushSettings } from "@entities/employee-push/ui/EmployeePushSettings";
 import { useLanguageRevision } from "@shared/i18n/useLanguageRevision";
 import { LanguageSelector } from "@shared/i18n/LanguageSelector";
 import { useEffect, useState } from "react";
@@ -396,8 +395,6 @@ export function EmployeeAccountPage() {
         ) : (
           <div className={styles.loadingState}>{t("Your profile is not available yet.")}</div>
         )}
-
-        {profile ? <EmployeePushSettings employeeId={profile.employeeId} appearance="profile" /> : null}
 
         {profile ? (
           <RegulationHistoryCard appearance="temporarily-closed" />

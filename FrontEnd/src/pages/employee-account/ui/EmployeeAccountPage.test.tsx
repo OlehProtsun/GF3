@@ -128,7 +128,7 @@ test("account editing is separate, mutually exclusive and cancellable without wr
   expect(screen.getByRole("region", { name: "Regulation history" })).toBeVisible();
   expect(within(account).getByText("Login")).toBeVisible();
   expect(within(account).getByText("Display name")).toBeVisible();
-  expect(screen.getByRole("region", { name: "Push notifications" })).toBeVisible();
+  expect(screen.queryByRole("region", { name: "Push notifications" })).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Edit account details" }));
   expect(screen.queryByLabelText("Verification code")).not.toBeInTheDocument();
   expect(screen.queryByLabelText("New password")).not.toBeInTheDocument();

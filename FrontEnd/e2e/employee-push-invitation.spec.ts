@@ -97,8 +97,8 @@ test("welcome stays centered, never prompts automatically, and respects Not now 
   expect(lockedBox!.y).toBeGreaterThan(headingBox!.y + headingBox!.height);
   expect(await history.evaluate(element => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
   await history.screenshot({ path: test.info().outputPath("regulation-history-locked-320.png") });
-  await page.getByRole("button", { name: "Włącz powiadomienia", exact: true }).click();
-  await expect(page.getByText("Włączone na tym urządzeniu", { exact: true })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Powiadomienia push" })).toHaveCount(0);
+  expect(await promptCount(page)).toBe(0);
 });
 
 test("granted permission follows A, B and A again across signouts without another prompt", async ({ page }) => {
@@ -107,9 +107,8 @@ test("granted permission follows A, B and A again across signouts without anothe
   expect(calls).toHaveLength(0);
   await dialog.getByRole("button", { name: "Włącz powiadomienia" }).click();
   await expect(dialog).not.toBeVisible();
-  const enabled = page.getByText("Włączone na tym urządzeniu", { exact: true });
-  await expect(enabled).toBeVisible();
-  await expect(page.getByRole("button", { name: "Wyłącz powiadomienia" })).toHaveCount(0);
+  await expect.poll(() => [...recipients.values()]).toEqual([77]);
+  await expect(page.getByRole("region", { name: "Powiadomienia push" })).toHaveCount(0);
   expect(calls).toEqual([{ method: "PUT", employeeId: 77, endpoint: "https://fcm.googleapis.com/test-1" }]);
   expect(await promptCount(page)).toBe(1);
 
@@ -127,7 +126,7 @@ test("granted permission follows A, B and A again across signouts without anothe
     await expect.poll(() => page.evaluate(() => Number(localStorage.getItem("gf3.push.employeeId")))).toBe(employeeId);
     const profile = page.getByRole("link", { name: "Profil", exact: true });
     if (!new URL(page.url()).pathname.endsWith("/profile")) await profile.click();
-    await expect(enabled).toBeVisible();
+    await expect(page.getByRole("region", { name: "Historia regulaminów" })).toBeVisible();
     await expect(dialog).not.toBeVisible();
     expect(await promptCount(page)).toBe(1);
   };
@@ -141,7 +140,9 @@ test("granted permission follows A, B and A again across signouts without anothe
   ];
   expect(calls.map(({ method, employeeId, endpoint }) => [method, employeeId, endpoint.split("/").at(-1)])).toEqual(expectedOperations);
   await page.reload();
-  await expect(enabled).toBeVisible();
+  await expect.poll(() => calls.slice(expectedOperations.length)).toEqual([
+    { method: "PUT", employeeId: 77, endpoint: "https://fcm.googleapis.com/test-3" },
+  ]);
   expect(recipients.size).toBe(1);
   expect(await promptCount(page)).toBe(1);
 });
