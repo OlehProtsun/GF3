@@ -481,13 +481,20 @@
   padding-bottom: 18px;
 }
 
-.publicationHeaderTools { position: absolute; z-index: 2; top: 20px; right: 64px; display: inline-flex; align-items: center; }
-.publicationColorControl { position: relative; width: 34px; height: 34px; display: grid; place-items: center; box-sizing: border-box; padding: 0; border: 1px solid rgba(148,163,184,.17); border-radius: 50%; background: rgba(248,250,252,.92); cursor: pointer; transition: background 140ms ease,box-shadow 140ms ease,transform 120ms ease; }
-.publicationColorControl:hover:not(:disabled) { background: #fff; box-shadow: 0 10px 24px rgba(15,23,42,.12); }
-.publicationColorControl:active:not(:disabled) { transform: scale(.98); }
-.publicationColorControl:focus-visible { outline: none; box-shadow: 0 0 0 4px rgba(37,99,235,.18); }
-.publicationColorControl:disabled { opacity: .55; cursor: not-allowed; }
-.publicationColorSwatch { width: 15px; height: 15px; border: 3px solid #fff; border-radius: 50%; box-shadow: 0 0 0 1px rgba(15,23,42,.2); pointer-events: none; }
+.openActivityButton {
+  min-height: 42px;
+  border: 1px solid #dfe6f1;
+  border-radius: 17px;
+  background: #f1f5fc;
+  color: #24478b;
+  font: inherit;
+  font-size: .87rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.openActivityButton:hover { background: #e8effd; }
+.openActivityButton:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
 
 .publicationControl {
   display: grid;
@@ -528,199 +535,6 @@
   box-shadow:
     0 10px 22px rgba(15, 23, 42, 0.08),
     0 0 0 1px rgba(37, 99, 235, 0.12) inset;
-}
-
-.publicationLog {
-  display: grid;
-  gap: 10px;
-  padding: 12px;
-  border-radius: 20px;
-  border: 1px solid rgba(148, 163, 184, 0.14);
-  background: rgba(248, 250, 252, 0.76);
-}
-
-.publicationLogHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.publicationLogHeader span {
-  color: #0f172a;
-  font-size: 0.84rem;
-  font-weight: 900;
-}
-
-.publicationLogHeader strong {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 28px;
-  min-height: 24px;
-  padding: 0 8px;
-  border-radius: 999px;
-  background: rgba(226, 232, 240, 0.82);
-  color: #334155;
-  font-size: 0.76rem;
-  font-weight: 900;
-}
-
-.publicationLogState {
-  margin: 0;
-  padding: 10px 8px 4px;
-  color: rgba(71, 85, 105, 0.78);
-  font-size: 0.8rem;
-  font-weight: 750;
-}
-
-.publicationLogSearch {
-  min-width: 0;
-  min-height: 40px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 11px;
-  box-sizing: border-box;
-  border: 1px solid rgba(148, 163, 184, 0.2);
-  border-radius: 13px;
-  background: rgba(255, 255, 255, 0.9);
-  color: #64748b;
-}
-
-.publicationLogSearch:focus-within {
-  border-color: rgba(37, 99, 235, 0.38);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
-  color: #2563eb;
-}
-
-.publicationLogSearch input {
-  width: 100%;
-  min-width: 0;
-  border: 0;
-  outline: 0;
-  background: transparent;
-  color: #0f172a;
-  font: inherit;
-  font-size: 0.8rem;
-  font-weight: 700;
-}
-
-.publicationLogSearch input::placeholder {
-  color: rgba(100, 116, 139, 0.76);
-}
-
-.publicationLogList {
-  display: grid;
-  gap: 8px;
-  max-height: 888px;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  padding-right: 2px;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(148, 163, 184, 0.52) transparent;
-}
-
-.publicationLogList::-webkit-scrollbar {
-  width: 8px;
-}
-
-.publicationLogList::-webkit-scrollbar-thumb {
-  border-radius: 999px;
-  border: 2px solid transparent;
-  background: #cbd5e1;
-  background-clip: content-box;
-}
-
-.publicationLogItem {
-  display: grid;
-  gap: 7px;
-  min-height: 104px;
-  padding: 10px;
-  box-sizing: border-box;
-  border-radius: 16px;
-  border: 1px solid rgba(148, 163, 184, 0.14);
-  background: rgba(255, 255, 255, 0.84);
-}
-
-.publicationLogItemHeader {
-  min-width: 0;
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.publicationLogItemMain {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 5px;
-  color: #0f172a;
-  font-size: 0.82rem;
-  font-weight: 800;
-  line-height: 1.25;
-}
-
-.publicationLogViewButton {
-  width: 34px;
-  height: 34px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 auto;
-  border: 1px solid rgba(96, 165, 250, 0.22);
-  border-radius: 50%;
-  background: rgba(239, 246, 255, 0.9);
-  color: #2563eb;
-  cursor: pointer;
-  transition:
-    background-color 140ms ease,
-    border-color 140ms ease,
-    transform 140ms ease;
-}
-
-.publicationLogViewButton:hover {
-  border-color: rgba(37, 99, 235, 0.36);
-  background: #dbeafe;
-  transform: translateY(-1px);
-}
-
-.publicationLogViewButton:focus-visible {
-  outline: 3px solid rgba(37, 99, 235, 0.14);
-}
-
-.publicationLogItemMain strong {
-  min-width: 0;
-  max-width: 100%;
-  overflow-wrap: anywhere;
-}
-
-.publicationLogItemMain span,
-.publicationLogDetail span {
-  color: rgba(71, 85, 105, 0.78);
-  font-size: 0.74rem;
-  font-weight: 750;
-}
-
-.publicationLogDetails {
-  display: grid;
-  gap: 5px;
-}
-
-.publicationLogDetail {
-  min-width: 0;
-  display: grid;
-  gap: 2px;
-  line-height: 1.25;
-}
-
-.publicationLogDetail strong {
-  min-width: 0;
-  color: #0f172a;
-  font-size: 0.78rem;
-  font-weight: 850;
-  overflow-wrap: anywhere;
 }
 
 .generateButton {

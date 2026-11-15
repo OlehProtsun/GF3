@@ -1095,7 +1095,7 @@ public sealed class ShiftSwapControllerWorkflowTests
     {
         await using var database = await SqliteTestDatabase.CreateAsync();
         await using var context = database.CreateContext();
-        var fixture = await SeedPublishedScheduleAsync(context, note: "Planner note\n\n<!--GF3_GRAPH_META:{\"m\":[[2,\"Open counter\",{\"5\":\"09:00 - 13:30\"}]]}-->");
+        var fixture = await SeedPublishedScheduleAsync(context, note: "Planner note\n\n<!--GF3_GRAPH_META:{\"m\":[[2,\"Open counter\",{\"5\":\"09:00 - 13:30\",\"6\":\"09:00 - 13:30\"}]]}-->");
         var controller = new ShiftSwapLogsController(
             context,
             new NoopWorkflowLogService(),
@@ -1137,6 +1137,141 @@ public sealed class ShiftSwapControllerWorkflowTests
         Assert.IsType<NoContentResult>(cancelResult);
         Assert.False(await context.ShiftSwapRequests.AnyAsync());
         Assert.DoesNotContain(await context.ScheduleSlots.ToListAsync(), slot => slot.Id == createdDto.ScheduleSlotId);
+        await Assert.ThrowsAsync<KeyNotFoundException>(() => controller.RefreshManualOffer(
+            fixture.ContainerId, fixture.ScheduleId, createdDto.Id,
+            new RefreshManualShiftOfferRequest { ExpectedPublishedAtUtc = createdDto.CreatedAtUtc }, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task ShiftSwapLogsController_RefreshesOpenManualOfferOnceAndPreservesItsIdentity()
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        await using var context = database.CreateContext();
+        var fixture = await SeedPublishedScheduleAsync(context, note: "Planner note\n\n<!--GF3_GRAPH_META:{\"m\":[[2,\"Open counter\",{\"5\":\"09:00 - 13:30\",\"6\":\"09:00 - 13:30\"}]]}-->");
+        var schedule = await context.Schedules.SingleAsync(x => x.Id == fixture.ScheduleId);
+        var futureMonth = DateTimeOffset.UtcNow.AddMonths(1);
+        schedule.Year = futureMonth.Year;
+        schedule.Month = futureMonth.Month;
+        await context.SaveChangesAsync();
+        var controller = new ShiftSwapLogsController(context, new NoopWorkflowLogService(), new NoopRealtimeNotifier(),
+            timeProvider: new RefreshTestClock(DateTimeOffset.UtcNow.AddMinutes(1)));
+        SetManagerUser(controller, managerId: 3);
+        var createResult = await controller.CreateManualOffer(fixture.ContainerId, fixture.ScheduleId,
+            new CreateManagerShiftSwapRequest { ManualColumnId = 2, DayOfMonth = 5, FromTime = "09:00", ToTime = "13:30", AllowPartialAcceptance = true },
+            CancellationToken.None);
+        var created = Assert.IsType<ShiftSwapDto>(Assert.IsType<CreatedAtActionResult>(createResult.Result).Value);
+        var expected = created.CreatedAtUtc;
+        var secondCreateResult = await controller.CreateManualOffer(fixture.ContainerId, fixture.ScheduleId,
+            new CreateManagerShiftSwapRequest { ManualColumnId = 2, DayOfMonth = 6, FromTime = "09:00", ToTime = "13:30" },
+            CancellationToken.None);
+        var secondCreated = Assert.IsType<ShiftSwapDto>(Assert.IsType<CreatedAtActionResult>(secondCreateResult.Result).Value);
+
+        Assert.IsType<NoContentResult>(await controller.RefreshManualOffer(fixture.ContainerId, fixture.ScheduleId, created.Id,
+            new RefreshManualShiftOfferRequest { ExpectedPublishedAtUtc = expected }, CancellationToken.None));
+        var refreshed = await context.ShiftSwapRequests.SingleAsync(x => x.Id == created.Id);
+        Assert.Equal(created.Id, refreshed.Id);
+        Assert.NotNull(refreshed.RefreshedAtUtc);
+        Assert.True(refreshed.AllowPartialAcceptance);
+        var refreshedAt = refreshed.RefreshedAtUtc;
+
+        Assert.IsType<NoContentResult>(await controller.RefreshManualOffer(fixture.ContainerId, fixture.ScheduleId, created.Id,
+            new RefreshManualShiftOfferRequest { ExpectedPublishedAtUtc = expected }, CancellationToken.None));
+        Assert.Equal(refreshedAt, (await context.ShiftSwapRequests.SingleAsync(x => x.Id == created.Id)).RefreshedAtUtc);
+        var visibleOffersResult = await ShiftSwapScenarioFactory.EmployeeController(context, fixture.TargetEmployeeId)
+            .GetVisible(CancellationToken.None);
+        var employeeOffers = Assert.IsAssignableFrom<IEnumerable<ShiftSwapDto>>(
+            Assert.IsType<OkObjectResult>(visibleOffersResult.Result).Value);
+        Assert.Equal(created.Id, employeeOffers.First().Id);
+        Assert.Contains(employeeOffers, item => item.Id == secondCreated.Id);
+
+        var scheduleAfterRefresh = await context.Schedules.SingleAsync(x => x.Id == fixture.ScheduleId);
+        scheduleAfterRefresh.AllowSwap = false;
+        await context.SaveChangesAsync();
+        var disabledLogResult = await controller.GetGraphLog(fixture.ContainerId, fixture.ScheduleId, CancellationToken.None);
+        var log = Assert.IsAssignableFrom<IEnumerable<ShiftSwapDto>>(Assert.IsType<OkObjectResult>(disabledLogResult.Result).Value);
+        Assert.Equal("unavailable", Assert.Single(log, item => item.Id == created.Id).ManualOfferRefreshStatus);
+        await Assert.ThrowsAsync<ValidationException>(() => controller.RefreshManualOffer(fixture.ContainerId, fixture.ScheduleId, created.Id,
+            new RefreshManualShiftOfferRequest { ExpectedPublishedAtUtc = refreshedAt }, CancellationToken.None));
+
+        scheduleAfterRefresh.AllowSwap = true;
+        var accepted = await context.ShiftSwapRequests.SingleAsync(x => x.Id == created.Id);
+        accepted.Status = ShiftSwapStatus.Accepted;
+        accepted.AcceptedAtUtc = DateTimeOffset.UtcNow;
+        accepted.AcceptedByEmployeeId = fixture.TargetEmployeeId;
+        await context.SaveChangesAsync();
+        await Assert.ThrowsAsync<ValidationException>(() => controller.RefreshManualOffer(fixture.ContainerId, fixture.ScheduleId, created.Id,
+            new RefreshManualShiftOfferRequest { ExpectedPublishedAtUtc = refreshedAt }, CancellationToken.None));
+    }
+
+    private sealed class RefreshTestClock(DateTimeOffset now) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => now;
+    }
+
+    [Fact]
+    public async Task FinishedManagerOfferIsNotRefreshableOrAcceptableAndIsReportedInHistory()
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        await using var context = database.CreateContext();
+        var warsawNow = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, TimeZoneInfo.FindSystemTimeZoneById("Europe/Warsaw"));
+        var yesterday = warsawNow.Date.AddDays(-1);
+        var note = "Planner note\n\n<!--GF3_GRAPH_META:{\"m\":[[2,\"Open counter\",{\"" + yesterday.Day + "\":\"09:00 - 13:30\"}]]}-->";
+        var fixture = await SeedPublishedScheduleAsync(context, note);
+        var schedule = await context.Schedules.SingleAsync(x => x.Id == fixture.ScheduleId);
+        schedule.Year = yesterday.Year;
+        schedule.Month = yesterday.Month;
+        await context.SaveChangesAsync();
+        var controller = new ShiftSwapLogsController(context, new NoopWorkflowLogService(), new NoopRealtimeNotifier(),
+            timeProvider: new RefreshTestClock(DateTimeOffset.UtcNow));
+        SetManagerUser(controller, managerId: 3);
+        var createResult = await controller.CreateManualOffer(fixture.ContainerId, fixture.ScheduleId,
+            new CreateManagerShiftSwapRequest { ManualColumnId = 2, DayOfMonth = yesterday.Day, FromTime = "09:00", ToTime = "13:30" },
+            CancellationToken.None);
+        var created = Assert.IsType<ShiftSwapDto>(Assert.IsType<CreatedAtActionResult>(createResult.Result).Value);
+
+        var graphLogResult = await controller.GetGraphLog(fixture.ContainerId, fixture.ScheduleId, CancellationToken.None);
+        var log = Assert.IsType<List<ShiftSwapDto>>(Assert.IsType<OkObjectResult>(graphLogResult.Result).Value);
+        var loggedOffer = Assert.Single(log, item => item.Id == created.Id);
+        Assert.Equal("finished", loggedOffer.ManualOfferRefreshStatus);
+        Assert.True(loggedOffer.IsFinished);
+
+        var unavailable = await Assert.ThrowsAsync<ValidationException>(() => controller.RefreshManualOffer(
+            fixture.ContainerId, fixture.ScheduleId, created.Id,
+            new RefreshManualShiftOfferRequest { ExpectedPublishedAtUtc = created.CreatedAtUtc }, CancellationToken.None));
+        Assert.Contains("finished", unavailable.Message, StringComparison.OrdinalIgnoreCase);
+
+        var employee = ShiftSwapScenarioFactory.EmployeeController(context, fixture.TargetEmployeeId);
+        var employeeOffers = Assert.IsAssignableFrom<IEnumerable<ShiftSwapDto>>(
+            Assert.IsType<OkObjectResult>((await employee.GetVisible(CancellationToken.None)).Result).Value);
+        var employeeOffer = Assert.Single(employeeOffers, item => item.Id == created.Id);
+        Assert.True(employeeOffer.IsFinished);
+        Assert.False(employeeOffer.CanAccept);
+    }
+
+    [Fact]
+    public async Task CurrentDayManualOfferCanBeRefreshedBeforeItsEndTime()
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        await using var context = database.CreateContext();
+        var now = DateTimeOffset.UtcNow.AddMinutes(1);
+        var warsawNow = TimeZoneInfo.ConvertTime(now, TimeZoneInfo.FindSystemTimeZoneById("Europe/Warsaw"));
+        Assert.True(warsawNow.Hour < 23 || warsawNow.Minute < 58, "The current-day fixture needs a little time before the end of day.");
+        var day = warsawNow.Day;
+        var note = "Planner note\n\n<!--GF3_GRAPH_META:{\"m\":[[2,\"Open counter\",{\"" + day + "\":\"00:01 - 23:59\"}]]}-->";
+        var fixture = await SeedPublishedScheduleAsync(context, note);
+        var schedule = await context.Schedules.SingleAsync(x => x.Id == fixture.ScheduleId);
+        schedule.Year = warsawNow.Year;
+        schedule.Month = warsawNow.Month;
+        await context.SaveChangesAsync();
+        var controller = new ShiftSwapLogsController(context, new NoopWorkflowLogService(), new NoopRealtimeNotifier(),
+            timeProvider: new RefreshTestClock(now));
+        SetManagerUser(controller, managerId: 3);
+        var createResult = await controller.CreateManualOffer(fixture.ContainerId, fixture.ScheduleId,
+            new CreateManagerShiftSwapRequest { ManualColumnId = 2, DayOfMonth = day, FromTime = "00:01", ToTime = "23:59" },
+            CancellationToken.None);
+        var offer = Assert.IsType<ShiftSwapDto>(Assert.IsType<CreatedAtActionResult>(createResult.Result).Value);
+        Assert.IsType<NoContentResult>(await controller.RefreshManualOffer(fixture.ContainerId, fixture.ScheduleId, offer.Id,
+            new RefreshManualShiftOfferRequest { ExpectedPublishedAtUtc = offer.CreatedAtUtc }, CancellationToken.None));
     }
 
     [Fact]
@@ -1202,6 +1337,11 @@ public sealed class ShiftSwapControllerWorkflowTests
         var fixture = await SeedPublishedScheduleAsync(
             context,
             note: "Planner note\n\n<!--GF3_GRAPH_META:{\"m\":[[2,\"Open counter\",{\"5\":\"09:00 - 13:00\"}]]}-->");
+        var scheduleForFutureOffer = await context.Schedules.SingleAsync(item => item.Id == fixture.ScheduleId);
+        var futureMonth = DateTimeOffset.UtcNow.AddMonths(1);
+        scheduleForFutureOffer.Year = futureMonth.Year;
+        scheduleForFutureOffer.Month = futureMonth.Month;
+        await context.SaveChangesAsync();
         var managerController = new ShiftSwapLogsController(
             context,
             new NoopWorkflowLogService(),
@@ -1254,6 +1394,11 @@ public sealed class ShiftSwapControllerWorkflowTests
             """;
         var note = "Planner note\n\n[[GF3_GRAPH_META:b64:" + Convert.ToBase64String(Encoding.UTF8.GetBytes(metadata)) + "]]";
         var fixture = await SeedPublishedScheduleAsync(context, note: note);
+        var scheduleForFutureOffer = await context.Schedules.SingleAsync(item => item.Id == fixture.ScheduleId);
+        var futureMonth = DateTimeOffset.UtcNow.AddMonths(1);
+        scheduleForFutureOffer.Year = futureMonth.Year;
+        scheduleForFutureOffer.Month = futureMonth.Month;
+        await context.SaveChangesAsync();
         var managerController = new ShiftSwapLogsController(
             context,
             new NoopWorkflowLogService(),

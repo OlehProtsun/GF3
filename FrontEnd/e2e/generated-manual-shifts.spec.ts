@@ -2,6 +2,14 @@ import { expect, test, type Page } from "@playwright/test";
 
 test.use({ actionTimeout: 10_000, launchOptions: process.platform === "win32" ? { ignoreDefaultArgs: ["--disable-accelerated-compositing"] } : {} });
 
+async function openManualActivity(page: Page) {
+  const publication = page.getByRole("button", { name: /^(Expand Publication|Rozwiń Publikacja|Розгорнути Публікація)$/ });
+  await publication.focus({ timeout: 20_000 });
+  await page.keyboard.press("Enter");
+  await page.getByRole("button", { name: /^(Open details|Otwórz szczegóły|Відкрити подробиці)$/ }).click();
+  await page.getByRole("tab", { name: /^(Manual shifts|Zmiany ręczne|Ручні зміни)/ }).click();
+}
+
 test("real backend manual acceptance persists and refreshes both colored cells", async ({ browser }, testInfo) => {
   test.skip(!process.env.GF3_LIVE_URL, "Run through ManualShiftHighlightTests with GF3_RUN_LIVE_BROWSER=1 for an isolated authenticated SQLite backend.");
   test.setTimeout(90_000);
@@ -18,8 +26,7 @@ test("real backend manual acceptance persists and refreshes both colored cells",
     }
     const managerPage = await manager.newPage();
     await managerPage.goto(`${url}/container/${containerId}/graphs/${graphId}/edit`);
-    await managerPage.getByRole("button", { name: "Collapse sidebar", exact: true }).click();
-    await managerPage.getByRole("button", { name: "Expand Manual shifts", exact: true }).click();
+    await openManualActivity(managerPage);
     const swatch = managerPage.getByRole("button", { name: "Accepted manual shift highlight color", exact: true });
     await swatch.click();
     await managerPage.getByRole("textbox", { name: "Accepted manual shift highlight hex color" }).fill("#99F6E4");
@@ -71,8 +78,11 @@ async function fixture(page: Page, language: string, availableShiftCount?: numbe
   if (claimFlow) graph = { ...graph, peoplePerShift: 1, shift1Time: "09:00 - 15:00", shift2Time: "15:00 - 21:00" };
   if (previewRaw) graph.note = `Visible note\n\n[[GF3_GRAPH_META:${JSON.stringify({ m: [[1, "do obstawienia", typeof previewRaw === "string" ? { "1": previewRaw } : previewRaw]], g: [1] })}]]`;
   let actor = 0;
+  let versionCount = 0;
+  let nextOfferId = 1;
   const claims: unknown[] = [];
-  const slots: unknown[] = [];
+  type Slot = { employeeId: number | null; dayOfMonth: number; slotNo: number; fromTime: string; toTime: string };
+  const slots: Array<Slot & { id: number; scheduleId: number; status: number }> = [];
   const offers: Record<string, unknown>[] = [];
   const publications: unknown[] = [];
   const graphWrites: string[] = [];
@@ -99,9 +109,29 @@ async function fixture(page: Page, language: string, availableShiftCount?: numbe
     if (path === "/api/containers/1/graphs/1/slots" && method === "POST") {
       const slot = { ...request.postDataJSON(), id: slots.length + 1, scheduleId: 1 }; slots.push(slot); return json(slot, 201);
     }
+    if (path === "/api/containers/1/graphs/1/slots" && method === "PUT") {
+      const groups = new Map<string, Slot[]>();
+      for (const slot of request.postDataJSON().slots as Slot[]) {
+        const key = `${slot.dayOfMonth}/${slot.fromTime}/${slot.toTime}`;
+        groups.set(key, [...groups.get(key) ?? [], slot]);
+      }
+      slots.length = 0;
+      for (const group of groups.values()) {
+        group.sort((a, b) => a.slotNo - b.slotNo || (a.employeeId ?? Infinity) - (b.employeeId ?? Infinity));
+        group.forEach((slot, index) => slots.push({
+          ...slot, id: slots.length + 1, scheduleId: 1, slotNo: index + 1, status: slot.employeeId ? 1 : 0,
+        }));
+      }
+      return route.fulfill({ status: 204 });
+    }
     if (path === "/api/containers/1/graphs/1/shift-swaps/manual" && method === "POST") {
       const input = request.postDataJSON(); publications.push(input);
-      const offer = { ...input, id: offers.length + 1, scheduleId: 1, isManagerCreated: true, status: "open", visibility: input.targetEmployeeId ? "private" : "public", year: 2026, month: 2 };
+      const id = nextOfferId++;
+      const scheduleSlotId = 1000 + id;
+      slots.push({ id: scheduleSlotId, scheduleId: 1, employeeId: null, status: 0,
+        dayOfMonth: input.dayOfMonth, fromTime: input.fromTime, toTime: input.toTime, slotNo: id });
+      const offer = { ...input, id, scheduleId: 1, scheduleSlotId, isManagerCreated: true, status: "open",
+        visibility: input.targetEmployeeId ? "private" : "public", year: 2026, month: 2 };
       offers.push(offer); return json(offer, 201);
     }
     const employeeDto = (offer: Record<string, unknown>) => {
@@ -134,10 +164,20 @@ async function fixture(page: Page, language: string, availableShiftCount?: numbe
     if (/\/shift-swaps\/\d+\/cancel$/.test(path)) {
       const id = Number(path.split("/").at(-2));
       const index = offers.findIndex(offer => offer.id === id);
-      if (index >= 0) offers.splice(index, 1);
+      if (index >= 0) {
+        const [offer] = offers.splice(index, 1);
+        const slotIndex = slots.findIndex(slot => slot.id === offer.scheduleSlotId);
+        if (slotIndex >= 0) slots.splice(slotIndex, 1);
+      }
       return route.fulfill({ status: 204 });
     }
-    if (path === "/api/containers/1/graphs/1/versions") return json({ versions: [], currentVersionId: null });
+    if (path === "/api/containers/1/graphs/1/versions") {
+      if (method === "POST") versionCount += 1;
+      return json({ currentVersionId: versionCount || null,
+        versions: Array.from({ length: versionCount }, (_, index) => ({
+          id: index + 1, versionNumber: index + 1, scheduleId: 1, createdAtUtc: "2026-02-01T00:00:00Z",
+        })) });
+    }
     if (path === "/api/containers/1/graphs/1") return json(graph);
     if (path === "/api/containers/1/graphs") return json([graph]);
     if (path === "/api/containers/1") return json({ id: 1, name: "Container" });
@@ -169,7 +209,6 @@ test("adjacent More previews replace each other and fit available viewport space
   await page.setViewportSize({ width: 1280, height: 900 });
   for (const path of ["/container/1/graphs/1", "/container/1/graphs/1/edit"]) {
     await page.goto(path);
-    await page.getByRole("button", { name: "Collapse sidebar", exact: true }).click();
     const buttons = page.getByRole("button", { name: "More: Shifts", exact: true });
     const popup = page.getByRole("tooltip");
     await expect(buttons).toHaveCount(4, { timeout: 20_000 });
@@ -253,7 +292,6 @@ test("compact manual demand survives editor, profile and employee phone", async 
   await page.setViewportSize({ width: 1280, height: 900 });
   for (const path of ["/container/1/graphs/1/edit", "/container/1/graphs/1"]) {
     await page.goto(path);
-    await page.getByRole("button", { name: "Collapse sidebar", exact: true }).click();
     const more = page.getByRole("button", { name: "More: Shifts", exact: true });
     await expect(more).toHaveCount(1, { timeout: 20_000 });
     await expect(more).toHaveCSS("color", "rgb(37, 99, 235)");
@@ -332,13 +370,12 @@ test("manual color retains confirmed value when the server rejects saving", asyn
     ? route.fulfill({ status: 409, contentType: "application/problem+json", body: JSON.stringify({ title: "Color conflict", detail: "Color conflict" }) })
     : route.fallback());
   await page.goto("/container/1/graphs/1/edit");
-  await page.getByRole("button", { name: "Collapse sidebar", exact: true }).click();
-  await page.getByRole("button", { name: "Expand Manual shifts", exact: true }).click();
+  await openManualActivity(page);
   const swatch = page.getByRole("button", { name: "Accepted manual shift highlight color", exact: true });
   await swatch.click();
   await page.getByRole("textbox", { name: "Accepted manual shift highlight hex color" }).fill("#AABBCC");
   await page.getByRole("button", { name: "Use color", exact: true }).click();
-  await expect(page.getByRole("main").getByText("Color conflict", { exact: true })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Schedule Activity" }).getByText("Color conflict", { exact: true })).toBeVisible();
   await expect(page.getByRole("dialog", { name: "Choose accepted shift color" })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog", { name: "Choose accepted shift color" })).toHaveCount(0);
@@ -350,13 +387,12 @@ for (const count of [0, 1, 5, 30, 62]) {
     test.setTimeout(60_000);
     await fixture(page, "en", count);
     await page.goto("/container/1/graphs/1/edit");
-    const expand = page.getByRole("button", { name: "Expand Manual shifts", exact: true });
+    const expand = page.getByRole("button", { name: "Expand Publication", exact: true });
     await expect(expand).toBeVisible({ timeout: 20_000 });
-    await page.getByRole("button", { name: "Collapse sidebar", exact: true }).click();
     const labels = await page.locator('button[aria-label^="Expand "]').evaluateAll(buttons => buttons.map(button => button.getAttribute("aria-label")));
-    expect(labels.filter(label => label !== "Expand header")).toEqual(["Expand Schedule Details", "Expand Employees", "Expand Publication", "Expand Manual shifts", "Expand Shift Corrections", "Expand Bind Information"]);
+    expect(labels.filter(label => label !== "Expand header")).toEqual(["Expand Schedule Details", "Expand Employees", "Expand Publication", "Expand Bind Information"]);
     await expect(page.locator("#graph-note")).toHaveCount(0);
-    await expand.click();
+    await openManualActivity(page);
     const card = page.locator("section").filter({ has: page.getByText(/^Manual shifts/) }).last();
     const list = card.getByRole("region", { name: "Available shifts", exact: true });
     await expect(card.getByRole("button", { name: /Show all|Show less|Load more/ })).toHaveCount(0);
@@ -412,12 +448,12 @@ for (const language of ["en", "pl", "uk"]) {
     const generate = page.getByRole("button", { name: generateLabels[language as keyof typeof generateLabels], exact: true });
     const expandDetails = page.getByRole("button", { name: /Expand Schedule Details|Rozwiń Szczegóły grafiku|Розгорнути Дані графіка/, exact: true });
     await expect(expandDetails).toBeVisible({ timeout: 20_000 });
-    await page.getByRole("button", { name: /Collapse sidebar|Zwiń pasek boczny|Згорнути бічну панель/, exact: true }).click();
-    await expandDetails.click();
+    await expandDetails.focus();
+    await page.keyboard.press("Enter");
     await expect(generate).toBeVisible(); await generate.click();
-    await expect(page.getByText("do obstawienia", { exact: true }).first()).toBeVisible();
+    await expect(page.getByRole("columnheader", { name: "do obstawienia", exact: true })).toBeVisible();
     const card = page.locator("section").filter({ has: page.getByText(new RegExp(`^${titles[language as keyof typeof titles]}`)) }).last();
-    await page.getByRole("button", { name: /Expand Manual shifts|Rozwiń Zmiany ręczne|Розгорнути Ручні зміни/, exact: true }).click();
+    await openManualActivity(page);
     await expect(card).toBeVisible();
     const colorLabels = {
       en: { swatch: "Accepted manual shift highlight color", input: "Accepted manual shift highlight hex color", use: "Use color" },
@@ -450,7 +486,14 @@ for (const language of ["en", "pl", "uk"]) {
       await card.getByRole("button", { name: "Publish shift", exact: true }).click();
       await expect(rows).toHaveCount(0);
       await expect(card.getByRole("button", { name: /Offered \(2\)/ })).toHaveAttribute("aria-expanded", "true");
+      const activity = page.getByRole("dialog", { name: "Schedule Activity" });
+      await expect(activity.getByText("Offered", { exact: true }).locator("..")).toHaveText("Offered0");
+      await expect(activity.getByText("Pending", { exact: true }).locator("..")).toHaveText("Pending2");
       expect(fixtureState.publications).toEqual([]);
+      await page.getByRole("dialog", { name: "Schedule Activity" }).getByRole("button", { name: "Close", exact: true }).click();
+      await openManualActivity(page);
+      await expect(card.getByRole("button", { name: /Offered \(2\)/ })).toBeVisible();
+      await page.getByRole("dialog", { name: "Schedule Activity" }).getByRole("button", { name: "Close", exact: true }).click();
       await page.getByRole("button", { name: "Save", exact: true }).first().click();
       await page.getByRole("dialog", { name: "Save schedule", exact: true }).getByRole("button", { name: "Save", exact: true }).click();
       await expect.poll(() => fixtureState.publications.length).toBe(2);
@@ -458,10 +501,9 @@ for (const language of ["en", "pl", "uk"]) {
         { manualColumnId: 1, dayOfMonth: 1, fromTime: "08:00", toTime: "12:00", targetEmployeeId: null, allowPartialAcceptance: false },
         { manualColumnId: 1, dayOfMonth: 1, fromTime: "08:00", toTime: "12:00", targetEmployeeId: 2, allowPartialAcceptance: false },
       ]);
-      await page.waitForURL(/\/container\/1\/graphs\/1$/);
+      await expect(page).toHaveURL(/\/container\/1\/graphs\/1$/, { timeout: 20_000 });
       await page.goto("/container/1/graphs/1/edit");
-      await page.getByRole("button", { name: "Collapse sidebar", exact: true }).click();
-      await page.getByRole("button", { name: "Expand Manual shifts", exact: true }).click({ timeout: 20_000 });
+      await openManualActivity(page);
       await expect(card.getByText("do obstawienia", { exact: true })).toBeVisible();
       await expect(rows).toHaveCount(0);
       await card.getByRole("button", { name: /Offered \(2\)/ }).click();
@@ -478,20 +520,21 @@ for (const flexible of [true, false]) {
     await page.setViewportSize({ width: 1280, height: 900 });
     const state = await fixture(page, "en", undefined, true);
     await page.goto("/container/1/graphs/1/edit");
-    await page.getByRole("button", {name:"Collapse sidebar",exact:true}).click();
-    await page.getByRole("button", {name:"Expand Schedule Details",exact:true}).click();
+    await page.getByRole("button", { name: "Expand Schedule Details", exact: true }).focus({ timeout: 20_000 });
+    await page.keyboard.press("Enter");
     await page.getByRole("button", {name:"Generate",exact:true}).click();
-    await expect(page.getByText("do obstawienia",{exact:true}).first()).toBeVisible();
-    await page.getByRole("button", {name:"Expand Manual shifts",exact:true}).click();
+    await expect(page.getByRole("columnheader", { name: "do obstawienia", exact: true })).toBeVisible();
+    await openManualActivity(page);
     const card=page.locator("section").filter({has:page.getByText(/^Manual shifts/)}).last();
     await card.getByRole("region",{name:"Available shifts",exact:true}).getByRole("button",{name:/09:00–21:00/}).click();
     if(flexible) await card.getByRole("button",{name:"Allow custom time",exact:true}).click();
     await card.getByRole("button",{name:"Publish shift",exact:true}).click();
+    await page.getByRole("dialog", { name: "Schedule Activity" }).getByRole("button", { name: "Close", exact: true }).click();
     await page.getByRole("button",{name:"Save",exact:true}).first().click();
     await page.getByRole("dialog",{name:"Save schedule",exact:true}).getByRole("button",{name:"Save",exact:true}).click();
     await expect.poll(()=>state.publications.length).toBe(1);
     expect(state.publications[0]).toEqual({manualColumnId:1,dayOfMonth:1,fromTime:"09:00",toTime:"21:00",targetEmployeeId:null,allowPartialAcceptance:flexible});
-    await page.waitForURL(/\/container\/1\/graphs\/1$/);
+    await expect(page).toHaveURL(/\/container\/1\/graphs\/1$/, { timeout: 20_000 });
     if (employeeViewport) await page.setViewportSize(employeeViewport);
     state.useEmployee(2); await page.goto("/swap");
     await page.getByRole("button",{name:"View offer details for Generated shifts"}).click();

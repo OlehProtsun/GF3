@@ -246,6 +246,7 @@ beforeEach(() => { contract.claim.mockReset(); contract.exception.mockReset(); c
 test("approval-required claim invokes only the pending route, without an instant transfer", async () => {
   mocks.swapsQuery.mockReturnValue({ data: [createSwap({requiresManagerApproval:true,canRequestManagerApproval:true})],error:null });
   renderPage(); const user = userEvent.setup();
+  expect(screen.getByText("Manager approval")).toBeVisible();
   await user.click(screen.getByRole("button",{name:"View offer details for May Schedule"}));
   await user.click(screen.getByRole("button",{name:"Request manager approval"}));
   expect(screen.getByRole("dialog",{name:"Request manager approval?"})).toHaveTextContent("The offer will be reserved until a decision.");
@@ -280,16 +281,44 @@ test("below-minimum preview offers an explicit exception action and blocks publi
 });
 
 
-test("public offers show a contract-specific policy badge and held offers disable other recipients", async () => {
+test("a public hold shows Awaiting approval and disables other recipients", async () => {
   const held = createSwap({ pickupApprovalPolicyApplies: true, isAwaitingManagerApproval: true, canAccept: false, requiresManagerApproval: false });
   mocks.swapsQuery.mockReturnValue({ data: [held], error: null }); renderPage();
-  expect(screen.getByText("Manager approval").closest("[title]")).toHaveAttribute("title", "Manager approval is required when the shift owner or recipient has an employment contract.");
+  expect(screen.queryByText("Manager approval", { exact: true })).toBeNull();
   expect(screen.getByText("Awaiting approval")).toBeInTheDocument();
   await userEvent.setup().click(screen.getByRole("button", { name: "View offer details for May Schedule" }));
   expect(screen.getByRole("button", { name: "Awaiting manager approval" })).toBeDisabled();
   expect(screen.getByRole("status")).toHaveTextContent("This offer is awaiting manager approval.");
   expect(screen.getByText("This offer is unavailable to others while manager approval is pending.")).toBeInTheDocument();
   expect(mocks.acceptMutate).not.toHaveBeenCalled();
+});
+
+test.each([
+  ["zlecenie", true],
+  ["o_prace", false],
+] as const)("a %s viewer with policy flag %s accepts directly when approval is unnecessary", async (profile, policy) => {
+  contract.profileContract = profile;
+  mocks.swapsQuery.mockReturnValue({
+    data: [createSwap({ pickupApprovalPolicyApplies: policy, requiresManagerApproval: false })], error: null,
+  });
+  renderPage();
+  const user = userEvent.setup();
+  expect(screen.queryByText("Manager approval", { exact: true })).toBeNull();
+  await user.click(screen.getByRole("button", { name: "View offer details for May Schedule" }));
+  await user.click(screen.getByRole("button", { name: "Accept shift" }));
+  const confirmation = screen.getByRole("dialog", { name: "Accept this shift?" });
+  await user.click(within(confirmation).getByRole("button", { name: "Accept shift" }));
+  expect(mocks.acceptMutate).toHaveBeenCalledWith({ id: 5 }, expect.anything());
+  expect(contract.claim).not.toHaveBeenCalled();
+});
+
+test("a viewer-specific reservation displays Awaiting approval instead of Manager approval", () => {
+  mocks.swapsQuery.mockReturnValue({
+    data: [createSwap({ requiresManagerApproval: true, approvalPendingForCurrentEmployee: true, canAccept: false })], error: null,
+  });
+  renderPage();
+  expect(screen.getByText("Awaiting approval", { exact: true })).toBeVisible();
+  expect(screen.queryByText("Manager approval", { exact: true })).toBeNull();
 });
 
 test("a live reservation arriving during confirmation prevents the stale acceptance", async () => {
@@ -353,6 +382,7 @@ test("an owner's contract approval flag routes a zlecenie recipient through clai
   contract.profileContract = "zlecenie";
   mocks.swapsQuery.mockReturnValue({ data: [createSwap({ requiresManagerApproval: true, canRequestManagerApproval: true, pickupApprovalPolicyApplies: true })], error: null });
   renderPage(); const user = userEvent.setup();
+  expect(screen.getByText("Manager approval")).toBeVisible();
   await user.click(screen.getByRole("button", { name: "View offer details for May Schedule" }));
   expect(screen.queryByRole("button", { name: "Accept shift" })).toBeNull();
   await user.click(screen.getByRole("button", { name: "Request manager approval" }));

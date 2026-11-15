@@ -2255,6 +2255,10 @@ namespace DataAccessLayer.Migrations
                         .HasColumnType("TEXT")
                         .HasColumnName("offered_to_time");
 
+                    b.Property<long?>("RefreshedAtUtc")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("refreshed_at_utc");
+
                     b.Property<string>("RequestKind")
                         .IsRequired()
                         .ValueGeneratedOnAdd()

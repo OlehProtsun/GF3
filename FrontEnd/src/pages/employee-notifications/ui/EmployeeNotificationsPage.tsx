@@ -163,14 +163,14 @@ export function EmployeeNotificationsPage() {
                   <button type="button" role="tab" aria-selected={activeTab === "inbox"} className={activeTab === "inbox" ? styles.inboxTabActive : ""} onClick={() => setActiveTab("inbox")}>{t("Inbox")}{unreadCount > 0 ? <span>{unreadCount}</span> : null}</button>
                   <button type="button" role="tab" aria-selected={activeTab === "news"} className={activeTab === "news" ? styles.inboxTabActive : ""} onClick={() => setActiveTab("news")}>{t("News")}{newsUnreadCount > 0 ? <span>{newsUnreadCount}</span> : null}</button>
                 </div>
-                <span className={`${styles.countBadge} ${activeUnreadCount > 0 ? styles.countBadgeUnread : ""}`} role="status" aria-label={badgeLabel} title={badgeLabel}>
-                  {badgeCount > 99 ? "99+" : badgeCount}
-                </span>
               </div>
             </div>
           </div>
 
           <div className={styles.inboxHeaderActions}>
+            <span className={`${styles.countBadge} ${activeUnreadCount > 0 ? styles.countBadgeUnread : ""}`} role="status" aria-label={badgeLabel} title={badgeLabel}>
+              {badgeCount > 99 ? "99+" : badgeCount}
+            </span>
             {activeUnreadCount > 0 ? (
               <button type="button" className={styles.actionButton} onClick={activeTab === "inbox" ? handleMarkAllRead : () => markAllNewsRead.mutate(undefined)}>
                 {t("Mark all read")}</button>

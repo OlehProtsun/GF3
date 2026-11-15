@@ -183,14 +183,15 @@ export function buildOpenShiftLiveNotification(
 }
 
 export function buildOpenShiftSnapshotNotification(swap: ShiftSwap): EmployeeNotificationItem {
+  const id = getEmployeeOpenShiftNotificationId(swap.id, swap.refreshedAtUtc);
   return {
-    id: getEmployeeOpenShiftNotificationId(swap.id),
-    readIds: getOpenShiftSwapReadIds(swap),
+    id,
+    readIds: swap.refreshedAtUtc ? [id] : getOpenShiftSwapReadIds(swap),
     title: t("Open shift posted"),
     body: t("Open shift for {0}: {1} {2} - {3}.", swap.scheduleName, formatSwapDay(swap), swap.fromTime, swap.toTime),
     meta: `${swap.shopName || t("Shop")} / ${swap.containerName || t("Container")}`,
     tone: "swap",
-    occurredAtUtc: swap.createdAtUtc,
+    occurredAtUtc: swap.refreshedAtUtc ?? swap.createdAtUtc,
     actionPath: `/swap?swapId=${swap.id}`,
     actionLabel: t("Open swap"),
   };
@@ -292,6 +293,7 @@ function buildSwapAvailableNotification(
 ): EmployeeNotificationItem {
   if (swap.isManagerCreated) {
     const item = buildOpenShiftSnapshotNotification(swap);
+    if (swap.refreshedAtUtc) return item;
     return {
       ...item,
       readIds: uniqueIds([...item.readIds, event?.id]),
@@ -347,7 +349,8 @@ export function buildEmployeeNotificationItems(
     }
 
     const current = latestOpenSwapByScheduleId.get(swap.scheduleId);
-    if (!current || getNotificationSortValue({ occurredAtUtc: swap.createdAtUtc }) > getNotificationSortValue({ occurredAtUtc: current.createdAtUtc })) {
+    if (!current || getNotificationSortValue({ occurredAtUtc: swap.refreshedAtUtc ?? swap.createdAtUtc }) >
+      getNotificationSortValue({ occurredAtUtc: current.refreshedAtUtc ?? current.createdAtUtc })) {
       latestOpenSwapByScheduleId.set(swap.scheduleId, swap);
     }
   });
@@ -369,7 +372,8 @@ export function buildEmployeeNotificationItems(
     if (
       swap.status === "open" &&
       !swap.isCreatedByCurrentEmployee &&
-      isWithinEmployeeNotificationRetention(swap.createdAtUtc, nowMs)
+      (!swap.refreshedAtUtc || !swap.isAwaitingManagerApproval) &&
+      isWithinEmployeeNotificationRetention(swap.refreshedAtUtc ?? swap.createdAtUtc, nowMs)
     ) {
       items.push(buildSwapAvailableNotification(
         swap,

@@ -1,9 +1,8 @@
 import { usePublicHolidayVisibility } from "@app/providers/PublicHolidayVisibilityProvider";
-import { dateTimeFormat, t } from "@shared/i18n";
+import { t } from "@shared/i18n";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AvailabilitySidebarCollapseButton, AvailabilitySidebarSection } from "@entities/availability-groups/ui/AvailabilitySidebarSection";
 import {
-  filterShiftSwaps,
   useCancelContainerShiftSwapMutation,
   useContainerShiftSwapsQuery,
   useDeleteContainerShiftSwapMutation,
@@ -15,7 +14,7 @@ import { ConfirmDialog } from "@shared/ui/ConfirmDialog";
 import { ErrorBanner } from "@shared/ui/components/ErrorBanner";
 import { IosButton } from "@shared/ui/components/IosButton";
 import { RecordGrid } from "@shared/ui/components/RecordGrid";
-import { EyeIcon, SearchIcon, ContainerInfoIcon, InformationIcon, PlusIcon, ScheduleIcon, SwapOffersIcon } from "@shared/ui/icons";
+import { SearchIcon, ContainerInfoIcon, InformationIcon, PlusIcon, ScheduleIcon, SwapOffersIcon } from "@shared/ui/icons";
 import { ScheduleSummaryTile } from "./ScheduleSummaryTile";
 import { CardSection } from "@shared/ui/sections/CardSection";
 import type { Container } from "@entities/containers/model/types";
@@ -27,6 +26,7 @@ import {
 } from "@entities/containers/model/presentation";
 import type { ContainerGraphSummary, ContainerStatistics } from "@entities/containers/model/statistics";
 import { ShiftSwapHistoryDialog } from "./ShiftSwapHistoryDialog";
+import { ContainerSwapsDialog } from "./ContainerSwapsDialog";
 import styles from "./ContainerProfileWorkspace.module.css";
 type ContainerProfileWorkspaceProps = {
   container?: Container | null;
@@ -63,23 +63,6 @@ function matchesEmployeeSearch(employeeName: string, searchQuery: string) {
   const searchTerms = searchQuery.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
 
   return searchTerms.every(term => normalizedEmployeeName.includes(term));
-}
-
-function formatSwapDate(swap: ShiftSwap) {
-  return dateTimeFormat("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    timeZone: "UTC",
-  }).format(new Date(Date.UTC(swap.year, swap.month - 1, swap.dayOfMonth)));
-}
-
-function getSwapReceiver(swap: ShiftSwap) {
-  if (swap.status === "accepted") {
-    return swap.acceptedByEmployeeName ?? t("Employee");
-  }
-
-  return swap.targetEmployeeName ?? t("Everyone");
 }
 
 type SwapAction = { type: "cancel" | "delete"; swap: ShiftSwap } | null;
@@ -141,7 +124,7 @@ export function ContainerProfileWorkspace({
   });
   const [scheduleCardHeight, setScheduleCardHeight] = useState<number | null>(null);
   const [statisticsSearchQuery, setStatisticsSearchQuery] = useState("");
-  const [swapSearchQuery, setSwapSearchQuery] = useState("");
+  const [isSwapsDialogOpen, setIsSwapsDialogOpen] = useState(false);
   const [selectedSwap, setSelectedSwap] = useState<ShiftSwap | null>(null);
   const [swapAction, setSwapAction] = useState<SwapAction>(null);
   const [swapActionError, setSwapActionError] = useState<string | null>(null);
@@ -155,11 +138,6 @@ export function ContainerProfileWorkspace({
   const deleteSwapMutation = useDeleteContainerShiftSwapMutation();
   const updateGraphsPublicationMutation = useUpdateGraphsPublicationMutation();
   const swaps = useMemo(() => swapsQuery.data ?? [], [swapsQuery.data]);
-  const filteredSwaps = useMemo(
-    () => filterShiftSwaps(swaps, swapSearchQuery),
-    [swapSearchQuery, swaps],
-  );
-  const hasSwapSearch = swapSearchQuery.trim().length > 0;
   const isSwapActionPending = cancelSwapMutation.isPending || deleteSwapMutation.isPending;
 
   useEffect(() => {
@@ -211,7 +189,7 @@ export function ContainerProfileWorkspace({
     return () => {
       observer.disconnect();
     };
-  }, [collapsedSections.information, collapsedSections.swaps, filteredSwaps.length, isDesktopLayout, totalGraphsCount, graphs.length, statistics.totalHoursText]);
+  }, [collapsedSections.information, collapsedSections.swaps, swaps.length, isDesktopLayout, totalGraphsCount, graphs.length, statistics.totalHoursText]);
 
   const handleSwapActionConfirm = () => {
     if (!container || !swapAction) {
@@ -374,7 +352,7 @@ export function ContainerProfileWorkspace({
               icon={<SwapOffersIcon size={18} />}
               headerRightSlot={
                 <div className={styles.swapHeaderActions}>
-                  <span className={styles.headerBadge}>{hasSwapSearch ? `${filteredSwaps.length}/${swaps.length}` : swaps.length}</span>
+                  <span className={styles.headerBadge}>{swaps.length}</span>
                   <AvailabilitySidebarCollapseButton
                     label={t("Swaps")}
                     onCollapse={() => setCollapsedSections(current => ({ ...current, swaps: true }))}
@@ -383,69 +361,10 @@ export function ContainerProfileWorkspace({
               }
             >
               <div className={styles.swapsContent}>
-                <div className={styles.swapMonthLabel}>
-                  {t("All schedules in this container")}</div>
-
-                <label className={joinClassNames(styles.searchField, styles.swapSearchField)} htmlFor="container-swaps-search">
-                  <SearchIcon className={styles.searchIcon} />
-                  <input
-                    id="container-swaps-search"
-                    className={styles.searchInput}
-                    type="search"
-                    value={swapSearchQuery}
-                    onChange={event => setSwapSearchQuery(event.target.value)}
-                    placeholder={t("Employee, date or schedule")}
-                    aria-label={t("Search swaps by giver, receiver, date or schedule")}
-                  />
-                </label>
-
-                {swapActionError ? <ErrorBanner className={styles.swapError}>{swapActionError}</ErrorBanner> : null}
-                {swapsQuery.isLoading ? <div className={styles.swapState}>{t("Loading swaps...")}</div> : null}
-                {swapsQuery.isError ? <div className={styles.swapState}>{t("Could not load swaps for this container.")}</div> : null}
-                {!swapsQuery.isLoading && !swapsQuery.isError && swaps.length === 0 ? (
-                  <div className={styles.swapState}>{t("No swaps in this container.")}</div>
-                ) : null}
-                {!swapsQuery.isLoading && swaps.length > 0 && filteredSwaps.length === 0 ? (
-                  <div className={styles.swapState}>{t("No swaps match \"{0}\".", swapSearchQuery.trim())}</div>
-                ) : null}
-
-                {filteredSwaps.length > 0 ? (
-                  <div className={styles.swapList}>
-                    {filteredSwaps.map(swap => (
-                      <article key={`${swap.status}-${swap.id}`} className={styles.swapItem}>
-                        <div className={styles.swapItemHeader}>
-                          <div className={styles.swapPeople}>
-                            <strong>{swap.fromEmployeeName}</strong>
-                            <span>{t("to")}</span>
-                            <strong>{getSwapReceiver(swap)}</strong>
-                          </div>
-                          <span className={joinClassNames(styles.swapStatus, styles[`swapStatus${swap.status}`])}>{swap.status}</span>
-                        </div>
-                        <div className={styles.swapMeta}>
-                          <strong>{swap.scheduleName}</strong>
-                          <span>{`${formatSwapDate(swap)} | ${swap.fromTime.slice(0, 5)}-${swap.toTime.slice(0, 5)}`}</span>
-                        </div>
-                        <div className={styles.swapActions}>
-                          <button type="button" onClick={() => setSelectedSwap(swap)} aria-label={t("View {0} swap", swap.scheduleName)}>
-                            <EyeIcon size={16} />
-                            <span>{t("View")}</span>
-                          </button>
-                          {swap.status === "open" ? (
-                            <button type="button" disabled={isSwapActionPending} onClick={() => setSwapAction({ type: "cancel", swap })}>
-                              {t("Cancel")}</button>
-                          ) : null}
-                          <button
-                            type="button"
-                            className={styles.swapDeleteButton}
-                            disabled={isSwapActionPending}
-                            onClick={() => setSwapAction({ type: "delete", swap })}
-                          >
-                            {t("Delete")}</button>
-                        </div>
-                      </article>
-                    ))}
-                  </div>
-                ) : null}
+                <div className={styles.swapMonthLabel}>{t("All schedules in this container")}</div>
+                <button type="button" className={styles.showSwapsButton} onClick={() => setIsSwapsDialogOpen(true)}>
+                  {t("Show more")}
+                </button>
               </div>
             </CardSection>
           </AvailabilitySidebarSection>
@@ -706,6 +625,19 @@ export function ContainerProfileWorkspace({
       />
 
       <ShiftSwapHistoryDialog open={selectedSwap !== null} swap={selectedSwap} onCancel={() => setSelectedSwap(null)} />
+      <ContainerSwapsDialog
+        open={isSwapsDialogOpen}
+        swaps={swaps}
+        isLoading={swapsQuery.isLoading}
+        isError={swapsQuery.isError}
+        actionError={swapActionError}
+        isActionPending={isSwapActionPending}
+        onRetry={() => { void swapsQuery.refetchWithSignal(new AbortController().signal); }}
+        onClose={() => setIsSwapsDialogOpen(false)}
+        onView={setSelectedSwap}
+        onCancel={swap => setSwapAction({ type: "cancel", swap })}
+        onDelete={swap => setSwapAction({ type: "delete", swap })}
+      />
       <ConfirmDialog
         open={swapAction !== null}
         title={swapAction?.type === "cancel" ? t("Cancel swap") : t("Delete swap")}

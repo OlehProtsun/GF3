@@ -29,6 +29,11 @@ export const shiftSwapsApi = {
     request<void>(`${containerEndpoint}/${containerId}/graphs/${graphId}/shift-swaps/${id}/cancel`, {
       method: "POST",
     }),
+  refreshManagerManual: (containerId: number, graphId: number, id: number, expectedPublishedAtUtc: string) =>
+    request<void>(`${containerEndpoint}/${containerId}/graphs/${graphId}/shift-swaps/${id}/refresh`, {
+      method: "POST",
+      body: { expectedPublishedAtUtc },
+    }),
   listGraphLog: (containerId: number, graphId: number, signal?: AbortSignal) =>
     request<ShiftSwap[]>(`${containerEndpoint}/${containerId}/graphs/${graphId}/shift-swaps`, { signal }),
   getHighlightSetting: (containerId: number, graphId: number, signal?: AbortSignal) =>

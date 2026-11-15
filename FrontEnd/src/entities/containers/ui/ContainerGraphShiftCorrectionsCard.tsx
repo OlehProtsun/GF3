@@ -1,5 +1,5 @@
 import { dateTimeFormat, t } from "@shared/i18n";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { containersApi } from "@entities/containers/api/containersApi";
 import {
   useApproveShiftCorrectionMutation,
@@ -12,7 +12,9 @@ import {
 import { getErrorMessage } from "@shared/api/httpClient";
 import { ErrorBanner } from "@shared/ui/components/ErrorBanner";
 import { IosButton } from "@shared/ui/components/IosButton";
-import { ArrowRightIcon, CheckIcon, ChevronRightIcon, ClockIcon, CloseIcon, GroupIcon, LockIcon, ScheduleIcon, StatisticsIcon } from "@shared/ui/icons";
+import { ArrowRightIcon, CheckIcon, ChevronRightIcon, ClockIcon, CloseIcon, GroupIcon, LockIcon, ScheduleDetailsIcon, ScheduleIcon, StatisticsIcon } from "@shared/ui/icons";
+import { CardSection } from "@shared/ui/sections/CardSection";
+import activity from "./ContainerGraphActivity.module.css";
 import { ContainerGraphHighlightColorDialog } from "./ContainerGraphHighlightColorDialog";
 import styles from "./ContainerGraphShiftCorrectionsCard.module.css";
 
@@ -22,6 +24,7 @@ type ContainerGraphShiftCorrectionsCardProps = {
   hasUnsavedChanges: boolean;
   disabled: boolean;
   onApproved: () => void;
+  children?: ReactNode;
   onPendingCountChange?: (count: number) => void;
 };
 
@@ -66,6 +69,7 @@ export function ContainerGraphShiftCorrectionsCard({
   disabled,
   onApproved,
   onPendingCountChange,
+  children,
 }: ContainerGraphShiftCorrectionsCardProps) {
   const hasPersistedGraph = Number.isInteger(containerId) && containerId !== null && containerId > 0
     && Number.isInteger(graphId) && graphId !== null && graphId > 0;
@@ -175,65 +179,73 @@ export function ContainerGraphShiftCorrectionsCard({
         <>
           {hasUnsavedChanges ? <p className={styles.saveHint}>{t("Save your current schedule edits before approving.")}</p> : null}
           <div className={styles.actions}>
-            <IosButton label={rejectMutation.isPending ? t("Rejecting...") : t("Reject")} variant="secondary" size="compact"
+            <IosButton className={`${activity.action} ${activity.danger}`} label={rejectMutation.isPending ? t("Rejecting...") : t("Reject")} variant="secondary" size="compact"
               icon={<CloseIcon size={15} />} disabled={isBusy} onClick={handleReject} />
-            <IosButton label={approveMutation.isPending ? t("Applying...") : t("Approve")} size="compact"
+            <IosButton className={`${activity.action} ${activity.success}`} label={approveMutation.isPending ? t("Applying...") : t("Approve")} size="compact"
               icon={<CheckIcon size={15} />} disabled={isBusy || hasUnsavedChanges} onClick={handleApprove} />
           </div>
         </>
       ) : (
-        <p className={styles.reviewed}><span className={styles.reviewMark} aria-hidden="true"><CheckIcon size={12} /></span><span>{selected.reviewedByManagerName
+        <p className={`${styles.reviewed} ${selected.status === "approved" ? activity.success : activity.danger}`}><span className={styles.reviewMark} aria-hidden="true">{selected.status === "approved" ? <CheckIcon size={12} /> : <CloseIcon size={12} />}</span><span>{selected.reviewedByManagerName
           ? t("Reviewed by {0}", selected.reviewedByManagerName) : t("Reviewed")}</span></p>
       )}
     </article>
   ) : null;
 
   return (
-    <>
-      <div className={styles.headerTools}>
-        <button type="button" className={styles.colorControl} title={t("Approved correction highlight color")}
+    <CardSection className={activity.card} headerClassName={activity.header}
+      title={<span className={activity.title} role="heading" aria-level={3}>{t("Shift Corrections")} <span className={activity.badge}>{requests.length}</span></span>}
+      icon={<span className={activity.sectionIcon} aria-hidden="true"><ScheduleDetailsIcon size={18} /></span>}
+      headerRightSlot={
+        <button type="button" className={activity.iconButton} title={t("Approved correction highlight color")}
           aria-label={t("Approved correction highlight color")} disabled={!hasPersistedGraph || saveSettingMutation.isPending}
           onClick={() => setIsColorDialogOpen(true)}>
-          <span className={styles.colorSwatch} style={{ backgroundColor: highlightColor }} aria-hidden="true" />
+          <span className={activity.swatch} style={{ backgroundColor: highlightColor }} aria-hidden="true" />
         </button>
-      </div>
+      }>
 
       <ContainerGraphHighlightColorDialog open={isColorDialogOpen} value={highlightColor}
         eyebrow={t("Shift corrections")} title={t("Choose approval color")} inputLabel={t("Approval highlight hex color")}
         isSaving={saveSettingMutation.isPending} onCancel={() => setIsColorDialogOpen(false)} onSave={handleColorChange} />
 
-      {actionError ? <ErrorBanner dismissible={false}>{actionError}</ErrorBanner> : null}
+      <div className={activity.stack}>
+        <section className={styles.requestsPanel} aria-label={t("Employee requests")}>
+          {actionError ? <ErrorBanner dismissible={false}>{actionError}</ErrorBanner> : null}
 
-      <div className={styles.summary}>
-        <span>{t("Employee requests")}</span><strong><ClockIcon size={14} />{pendingCount}  {t("pending")}</strong>
+          <header className={activity.panelHeader}>
+            <span>{t("Employee requests")}</span>
+            <span className={`${activity.badge} ${activity.pending}`}><ClockIcon size={13} />{pendingCount} {t("pending")}</span>
+          </header>
+
+          {requestsQuery.isLoading ? <p className={activity.state}>{t("Loading requests...")}</p> : null}
+          {requestsQuery.isError ? <p className={`${activity.state} ${activity.danger}`}>{t("Could not load shift corrections.")}</p> : null}
+          {!requestsQuery.isLoading && !requestsQuery.isError && requests.length === 0 ? (
+            <p className={activity.state}>{t("No correction requests yet.")}</p>
+          ) : null}
+
+          {requests.length > 0 ? (
+            <div className={styles.list} role="list" tabIndex={0} aria-label={t("Shift correction requests")}>
+              {requests.map(request => selected?.id === request.id ? selectedDetails : (
+                <button key={request.id} type="button" role="listitem"
+                  className={styles.requestButton}
+                  aria-expanded={selected?.id === request.id}
+                  onClick={() => { setSelectedId(current => current === request.id ? null : request.id); setActionError(null); }}>
+                  <span className={styles.avatar} aria-hidden="true">{initials(request.employeeName)}</span>
+                  <span className={styles.requestCopy}>
+                    <strong>{request.employeeName}</strong>
+                    <small>{request.isDayOffRequest
+                      ? `${String(request.dayOfMonth).padStart(2, "0")}.${String(request.month).padStart(2, "0")}.${request.year} · ${t("Day off")} → ${request.requestedFromTime}–${request.requestedToTime} · ${request.scheduleName} · ${request.shopName}`
+                      : `${t("Day")} ${request.dayOfMonth} · ${request.originalFromTime}–${request.originalToTime}`}</small>
+                  </span>
+                  <em className={`${styles.status} ${styles[`status${request.status}`]}`}>{statusIcon(request.status)}{statusLabel(request.status)}</em>
+                  <span className={styles.chevron} aria-hidden="true"><ChevronRightIcon size={15} /></span>
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </section>
+        {children}
       </div>
-
-      {requestsQuery.isLoading ? <p className={styles.state}>{t("Loading requests...")}</p> : null}
-      {requestsQuery.isError ? <p className={styles.state}>{t("Could not load shift corrections.")}</p> : null}
-      {!requestsQuery.isLoading && !requestsQuery.isError && requests.length === 0 ? (
-        <p className={styles.state}>{t("No correction requests yet.")}</p>
-      ) : null}
-
-      {requests.length > 0 ? (
-        <div className={styles.list} role="list" tabIndex={0} aria-label={t("Shift correction requests")}>
-          {requests.map(request => selected?.id === request.id ? selectedDetails : (
-            <button key={request.id} type="button" role="listitem"
-              className={styles.requestButton}
-              aria-expanded={selected?.id === request.id}
-              onClick={() => { setSelectedId(current => current === request.id ? null : request.id); setActionError(null); }}>
-              <span className={styles.avatar} aria-hidden="true">{initials(request.employeeName)}</span>
-              <span className={styles.requestCopy}>
-                <strong>{request.employeeName}</strong>
-                <small>{request.isDayOffRequest
-                  ? `${String(request.dayOfMonth).padStart(2, "0")}.${String(request.month).padStart(2, "0")}.${request.year} · ${t("Day off")} → ${request.requestedFromTime}–${request.requestedToTime} · ${request.scheduleName} · ${request.shopName}`
-                  : `${t("Day")} ${request.dayOfMonth} · ${request.originalFromTime}–${request.originalToTime}`}</small>
-              </span>
-              <em className={`${styles.status} ${styles[`status${request.status}`]}`}>{statusIcon(request.status)}{statusLabel(request.status)}</em>
-              <span className={styles.chevron} aria-hidden="true"><ChevronRightIcon size={15} /></span>
-            </button>
-          ))}
-        </div>
-      ) : null}
-    </>
+    </CardSection>
   );
 }

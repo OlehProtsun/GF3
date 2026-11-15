@@ -96,7 +96,8 @@ public sealed class ManagerHomeActivityControllerTests
             var response = await host.Client.GetAsync("/api/manager-home/activity?" + query);
             Assert.True(response.StatusCode == HttpStatusCode.BadRequest, query + ": " + response.StatusCode + " " + await response.Content.ReadAsStringAsync());
         }
-        foreach (var query in new[] { "year=1&month=1", "year=9999&month=12", "year=2026&month=11&limit=50&offset=10000&tab=approvals" })
+        foreach (var query in new[] { "year=1&month=1", "year=9999&month=12", "year=2026&month=11&limit=50&offset=10000&tab=approvals",
+            "year=2026&month=11&tab=swaps", "year=2026&month=11&tab=vacations", "year=2026&month=11&tab=corrections", "year=2026&month=11&tab=availability" })
             Assert.Equal(HttpStatusCode.OK, (await host.Client.GetAsync("/api/manager-home/activity?" + query)).StatusCode);
     }
     [Fact]
@@ -114,6 +115,15 @@ public sealed class ManagerHomeActivityControllerTests
         await db.SaveChangesAsync(); db.ChangeTracker.Clear();
         var all = await Read(db); var pending = await Read(db, "approvals");
         Assert.Equal(8, all.AllActivityCount); Assert.Equal(3, all.RequiresApprovalCount); Assert.Equal(3, pending.Items.Count);
+        Assert.Equal(new(0, 3, 3, 1), all.CategoryCounts);
+        Assert.Equal(all.CategoryCounts, pending.CategoryCounts);
+        Assert.All((await Read(db, "vacations")).Items, item => Assert.StartsWith("urlop_", item.Kind));
+        Assert.Single((await Read(db, "availability")).Items);
+        var corrections = await ManagerHomeActivityReader.ReadAsync(db, 2026, 11, "corrections", 0, 2, default);
+        Assert.True(corrections.HasMore);
+        Assert.Equal(2, corrections.Items.Count);
+        Assert.Equal(3, corrections.CategoryCounts.Corrections);
+        Assert.All(corrections.Items, item => Assert.True(item.Kind.StartsWith("correction_") || item.Kind.StartsWith("day_off_")));
         Assert.All(pending.Items, item => { Assert.True(item.RequiresApproval); Assert.Equal("pending", item.Status); });
         Assert.Contains(pending.Items, item => item.OccurredAtUtc.Month == 9);
         Assert.Single(all.Items, x => x.Kind == "availability_updated");
@@ -130,10 +140,13 @@ public sealed class ManagerHomeActivityControllerTests
         await using var database = await SqliteTestDatabase.CreateAsync(); await using var db = database.CreateContext(); await Seed(db);
         db.Add(new ShiftSwapRequestModel { Id = 10, ScheduleId = 1, ScheduleSlotId = 1, FromEmployeeId = 1, Status = ShiftSwapStatus.Accepted, CreatedAtUtc = Stamp });
         db.Add(new ShiftSwapRequestModel { Id = 11, ScheduleId = 2, ScheduleSlotId = 2, FromEmployeeId = 1, Status = ShiftSwapStatus.Cancelled, CreatedAtUtc = Stamp, CancelledAtUtc = Stamp.AddHours(1) });
-        foreach (var sourceId in new[] { 10, 12 }) db.Add(new ShiftSwapHistoryModel { SourceShiftSwapRequestId = sourceId, ScheduleId = 1, ScheduleSlotId = 1, ScheduleName = "First", ContainerName = "A", ShopName = "Shop", FromTime = "08:00", ToTime = "16:00", FromEmployeeName = "Archived Person", AcceptedByEmployeeName = "Receiver Name", AcceptedByEmployeeId = 1, Year = 2026, Month = 11, DayOfMonth = 4, CreatedAtUtc = Stamp, AcceptedAtUtc = Stamp.AddHours(1) });
+        foreach (var sourceId in new[] { 10, 12 }) db.Add(new ShiftSwapHistoryModel { SourceShiftSwapRequestId = sourceId, ScheduleId = 1, ScheduleSlotId = 1, ScheduleName = "First", ContainerName = "A", ShopName = "Shop", FromTime = "08:00", ToTime = "16:00", FromEmployeeName = "Archived Person", AcceptedByEmployeeName = "Receiver Name", AcceptedByEmployeeId = 1, Year = 2026, Month = 11, DayOfMonth = 4, CreatedAtUtc = Stamp, AcceptedAtUtc = Stamp.AddHours(1), IsManagerCreated = sourceId == 12 });
         await db.SaveChangesAsync(); var all = await Read(db);
         Assert.Equal(6, all.AllActivityCount); Assert.Equal(0, all.RequiresApprovalCount);
+        Assert.Equal(6, all.CategoryCounts.Swaps);
+        Assert.Equal(all.Items.Select(item => item.Id), (await Read(db, "swaps")).Items.Select(item => item.Id));
         Assert.Single(all.Items, x => x.Id == "swap-created:10"); Assert.Single(all.Items, x => x.Id == "swap-created:12");
+        Assert.True(all.Items.Single(item => item.Id == "swap-created:12").IsManagerCreatedOffer);
         Assert.Equal(2, all.Items.Count(x => x.Kind == "swap_accepted")); Assert.Single(all.Items, x => x.Kind == "swap_cancelled");
         Assert.All(all.Items.Where(x => x.Kind == "swap_accepted"), item => { Assert.Equal("Receiver Name", item.CounterpartyName); Assert.Equal("accepted", item.Status); });
     }

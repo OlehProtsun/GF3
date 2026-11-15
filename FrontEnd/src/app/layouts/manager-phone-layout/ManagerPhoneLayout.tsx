@@ -27,21 +27,24 @@ export function ManagerPhoneLayout({ children }: PropsWithChildren) {
   const { pathname } = useLocation();
   return <div className={styles.layout} data-manager-phone>
     <button ref={openButtonRef} type="button" aria-label={t("Open navigation")}
-      className={`${styles.openButton} ${isTabsCollapsed ? "" : styles.openHidden}`}
-      inert={!isTabsCollapsed} onClick={() => setIsTabsCollapsed(false)}><BackIcon size={14} /></button>
+      className={`${styles.openButton} ${isTabsCollapsed ? styles.openVisible : styles.openHidden}`}
+      inert={!isTabsCollapsed} onClick={() => setIsTabsCollapsed(false)}>
+      <span className={`${styles.controlIcon} ${styles.controlIconExpand}`}><BackIcon size={14} /></span>
+    </button>
     <div className={`${styles.shell} ${isTabsCollapsed ? styles.shellCollapsed : ""}`}>
       <main className={styles.content}>{children}</main>
-      <nav ref={navigationRef} inert={isTabsCollapsed} className={`${styles.nav} ${isTabsCollapsed ? styles.navCollapsed : ""}`} aria-label={t("Manager navigation")}>
+      <nav ref={navigationRef} inert={isTabsCollapsed} className={`${styles.nav} ${isTabsCollapsed ? styles.navCollapsed : styles.navExpanded}`} aria-label={t("Manager navigation")}>
         {tabs.map(({ label, to, icon: Icon }) => {
           const active = to === "/" ? pathname === "/"
             : pathname === to || pathname.startsWith(`${to}/`) || (to === "/more" && pathname.startsWith("/shop"));
           return <NavLink key={to} to={to} tabIndex={0} aria-label={t(label)} aria-current={active ? "page" : undefined}
             className={`${styles.tab} ${active ? styles.active : ""}`}>
-            <Icon size={20} className={to === "/" ? styles.homeIcon : undefined} /><span className={styles.tabLabel} aria-hidden="true">{t(label)}</span>
+            <span className={styles.tabIcon}><Icon size={18} className={to === "/" ? styles.homeIcon : undefined} /></span>
+            <span className={styles.tabLabel} aria-hidden="true">{t(label)}</span>
           </NavLink>;
         })}
         <button type="button" className={styles.collapseButton} aria-label={t("Collapse navigation")}
-          onClick={() => setIsTabsCollapsed(true)}><BackIcon size={14} /></button>
+          onClick={() => setIsTabsCollapsed(true)}><span className={styles.controlIcon}><BackIcon size={14} /></span></button>
       </nav>
     </div>
   </div>;

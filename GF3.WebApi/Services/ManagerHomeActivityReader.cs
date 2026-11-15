@@ -37,22 +37,27 @@ public static class ManagerHomeActivityReader
         object[] Parameters() => [
             new SqliteParameter("@start", start.ToString("yyyy-MM-dd HH:mm:ss.fffffff", CultureInfo.InvariantCulture)),
             new SqliteParameter("@end", (object?)end?.ToString("yyyy-MM-dd HH:mm:ss.fffffff", CultureInfo.InvariantCulture) ?? DBNull.Value),
-            new SqliteParameter("@approvals", tab == "approvals"),
+            new SqliteParameter("@tab", tab),
             new SqliteParameter("@offset", offset), new SqliteParameter("@limit", limit + 1)];
 
         var counts = (await db.Database.SqlQueryRaw<ActivityCounts>(CanonicalSql + """
-            SELECT COALESCE(SUM(CASE WHEN OccurredAt >= @start AND (@end IS NULL OR OccurredAt < @end) THEN 1 ELSE 0 END), 0) AS AllActivityCount,
-                   COALESCE(SUM(RequiresApproval), 0) AS RequiresApprovalCount
-            FROM events
+            SELECT COALESCE(SUM(InMonth), 0) AS AllActivityCount,
+                   COALESCE(SUM(RequiresApproval), 0) AS RequiresApprovalCount,
+                   COALESCE(SUM(InMonth AND Category = 'swaps'), 0) AS Swaps,
+                   COALESCE(SUM(InMonth AND Category = 'vacations'), 0) AS Vacations,
+                   COALESCE(SUM(InMonth AND Category = 'corrections'), 0) AS Corrections,
+                   COALESCE(SUM(InMonth AND Category = 'availability'), 0) AS Availability
+            FROM (SELECT *, OccurredAt >= @start AND (@end IS NULL OR OccurredAt < @end) AS InMonth FROM events)
             """, Parameters()).AsNoTracking().ToListAsync(cancellationToken)).Single();
         var rows = await db.Database.SqlQueryRaw<ActivityRow>(CanonicalSql + """
             SELECT Id, Kind, OccurredAt, Status, RequiresApproval, TargetType, Payload FROM events
-            WHERE (@approvals = 1 AND RequiresApproval = 1)
-               OR (@approvals = 0 AND OccurredAt >= @start AND (@end IS NULL OR OccurredAt < @end))
+            WHERE (@tab = 'approvals' AND RequiresApproval = 1)
+               OR ((@tab = 'all' OR @tab = Category) AND OccurredAt >= @start AND (@end IS NULL OR OccurredAt < @end))
             ORDER BY OccurredAt DESC, Id COLLATE BINARY ASC LIMIT @limit OFFSET @offset
             """, Parameters()).AsNoTracking().ToListAsync(cancellationToken);
         var items = rows.Take(limit).Select(ToDto).ToArray();
-        return new(items, counts.AllActivityCount, counts.RequiresApprovalCount, rows.Count > limit, offset + items.Length);
+        return new(items, counts.AllActivityCount, counts.RequiresApprovalCount, rows.Count > limit, offset + items.Length,
+            new(counts.Swaps, counts.Vacations, counts.Corrections, counts.Availability));
     }
 
     private static ManagerHomeActivityItemDto ToDto(ActivityRow row)
@@ -73,7 +78,8 @@ public static class ManagerHomeActivityReader
             Id = row.Id, Kind = row.Kind,
             OccurredAtUtc = new DateTimeOffset(DateTime.ParseExact(row.OccurredAt, "yyyy-MM-dd HH:mm:ss.fffffff", CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal)),
             EmployeeName = string.IsNullOrWhiteSpace(name) ? employeeId?.ToString(CultureInfo.InvariantCulture) ?? "—" : name,
-            CounterpartyName = Text("CounterpartyName"), Status = row.Status, RequiresApproval = row.RequiresApproval,
+            CounterpartyName = Text("CounterpartyName"), IsManagerCreatedOffer = Number("IsManagerCreatedOffer") == 1,
+            Status = row.Status, RequiresApproval = row.RequiresApproval,
             TargetType = row.TargetType, ContainerId = Number("ContainerId"), GraphId = Number("GraphId"),
             AvailabilityGroupId = Number("AvailabilityGroupId"), ShopId = Number("ShopId"), EmployeeId = employeeId,
             ScheduleName = Text("ScheduleName"), ShopName = Text("ShopName"), ShiftDate = shiftDate,
@@ -87,6 +93,10 @@ public static class ManagerHomeActivityReader
     {
         public int AllActivityCount { get; set; }
         public int RequiresApprovalCount { get; set; }
+        public int Swaps { get; set; }
+        public int Vacations { get; set; }
+        public int Corrections { get; set; }
+        public int Availability { get; set; }
     }
 
     private sealed class ActivityRow
@@ -106,6 +116,7 @@ public static class ManagerHomeActivityReader
         WITH swaps AS (
             SELECT r.id, r.created_at_utc, r.cancelled_at_utc, lower(r.status) AS status,
                 json_object('EmployeeId', r.from_employee_id, 'EmployeeName', e.first_name || ' ' || e.last_name,
+                    'IsManagerCreatedOffer', r.is_manager_created,
                     'CounterpartyName', COALESCE(a.first_name || ' ' || a.last_name, t.first_name || ' ' || t.last_name),
                     'ContainerId', s.container_id, 'GraphId', s.id, 'ScheduleName', s.name, 'ShopName', p.name,
                     'Year', s.year, 'Month', s.month, 'Day', slot.day_of_month,
@@ -122,6 +133,7 @@ public static class ManagerHomeActivityReader
             SELECT h.source_shift_swap_request_id AS id, h.created_at_utc, h.accepted_at_utc,
                 NOT EXISTS(SELECT 1 FROM shift_swap_request r WHERE r.id = h.source_shift_swap_request_id) AS history_only,
                 json_object('EmployeeId', h.from_employee_id, 'EmployeeName', h.from_employee_name,
+                    'IsManagerCreatedOffer', h.is_manager_created,
                     'CounterpartyName', h.accepted_by_employee_name, 'ContainerId', s.container_id, 'GraphId', s.id,
                     'ScheduleName', h.schedule_name, 'ShopName', h.shop_name, 'Year', h.year, 'Month', h.month, 'Day', h.day_of_month,
                     'FromTime', h.from_time, 'ToTime', h.to_time, 'ReturnYear', h.return_year, 'ReturnMonth', h.return_month,
@@ -182,7 +194,13 @@ public static class ManagerHomeActivityReader
         ), events AS (
             SELECT Id, Kind, datetime(substr(stamp, 1, 19) || substr(stamp, -6)) || '.' ||
                 substr(CASE WHEN substr(stamp, 20, 1) = '.' THEN substr(stamp, 21, length(stamp) - 26) ELSE '' END || '0000000', 1, 7) AS OccurredAt,
-                Status, RequiresApproval, TargetType, Payload FROM transitions
+                Status, RequiresApproval, TargetType, Payload,
+                CASE WHEN substr(Kind, 1, 5) = 'swap_' THEN 'swaps'
+                     WHEN TargetType = 'urlop' THEN 'vacations'
+                     WHEN TargetType = 'availability' THEN 'availability'
+                     WHEN substr(Kind, 1, 11) = 'correction_' OR substr(Kind, 1, 8) = 'day_off_' THEN 'corrections'
+                END AS Category
+            FROM transitions
         )
         """;
 }

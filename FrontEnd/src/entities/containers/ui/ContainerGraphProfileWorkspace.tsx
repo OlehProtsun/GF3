@@ -1,10 +1,9 @@
 import { usePublicHolidayVisibility } from "@app/providers/PublicHolidayVisibilityProvider";
 import { dateTimeFormat, t } from "@shared/i18n";
 import { pinGeneratedColumnsFirst } from "../model/graphColumnOrder";
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useId, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import type { AvailabilityGroup } from "@entities/availability-groups/model/types";
-import { AvailabilitySidebarCollapseButton, AvailabilitySidebarSection } from "@entities/availability-groups/ui/AvailabilitySidebarSection";
 import {
   buildGraphCellMap,
   buildGraphConflictDayMap,
@@ -27,7 +26,8 @@ import type { Employee } from "@entities/employees/model/types";
 import type { Shop } from "@entities/shops/model/types";
 import { ErrorBanner } from "@shared/ui/components/ErrorBanner";
 import { IosButton } from "@shared/ui/components/IosButton";
-import { InformationIcon, ScheduleDetailsIcon, SearchIcon, StatisticsIcon, NoteIcon, ScheduleIcon, ShopIcon, CheckIcon, EmployeeIcon, ContainerIcon, ChevronRightIcon } from "@shared/ui/icons";
+import { InformationIcon, ScheduleDetailsIcon, SearchIcon, StatisticsIcon, NoteIcon, ScheduleIcon, ShopIcon, CheckIcon, EmployeeIcon, ContainerIcon, ChevronRightIcon, CloseIcon, ClockIcon, GroupIcon, AvailabilityIcon } from "@shared/ui/icons";
+import { createIcon } from "@shared/ui/icons/createIcon";
 import { formatScheduleLastUpdate } from "@shared/lib/scheduleLastUpdate";
 import { CardSection } from "@shared/ui/sections/CardSection";
 import { ContainerGraphMatrix } from "./ContainerGraphMatrix";
@@ -79,6 +79,9 @@ const detailIcons = {
   "max-days": ScheduleDetailsIcon, "max-consecutive-full": ScheduleDetailsIcon,
   "max-full": ContainerIcon, availability: ContainerIcon,
 };
+
+const PencilIcon = createIcon("M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25ZM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83Z");
+const TrashIcon = createIcon("M9 3h6l1 2h4v2H4V5h4l1-2ZM6 9h12l-1 11a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1L6 9Zm3 2 .5 8H11v-8H9Zm4 0v8h1.5l.5-8H13Z", { fillRule: "evenodd" });
 
 function getGraphInitials(graph?: Graph | null) {
   const parts = (graph?.name ?? "")
@@ -171,10 +174,15 @@ export function ContainerGraphProfileWorkspace({
   onDelete,
 }: ContainerGraphProfileWorkspaceProps) {
   const showPublicHolidays = usePublicHolidayVisibility();
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true);
+  const informationDialogRef = useRef<HTMLDialogElement>(null);
+  const informationTitleId = useId();
   const [activeRelatedHintCellKey, setActiveRelatedHintCellKey] = useState<string | null>(null);
   const [selectedCellKeys, setSelectedCellKeys] = useState<string[]>([]);
   const [summarySearchQuery, setSummarySearchQuery] = useState("");
+  const [phoneInformationExpanded, setPhoneInformationExpanded] = useState(false);
+  const [phoneSummaryExpanded, setPhoneSummaryExpanded] = useState(false);
+  const phoneInformationPanelId = useId();
+  const phoneSummaryPanelId = useId();
   const [viewportHeight, setViewportHeight] = useState(() => {
     if (typeof window === "undefined") {
       return 0;
@@ -266,13 +274,13 @@ export function ContainerGraphProfileWorkspace({
   const note = getGraphVisibleNote(graph.note).trim();
   const hasNote = note.length > 0;
   const lastUpdateLabel = formatScheduleLastUpdate(graph.lastUpdatedAtUtc);
-  const topRowBaseMinHeight = Math.max(
+  const matrixBaseMinHeight = Math.max(
     isHeaderCollapsed ? 680 : 660,
     viewportHeight - (isHeaderCollapsed ? 188 : 228),
   );
-  const topRowCardMinHeight = Math.min(
+  const matrixCardMinHeight = Math.min(
     isHeaderCollapsed ? 1000 : 980,
-    Math.round(topRowBaseMinHeight * 1.15),
+    Math.round(matrixBaseMinHeight * 1.15),
   );
   const phoneMatrixViewport = compactSize && !showManagementActions;
   const shouldPreserveMatrixHeight = !compactSize;
@@ -288,11 +296,14 @@ export function ContainerGraphProfileWorkspace({
     activeRelatedHint
       ? formatGraphHintDateLabel(graph.year, graph.month, activeRelatedHint.dayOfMonth)
       : "";
+  const isPublic = graph.publicationStatus === "public";
+  const publicationStatusLabel = isPublic ? t("Public") : t("Private");
+  const publicationStatusClass = isPublic ? styles.scheduleStatusPublic : styles.scheduleStatusPrivate;
   const scheduleDetails = [
     { key: "month", label: t("Month"), value: getGraphMonthLabel(graph.year, graph.month) },
     { key: "year", label: t("Year"), value: String(graph.year) },
     { key: "shop", label: t("Shop"), value: shop?.name ?? t("Shop {0}", graph.shopId) },
-    { key: "status", label: t("Status"), value: graph.publicationStatus === "public" ? t("Public") : t("Private") },
+    { key: "status", label: t("Status"), value: publicationStatusLabel },
     { key: "people", label: t("People on Shift"), value: String(graph.peoplePerShift) },
     { key: "shift1", label: t("Shift1"), value: graph.shift1Time },
     { key: "shift2", label: t("Shift2"), value: graph.shift2Time },
@@ -304,9 +315,9 @@ export function ContainerGraphProfileWorkspace({
   const matrixCardShellStyle =
     shouldPreserveMatrixHeight
       ? {
-        minHeight: `${topRowCardMinHeight}px`,
-        height: `${topRowCardMinHeight}px`,
-        maxHeight: `${topRowCardMinHeight}px`,
+        minHeight: `${matrixCardMinHeight}px`,
+        height: `${matrixCardMinHeight}px`,
+        maxHeight: `${matrixCardMinHeight}px`,
       }
       : undefined;
   const matrixCardStyle =
@@ -318,14 +329,39 @@ export function ContainerGraphProfileWorkspace({
         "--matrix-card-padding-bottom": "0px",
         "--matrix-layout-padding-bottom": "0px",
       } as CSSProperties);
+  const lastUpdate = (
+    <div className={styles.lastUpdateField} aria-label={t("Last Update: {0}", lastUpdateLabel)}>
+      <span className={styles.lastUpdateLabel}>
+        <span className={styles.lastUpdateDot} aria-hidden="true" />
+        {t("Last Update")}
+      </span>
+      <strong className={styles.lastUpdateValue}>
+        {graph.lastUpdatedAtUtc ? (
+          <time dateTime={graph.lastUpdatedAtUtc}>{lastUpdateLabel}</time>
+        ) : lastUpdateLabel}
+      </strong>
+    </div>
+  );
+  const badges = (
+    <div className={styles.badges}>
+      <span className={styles.badge}>
+        {!phoneMatrixViewport && <GroupIcon size={15} />}
+        {t("Total Employees: {0}", totals.totalEmployees)}
+      </span>
+      <span className={styles.badge}>
+        {!phoneMatrixViewport && <ClockIcon size={15} />}
+        {t("Total Hours: {0}", totals.totalHoursText)}
+      </span>
+    </div>
+  );
   const matrix = (
     <ContainerGraphMatrix
       urlopCellKeys={urlopCellKeys}
       className={joinClassNames(styles.matrixCard, compactSize && styles.matrixCardCompact)}
       style={matrixCardStyle}
-      headerClassName={phoneMatrixViewport ? styles.phoneMatrixHeader : undefined}
-      titleClassName={phoneMatrixViewport ? styles.phoneSectionTitle : undefined}
-      headerRightClassName={phoneMatrixViewport ? styles.phoneMatrixHeaderRight : undefined}
+      headerClassName={phoneMatrixViewport ? styles.phoneMatrixHeader : styles.matrixHeader}
+      titleClassName={phoneMatrixViewport ? styles.phoneSectionTitle : styles.matrixTitle}
+      headerRightClassName={phoneMatrixViewport ? styles.phoneMatrixHeaderRight : styles.matrixHeaderRight}
       graph={graph}
       showShiftStaffingCounts
       compactSize={compactSize}
@@ -346,94 +382,160 @@ export function ContainerGraphProfileWorkspace({
       onSelectedCellKeysChange={setSelectedCellKeys}
       helperText={showManagementActions ? t("This schedule is read-only. Open edit to update details, assigned employees, matrix values or cell styles.") : t("This schedule is read-only.")}
       onVisualHintClick={detail => setActiveRelatedHintCellKey(`${detail.employeeId}:${detail.dayOfMonth}`)}
-      headerRightSlot={
-        <div className={styles.badges}>
-          <span className={styles.badge}>{t("Total Employees: {0}", totals.totalEmployees)}</span>
-          <span className={styles.badge}>{t("Total Hours: {0}", totals.totalHoursText)}</span>
-        </div>
-      }
+      headerRightSlot={phoneMatrixViewport ? badges : (
+        <>
+          <div className={styles.matrixActions}>
+            {lastUpdate}
+            <button
+              type="button"
+              className={joinClassNames(styles.roundButton, styles.infoAction)}
+              aria-label={t("Schedule Information")}
+              aria-haspopup="dialog"
+              onClick={event => {
+                event.currentTarget.focus({ preventScroll: true });
+                informationDialogRef.current?.showModal();
+              }}
+            >
+              <InformationIcon size={18} aria-hidden="true" />
+            </button>
+            {showManagementActions && (
+              <>
+                {showEditAction && (
+                  <IosButton
+                    className={joinClassNames(styles.matrixAction, styles.editAction)}
+                    size="compact"
+                    label={t("Edit Schedule")}
+                    icon={<PencilIcon />}
+                    onClick={onEdit}
+                  />
+                )}
+                <IosButton
+                  className={joinClassNames(styles.matrixAction, styles.deleteAction)}
+                  size="compact"
+                  label={isDeleting ? t("Deleting...") : t("Delete Schedule")}
+                  icon={<TrashIcon />}
+                  variant="secondary"
+                  customColor="#fff0ef"
+                  customBorderColor="#f7d5d1"
+                  disabled={isDeleting}
+                  onClick={onDelete}
+                />
+              </>
+            )}
+          </div>
+          {badges}
+        </>
+      )}
     />
   );
 
-  const informationCard = (
-    <CardSection
-      className={styles.summaryCard}
-      title={t("Schedule Information")}
-      icon={<ScheduleDetailsIcon size={18} />}
-      titleClassName={phoneMatrixViewport ? styles.phoneSectionTitle : undefined}
-      headerRightSlot={phoneMatrixViewport ? undefined :
-        <AvailabilitySidebarCollapseButton
-          label={t("Schedule Information")}
-          onCollapse={() => setIsSidebarCollapsed(true)}
-        />
-      }
-    >
-      <div className={styles.summaryContent}>
-        <div className={styles.scheduleIdentity}>
-          <div className={styles.scheduleAvatar} aria-hidden="true">
-            {getGraphInitials(graph)}
-          </div>
-          <div className={styles.scheduleIdentityText}>
-            <h2 className={styles.scheduleName}>{graph.name}</h2>
+  const informationContent = (
+    <div className={styles.summaryContent}>
+      <div className={styles.scheduleIdentity}>
+        <div className={styles.scheduleAvatar} aria-hidden="true">
+          {getGraphInitials(graph)}
+        </div>
+        <div className={styles.scheduleIdentityText}>
+          <h2 className={styles.scheduleName}>{graph.name}</h2>
+          <div className={styles.scheduleIdentityMeta}>
             <p className={styles.scheduleId}>{`ID ${graph.id}`}</p>
+            {!phoneMatrixViewport && (
+              <span className={joinClassNames(styles.publicationBadge, publicationStatusClass)}>{publicationStatusLabel}</span>
+            )}
           </div>
         </div>
-
-        <div className={joinClassNames(styles.scheduleNote, !hasNote && styles.scheduleNoteEmpty)}>
-          <span className={styles.scheduleInfoLabel}>{phoneMatrixViewport && <NoteIcon size={16} aria-hidden="true" />}{t("Note")}</span>
-          <div className={styles.scheduleNoteValue} tabIndex={phoneMatrixViewport && hasNote ? 0 : undefined}>
-            {note || <span className={styles.mutedValue}>{t("No notes yet.")}</span>}
-          </div>
-        </div>
-
-        <div className={styles.scheduleInfoLabels} role="group" aria-label={t("Schedule details")}>
-          {scheduleDetails.map(item => {
-            const Icon = detailIcons[item.key];
-            return (
-              <div key={item.key} className={joinClassNames(styles.scheduleInfoItem, phoneMatrixViewport && item.key === "availability" && styles.phoneAvailabilityTile)}>
-                {phoneMatrixViewport && <span className={styles.phoneDetailIcon} aria-hidden="true"><Icon size={16} /></span>}
-                <span className={styles.scheduleInfoLabel}>{item.label}</span>
-                <strong
-                  className={joinClassNames(
-                    styles.scheduleInfoValue,
-                    item.key === "status" && (
-                      graph.publicationStatus === "public"
-                        ? styles.scheduleStatusPublic
-                        : styles.scheduleStatusPrivate
-                    ),
-                  )}
-                >
-                  {item.value}
-                </strong>
-              </div>
-            );
-          })}
-        </div>
-
-        <div className={styles.lastUpdateField} aria-label={t("Last Update: {0}", lastUpdateLabel)}>
-          <span className={styles.lastUpdateLabel}>
-            <span className={styles.lastUpdateDot} aria-hidden="true" />
-            {t("Last Update")}</span>
-          <strong className={styles.lastUpdateValue}>
-            {graph.lastUpdatedAtUtc ? (
-              <time dateTime={graph.lastUpdatedAtUtc}>{lastUpdateLabel}</time>
-            ) : lastUpdateLabel}
-          </strong>
-        </div>
-
-        {showManagementActions ? <div className={styles.scheduleInfoActions}>
-          {showEditAction ? <IosButton label={t("Edit Schedule")} onClick={onEdit} /> : null}
-          <IosButton
-            label={isDeleting ? t("Deleting...") : t("Delete Schedule")}
-            variant="secondary"
-            customColor="#ef4444"
-            customBorderColor="#ef4444"
-            disabled={isDeleting}
-            onClick={onDelete}
-          />
-        </div> : null}
       </div>
-    </CardSection>
+
+      <div className={joinClassNames(styles.scheduleNote, !hasNote && styles.scheduleNoteEmpty)}>
+        <span className={styles.scheduleInfoLabel}><NoteIcon size={16} aria-hidden="true" />{t("Note")}</span>
+        <div className={styles.scheduleNoteValue} tabIndex={phoneMatrixViewport && hasNote ? 0 : undefined}>
+          {note || <span className={styles.mutedValue}>{t("No notes yet.")}</span>}
+        </div>
+      </div>
+
+      <div className={styles.scheduleInfoLabels} role="group" aria-label={t("Schedule details")}>
+        {scheduleDetails.map(item => {
+          const Icon = detailIcons[item.key];
+          return (
+            <div key={item.key} className={joinClassNames(styles.scheduleInfoItem, phoneMatrixViewport && item.key === "availability" && styles.phoneAvailabilityTile)}>
+              <span className={styles.detailIcon} aria-hidden="true"><Icon size={16} /></span>
+              <span className={styles.scheduleInfoLabel}>{item.label}</span>
+              <strong className={joinClassNames(styles.scheduleInfoValue, item.key === "status" && publicationStatusClass)}>
+                {item.value}
+              </strong>
+            </div>
+          );
+        })}
+      </div>
+
+      {phoneMatrixViewport && lastUpdate}
+    </div>
+  );
+  const phoneInformationCard = (
+    <section className={joinClassNames(styles.phoneCollapsibleCard, styles.phoneInformationCard)} data-phone-schedule-information>
+      <h2 className={styles.phoneCollapsibleHeading}>
+        <button type="button" className={styles.phoneCollapsibleToggle} aria-expanded={phoneInformationExpanded} aria-controls={phoneInformationPanelId}
+          onClick={() => setPhoneInformationExpanded(current => !current)}>
+          <span className={styles.phoneCollapsibleIcon}><ScheduleDetailsIcon size={19} /></span>
+          <span>{t("Schedule Information")}</span>
+          <span className={styles.phoneCollapsibleChevron}><ChevronRightIcon size={16} /></span>
+        </button>
+      </h2>
+      <div id={phoneInformationPanelId} className={styles.phoneCollapsiblePanel} data-expanded={phoneInformationExpanded} inert={!phoneInformationExpanded} aria-hidden={!phoneInformationExpanded}>
+        <div className={styles.phoneCollapsibleClip}><div className={styles.phoneInformationContent}>{informationContent}</div></div>
+      </div>
+    </section>
+  );
+  const phoneSummaryCard = (
+    <section className={joinClassNames(styles.phoneCollapsibleCard, styles.phoneSummarySection)}>
+      <h2 className={styles.phoneCollapsibleHeading}>
+        <button type="button" className={styles.phoneCollapsibleToggle} aria-expanded={phoneSummaryExpanded} aria-controls={phoneSummaryPanelId}
+          onClick={() => setPhoneSummaryExpanded(current => !current)}>
+          <span className={styles.phoneCollapsibleIcon}><StatisticsIcon size={19} /></span>
+          <span>{t("Schedule Summary")}</span>
+          <span className={styles.phoneEmployeeCount}>{t("Employees: {0}", summaryRows.length)}</span>
+          <span className={styles.phoneCollapsibleChevron}><ChevronRightIcon size={16} /></span>
+        </button>
+      </h2>
+      <div id={phoneSummaryPanelId} className={styles.phoneCollapsiblePanel} data-expanded={phoneSummaryExpanded} inert={!phoneSummaryExpanded} aria-hidden={!phoneSummaryExpanded}>
+        <div className={styles.phoneCollapsibleClip}>
+          <div className={styles.phoneSummaryContent}>
+            {summaryRows.length > 0 && (
+              <label className={joinClassNames(styles.summarySearchField, styles.phoneSummarySearch)} htmlFor="schedule-summary-search">
+                <SearchIcon className={styles.summarySearchIcon} />
+                <input id="schedule-summary-search" className={styles.summarySearchInput} type="search" value={summarySearchQuery}
+                  onChange={event => setSummarySearchQuery(event.target.value)} placeholder={t("Search by name or surname")}
+                  aria-label={t("Search schedule summary by employee name or surname")} />
+              </label>
+            )}
+            {summaryRows.length === 0 ? <div className={styles.emptyState}>{showManagementActions ? t("No employee schedule rows yet. Generate a schedule or assign matrix intervals to see the summary.") : t("No results")}</div>
+              : showSummarySearchEmpty ? <div className={styles.emptyState} role="status">{t("No employees found for \"{0}\".", summarySearchQuery.trim())}</div>
+                : <div className={styles.phoneSummary} data-phone-schedule-summary>
+                  {filteredSummaryRows.map(row => <details className={styles.phoneSummaryEmployee} key={row.employeeId}>
+                    <summary className={styles.phoneSummaryToggle}>
+                      <span className={joinClassNames(styles.phoneEmployeeAvatar, styles[`phoneAvatar${Math.abs(row.employeeId) % 6}`])} aria-hidden="true">{getEmployeeInitials(row.employee)}</span>
+                      <h3 className={styles.phoneEmployeeName}>{row.employee}</h3>
+                      <dl className={joinClassNames(styles.phoneSummaryMetrics, showPublicHolidays && styles.phoneSummaryMetricsWithHolidays)}>
+                        <div><dt><ScheduleDetailsIcon size={13} />{t("Work Days")}</dt><dd>{row.workDays}</dd></div>
+                        <div><dt><AvailabilityIcon size={13} />{t("Free Days")}</dt><dd>{row.freeDays}</dd></div>
+                        <div><dt><ScheduleIcon size={13} />{t("Urlop Days")}</dt><dd>{row.urlopDays}</dd></div>
+                        <div><dt><ClockIcon size={13} />{t("Hours")}</dt><dd>{row.sum || "0"}</dd></div>
+                        {showPublicHolidays && <div><dt><ScheduleDetailsIcon size={13} />{t("Holiday Days")}</dt><dd>{row.holidayDays}</dd></div>}
+                      </dl>
+                      <span className={styles.phoneEmployeeChevron} aria-hidden="true"><ChevronRightIcon size={18} /></span>
+                    </summary>
+                    <dl className={styles.phoneSummaryDays}>{summaryHeaders.map((header, dayIndex) => <div key={header.dayOfMonth}>
+                      <dt>{header.label}</dt>
+                      <dd>{row.dayRows.map((days, rowIndex) => <div className={styles.phoneSummaryShift} key={rowIndex}>
+                        <span><small>{t("From")}</small>{days[dayIndex].from || "-"}</span><span><small>{t("To")}</small>{days[dayIndex].to || "-"}</span><span><small>{t("Hours")}</small>{days[dayIndex].hours || "-"}</span>
+                      </div>)}</dd>
+                    </div>)}</dl>
+                  </details>)}
+                </div>}
+          </div>
+        </div>
+      </div>
+    </section>
   );
   const summaryCard = (
     <CardSection
@@ -560,36 +662,31 @@ export function ContainerGraphProfileWorkspace({
   return (
     <>
       {phoneMatrixViewport ? <div className={joinClassNames(styles.workspace, styles.workspacePhone)}>
-        <div className={styles.phoneInformationWrap} data-phone-schedule-information>{informationCard}</div>
+        {phoneInformationCard}
         <div className={joinClassNames(styles.mainColumn, styles.mainColumnCompact)}>{matrix}</div>
-        {summaryCard}
+        {phoneSummaryCard}
       </div> : <div className={joinClassNames(styles.workspace, isHeaderCollapsed && styles.workspaceHeaderCollapsed)}>
-        <div className={joinClassNames(styles.topRow, isSidebarCollapsed && styles.topRowCollapsed)}>
-          <aside className={joinClassNames(styles.sidebar, isSidebarCollapsed && styles.sidebarCollapsed)}>
-          <AvailabilitySidebarSection
-            label={t("Schedule Information")}
-            preserveCollapsedOnMobile
-            collapsed={isSidebarCollapsed}
-            collapsedOffset="flush"
-            onExpand={() => setIsSidebarCollapsed(false)}
-          >
-            <div className={styles.summaryCardMeasure}>
-              {informationCard}
+        <div className={joinClassNames(styles.mainColumn, compactSize && styles.mainColumnCompact)}>
+          {compactSize ? (
+            matrix
+          ) : (
+            <div className={styles.matrixCardShell} style={matrixCardShellStyle}>
+              {matrix}
             </div>
-          </AvailabilitySidebarSection>
-          </aside>
-
-          <div className={joinClassNames(styles.mainColumn, compactSize && styles.mainColumnCompact)}>
-            {compactSize ? (
-              matrix
-            ) : (
-              <div className={styles.matrixCardShell} style={matrixCardShellStyle}>
-                {matrix}
-              </div>
-            )}
-          </div>
+          )}
         </div>
         {summaryCard}
+        <dialog ref={informationDialogRef} className={styles.informationDialog} aria-labelledby={informationTitleId}>
+          <header className={styles.informationHeader}>
+            <h2 id={informationTitleId}>{t("Schedule Information")}</h2>
+            <button type="button" className={styles.roundButton} aria-label={t("Close")} onClick={() => informationDialogRef.current?.close()}>
+              <CloseIcon size={18} aria-hidden="true" />
+            </button>
+          </header>
+          <div className={styles.informationBody} tabIndex={0}>
+            {informationContent}
+          </div>
+        </dialog>
       </div>}
 
       <ContainerGraphRelatedHintDialog

@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { expectVisibleField, setVisualViewport } from "./fixtures/visualViewport";
 
 test.use({ timezoneId: "Europe/Warsaw" });
 test.describe.configure({ mode: "parallel" });
@@ -110,6 +111,57 @@ for (const [width, height] of [[320, 640], [375, 812], [390, 844], [430, 932], [
       await expect(modal).toHaveCount(0);
       expect(await page.evaluate(() => scrollY)).toBeCloseTo(scroll, 0);
     }
+  });
+}
+
+for (const width of [320, 375, 430]) {
+  test(`shift correction fields stay above the keyboard at ${width}px`, async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.setViewportSize({ width, height: 812 });
+    await fixture(page);
+    await page.goto("/schedule");
+    const adjust = page.getByRole("button", { name: "Request a shift correction", exact: true });
+    await expect(adjust).toBeVisible();
+    await page.evaluate(() => window.scrollTo(0, 80));
+    const restoredY = await page.evaluate(() => scrollY);
+    await adjust.evaluate(element => (element as HTMLButtonElement).click());
+    const dialog = page.getByRole("dialog", { name: "Request a shift change" });
+    const close = dialog.getByRole("button", { name: "Close shift correction dialog" });
+    const comment = dialog.getByRole("textbox", { name: "Comment (optional)" });
+    const scroller = comment.locator("../..");
+    await dialog.getByRole("button", { name: "Change start time from 08:00" }).click();
+    const time = dialog.getByLabel("New start time");
+
+    await comment.evaluate(element => element.focus({ preventScroll: true }));
+    await setVisualViewport(page, { height: 310, top: 64 });
+    await expectVisibleField(comment, scroller);
+    await page.keyboard.insertText("First line\nSecond line");
+    await comment.evaluate(element => (element as HTMLTextAreaElement).setSelectionRange(6, 6));
+    await page.keyboard.insertText("edited ");
+    await expect(comment).toHaveValue("First edited line\nSecond line");
+    await expectVisibleField(comment, scroller);
+
+    await time.evaluate(element => element.focus({ preventScroll: true }));
+    await expectVisibleField(time, scroller);
+    await expect(time).toHaveValue("08:00");
+    await comment.evaluate(element => element.focus({ preventScroll: true }));
+    await page.setViewportSize({ width: 670, height: 375 });
+    await setVisualViewport(page, { height: 200, top: 52 });
+    await expectVisibleField(comment, scroller);
+    await expect(comment).toHaveValue("First edited line\nSecond line");
+    await expect(close).toBeInViewport({ ratio: 1 });
+    expect(await page.evaluate(() => document.body.style.position)).toBe("fixed");
+    await close.click();
+    await expect(dialog).toHaveCount(0);
+    await expect.poll(() => page.evaluate(() => scrollY)).toBeCloseTo(restoredY, 0);
+    await setVisualViewport(page, null);
+    await page.setViewportSize({ width, height: 812 });
+
+    await adjust.evaluate(element => (element as HTMLButtonElement).click());
+    await expect(comment).toHaveValue("");
+    await comment.scrollIntoViewIfNeeded();
+    await expect(comment).toBeInViewport({ ratio: 1 });
+    await close.click();
   });
 }
 

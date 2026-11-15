@@ -1,9 +1,36 @@
 import { useEffect, type RefObject } from "react";
 
+const editableInputTypes = ["text", "search", "time", "number", "email", "tel", "url", "password"];
+
+function revealFocusedField(dialog: HTMLDialogElement) {
+  const field = document.activeElement;
+  if (!(field instanceof HTMLTextAreaElement ||
+    (field instanceof HTMLInputElement && editableInputTypes.includes(field.type))) ||
+    field.disabled || field.readOnly || !dialog.contains(field)) return;
+
+  for (let scroller = field.parentElement; scroller && scroller !== dialog; scroller = scroller.parentElement) {
+    if (scroller.scrollHeight <= scroller.clientHeight) continue;
+    const style = getComputedStyle(scroller);
+    if (style.overflowY !== "auto" && style.overflowY !== "scroll") continue;
+
+    const rect = field.getBoundingClientRect();
+    const top = scroller.getBoundingClientRect().top + scroller.clientTop;
+    const bottom = top + scroller.clientHeight;
+    // Reduce the inset if the field nearly fills the available space.
+    const maxPadding = Math.max(0, (scroller.clientHeight - rect.height) / 2);
+    const visibleTop = top + Math.min(maxPadding, parseFloat(style.scrollPaddingTop) || 0);
+    const visibleBottom = bottom - Math.min(maxPadding, parseFloat(style.scrollPaddingBottom) || 0);
+    const delta = rect.top < visibleTop ? rect.top - visibleTop : Math.max(0, rect.bottom - visibleBottom);
+    if (Math.abs(delta) > 1) scroller.scrollBy({ top: delta, behavior: "instant" });
+    return;
+  }
+}
+
 export function useSwapModalEnvironment(dialogRef: RefObject<HTMLDialogElement | null>, returnFocusRef?: RefObject<HTMLElement | null>, active = true): void {
   useEffect(() => {
     if (!active) return;
     const dialog = dialogRef.current;
+    if (!dialog) return;
     const previousFocus = returnFocusRef?.current ?? document.activeElement as HTMLElement | null;
     const pagePosition = { left: window.scrollX, top: window.scrollY };
     const restoreStyles: (() => void)[] = [];
@@ -28,22 +55,56 @@ export function useSwapModalEnvironment(dialogRef: RefObject<HTMLDialogElement |
     setStyles(document.body, { "overflow-x": "hidden", "overflow-y": "hidden", position: "fixed", top: `${-pagePosition.top}px`, left: `${-pagePosition.left}px`,
       width: "100%", "box-sizing": "border-box", "padding-right": `calc(${bodyPadding} + ${scrollbarGap}px)` });
     const viewport = window.visualViewport;
+    let height: number | undefined;
+    let top: number | undefined;
+    let viewportFrame = 0;
+    let focusFrame = 0;
+    const queueFocusReveal = () => {
+      if (focusFrame) return;
+      focusFrame = requestAnimationFrame(() => {
+        focusFrame = 0;
+        // Leave panning to the user while pinch-zoomed.
+        if (Math.abs((viewport?.scale ?? 1) - 1) < 0.01) revealFocusedField(dialog);
+      });
+    };
     const updateViewport = () => {
-      const height = viewport?.height ?? window.innerHeight;
-      dialog?.style.setProperty("--swap-visual-height", `${height}px`);
-      dialog?.style.setProperty("--swap-visual-top", `${viewport?.offsetTop ?? 0}px`);
-      if (dialog) dialog.dataset.compactViewport = String(height < 600);
+      const nextHeight = viewport?.height ?? window.innerHeight;
+      const nextTop = viewport?.offsetTop ?? 0;
+      if (nextHeight !== height) {
+        height = nextHeight;
+        dialog.style.setProperty("--swap-visual-height", `${height}px`);
+        const compact = String(height < 600);
+        if (dialog.dataset.compactViewport !== compact) dialog.dataset.compactViewport = compact;
+      }
+      if (nextTop !== top) {
+        top = nextTop;
+        dialog.style.setProperty("--swap-visual-top", `${top}px`);
+      }
+    };
+    const queueViewportUpdate = () => {
+      if (viewportFrame) return;
+      viewportFrame = requestAnimationFrame(() => {
+        viewportFrame = 0;
+        updateViewport();
+        queueFocusReveal();
+      });
     };
     updateViewport();
-    viewport?.addEventListener("resize", updateViewport);
-    viewport?.addEventListener("scroll", updateViewport);
-    window.addEventListener("resize", updateViewport);
-    dialog?.showModal();
+    viewport?.addEventListener("resize", queueViewportUpdate);
+    viewport?.addEventListener("scroll", queueViewportUpdate);
+    window.addEventListener("resize", queueViewportUpdate);
+    dialog.addEventListener("focusin", queueFocusReveal);
+    dialog.addEventListener("input", queueFocusReveal);
+    dialog.showModal();
     return () => {
-      viewport?.removeEventListener("resize", updateViewport);
-      viewport?.removeEventListener("scroll", updateViewport);
-      window.removeEventListener("resize", updateViewport);
-      dialog?.close();
+      viewport?.removeEventListener("resize", queueViewportUpdate);
+      viewport?.removeEventListener("scroll", queueViewportUpdate);
+      window.removeEventListener("resize", queueViewportUpdate);
+      dialog.removeEventListener("focusin", queueFocusReveal);
+      dialog.removeEventListener("input", queueFocusReveal);
+      cancelAnimationFrame(viewportFrame);
+      cancelAnimationFrame(focusFrame);
+      dialog.close();
       for (const restore of restoreStyles.reverse()) restore();
       for (const { element, left, top } of backgroundScrollers) { element.scrollLeft = left; element.scrollTop = top; }
       window.scrollTo({ ...pagePosition, behavior: "instant" });

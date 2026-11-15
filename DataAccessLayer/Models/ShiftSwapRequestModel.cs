@@ -91,6 +91,9 @@ public class ShiftSwapRequestModel
     [Column("created_at_utc")]
     public DateTimeOffset CreatedAtUtc { get; set; }
 
+    [Column("refreshed_at_utc")]
+    public DateTimeOffset? RefreshedAtUtc { get; set; }
+
     [Column("accepted_at_utc")]
     public DateTimeOffset? AcceptedAtUtc { get; set; }
 

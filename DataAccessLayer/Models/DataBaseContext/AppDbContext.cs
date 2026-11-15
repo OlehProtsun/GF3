@@ -958,6 +958,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, TimeProvider? 
                 .HasDefaultValue(false);
             entity.Property(request => request.ManualColumnId).IsRequired(false);
             entity.Property(request => request.CreatedAtUtc).IsRequired();
+            entity.Property(request => request.RefreshedAtUtc)
+                .HasConversion(value => value.HasValue ? value.Value.UtcTicks : (long?)null,
+                    value => value.HasValue ? new DateTimeOffset(value.Value, TimeSpan.Zero) : null)
+                .IsRequired(false);
             entity.Property(request => request.AcceptedAtUtc).IsRequired(false);
             entity.Property(request => request.CancelledAtUtc).IsRequired(false);
 

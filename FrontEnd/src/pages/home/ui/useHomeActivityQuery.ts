@@ -11,8 +11,9 @@ export function useHomeActivityQuery(year: number, month: number, tab: HomeActiv
   const client = useQueryClient();
   const queryKey = [...queryKeys.home.activity(), year, month, tab];
   const scope = `${year}:${month}:${tab}`;
-  const nextRequest = useRef<Promise<unknown> | null>(null);
-  const [next, setNext] = useState<{ scope: string; loading: boolean; error: unknown }>({ scope, loading: false, error: null });
+  const nextRequest = useRef(new Set<string>());
+  const [nextByScope, setNextByScope] = useState<Record<string, { loading: boolean; error: unknown }>>({});
+  const next = nextByScope[scope];
   const query = useQuery<ActivityData>({
     queryKey, staleTime: 30_000, cancelOnUnmount: true,
     queryFn: async ({ signal }) => {
@@ -31,21 +32,26 @@ export function useHomeActivityQuery(year: number, month: number, tab: HomeActiv
   const data = query.data?.scope === scope ? query.data : undefined;
   const lastPage = data?.pages.at(-1);
   async function fetchNextPage() {
-    if (!lastPage?.hasMore || query.isFetching || nextRequest.current) return;
-    setNext({ scope, loading: true, error: null });
-    const promise = client.fetchQuery(queryKey, async ({ signal }) => {
-      const page = await managerHomeActivityApi.list({ year, month, tab, offset: lastPage.nextOffset, limit: 7 }, signal);
-      return { scope, pages: [...data!.pages, page] };
-    });
-    nextRequest.current = promise;
-    try { await promise; setNext({ scope, loading: false, error: null }); }
-    catch (error) { setNext({ scope, loading: false, error }); }
-    finally { if (nextRequest.current === promise) nextRequest.current = null; }
+    if (!lastPage?.hasMore || query.isFetching || nextRequest.current.has(scope)) return;
+    nextRequest.current.add(scope);
+    setNextByScope(previous => ({ ...previous, [scope]: { loading: true, error: null } }));
+    let error: unknown = null;
+    try {
+      await client.fetchQuery(queryKey, async ({ signal }) => {
+        const page = await managerHomeActivityApi.list({ year, month, tab, offset: lastPage.nextOffset, limit: 7 }, signal);
+        return { scope, pages: [...data!.pages, page] };
+      }, { retry: 0 });
+    } catch (caught) {
+      if (!(caught instanceof Error && caught.name === "AbortError")) error = caught;
+    } finally {
+      nextRequest.current.delete(scope);
+      setNextByScope(previous => ({ ...previous, [scope]: { loading: false, error } }));
+    }
   }
   return { data, error: query.error, isError: query.isError, isLoading: query.isLoading || (!data && !query.isError),
     isFetching: query.isFetching, hasNextPage: lastPage?.hasMore ?? false,
-    isFetchingNextPage: next.scope === scope && next.loading,
-    nextPageError: next.scope === scope ? next.error : null,
+    isFetchingNextPage: next?.loading ?? false,
+    nextPageError: next?.error ?? null,
     fetchNextPage, refetch: () => client.invalidateQueries({ queryKey }),
   };
 }

@@ -2,7 +2,7 @@ import { buildEffectiveManagerAvailabilityCellMap, getAutomaticManagerEmployeeId
 import { useEmploymentContractSettingsQuery } from "@entities/employment-contracts";
 import { canReserveManualShift } from "@entities/containers/model/manualShiftIntervals";
 import { useLanguageRevision } from "@shared/i18n/useLanguageRevision";
-import { dateTimeFormat, t } from "@shared/i18n";
+import { dateTimeFormat, t, translateServerMessage } from "@shared/i18n";
 import { useGraphApprovedUrlopQuery, approvedKeys } from "@entities/urlop";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { deriveGeneratedVacancies, reconcileGeneratedManualColumns } from "@entities/containers/model/generatedManualShifts";
@@ -108,6 +108,7 @@ import {
   shiftSwapsApi,
   useCancelManagerManualShiftSwapMutation,
   useCreateManagerManualShiftSwapMutation,
+  useRefreshManagerManualShiftSwapMutation,
   useGraphShiftSwapLogQuery,
   type ShiftSwap,
 } from "@entities/shift-swaps";
@@ -246,7 +247,7 @@ function toErrorMessage(error: unknown) {
 
 function toManualShiftPublishError(error: unknown) {
   if (error instanceof ApiError || error instanceof Error) {
-    return error.message;
+    return translateServerMessage(error.message);
   }
 
   return t("Could not publish this manual shift.");
@@ -1121,6 +1122,7 @@ export function ContainerGraphEditPage() {
   const deleteTextColorBindMutation = useDeleteManagerGraphTextColorBindMutation();
   const createManualShiftSwapMutation = useCreateManagerManualShiftSwapMutation();
   const cancelManualShiftSwapMutation = useCancelManagerManualShiftSwapMutation();
+  const refreshManualShiftSwapMutation = useRefreshManagerManualShiftSwapMutation();
 
   const [form, setForm] = useState<ContainerGraphFormState>(() => createInitialGraphForm());
   const urlop = useGraphApprovedUrlopQuery({ shopId: Number(form.shopId), year: Number(form.year) || 2000, month: Number(form.month) || 1 });
@@ -1135,6 +1137,12 @@ export function ContainerGraphEditPage() {
   const [validationSignal, setValidationSignal] = useState(0);
   const [submitError, setSubmitError] = useState<string | undefined>();
   const [manualShiftPublishError, setManualShiftPublishError] = useState<string | null>(null);
+  const [refreshingManualShiftId, setRefreshingManualShiftId] = useState<number | null>(null);
+  const [refreshedManualShiftId, setRefreshedManualShiftId] = useState<number | null>(null);
+  const refreshSuccessTimeoutRef = useRef<number | null>(null);
+  useEffect(() => () => {
+    if (refreshSuccessTimeoutRef.current !== null) window.clearTimeout(refreshSuccessTimeoutRef.current);
+  }, []);
   const [hydratedKey, setHydratedKey] = useState<string | null>(null);
   const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(false);
   const [selectedCellKeys, setSelectedCellKeys] = useState<string[]>([]);
@@ -3421,6 +3429,36 @@ export function ContainerGraphEditPage() {
     );
   };
 
+  const handleRefreshManualShift = (shift: ShiftSwap) => {
+    setManualShiftPublishError(null);
+    if (!containerId || !graphId) {
+      setManualShiftPublishError(t("Schedule is not ready yet."));
+      return;
+    }
+    setRefreshedManualShiftId(null);
+    if (refreshSuccessTimeoutRef.current !== null) window.clearTimeout(refreshSuccessTimeoutRef.current);
+    setRefreshingManualShiftId(shift.id);
+    refreshManualShiftSwapMutation.mutate({
+      containerId,
+      graphId,
+      id: shift.id,
+      expectedPublishedAtUtc: shift.refreshedAtUtc ?? shift.createdAtUtc,
+    }, {
+      onSuccess: () => {
+        setRefreshingManualShiftId(null);
+        setRefreshedManualShiftId(shift.id);
+        refreshSuccessTimeoutRef.current = window.setTimeout(() => {
+          setRefreshedManualShiftId(null);
+          refreshSuccessTimeoutRef.current = null;
+        }, 3000);
+      },
+      onError: error => {
+        setRefreshingManualShiftId(null);
+        setManualShiftPublishError(toManualShiftPublishError(error));
+      },
+    });
+  };
+
   const saveDisabled = isLoading || hasLoadError || isPolicyUnavailable || isSaving || generateMutation.isPending;
   const graphLabel = (id: number) =>
     baselinePersistedByIdRef.current[id]?.graph.name ?? sessionGraphs.find(graph => graph.id === id)?.name ?? t("Schedule {0}", id);
@@ -3561,6 +3599,8 @@ export function ContainerGraphEditPage() {
         isSchedulePresetsLoading={schedulePresetsQuery.isLoading}
         isPublishingManualShift={createManualShiftSwapMutation.isPending || isSaving}
         isCancellingManualShift={cancelManualShiftSwapMutation.isPending}
+        refreshingManualShiftId={refreshingManualShiftId}
+        refreshedManualShiftId={refreshedManualShiftId}
         submitError={submitError}
         bindErrorMessage={bindError ?? (bindsQuery.isError && bindRows.length === 0 ? t("Could not load bind information.") : undefined)}
         manualShiftPublishError={manualShiftPublishError}
@@ -3584,6 +3624,7 @@ export function ContainerGraphEditPage() {
         onDeleteManualColumn={handleDeleteManualColumn}
         onPublishManualShift={handlePublishManualShift}
         onCancelManualShift={handleCancelManualShift}
+        onRefreshManualShift={handleRefreshManualShift}
         onCancelPendingManualShift={handleCancelPendingManualShift}
         onEmployeePriorityChange={(employeeId, checked) => {
           if (graphEmployeeRows.find(row => row.employeeId === employeeId)?.isPriority !== checked) {

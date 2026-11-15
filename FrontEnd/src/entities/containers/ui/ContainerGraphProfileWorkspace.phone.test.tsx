@@ -39,12 +39,24 @@ test("legacy order pins a tagged empty generated column and displays accepted ma
   expect(screen.getByRole("button", { name: "Generated day 1" }).closest("td")).toHaveStyle({ backgroundColor: "#BAE6FD" });
 });
 
-test("phone sections have reading order, real metrics and a preserved read-only matrix", () => {
+test("phone sections start collapsed independently around a visible read-only matrix", async () => {
   const { container } = render(<ContainerGraphProfileWorkspace {...props} cellStyles={[{ id: 9, scheduleId: 3, dayOfMonth: 1, employeeId: 2, backgroundColorArgb: -65536 }]} />);
   const sections = ["Schedule Information", "Schedule Matrix", "Schedule Summary"].map(title => screen.getByText(title).closest("section")!);
   expect(sections[0].compareDocumentPosition(sections[1]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   expect(sections[1].compareDocumentPosition(sections[2]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-  expect(screen.getAllByRole("searchbox")).toHaveLength(1);
+  const infoToggle = screen.getByRole("button", { name: "Schedule Information" });
+  const summaryToggle = screen.getByRole("button", { name: /Schedule Summary/ });
+  expect(infoToggle).toHaveAttribute("aria-expanded", "false");
+  expect(summaryToggle).toHaveAttribute("aria-expanded", "false");
+  expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
+  await userEvent.click(infoToggle);
+  expect(infoToggle).toHaveAttribute("aria-expanded", "true");
+  expect(summaryToggle).toHaveAttribute("aria-expanded", "false");
+  expect(screen.getByRole("group", { name: "Schedule details" })).toBeVisible();
+  await userEvent.click(summaryToggle);
+  expect(summaryToggle).toHaveAttribute("aria-expanded", "true");
+  expect(infoToggle).toHaveAttribute("aria-expanded", "true");
+  expect(screen.getByRole("searchbox")).toBeVisible();
   const rows = cards(container);
   expect(rows).toHaveLength(2);
   expect(within(rows[0]).getByText("AK")).toHaveAttribute("aria-hidden", "true");
@@ -60,6 +72,7 @@ test("phone sections have reading order, real metrics and a preserved read-only 
 
 test("search handles names, surnames, multiword case, no matches and clearing", () => {
   const { container } = render(<ContainerGraphProfileWorkspace {...props} />);
+  fireEvent.click(screen.getByRole("button", { name: /Schedule Summary/ }));
   const input = screen.getByRole("searchbox");
   for (const value of ["anna", "KOWALSKA", "kOwAlSkA aNnA"]) {
     fireEvent.change(input, { target: { value } });
@@ -76,6 +89,7 @@ test("search handles names, surnames, multiword case, no matches and clearing", 
 test("native employee disclosure toggles and retains multiple daily shifts", async () => {
   const user = userEvent.setup();
   const { container } = render(<ContainerGraphProfileWorkspace {...props} />);
+  await user.click(screen.getByRole("button", { name: /Schedule Summary/ }));
   const card = cards(container)[0];
   const summary = card.querySelector("summary")!;
   expect(card.open).toBe(false);
@@ -92,11 +106,14 @@ test("native employee disclosure toggles and retains multiple daily shifts", asy
   expect(summary.querySelector("button, a")).toBeNull();
 });
 
-test.each(["public", "private"] as const)("information is initially visible with all fields and %s status", status => {
+test.each(["public", "private"] as const)("schedule information expands with all fields and %s status", async status => {
   const { container } = render(<ContainerGraphProfileWorkspace {...props} graph={{ ...graph, publicationStatus: status }} />);
   const information = container.querySelector<HTMLElement>("[data-phone-schedule-information]")!;
   expect(information).toBeVisible();
-  expect(screen.queryByRole("button", { name: /Collapse Schedule Information|Expand Schedule Information/ })).not.toBeInTheDocument();
+  const toggle = within(information).getByRole("button", { name: "Schedule Information" });
+  expect(toggle).toHaveAttribute("aria-expanded", "false");
+  await userEvent.click(toggle);
+  expect(toggle).toHaveAttribute("aria-expanded", "true");
   const fields = within(information).getByRole("group", { name: "Schedule details" });
   expect(fields.children).toHaveLength(11);
   for (const label of ["Month", "Year", "Shop", "Status", "People on Shift", "Shift1", "Shift2", "Max Consecutive Days", "Max Consecutive Full", "Max Full", "Availability"]) expect(within(fields).getByText(label)).toBeInTheDocument();
@@ -107,16 +124,40 @@ test.each(["public", "private"] as const)("information is initially visible with
   expect(within(information).getByText("Last Update")).toBeInTheDocument();
 });
 
-test.each([false, true])("desktop compact=%s retains summary table and information controls", async compactSize => {
+test.each([false, true])("desktop compact=%s puts actions in the matrix and details in a dialog", async compactSize => {
   const user = userEvent.setup();
-  const { container } = render(<ContainerGraphProfileWorkspace {...props} compactSize={compactSize} showManagementActions />);
+  const onEdit = vi.fn();
+  const onDelete = vi.fn();
+  const { container, rerender } = render(<ContainerGraphProfileWorkspace {...props} compactSize={compactSize} showManagementActions onEdit={onEdit} onDelete={onDelete} />);
   expect(container.querySelector('[data-phone-schedule-summary]')).toBeNull();
+  expect(container.querySelector("aside")).toBeNull();
   expect(screen.getByRole("columnheader", { name: "Work Days" })).toBeInTheDocument();
-  await user.click(screen.getByRole("button", { name: "Expand Schedule Information" }));
-  expect(screen.getByRole("button", { name: "Collapse Schedule Information" })).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Edit Schedule" })).toBeInTheDocument();
-  await user.click(screen.getByRole("button", { name: "Collapse Schedule Information" }));
-  expect(screen.getByRole("button", { name: "Expand Schedule Information" })).toBeInTheDocument();
+  const matrix = within(screen.getByText("Schedule Matrix", { exact: true }).closest("section")!);
+  expect(matrix.getByText("Last Update")).toBeVisible();
+  expect(matrix.getByText("Total Employees: 2")).toBeVisible();
+  await user.click(matrix.getByRole("button", { name: "Edit Schedule" }));
+  await user.click(matrix.getByRole("button", { name: "Delete Schedule" }));
+  expect(onEdit).toHaveBeenCalledTimes(1);
+  expect(onDelete).toHaveBeenCalledTimes(1);
+
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  await user.click(matrix.getByRole("button", { name: "Schedule Information" }));
+  const dialog = within(screen.getByRole("dialog", { name: "Schedule Information" }));
+  expect(dialog.getByRole("heading", { name: graph.name })).toBeVisible();
+  expect(dialog.getByText("ID 3")).toBeVisible();
+  expect(dialog.getByText("No notes yet.")).toBeVisible();
+  const fields = dialog.getByRole("group", { name: "Schedule details" });
+  expect(Array.from(fields.children, tile => tile.textContent)).toEqual([
+    "MonthJuly", "Year2026", "ShopShop 4", "StatusPublic", "People on Shift1", "Shift108:00 - 12:00",
+    "Shift214:00 - 18:00", "Max Consecutive Days5", "Max Consecutive Full3", "Max Full10", "AvailabilityNone",
+  ]);
+  expect(dialog.queryByRole("button", { name: /Edit|Delete/ })).not.toBeInTheDocument();
+  await user.click(dialog.getByRole("button", { name: "Close" }));
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+  rerender(<ContainerGraphProfileWorkspace {...props} compactSize={compactSize} showManagementActions showEditAction={false} isDeleting />);
+  expect(matrix.queryByRole("button", { name: "Edit Schedule" })).not.toBeInTheDocument();
+  expect(matrix.getByRole("button", { name: "Deleting..." })).toBeDisabled();
 });
 
 test("empty and optional data use existing fallbacks", () => {
@@ -132,6 +173,7 @@ test("empty and optional data use existing fallbacks", () => {
 
 test("phone holiday metric follows visibility while preserving original metrics and disclosure", () => {
   const { container, rerender } = render(<ContainerGraphProfileWorkspace {...props} graph={{ ...graph, month: 5 }} />);
+  fireEvent.click(screen.getByRole("button", { name: /Schedule Summary/ }));
   const summary = cards(container)[0].querySelector("summary")!;
   expect(within(summary).getByText("Holiday Days").nextElementSibling).toHaveTextContent("1");
   expect(Array.from(summary.querySelectorAll("dd")).map(node => node.textContent)).toEqual(["1", "30", "0", "8", "1"]);

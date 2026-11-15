@@ -3,7 +3,7 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
 const names = ["Ada Able", "Ben Baker", "Zoe Young"];
 const savedOrderKey = "gf3:employee-schedule-column-order:v1:employee-1";
 
-async function openSchedule(page: Page, longList = false) {
+async function openSchedule(page: Page, longList = false, additionalNames: string[] = []) {
   await page.clock.setFixedTime(new Date("2026-08-12T12:00:00Z"));
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.addInitScript(() => {
@@ -11,7 +11,7 @@ async function openSchedule(page: Page, longList = false) {
   });
 
   const employeeNames = longList ? [...names, ...Array.from({ length: 18 }, (_, index) =>
-    `Employee ${index} With A Long Name ${"W".repeat(38)}`)] : names;
+    `Employee ${index} With A Long Name ${"W".repeat(38)}`)] : [...names, ...additionalNames];
   const employees = employeeNames.map((label, index) => {
     const [firstName, ...lastName] = label.split(" ");
     return { id: index + 1, employeeId: index + 1, firstName, lastName: lastName.join(" "), displayOrder: index };
@@ -52,6 +52,48 @@ async function openDialog(page: Page) {
   await expect(dialog).toBeVisible();
   return dialog;
 }
+
+test("employee matrix names keep one font size while scrolling and changing phone orientation", async ({ page }, info) => {
+  const employeeNames = [
+    "Aleksandra Żółć-Nowak",
+    "Анна-Марія Гринчук",
+    "Jean-Claude Dupont",
+    "Avery Anastasia Supercalifragilistic Expialidocious",
+    "Oleh Protsun",
+  ];
+  await openSchedule(page, false, employeeNames);
+  const headers = page.getByRole("button", { name: /^Customize columns from / });
+  await expect(headers).toHaveCount(names.length + employeeNames.length);
+
+  const readHeaderMetrics = () => headers.evaluateAll(elements => elements.map(element => {
+    const style = getComputedStyle(element);
+    return { fontSize: style.fontSize, lineHeight: style.lineHeight };
+  }));
+  const initial = await readHeaderMetrics();
+  expect(new Set(initial.map(item => item.fontSize)).size).toBe(1);
+  expect(initial[0].fontSize).toBe("12.48px");
+  expect(new Set(initial.map(item => item.lineHeight)).size).toBe(1);
+  const matrixCard = page.locator('[class*="openScheduleMatrix"]');
+  const textSizeAdjust = await matrixCard.evaluate(element => {
+    const style = getComputedStyle(element);
+    const value = style.getPropertyValue("-webkit-text-size-adjust") || style.getPropertyValue("text-size-adjust") ||
+      (style as CSSStyleDeclaration & { webkitTextSizeAdjust?: string }).webkitTextSizeAdjust || "";
+    return { value, supported: CSS.supports("-webkit-text-size-adjust", "100%") || CSS.supports("text-size-adjust", "100%") };
+  });
+  if (textSizeAdjust.supported) expect(textSizeAdjust.value).toBe("100%");
+
+  const matrix = matrixCard.locator("table");
+  const scroller = matrix.locator("xpath=..");
+  const dimensions = await scroller.evaluate(element => ({ clientWidth: element.clientWidth, scrollWidth: element.scrollWidth }));
+  expect(dimensions.scrollWidth).toBeGreaterThan(dimensions.clientWidth);
+  await scroller.evaluate(element => { element.scrollLeft = element.scrollWidth; });
+  await expect.poll(readHeaderMetrics).toEqual(initial);
+
+  if (info.project.name === "webkit-iphone-x" || info.project.name === "mobile-chrome") {
+    await page.setViewportSize({ width: 812, height: 375 });
+    await expect.poll(readHeaderMetrics).toEqual(initial);
+  }
+});
 
 async function center(locator: Locator) {
   const box = await locator.boundingBox();

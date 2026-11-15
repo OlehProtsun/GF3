@@ -17,7 +17,7 @@
   max-height: calc(100dvh - 60px);
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
-  gap: 16px;
+  gap: 12px;
   padding: 20px;
   box-sizing: border-box;
   border: 1px solid rgba(255, 255, 255, 0.58);
@@ -28,6 +28,12 @@
 }
 
 .header {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.headerRow {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -65,6 +71,77 @@
   line-height: 1.5;
 }
 
+.exchangeBadge { margin: 0; }
+
+.scheduleSwitcher {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  padding: 5px;
+  border: 1px solid #e2e8f1;
+  border-radius: 21px;
+  background: #e9eef5;
+  box-shadow: inset 0 1px 4px rgb(38 56 84 / 6%);
+}
+
+.scheduleSwitcher button {
+  display: grid;
+  align-content: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 8px 12px;
+  border: 1px solid #e0e6ee;
+  border-radius: 16px;
+  background: #f3f5f8;
+  color: #40516c;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease, color 160ms ease;
+}
+
+.scheduleSwitcher button:hover { background: #fafbfd; border-color: #cbd8ea; }
+.scheduleSwitcher button[aria-pressed="true"] {
+  border-color: #bdd2fa;
+  background: #eef5ff;
+  color: #2452a4;
+  box-shadow: 0 2px 6px rgb(38 83 153 / 11%), inset 0 1px #fff;
+}
+
+.scheduleLabel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.scheduleKind, .scheduleIdentifier {
+  min-width: 0;
+  padding: 3px 8px;
+  border: 1px solid #dce4ee;
+  border-radius: 999px;
+  font-size: .7rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+.scheduleKind { background: #e8edf4; }
+.scheduleIdentifier { background: #fff; color: #253750; font-weight: 800; }
+.scheduleSwitcher button[aria-pressed="true"] .scheduleKind { background: #dfeaff; border-color: #cfdef8; }
+.scheduleSwitcher button[aria-pressed="true"] .scheduleIdentifier { border-color: #c7dafa; color: #2452a4; }
+
+.scheduleMeta {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 2px 9px;
+  font-size: .73rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.scheduleMeta strong { color: #23334b; font-size: .81rem; }
+.scheduleTime { font-variant-numeric: tabular-nums; font-weight: 650; }
+
 .closeButton {
   width: 42px;
   height: 42px;
@@ -85,32 +162,41 @@
   color: #1d4ed8;
 }
 
-.closeButton:focus-visible {
-  outline: 3px solid rgba(37, 99, 235, 0.16);
+.closeButton:focus-visible,
+.scheduleSwitcher button:focus-visible,
+.comparisonBody:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: -2px;
+}
+
+.comparisonBody {
+  min-width: 0;
+  min-height: 0;
+  padding: 16px clamp(16px, 2vw, 28px) 34px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
 }
 
 .matrixGrid {
   align-items: start;
-  grid-auto-rows: max-content;
-  min-height: 0;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-  padding: 10px 20px 36px;
-  box-sizing: border-box;
-  overflow: auto;
+  gap: 28px;
 }
 
-.matrixCard {
-  --matrix-scroll-max-height: clamp(180px, calc(100dvh - 360px), 480px);
-  --matrix-day-column-width: 56px;
+.matrixCard.matrixCard {
+  --matrix-day-column-width: 92px;
   --matrix-cell-min-width: 112px;
   --matrix-cell-min-height: 28px;
   --matrix-card-padding-bottom: 18px;
   width: 100%;
   min-width: 0;
   margin: 0;
+  box-shadow: 0 8px 20px rgb(30 47 74 / 10%), inset 0 1px rgb(255 255 255 / 45%);
 }
+
+.matrixCard div:has(> table) { overscroll-behavior-y: auto; }
 
 .emptyComparison {
   display: grid;
@@ -124,6 +210,29 @@
   font-size: 0.94rem;
   font-weight: 800;
   text-align: center;
+}
+
+@media (min-width: 1181px) and (min-height: 650px) {
+  .dialog[data-paired-matrices] { height: min(860px, calc(100dvh - 60px)); }
+  .dialog[data-paired-matrices] .comparisonBody {
+    display: grid;
+    grid-template-rows: minmax(0, 1fr);
+  }
+  .dialog[data-paired-matrices] .matrixGrid {
+    align-items: stretch;
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  /* Fit the table viewports inside the cards and keep the shadow gutters outside them. */
+  .dialog[data-paired-matrices] .matrixCard > div:has(table) {
+    flex: 1 1 0;
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .dialog[data-paired-matrices] .matrixCard div:has(> table) {
+    flex: 1 1 0;
+    min-height: 0;
+    overscroll-behavior-y: contain;
+  }
 }
 
 @media (max-width: 1180px) {
@@ -144,16 +253,19 @@
     border-radius: 20px;
   }
 
-  .header {
-    align-items: flex-start;
+  .scheduleSwitcher button { padding: 7px; }
+  .comparisonBody { padding-inline: 12px; }
+  .matrixGrid { gap: 24px; }
+  .matrixCard.matrixCard {
+    box-shadow: 0 6px 14px rgb(30 47 74 / 10%), inset 0 1px rgb(255 255 255 / 45%);
   }
+}
 
-  .matrixGrid {
-    padding-inline: 0;
-  }
+@media (max-height: 480px) {
+  .dialog { grid-template-rows: auto auto; overflow: auto; }
+  .comparisonBody { overflow: visible; }
+}
 
-  .matrixCard {
-    --matrix-scroll-max-height: clamp(120px, calc(100dvh - 460px), 360px);
-  }
-
+@media (prefers-reduced-motion: reduce) {
+  .scheduleSwitcher button { transition: none; }
 }

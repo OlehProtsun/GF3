@@ -420,6 +420,10 @@ public sealed class ContractShiftApprovalWorkflowTests
         var offer = await engine.Create(f.Owner, ContractTestFactory.Employee(f.Owner), ShiftSwapScenarioFactory.Request(f, new()), default);
         var ordinary = Assert.Single(await engine.GetVisible(f.Third, ContractTestFactory.Employee(f.Third), default));
         Assert.True(ordinary.PickupApprovalPolicyApplies); Assert.False(ordinary.RequiresManagerApproval); Assert.True(ordinary.CanAccept);
+        var employeeWithContract = Assert.Single(await engine.GetVisible(f.Target, ContractTestFactory.Employee(f.Target), default));
+        Assert.Equal(ordinary.Id, employeeWithContract.Id);
+        Assert.True(employeeWithContract.RequiresManagerApproval);
+        Assert.True(employeeWithContract.CanRequestManagerApproval);
         await ContractTestFactory.Approvals(db, engine).CreateClaimRequestAsync(f.Target, new() { ShiftSwapRequestId = offer.Id }, ContractTestFactory.Employee(f.Target));
         foreach (var viewer in new[] { f.Owner, f.Target, f.Third })
         {

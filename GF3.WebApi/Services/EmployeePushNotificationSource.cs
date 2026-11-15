@@ -4,6 +4,7 @@ using DataAccessLayer.Models.DataBaseContext;
 using DataAccessLayer.Models.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using WebApi.ShiftSwaps;
 
 namespace WebApi.Services;
 
@@ -70,8 +71,12 @@ public sealed class EmployeePushNotificationSource(AppDbContext db, IOptions<Mic
             (x.Status == ShiftSwapStatus.Accepted && x.FromEmployeeId == employeeId ||
                 x.Status == ShiftSwapStatus.Open && x.FromEmployeeId != employeeId &&
                 x.Schedule.Slots.Any(slot => slot.Id == x.ScheduleSlotId) &&
+                (x.RefreshedAtUtc == null || x.Schedule.AllowSwap &&
+                    x.ScheduleSlot!.EmployeeId == null && x.ScheduleSlot.Status == SlotStatus.UNFURNISHED &&
+                    !db.ContractShiftApprovalRequests.Any(approval =>
+                        approval.ShiftSwapRequestId == x.Id && approval.Kind == "claim" && approval.Status == "pending")) &&
                 (x.TargetEmployeeId == employeeId || x.Visibility == ShiftSwapVisibility.Public && sharedContainers.Contains(x.Schedule.ContainerId))))
-            .Select(x => new { x.Id, x.Status, x.CreatedAtUtc, x.AcceptedAtUtc, x.IsManagerCreated,
+            .Select(x => new { x.Id, x.Status, x.CreatedAtUtc, x.RefreshedAtUtc, x.AcceptedAtUtc, x.IsManagerCreated,
                 x.Schedule.Name, x.Schedule.Year, x.Schedule.Month, Day = x.ScheduleSlot == null ? (int?)null : x.ScheduleSlot.DayOfMonth,
                 From = x.OfferedFromTime ?? (x.ScheduleSlot == null ? null : x.ScheduleSlot.FromTime),
                 To = x.OfferedToTime ?? (x.ScheduleSlot == null ? null : x.ScheduleSlot.ToTime) }).ToListAsync(ct);
@@ -85,9 +90,21 @@ public sealed class EmployeePushNotificationSource(AppDbContext db, IOptions<Mic
             else if (swap.Status == ShiftSwapStatus.Open)
             {
                 var manual = swap.IsManagerCreated;
+                var id = $"{(manual ? "open-shift" : "swap-public")}:{swap.Id}";
+                var occurred = swap.CreatedAtUtc;
+                if (manual)
+                {
+                    if (swap.Day is not { } day || !ShiftSwapRules.IsBeforeManualOfferEnd(swap.Year, swap.Month, day, swap.To, nowUtc))
+                        continue;
+                    if (swap.RefreshedAtUtc is { } refreshed)
+                    {
+                        id += $":{Timestamp(refreshed)}";
+                        occurred = refreshed;
+                    }
+                }
                 var message = messages.Format(manual ? EmployeePushMessageKind.OpenShift : EmployeePushMessageKind.Swap,
                     swap.Name, swap.Year, swap.Month, day: swap.Day, from: swap.From, to: swap.To);
-                result.Add(new($"{(manual ? "open-shift" : "swap-public")}:{swap.Id}", swap.CreatedAtUtc,
+                result.Add(new(id, occurred,
                     message.Title, message.Body, $"/swap?swapId={swap.Id}", "swap"));
             }
         }

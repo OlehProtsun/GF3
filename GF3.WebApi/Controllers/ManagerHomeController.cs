@@ -25,7 +25,7 @@ public sealed class ManagerHomeController(AppDbContext db) : ControllerBase
         [FromQuery, BindRequired, Range(1, 9999)] int year,
         [FromQuery, BindRequired, Range(1, 12)] int month,
         CancellationToken cancellationToken,
-        [FromQuery, RegularExpression("^(all|approvals)$")] string tab = "all",
+        [FromQuery, RegularExpression("^(all|swaps|vacations|corrections|availability|approvals)$")] string tab = "all",
         [FromQuery, Range(0, 10000)] int offset = 0,
         [FromQuery, Range(1, 50)] int limit = 7)
         => Ok(await ManagerHomeActivityReader.ReadAsync(db, year, month, tab, offset, limit, cancellationToken));

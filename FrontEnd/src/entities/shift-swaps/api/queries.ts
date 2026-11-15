@@ -139,6 +139,20 @@ export function useCancelManagerManualShiftSwapMutation() {
   });
 }
 
+export function useRefreshManagerManualShiftSwapMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ containerId, graphId, id, expectedPublishedAtUtc }: {
+      containerId: number; graphId: number; id: number; expectedPublishedAtUtc: string;
+    }) => shiftSwapsApi.refreshManagerManual(containerId, graphId, id, expectedPublishedAtUtc),
+    onSuccess: (_data, payload) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.shiftSwaps.graphLog(payload.containerId, payload.graphId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.shiftSwaps.all });
+    },
+  });
+}
+
 export function useCancelContainerShiftSwapMutation() {
   const queryClient = useQueryClient();
 

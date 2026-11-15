@@ -6,8 +6,9 @@ import type { Employee } from "@entities/employees";
 import type { ShiftSwap } from "@entities/shift-swaps";
 import { IosButton } from "@shared/ui/components/IosButton";
 import { SearchableSelect, type SearchableSelectOption } from "@shared/ui/components/SearchableSelect";
-import { ChevronRightIcon, CloseIcon, PlusIcon, InformationIcon, ShareIcon, SwapHistoryIcon } from "@shared/ui/icons";
+import { CheckIcon, ChevronRightIcon, ClockIcon, CloseIcon, PlusIcon, InformationIcon, ShareIcon, SwapHistoryIcon } from "@shared/ui/icons";
 import { CardSection } from "@shared/ui/sections/CardSection";
+import activity from "./ContainerGraphActivity.module.css";
 import styles from "./ContainerGraphManualColumnsCard.module.css";
 
 type ManualColumnSummary = {
@@ -42,6 +43,8 @@ type ContainerGraphManualColumnsCardProps = {
   employees: Employee[];
   isPublishingShift?: boolean;
   isCancellingPublishedShift?: boolean;
+  refreshingPublishedShiftId?: number | null;
+  refreshedPublishedShiftId?: number | null;
   publishError?: string | null;
   publishedShifts?: ShiftSwap[];
   pendingPublishedShifts?: PendingManualColumnShiftPublication[];
@@ -50,6 +53,7 @@ type ContainerGraphManualColumnsCardProps = {
   onDeleteColumn: (columnId: number) => void;
   onPublishShift: (input: ManualColumnShiftPublicationInput) => void;
   onCancelPublishedShift?: (shiftId: number) => void;
+  onRefreshPublishedShift?: (shift: ShiftSwap) => void;
   onCancelPendingPublishedShift?: (clientId: string) => void;
 };
 
@@ -81,9 +85,9 @@ function getEmployeeLabel(employee: Employee) {
 export function ContainerGraphManualColumnsCard({
   highlightColor, highlightSettingDisabled, onOpenHighlightColorPicker,
   columns, allowSwap = true, isSchedulePublished = true, year, month, employees,
-  isPublishingShift = false, isCancellingPublishedShift = false, publishError = null,
+    isPublishingShift = false, isCancellingPublishedShift = false, refreshingPublishedShiftId = null, refreshedPublishedShiftId = null, publishError = null,
   publishedShifts = [], pendingPublishedShifts = [], headerRightSlot,
-  onAddColumn, onDeleteColumn, onPublishShift, onCancelPublishedShift, onCancelPendingPublishedShift,
+    onAddColumn, onDeleteColumn, onPublishShift, onCancelPublishedShift, onRefreshPublishedShift, onCancelPendingPublishedShift,
 }: ContainerGraphManualColumnsCardProps) {
   useLanguageRevision();
   const groups = columns.map((column, index) => ({ columnLabel: column.label.trim() || t("Manual column {0}", index + 1) }));
@@ -118,24 +122,23 @@ export function ContainerGraphManualColumnsCard({
     (targetMode === "public" || selectedEmployeeId !== null);
   const offerCount = openOffers.length + pendingPublishedShifts.length;
   return (
-    <CardSection className={styles.card}
-      title={<span className={styles.title}>{t("Manual shifts")} <span className={styles.badge}>{options.length}</span></span>}
-      icon={<span className={styles.calendarIcon}><InformationIcon size={18} /></span>}
-      headerRightSlot={headerRightSlot}>
-      <div className={styles.layout}>
-        <div className={styles.colorSetting}>
-          <span>{t("Accepted shift color")}</span>
-          <button type="button" className={styles.colorButton} aria-label={t("Accepted manual shift highlight color")}
-            disabled={highlightSettingDisabled} onClick={onOpenHighlightColorPicker}>
-            <span style={{ backgroundColor: highlightColor }} aria-hidden="true" />
-          </button>
-        </div>
+    <CardSection className={`${activity.card} ${styles.card}`} headerClassName={activity.header}
+      title={<span className={activity.title} role="heading" aria-level={3}>{t("Manual shifts")} <span className={activity.badge}>{options.length}</span></span>}
+      icon={<span className={activity.sectionIcon} aria-hidden="true"><InformationIcon size={18} /></span>}
+      headerRightSlot={<>
+        {headerRightSlot}
+        <button type="button" className={activity.iconButton} aria-label={t("Accepted manual shift highlight color")}
+          title={t("Accepted manual shift highlight color")} disabled={highlightSettingDisabled} onClick={onOpenHighlightColorPicker}>
+          <span className={activity.swatch} style={{ backgroundColor: highlightColor }} aria-hidden="true" />
+        </button>
+      </>}>
+      <div className={`${activity.stack} ${styles.layout}`}>
         <p className={styles.muted}>{t("Select a shift and publish it for employees to claim.")}</p>
         <section className={styles.panel} aria-label={t("Columns")}>
           <div className={styles.heading}><span>{t("Columns")} <span className={styles.badge}>{columns.length}</span></span>
             <IosButton className={styles.addButton} label={t("Add")} icon={<PlusIcon size={16} />} size="compact" variant="secondary" onClick={onAddColumn} />
           </div>
-          {columns.length === 0 ? <p className={styles.muted}>{t("No manual columns yet.")}</p> : (
+          {columns.length === 0 ? <p className={activity.state}>{t("No manual columns yet.")}</p> : (
             <div className={styles.list}>{columns.map((column, index) => (
               <div key={column.columnId} className={styles.column}>
                 <span className={styles.columnName} title={t("Edit header and values in the grid")}>{groups[index].columnLabel}</span>
@@ -148,7 +151,7 @@ export function ContainerGraphManualColumnsCard({
         </section>
         <section className={styles.panel}>
           <div className={styles.heading}><span>{t("Available shifts")} <span className={styles.badge}>{options.length}</span></span></div>
-          {options.length === 0 ? <p className={styles.muted}>{t("No available shifts. Enter a time range in the matrix.")}</p> : (
+          {options.length === 0 ? <p className={activity.state}>{t("No available shifts. Enter a time range in the matrix.")}</p> : (
             <div className={styles.shiftList} role="region" aria-label={t("Available shifts")} tabIndex={0}>{options.map(option => (
               <button type="button" key={option.id} className={styles.shift} aria-pressed={selected?.id === option.id} onClick={() => setSelectedId(option.id)}>
                 <span aria-hidden="true" className={styles.indicator} />
@@ -180,19 +183,37 @@ export function ContainerGraphManualColumnsCard({
           }} />
         </section>
         <section className={styles.offeredPanel} aria-label={t("Offered")}>
-          <button type="button" className={styles.offeredToggle} aria-expanded={offeredExpanded} onClick={() => setOfferedExpanded(value => !value)}><span className={styles.offeredTitle}><SwapHistoryIcon size={18} />{t("Offered")} ({offerCount})</span><ChevronRightIcon size={16} className={styles.offeredChevron} /></button>
+          <button type="button" className={styles.offeredToggle} aria-expanded={offeredExpanded} onClick={() => setOfferedExpanded(value => !value)}><span className={`${activity.badge} ${activity.pending}`}><SwapHistoryIcon size={17} />{t("Offered")} ({offerCount})</span><ChevronRightIcon size={16} className={styles.offeredChevron} /></button>
           {offeredExpanded ? <div className={styles.list}>
-            {offerCount === 0 ? <p className={styles.muted}>{t("No offered shifts.")}</p> : null}
+            {offerCount === 0 ? <p className={activity.state}>{t("No offered shifts.")}</p> : null}
             {pendingPublishedShifts.map(shift => <div className={styles.offer} key={shift.clientId}>
               <span className={styles.shiftText}><strong>{`${formatDay(year, month, shift.dayOfMonth)} · ${shift.fromTime}–${shift.toTime}`}</strong>
-                <small>{t(shift.allowPartialAcceptance ? "Allow custom time" : "Only the exact shift")} · {t("Pending save")} · {shift.targetEmployeeId ? t("Private") : t("Public")}{shift.targetEmployeeId ? ` · ${employeeNameById.get(shift.targetEmployeeId) ?? t("Selected employee")}` : ""}</small></span>
+                <small>{t(shift.allowPartialAcceptance ? "Allow custom time" : "Only the exact shift")} · {shift.targetEmployeeId ? t("Private") : t("Public")}{shift.targetEmployeeId ? ` · ${employeeNameById.get(shift.targetEmployeeId) ?? t("Selected employee")}` : ""}</small>
+                <span className={`${activity.badge} ${activity.pending}`}><ClockIcon size={12} />{t("Pending save")}</span></span>
               <button type="button" className={styles.quietButton} aria-label={t("Remove shift on {0}", formatDay(year, month, shift.dayOfMonth))} disabled={isPublishingShift || !onCancelPendingPublishedShift} onClick={() => onCancelPendingPublishedShift?.(shift.clientId)}>{t("Remove")}</button>
             </div>)}
-            {openOffers.map(shift => <div className={styles.offer} key={shift.id}>
+            {openOffers.map(shift => {
+              const refreshStatus = shift.manualOfferRefreshStatus ?? "unavailable";
+              const canRefresh = refreshStatus === "available";
+              return <div className={styles.offer} key={shift.id}>
               <span className={styles.shiftText}><strong>{`${formatDay(shift.year, shift.month, shift.dayOfMonth)} · ${shift.fromTime.slice(0, 5)}–${shift.toTime.slice(0, 5)}`}</strong>
-                <small>{t(shift.allowPartialAcceptance ? "Allow custom time" : "Only the exact shift")} · {shift.visibility === "private" ? t("Private") : t("Public")}{shift.targetEmployeeName ? ` · ${shift.targetEmployeeName}` : ""}</small></span>
-              <button type="button" className={styles.quietButton} aria-label={t("Cancel shift on {0}", formatDay(shift.year, shift.month, shift.dayOfMonth))} disabled={isPublishingShift || isCancellingPublishedShift || !onCancelPublishedShift} onClick={() => onCancelPublishedShift?.(shift.id)}>{isCancellingPublishedShift ? t("Cancelling...") : t("Cancel")}</button>
-            </div>)}
+                <small>{t(shift.allowPartialAcceptance ? "Allow custom time" : "Only the exact shift")} · {shift.visibility === "private" ? t("Private") : t("Public")}{shift.targetEmployeeName ? ` · ${shift.targetEmployeeName}` : ""}</small>
+                <span className={styles.offerStatuses}>
+                  <span className={`${activity.badge} ${activity.success}`}><CheckIcon size={12} />{t("Published")}</span>
+                  <span className={`${activity.badge} ${refreshStatus === "available" ? activity.pending : refreshStatus === "finished" ? styles.finishedBadge : activity.danger}`}>
+                    {refreshStatus === "available" ? <SwapHistoryIcon size={12} /> : refreshStatus === "finished" ? <ClockIcon size={12} /> : <CloseIcon size={12} />}
+                    {t(refreshStatus === "available" ? "Offered" : refreshStatus === "finished" ? "Finished" : "Unavailable")}
+                  </span>
+                </span></span>
+              <span className={styles.offerActions}>
+                <button type="button" className={styles.refreshButton} aria-label={t("Refresh shift on {0}", formatDay(shift.year, shift.month, shift.dayOfMonth))} disabled={isPublishingShift || isCancellingPublishedShift || refreshingPublishedShiftId != null || !canRefresh || !onRefreshPublishedShift} onClick={() => onRefreshPublishedShift?.(shift)}>
+                  {refreshingPublishedShiftId === shift.id ? <span className={styles.spinner} aria-hidden="true" /> : <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 7v5h-5"/><path d="M19 12a7 7 0 1 1-2-4.95L20 12"/></svg>}
+                  {refreshingPublishedShiftId === shift.id ? t("Refreshing...") : refreshedPublishedShiftId === shift.id ? t("Refreshed") : t("Refresh")}
+                </button>
+                <button type="button" className={styles.cancelButton} aria-label={t("Cancel shift on {0}", formatDay(shift.year, shift.month, shift.dayOfMonth))} disabled={isPublishingShift || isCancellingPublishedShift || refreshingPublishedShiftId != null || !onCancelPublishedShift} onClick={() => onCancelPublishedShift?.(shift.id)}>{isCancellingPublishedShift ? t("Cancelling...") : t("Cancel")}</button>
+              </span>
+              </div>;
+            })}
           </div> : null}
         </section>
       </div>

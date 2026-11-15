@@ -13,6 +13,17 @@ namespace WebApi.ShiftSwaps;
 
 internal static class ShiftSwapRules
 {
+    private static readonly TimeZoneInfo Warsaw = TimeZoneInfo.FindSystemTimeZoneById("Europe/Warsaw");
+
+    internal static bool IsBeforeManualOfferEnd(int year, int month, int day, string? toTime, DateTimeOffset nowUtc)
+    {
+        if (year is < 1 or > 9999 || month is < 1 or > 12 || day < 1 || day > DateTime.DaysInMonth(year, month) ||
+            !TimeOnly.TryParseExact(toTime, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var end))
+            return false;
+
+        return TimeZoneInfo.ConvertTime(nowUtc, Warsaw).DateTime < new DateOnly(year, month, day).ToDateTime(end);
+    }
+
     internal static void PopulateReturnSummary(ShiftSwapDto dto, ShiftSwapRequestModel swap,
         ScheduleSlotModel? returnSlot, ShiftSwapHistoryModel? history = null)
     {
@@ -155,6 +166,10 @@ internal static class ShiftSwapRules
                 _ => "open",
             },
             CreatedAtUtc = model.CreatedAtUtc,
+            RefreshedAtUtc = model.RefreshedAtUtc,
+            IsFinished = model.IsManagerCreated && model.ManualColumnId.HasValue && model.Status == ShiftSwapStatus.Open &&
+                model.ScheduleSlot is { } currentSlot && !IsBeforeManualOfferEnd(model.Schedule.Year, model.Schedule.Month,
+                    currentSlot.DayOfMonth, model.OfferedToTime ?? currentSlot.ToTime, DateTimeOffset.UtcNow),
             AcceptedAtUtc = model.AcceptedAtUtc,
             ShiftHours = Math.Round(shiftHours, 2),
             CurrentEmployeeHoursBefore = Math.Round(currentEmployeeStats.HoursBefore, 2),
@@ -198,6 +213,11 @@ internal static class ShiftSwapRules
             !swap.FromEmployeeId.HasValue || slot.EmployeeId != swap.FromEmployeeId)
             return swap.IsManagerCreated ? "This open shift is no longer available." :
                 "This shift is no longer assigned to the employee who opened the swap.";
+
+        if (swap.IsManagerCreated && swap.ManualColumnId.HasValue &&
+            !IsBeforeManualOfferEnd(swap.Schedule.Year, swap.Schedule.Month, slot.DayOfMonth,
+                swap.OfferedToTime ?? slot.ToTime, DateTimeOffset.UtcNow))
+            return "This manual shift offer has finished.";
 
         try
         {

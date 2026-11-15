@@ -1,5 +1,6 @@
 import { writeFile } from "node:fs/promises";
 import { expect, test, type Page } from "@playwright/test";
+import { expectVisibleField, setVisualViewport } from "./fixtures/visualViewport";
 import pl from "../src/shared/i18n/pl.json" with { type: "json" };
 import uk from "../src/shared/i18n/uk.json" with { type: "json" };
 
@@ -219,6 +220,47 @@ async function sourceSteps(page: Page) {
   await page.getByRole("button", { name: "Confirm shift" }).click();
   await expect(page.getByText("Thu 01 Oct · 09:00–16:30")).toBeVisible();
   await page.getByRole("button", { name: "Continue", exact: true }).click();
+}
+
+for (const width of [320, 375, 430]) {
+  test(`swap search stays above the keyboard at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 812 });
+    await mockApi(page, 1, { offers: [], employeeCount: 25 });
+    await page.goto("/swap");
+    await sourceSteps(page);
+    const dialog = page.getByRole("dialog", { name: "Create a swap offer" });
+    await dialog.getByRole("button", { name: "Specific employee" }).click();
+    const search = dialog.getByRole("searchbox", { name: "Search employee..." });
+    const scroller = search.locator("../..");
+    const initialWidth = (await dialog.boundingBox())!.width;
+    const scroll = await page.evaluate(() => scrollY);
+
+    await search.evaluate(element => element.focus({ preventScroll: true }));
+    await setVisualViewport(page, { height: 300, top: 72 });
+    await expectVisibleField(search, scroller);
+    expect((await dialog.boundingBox())!.width).toBeCloseTo(initialWidth, 0);
+
+    const name = "Zuzanna Aleksandra Kowalska-Wiśniewska";
+    await page.keyboard.insertText(name);
+    await expect(search).toHaveValue(name);
+    await expectVisibleField(search, scroller);
+    const results = dialog.getByRole("group", { name: "Employees" }).getByRole("button");
+    await expect(results).toHaveCount(24);
+    await scroller.evaluate(element => { element.scrollTop = element.scrollHeight; });
+    await expect(results.last()).toBeInViewport({ ratio: 1 });
+    await expect(search).toBeFocused();
+
+    await search.blur();
+    await setVisualViewport(page, null);
+    await search.evaluate(element => element.focus({ preventScroll: true }));
+    await page.setViewportSize({ width: 670, height: 375 });
+    await setVisualViewport(page, { height: 190, top: 55 });
+    await expectVisibleField(search, scroller);
+    await expect(search).toHaveValue(name);
+    expect(await page.evaluate(() => ({ scrollY, locked: document.body.style.position }))).toEqual({ scrollY: scroll, locked: "fixed" });
+    await results.last().click();
+    await expect(dialog.getByRole("button", { name: "Save selection" })).toBeVisible();
+  });
 }
 
 test("custom private Give sends exact payload and cancellation appears in History", async ({ page }) => {

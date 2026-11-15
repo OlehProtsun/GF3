@@ -117,6 +117,7 @@ function SwapOfferCard({ swap, isPinned, highlighted, onTogglePin, onViewDetails
   onViewDetails: (swapId: number, trigger: HTMLElement) => void;
 }) {
   const isOpen = swap.status === "open";
+  const awaitingApproval = isOpen && (swap.isAwaitingManagerApproval || swap.approvalPendingForCurrentEmployee);
   const [shareStatus, setShareStatus] = useState<string | null>(null);
   useEffect(() => {
     if (!shareStatus) return;
@@ -135,8 +136,9 @@ function SwapOfferCard({ swap, isPinned, highlighted, onTogglePin, onViewDetails
   };
   const isManagerManual = swap.isManagerCreated === true && typeof swap.manualColumnId === "number" && swap.manualColumnId > 0;
   const availabilityLabel = !isOpen ? swap.status === "accepted" ? t("Accepted") : t("Cancelled")
+    : swap.isFinished ? t("Finished")
     : swap.isCreatedByCurrentEmployee ? t("My offer") : swap.canAccept ? t("Can") : t("Can’t");
-  const unavailableReason = isOpen && !swap.canAccept ? swap.acceptanceUnavailableReason ||
+  const unavailableReason = isOpen && !swap.canAccept ? swap.isFinished ? t("This manual shift offer has finished.") : swap.acceptanceUnavailableReason ||
     (swap.isScheduleLocked ? "Schedule is locked while a manager is editing it." : null) : null;
   return <article className={[styles.offerCard, isPinned ? styles.offerCardPinned : "", highlighted ? styles.deepLinkedOffer : ""].join(" ")} data-swap-id={swap.id} data-pinned={String(isPinned)} data-own={swap.isCreatedByCurrentEmployee}>
     <button type="button" className={styles.offerOpenButton} aria-label={t("View offer details for {0}", swap.scheduleName)}
@@ -155,14 +157,14 @@ function SwapOfferCard({ swap, isPinned, highlighted, onTogglePin, onViewDetails
               : <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9" /><ellipse cx="12" cy="12" rx="4" ry="9" /><path d="M3 12h18" /></svg>}
             <span>{t(swap.visibility === "private" ? "Private" : "Public")}</span>
           </span>
-          <span className={`${styles.badge} ${!isOpen ? styles.badgeMuted : swap.isCreatedByCurrentEmployee ? styles.badgeMine : swap.canAccept ? styles.badgeCan : styles.badgeCant}`}>
+          <span className={`${styles.badge} ${!isOpen || swap.isFinished ? styles.badgeMuted : swap.isCreatedByCurrentEmployee ? styles.badgeMine : swap.canAccept ? styles.badgeCan : styles.badgeCant}`}>
             {isOpen && swap.isCreatedByCurrentEmployee ? <EmployeeIcon size={12} /> : (isOpen ? swap.canAccept : swap.status === "accepted") ? <CheckIcon size={13} /> : <WarnIcon size={13} />}
             <span>{availabilityLabel}</span>
           </span>
-          {swap.pickupApprovalPolicyApplies && <span className={`${styles.badge} ${styles.badgeApproval}`} title={t("Manager approval is required when the shift owner or recipient has an employment contract.")}>
+          {isOpen && !awaitingApproval && !swap.isCreatedByCurrentEmployee && swap.requiresManagerApproval && <span className={`${styles.badge} ${styles.badgeApproval}`} title={t("Request manager approval to accept this shift.")}>
             {t("Manager approval")}
           </span>}
-          {isOpen && swap.isAwaitingManagerApproval && <span className={`${styles.badge} ${styles.badgeApproval}`}>
+          {awaitingApproval && <span className={`${styles.badge} ${styles.badgeApproval}`}>
             {t("Awaiting approval")}
           </span>}
           {swap.allowPartialAcceptance === true && swap.requestKind !== "exchange" && <span className={`${styles.badge} ${styles.badgePartial}`}>
