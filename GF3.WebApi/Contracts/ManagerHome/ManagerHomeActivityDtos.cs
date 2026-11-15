@@ -12,6 +12,7 @@ public sealed record ManagerHomeActivityItemDto
     public required bool RequiresApproval { get; init; }
     public required string TargetType { get; init; }
     public string? CounterpartyName { get; init; }
+    public bool IsManagerCreatedOffer { get; init; }
     public string? ScheduleName { get; init; }
     public string? ShopName { get; init; }
     public DateOnly? ShiftDate { get; init; }
@@ -30,9 +31,12 @@ public sealed record ManagerHomeActivityItemDto
     public int? Month { get; init; }
 }
 
+public sealed record ManagerHomeActivityCategoryCountsDto(int Swaps, int Vacations, int Corrections, int Availability);
+
 public sealed record ManagerHomeActivityPageDto(
     IReadOnlyList<ManagerHomeActivityItemDto> Items,
     int AllActivityCount,
     int RequiresApprovalCount,
     bool HasMore,
-    int NextOffset);
+    int NextOffset,
+    ManagerHomeActivityCategoryCountsDto CategoryCounts);

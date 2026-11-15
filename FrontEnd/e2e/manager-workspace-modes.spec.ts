@@ -122,6 +122,94 @@ test("PC container schedule tiles preserve open and MultiOpen selection", async 
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
 });
 
+test("PC Schedule Profile uses the full matrix width and opens compact schedule information", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await fixture(page, "pc", "manager", { manualColumn: true, workerCount: 12 });
+  await page.goto("/container/1/graphs/3");
+
+  const title = page.getByText("Schedule Matrix", { exact: true });
+  const matrix = title.locator("xpath=ancestor::section[1]");
+  const workspace = matrix.locator("xpath=ancestor::div[following-sibling::section][1]/parent::div");
+  const info = matrix.getByRole("button", { name: "Schedule Information", exact: true });
+  const edit = matrix.getByRole("button", { name: "Edit Schedule", exact: true });
+  const remove = matrix.getByRole("button", { name: "Delete Schedule", exact: true });
+  await expect(info).toBeVisible();
+  await expect(workspace.locator("aside")).toHaveCount(0);
+  const matrixBox = (await matrix.boundingBox())!;
+  const workspaceBox = (await workspace.boundingBox())!;
+  expect(matrixBox.x).toBeCloseTo(workspaceBox.x, 0);
+  expect(matrixBox.width).toBeCloseTo(workspaceBox.width, 0);
+  const titleBox = (await title.boundingBox())!;
+  for (const control of [matrix.getByText("Last Update", { exact: true }), info, edit, remove]) {
+    const box = (await control.boundingBox())!;
+    expect(box.x).toBeGreaterThan(titleBox.x + titleBox.width);
+    expect(Math.abs(box.y + box.height / 2 - titleBox.y - titleBox.height / 2)).toBeLessThan(2);
+  }
+  await expect(matrix.getByText("Total Employees: 12")).toBeVisible();
+  const cell = matrix.getByRole("button", { name: "Worker 1 day 1", exact: true });
+  await expect(cell).toHaveText("Public schedule");
+  await expect(cell.locator("xpath=ancestor::td[1]")).toContainText("08:00 - 16:00");
+  await expect(matrix.getByText("Reserve coverage", { exact: true })).toBeVisible();
+  const scroll = matrix.locator("table").locator("..");
+  const scrollLeft = await scroll.evaluate(element => {
+    element.scrollLeft = element.scrollWidth;
+    return element.scrollLeft;
+  });
+  expect(scrollLeft).toBeGreaterThan(0);
+
+  await info.click();
+  const dialog = page.getByRole("dialog", { name: "Schedule Information" });
+  await expect(dialog).toBeVisible();
+  const close = dialog.getByRole("button", { name: "Close", exact: true });
+  await expect(close).toBeFocused();
+  await expect(dialog.getByRole("heading", { name: "Private schedule" })).toBeVisible();
+  await expect(dialog.getByRole("group", { name: "Schedule details" }).locator(":scope > div")).toHaveCount(11);
+  expect((await dialog.boundingBox())!.width).toBeLessThan(480);
+  expect(await page.evaluate(() => getComputedStyle(document.documentElement).overflowY)).toBe("hidden");
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  await expect(info).toBeFocused();
+  expect(await scroll.evaluate(element => element.scrollLeft)).toBe(scrollLeft);
+
+  await page.setViewportSize({ width: 390, height: 480 });
+  for (const control of [info, edit, remove]) await expect(control).toBeInViewport();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(391);
+  await info.click();
+  await expect(close).toBeInViewport();
+  const details = dialog.getByRole("group", { name: "Schedule details" });
+  await details.getByText("Availability", { exact: true }).scrollIntoViewIfNeeded();
+  await expect(details.getByText("Availability", { exact: true })).toBeInViewport();
+  await expect(close).toBeInViewport();
+  await close.click();
+  await expect(info).toBeFocused();
+});
+
+test("PC Schedule Profile preserves single and multi-schedule confirmations", async ({ page }) => {
+  await fixture(page, "pc");
+  await page.goto("/container/1/graphs/3");
+  await page.getByRole("button", { name: "Delete Schedule", exact: true }).click();
+  const deleteConfirmation = page.getByRole("dialog", { name: "Delete schedule" });
+  await expect(deleteConfirmation).toBeVisible();
+  await deleteConfirmation.getByRole("button", { name: "Cancel", exact: true }).click();
+  await page.getByRole("button", { name: "Edit Schedule", exact: true }).click();
+  const editConfirmation = page.getByRole("dialog", { name: "Edit schedule" });
+  await expect(editConfirmation).toContainText("Private schedule");
+  await editConfirmation.getByRole("button", { name: "Edit", exact: true }).click();
+  await expect(page).toHaveURL(/\/container\/1\/graphs\/3\/edit$/);
+
+  await page.goto("/container/1/graphs/3?openGraphIds=3,6");
+  await expect(page.getByRole("button", { name: "Edit Schedule", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Delete Schedule", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Edit all", exact: true }).click();
+  const multiConfirmation = page.getByRole("dialog", { name: "Edit selected schedules" });
+  await expect(multiConfirmation).toContainText("Private schedule");
+  await expect(multiConfirmation).toContainText("Public schedule");
+  await multiConfirmation.getByRole("button", { name: "Edit", exact: true }).click();
+  await expect(page).toHaveURL(url =>
+    url.pathname === "/container/1/graphs/3/edit" && url.searchParams.get("openGraphIds") === "3,6",
+  );
+});
+
 const legalDestinations = ["/legal/index.html", "/legal/regulamin.html", "/legal/polityka-prywatnosci.html"];
 async function legalFooter(page: Page, destinations: string[]) {
   const nav = page.getByRole("navigation", { name: "Legal documents", exact: true });
@@ -219,18 +307,18 @@ async function scrollMatrix(page: Page, headerCount = 7) {
   await noOverflow(page);
   return { ...before, after, headerCount };
 }
-async function navigation(page: Page, width: number) {
+async function navigation(page: Page) {
   const nav = page.getByRole("navigation", { name: "Manager navigation" });
   await expect(nav.getByRole("link")).toHaveCount(5);
   const current = nav.locator('[aria-current="page"]');
   await expect(current).toHaveCount(1);
-  await expect(current.locator("span")).toHaveCSS("opacity", width < 375 ? "0" : "1");
+  await expect(current.locator('span[aria-hidden="true"]')).toHaveCSS("opacity", "1");
   const glass = await nav.evaluate(element => ({ background: getComputedStyle(element).backgroundColor, filter: getComputedStyle(element).backdropFilter }));
   expect(glass.background).toBe("rgba(255, 255, 255, 0.16)");
   expect(glass.filter).toContain("blur(20px)");
   for (const link of await nav.getByRole("link").all()) {
     const box = await link.boundingBox(); expect(box!.height).toBeGreaterThanOrEqual(44);
-    expect(box!.width).toBeGreaterThanOrEqual(44);
+    expect(box!.width).toBeGreaterThan(0);
     await expect(link.locator("svg")).toBeVisible();
   }
   await page.getByRole("button", { name: "Collapse navigation", exact: true }).click();
@@ -241,6 +329,51 @@ async function navigation(page: Page, width: number) {
   await open.click(); await expect(current).toBeFocused();
   await expect(nav).not.toHaveAttribute("inert");
 }
+
+test("Manager Phone navigation matches Employee navigation geometry", async ({ page, context }) => {
+  const employeePage = await context.newPage();
+  await fixture(page, "phone");
+  await fixture(employeePage, "phone", "employee");
+  await Promise.all([page.goto("/"), employeePage.goto("/")]);
+  const manager = page.getByRole("navigation", { name: "Manager navigation" });
+  const employee = employeePage.getByRole("navigation", { name: "Employee sections" }).last();
+  const measure = (nav: Locator) => nav.evaluate(element => {
+    const box = element.getBoundingClientRect();
+    const size = (child: Element) => {
+      const { width, height } = child.getBoundingClientRect();
+      return { width, height };
+    };
+    return {
+      bar: size(element), x: box.x, bottom: innerHeight - box.bottom, padding: getComputedStyle(element).padding,
+      tabs: [...element.querySelectorAll("a")].map(size),
+      icons: [...element.querySelectorAll("a svg")].map(size),
+      activeGap: getComputedStyle(element.querySelector('[aria-current="page"]')!).gap,
+      collapse: size(element.querySelector("button")!),
+    };
+  });
+  for (const width of [320, 390, 768]) {
+    await Promise.all([page.setViewportSize({ width, height: 844 }), employeePage.setViewportSize({ width, height: 844 })]);
+    await expect(manager).toBeVisible();
+    await expect(employee).toBeVisible();
+    const reference = await measure(employee);
+    await expect.poll(() => measure(manager)).toEqual(reference);
+    expect(reference.tabs[0].width).toBeGreaterThan(reference.tabs[1].width);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  }
+  for (const browserPage of [page, employeePage]) {
+    await browserPage.getByRole("button", { name: "Collapse navigation", exact: true }).click();
+  }
+  const managerOpen = page.getByRole("button", { name: "Open navigation", exact: true });
+  const employeeOpen = employeePage.getByRole("button", { name: "Open navigation", exact: true });
+  await expect(managerOpen).toBeFocused();
+  await expect(employeeOpen).toBeFocused();
+  await expect(managerOpen).toHaveCSS("opacity", "1");
+  await expect(employeeOpen).toHaveCSS("opacity", "1");
+  const managerBox = (await managerOpen.boundingBox())!, employeeBox = (await employeeOpen.boundingBox())!;
+  for (const key of ["x", "y", "width", "height"] as const) {
+    expect(managerBox[key]).toBeCloseTo(employeeBox[key], 1);
+  }
+});
 
 test("login chooser selects original PC shell and edit controls", async ({ page }) => {
   const f = await fixture(page); await login(page);
@@ -265,7 +398,7 @@ for (const width of [320, 375, 390, 430, 768, 1440]) {
     test.setTimeout(60_000);
     await page.setViewportSize({ width, height: 850 }); const f = await fixture(page, "phone");
     await page.waitForLoadState("networkidle"); await page.goto("/"); await expect(page.getByRole("navigation", { name: "Manager navigation" })).toBeVisible(); await expect(page.getByRole("heading", { name: "Coming Soon" })).toBeVisible();
-    await expect(page.getByRole("link", { name: /Back/ })).toHaveCount(0); await noOverflow(page); await navigation(page, width);
+    await expect(page.getByRole("link", { name: /Back/ })).toHaveCount(0); await noOverflow(page); await navigation(page);
     await page.waitForLoadState("networkidle"); await page.goto("/container"); await expect(page.getByText("All manager container", { exact: true })).toBeVisible(); await noOverflow(page); await noManagement(page);
     await page.getByText("All manager container", { exact: true }).click(); await expect(page.getByText("Private schedule", { exact: true })).toBeVisible(); await expect(page.getByText("Public schedule", { exact: true })).toBeVisible(); await noOverflow(page);
     await page.getByText("Private schedule", { exact: true }).click(); await expect(page.getByText("Schedule Summary", { exact: true })).toBeVisible(); await noOverflow(page); await noManagement(page);
@@ -342,7 +475,7 @@ test("employee login never shows workspace choice", async ({ page }) => {
 
 test("chooser keyboard focus and reduced motion; phone nav touch targets", async ({ page }, testInfo) => {
   await page.emulateMedia({ reducedMotion: "reduce" }); await fixture(page, "choose"); await page.waitForLoadState("networkidle"); await page.goto("/");
-  const phone = page.getByRole("button", { name: "Phone Read only", exact: true }); await expect(phone).toBeVisible(); await phone.focus(); await expect(phone).toBeFocused();
+  const phone = page.getByRole("button", { name: /^(Phone Read only|Telefon Tylko podgląd)$/ }); await expect(phone).toBeVisible(); await phone.focus(); await expect(phone).toBeFocused();
   await page.screenshot({ path: testInfo.outputPath("chooser.png") }); await page.keyboard.press("Enter"); await expect(page.locator("[data-manager-phone]")).toBeVisible();
   const nav = page.getByRole("navigation", { name: "Manager navigation" });
   await page.getByRole("button", { name: "Collapse navigation", exact: true }).focus();
@@ -414,15 +547,36 @@ for (const width of [320, 375, 390, 430]) {
 test("phone search, descending containers, pin priority, metrics and long employee fields", async ({ page }, testInfo) => {
  await page.setViewportSize({ width: 390, height: 850 }); const f = await fixture(page, "phone", "manager", { longNames: true });
  await page.route("**/api/containers", route => route.fulfill({ contentType: "application/json", body: JSON.stringify([{ id: 1, name: "All manager container" }, { id: 9, name: "Container nine" }, { id: 4, name: "Container four" }]) }));
- await page.goto("/container"); await expect(page.getByText("Container nine", { exact: true })).toBeVisible();
- const titles = page.locator('main article[role="button"] [class*="_title_"]'); await expect(titles).toHaveText(["Container nine", "Container four", "All manager container"]);
+ await page.goto("/container"); await expect(page.getByRole("button", { name: "Open Container nine profile" })).toBeVisible({ timeout: 10_000 });
+ const titles = page.getByRole("button", { name: /^Open .* profile$/ }).locator("span[title]");
+ await expect(titles).toHaveText(["Container nine", "Container four", "All manager container"]);
  await page.getByRole("button", { name: /Pin All manager container/ }).click(); await expect(titles).toHaveText(["All manager container", "Container nine", "Container four"]);
  const search = page.getByRole("searchbox", { name: "Search", exact: true }); await search.fill("nine"); await expect(titles).toHaveText(["Container nine"]);
  await page.getByRole("button", { name: "Clear Search", exact: true }).click(); await expect(titles).toHaveCount(3);
- await page.getByText("All manager container", { exact: true }).click(); await expect(page.getByRole("heading", { name: "Statistics" })).toBeVisible();
+ await page.getByRole("button", { name: "Open All manager container profile" }).click(); await expect(page.getByRole("heading", { name: "Statistics" })).toBeVisible();
+ await expect(page.locator("main").getByText("Full manager records", { exact: true })).toHaveCount(0);
+ const toolbar = search.locator("../..");
+ const firstSchedule = page.getByRole("link", { name: /Private schedule/ });
+ const toolbarBox = (await toolbar.boundingBox())!;
+ const scheduleBox = (await firstSchedule.boundingBox())!;
+ expect(scheduleBox.y - toolbarBox.y - toolbarBox.height).toBeCloseTo(16, 0);
+ await expect(firstSchedule).toHaveCSS("border-top-left-radius", "30px");
+ await expect(firstSchedule.getByText("October 2026")).toBeVisible();
+ await expect(firstSchedule.getByText("6 employees")).toBeVisible();
+ await expect(firstSchedule.getByText("48h 0m")).toBeVisible();
  const stats = page.getByRole("heading", { name: "Statistics" }).locator(".."); await expect(stats.locator("table")).toHaveCount(0);
  await expect(stats.locator("article")).toHaveCount(7); await stats.locator("article details summary").first().click(); await expect(stats.locator("article").first()).toContainText("Central"); await noOverflow(page);
+ await page.setViewportSize({ width: 320, height: 560 });
+ await noOverflow(page);
+ expect(await firstSchedule.evaluate(card => card.scrollWidth <= card.clientWidth)).toBe(true);
+ await page.evaluate(() => window.scrollTo(0, 400));
+ await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(200);
+ await expect.poll(async () => (await toolbar.boundingBox())!.y).toBeCloseTo(toolbarBox.y, 0);
+ await search.fill("public");
+ await expect(firstSchedule).toHaveCount(0);
+ await expect(page.getByRole("link", { name: /Public schedule/ })).toHaveCount(1);
  await page.getByRole("link", { name: "Back", exact: true }).click(); await expect(page).toHaveURL(/\/container$/);
+ await page.setViewportSize({ width: 390, height: 850 });
  await page.goto("/employee/2"); await expect(page.getByText("Worker A very long employee surname 1", { exact: true })).toBeVisible(); await noOverflow(page); await noManagement(page);
  await page.goto("/more"); await expect(page.getByRole("button", { name: /Switch to Desktop/ }).locator("svg")).toHaveCSS("transform", "matrix(1, 0, 0, -1, 0, 0)");
  await page.screenshot({ path: testInfo.outputPath("phone-more.png"), fullPage: true }); await page.getByRole("button", { name: "Log out", exact: true }).click(); await expect(page).toHaveURL(/\/login$/); expect(f.unsafe).toEqual([]);

@@ -6,6 +6,7 @@ import { setLanguage } from "@shared/i18n";
 import { shiftSwapApprovalsApi as api } from "@entities/shift-swap-approvals/api/shiftSwapApprovalsApi";
 import type { ContractShiftApproval } from "@entities/shift-swap-approvals";
 import { ContainerGraphContractApprovalsCard } from "./ContainerGraphContractApprovalsCard";
+import { ContainerGraphScheduleActivityDialog } from "./ContainerGraphScheduleActivityDialog";
 vi.mock("@entities/shift-swap-approvals/api/shiftSwapApprovalsApi", () => ({ shiftSwapApprovalsApi: { graph: vi.fn(), review: vi.fn() } }));
 const pending: ContractShiftApproval = { id: 1, kind: "claim", status: "pending", employeeId: 2, employeeName: "Ada Worker", fromEmployeeId: 1, fromEmployeeName: "Oleh Owner", toEmployeeId: 2, toEmployeeName: "Ada Worker", scheduleId: 10, scheduleSlotId: 30,
   scheduleName: "October", shopId: 1, shopName: "Central", year: 2026, month: 10, dayOfMonth: 1, fromTime: "09:00", toTime: "17:00", shiftSwapRequestId: 5,
@@ -32,6 +33,34 @@ test("reject only reviews the graph request and unsaved edits block both actions
 });
 test("unsaved changes keep review disabled", async () => {
   mount(true); const user = userEvent.setup(); await user.click(await screen.findByRole("button", {name:/Ada Worker/})); expect(screen.getByRole("button",{name:"Approve"})).toBeDisabled(); expect(screen.getByRole("button",{name:"Reject"})).toBeDisabled();
+});
+
+test("pickup confirmation portals above Schedule Activity and Escape closes only the confirmation", async () => {
+  const onClose = vi.fn();
+  const onApproved = vi.fn();
+  const user = userEvent.setup();
+  render(<QueryClientProvider client={new QueryClient()}>
+    <ContainerGraphScheduleActivityDialog open onClose={onClose}
+      summary={{ swaps: 0, manual: 0, corrections: 0, contractApprovals: 1, total: 1, pending: 1, approvedOrAccepted: 0, rejected: 0, offered: 0 }}
+      swapPanel={null} manualPanel={null}
+      correctionsPanel={<ContainerGraphContractApprovalsCard containerId={1} graphId={10} disabled={false} hasUnsavedChanges={false} onApproved={onApproved} />} />
+  </QueryClientProvider>);
+  const activity = screen.getByRole("dialog", { name: "Schedule Activity" });
+  await user.click(await within(activity).findByRole("button", { name: /Ada Worker/ }));
+  const approve = within(activity).getByRole("button", { name: "Approve" });
+  await user.click(approve);
+  const confirmation = screen.getByRole("dialog", { name: "Approve shift transfer?" });
+  expect(confirmation.parentElement).toBe(document.body);
+  expect(activity).not.toContainElement(confirmation);
+  await user.keyboard("{Escape}");
+  expect(confirmation).not.toBeInTheDocument();
+  expect(activity).toBeVisible();
+  expect(onClose).not.toHaveBeenCalled();
+  expect(api.review).not.toHaveBeenCalled();
+  await user.click(approve);
+  await user.click(within(screen.getByRole("dialog", { name: "Approve shift transfer?" })).getByRole("button", { name: "Approve" }));
+  await waitFor(() => expect(onApproved).toHaveBeenCalledOnce());
+  expect(activity).toBeVisible();
 });
 
 test("pending cards are first; keyboard expansion opens only one card", async () => {

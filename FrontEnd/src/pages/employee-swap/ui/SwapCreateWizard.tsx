@@ -121,7 +121,9 @@ export function SwapCreateWizard({ schedules, employees, employeeId, employeeNam
     void client.invalidateQueries({ queryKey: queryKeys.shiftSwaps.preview(payload) });
     setStep(3);
   };
+  const isRecipientStep = view === "wizard" && step === 2;
   return createPortal(<dialog id="create-swap-panel" ref={dialogRef} className={`${styles.dialog} ${view === "wizard" ? `${styles.scheduleDialog} ${step === 2 ? styles.recipientDialog : step === 3 ? styles.reviewDialog : ""}` : view === "source" || view === "return" ? styles.pickerDialog : view === "type" ? styles.typeDialog : ""}`} aria-label={t("Create a swap offer")}
+    data-recipient-step={isRecipientStep ? "" : undefined}
     onCancel={event => { event.preventDefault(); if (!busy) { if (view === "wizard") onClose(); else back(); } }}
     onClick={event => { if (event.target === event.currentTarget && !busy) onClose(); }}>
     <div className={styles.shell}>
@@ -172,7 +174,7 @@ export function SwapCreateWizard({ schedules, employees, employeeId, employeeNam
           onBack={() => setView("returnSchedule")} onConfirm={selection => { setReturnSelection(selection); setView("type"); }} />}
         {view === "wizard" && <>
 
-          <h2 className={styles.heading} tabIndex={-1} data-subview-heading>{step === 1 ? t("Choose a schedule") : step === 2 ? t("Give to whom?") : t("Review & confirm")}</h2>
+          {step !== 2 && <h2 className={styles.heading} tabIndex={-1} data-subview-heading>{step === 1 ? t("Choose a schedule") : t("Review & confirm")}</h2>}
           {step === 1 && <p className={styles.description}><SwapSelectionContext message="Select a schedule for {0}." employeeName={employeeName} own /></p>}
           {step === 1 && <SwapScrollRegion key="schedules" scrollRef={schedulesRef} className={styles.cards} tabIndex={0} role="region" aria-label={t("Schedules")}>
             {schedules.filter(item => item.publicationStatus === "public" && item.allowSwap !== false).map(item => <div key={item.id} className={styles.card} data-selected={source?.shift.scheduleId === item.id}>
@@ -188,7 +190,9 @@ export function SwapCreateWizard({ schedules, employees, employeeId, employeeNam
             </div>)}
             {schedules.filter(s => s.publicationStatus === "public" && s.allowSwap !== false).length === 0 && <p>{t("No published schedules are available for swap.")}</p>}
           </SwapScrollRegion>}
-          {step === 2 && <><p className={styles.description}>{t("Choose who can take this shift.")}</p><SwapScrollRegion key="recipient" className={styles.recipientContent}>
+          {step === 2 && <SwapScrollRegion key="recipient" className={styles.recipientContent}>
+            <h2 className={styles.heading} tabIndex={-1} data-subview-heading>{t("Give to whom?")}</h2>
+            <p className={styles.description}>{t("Choose who can take this shift.")}</p>
             <div className={styles.recipientModes}>
               <div className={styles.recipientCard} data-selected={recipientMode === "everyone"}>
                 <button type="button" aria-pressed={recipientMode === "everyone"} aria-expanded={recipientMode === "everyone"} aria-controls={acceptanceId} onClick={() => { setRecipientMode("everyone"); setRecipient({ mode: "everyone" }); setReturnSelection(null); }} aria-label={t("Everyone")}><span className={styles.optionIcon} aria-hidden="true"><PeopleIcon group /></span><span className={styles.optionCopy}><strong>{t("Everyone")}</strong><small>{t("All employees can see and take this shift.")}</small></span><span className={styles.radioMark} aria-hidden="true" /></button>
@@ -219,7 +223,7 @@ export function SwapCreateWizard({ schedules, employees, employeeId, employeeNam
                   </button>)}
               </div>
             </>}
-          </SwapScrollRegion></>}
+          </SwapScrollRegion>}
           {step === 3 && <><p className={styles.description}>{t("Check all details before sending the request.")}</p>
             <SwapScrollRegion key="review" className={styles.reviewContent} tabIndex={0} role="region" aria-label={t("Review details")}>
             {previewQuery.isFetching && <p role="status">{t("Loading...")}</p>}

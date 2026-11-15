@@ -22,7 +22,8 @@ public sealed class ShiftSwapLogsController(
     AppDbContext db,
     IWorkflowLogService workflowLogService,
     IRealtimeNotifier realtimeNotifier,
-    IManagerEditLockService? editLockService = null) : ControllerBase
+    IManagerEditLockService? editLockService = null,
+    TimeProvider? timeProvider = null) : ControllerBase
 {
     [HttpGet("manual-highlight-setting")]
     [ProducesResponseType(typeof(ShiftSwapHighlightSettingDto), StatusCodes.Status200OK)]
@@ -504,11 +505,24 @@ public sealed class ShiftSwapLogsController(
         var returnSlotIds = openRequests.Where(r => r.ReturnScheduleSlotId.HasValue).Select(r => r.ReturnScheduleSlotId!.Value).ToArray();
         var returnSlots = await db.ScheduleSlots.AsNoTracking().Include(s => s.Schedule).ThenInclude(s => s.Shop)
             .Where(s => returnSlotIds.Contains(s.Id)).ToListAsync(cancellationToken);
+        var manualRequestIds = openRequests.Where(request => request.IsManagerCreated && request.ManualColumnId is > 0)
+            .Select(request => request.Id).ToArray();
+        List<int> pendingManualApprovalIds = manualRequestIds.Length == 0 ? [] : await db.ContractShiftApprovalRequests.AsNoTracking()
+            .Where(request => request.ShiftSwapRequestId.HasValue && manualRequestIds.Contains(request.ShiftSwapRequestId.Value) &&
+                request.Kind == "claim" && request.Status == "pending")
+            .Select(request => request.ShiftSwapRequestId!.Value).Distinct().ToListAsync(cancellationToken);
+        var now = (timeProvider ?? TimeProvider.System).GetUtcNow();
         var result = openRequests
-            .OrderByDescending(request => request.CreatedAtUtc)
+            .OrderByDescending(request => request.RefreshedAtUtc ?? request.CreatedAtUtc)
+            .ThenByDescending(request => request.Id)
             .Select(request =>
             {
                 var dto = ToLogDto(request);
+                dto.ManualOfferRefreshStatus = GetManualOfferRefreshStatus(request,
+                    pendingManualApprovalIds.Contains(request.Id), now);
+                dto.IsFinished = request.IsManagerCreated && request.ManualColumnId is > 0 && request.ScheduleSlot is { } slot &&
+                    !ShiftSwapRules.IsBeforeManualOfferEnd(request.Schedule.Year, request.Schedule.Month,
+                        slot.DayOfMonth, request.OfferedToTime ?? slot.ToTime, now);
                 if (request.RequestKind == ShiftSwapRequestKind.Exchange)
                     ShiftSwapRules.PopulateReturnSummary(dto, request, returnSlots.FirstOrDefault(s => s.Id == request.ReturnScheduleSlotId));
                 return dto;
@@ -517,6 +531,56 @@ public sealed class ShiftSwapLogsController(
             .ToList();
 
         return Ok(result);
+    }
+
+    [HttpPost("{id:int}/refresh")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<IActionResult> RefreshManualOffer(
+        int containerId, int graphId, int id, [FromBody] RefreshManualShiftOfferRequest request, CancellationToken cancellationToken)
+    {
+        if (CreateEditLockConflictResult(containerId, graphId) is { } conflict) return conflict;
+        if (request.ExpectedPublishedAtUtc is not { } expected)
+            throw ValidationException.ForField(nameof(request.ExpectedPublishedAtUtc), "The offer publication timestamp is required.");
+
+        try
+        {
+            await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+            var swap = await db.ShiftSwapRequests.Include(x => x.Schedule).Include(x => x.ScheduleSlot)
+                .Include(x => x.TargetEmployee)
+                .SingleOrDefaultAsync(x => x.Id == id && x.ScheduleId == graphId && x.Schedule.ContainerId == containerId,
+                    cancellationToken).ConfigureAwait(false)
+                ?? throw new KeyNotFoundException($"Shift swap with id {id} was not found.");
+
+            var now = (timeProvider ?? TimeProvider.System).GetUtcNow();
+            var hasPendingApproval = await db.ContractShiftApprovalRequests.AnyAsync(x =>
+                x.ShiftSwapRequestId == id && x.Kind == "claim" && x.Status == "pending", cancellationToken).ConfigureAwait(false);
+            var refreshStatus = GetManualOfferRefreshStatus(swap, hasPendingApproval, now);
+            if (refreshStatus != "available")
+                throw new ValidationException(refreshStatus == "finished"
+                    ? "This manual shift offer has finished and cannot be refreshed."
+                    : "Only available manual shift offers can be refreshed.");
+
+            // Replays of the same viewed revision cannot publish another notification.
+            var publishedAt = swap.RefreshedAtUtc ?? swap.CreatedAtUtc;
+            if (swap.RefreshedAtUtc is not null && expected >= swap.CreatedAtUtc && expected < publishedAt)
+                return NoContent();
+            if (expected != publishedAt || now <= publishedAt)
+                throw new ValidationException("This swap changed during another request. Refresh and try again.");
+            if (CreateEditLockConflictResult(containerId, graphId) is { } writingConflict) return writingConflict;
+
+            swap.RefreshedAtUtc = now;
+            await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception exception) when (ShiftSwapRules.IsSqliteWriterConflict(exception))
+        {
+            throw new ValidationException("This swap changed during another request. Refresh and try again.");
+        }
+
+        await PostCommitActions.RunAsync(HttpContext, () => realtimeNotifier
+            .NotifyShiftSwapsChangedAsync(containerId, graphId, graphId, "manager-manual-shift-offer-refreshed", id))
+            .ConfigureAwait(false);
+        return NoContent();
     }
 
     [HttpPost("{id:int}/cancel")]
@@ -604,6 +668,24 @@ public sealed class ShiftSwapLogsController(
             ManagerEditLockTargets.Schedule(containerId, graphId),
             "This schedule");
 
+    private static string GetManualOfferRefreshStatus(ShiftSwapRequestModel swap, bool hasPendingApproval, DateTimeOffset now)
+    {
+        var slot = swap.ScheduleSlot;
+        if (swap.IsManagerCreated && swap.ManualColumnId is > 0 && swap.Status == ShiftSwapStatus.Open && slot is not null &&
+            !ShiftSwapRules.IsBeforeManualOfferEnd(swap.Schedule.Year, swap.Schedule.Month,
+                slot.DayOfMonth, swap.OfferedToTime ?? slot.ToTime, now))
+            return "finished";
+
+        return swap.IsManagerCreated && swap.ManualColumnId is > 0 && swap.Status == ShiftSwapStatus.Open &&
+            swap.Schedule.PublicationStatus == SchedulePublicationStatus.Public && swap.Schedule.AllowSwap &&
+            slot is { EmployeeId: null, Status: SlotStatus.UNFURNISHED } && slot.ScheduleId == swap.ScheduleId &&
+            (swap.Visibility != ShiftSwapVisibility.Private || swap.TargetEmployee is { IsDeleted: false }) &&
+            !hasPendingApproval && ShiftSwapRules.IsBeforeManualOfferEnd(swap.Schedule.Year, swap.Schedule.Month,
+                slot.DayOfMonth, swap.OfferedToTime ?? slot.ToTime, now)
+                ? "available"
+                : "unavailable";
+    }
+
     private async Task NotifyContainerSwapChangedAsync(int containerId, int graphId, int shiftSwapId, string reason)
     {
         await realtimeNotifier
@@ -668,6 +750,7 @@ public sealed class ShiftSwapLogsController(
                 _ => "open",
             },
             CreatedAtUtc = model.CreatedAtUtc,
+            RefreshedAtUtc = model.RefreshedAtUtc,
             AcceptedAtUtc = model.AcceptedAtUtc,
             ShiftHours = shiftHours,
             CurrentEmployeeHoursBefore = 0,

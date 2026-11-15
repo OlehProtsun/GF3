@@ -53,7 +53,7 @@
   justify-content: center;
   flex: 0 0 auto;
   padding: 0;
-  border-radius: 13px;
+  border-radius: 999px;
   border: 1px solid rgba(37, 99, 235, 0.2);
   background: rgba(239, 246, 255, 0.94);
   color: #2563eb;
@@ -137,6 +137,8 @@
 }
 
 .openScheduleMatrix {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
   --matrix-day-column-width: 68px;
   --matrix-cell-min-width: 104px;
   --matrix-cell-min-height: 26px;
@@ -158,6 +160,17 @@
   margin-inline: 0;
   padding: 12px 10px 0;
   border-radius: 24px;
+}
+
+.openScheduleMatrix :global(thead th:not(:first-child) > div > span:first-child),
+.openScheduleMatrix :global(thead th:not(:first-child) > div > button) {
+  min-width: 0;
+  font-size: var(--matrix-header-font-size, 0.78rem);
+  line-height: 1.3;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 .openScheduleCorrectionButton {

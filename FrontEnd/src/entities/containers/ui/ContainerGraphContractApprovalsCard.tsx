@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { useGraphContractApprovalsQuery, useReviewContractApprovalMutation, type ContractShiftApproval } from "@entities/shift-swap-approvals";
 import { queryKeys } from "@shared/api/queryKeys";
@@ -8,6 +9,7 @@ import { ConfirmDialog } from "@shared/ui/ConfirmDialog";
 import { ErrorBanner } from "@shared/ui/components/ErrorBanner";
 import { IosButton } from "@shared/ui/components/IosButton";
 import { ArrowRightIcon, CheckIcon, ChevronRightIcon, ClockIcon, CloseIcon, GroupIcon, ScheduleIcon } from "@shared/ui/icons";
+import activity from "./ContainerGraphActivity.module.css";
 import styles from "./ContainerGraphContractApprovalsCard.module.css";
 
 const submittedAt = dateTimeFormat("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
@@ -65,16 +67,18 @@ export function ContainerGraphContractApprovalsCard({ containerId, graphId, disa
   if (!containerId || !graphId) return null;
   const blocked = disabled || hasUnsavedChanges || mutation.isPending;
   return <section className={styles.root} aria-label={t("Contract approvals")}>
-    <header className={styles.summary}><strong>{t("Contract approvals")}</strong><span><ClockIcon size={14} />{t("{0} pending", count)}</span></header>
-    {hasUnsavedChanges ? <p className={styles.state} role="status">{t("Save your changes before reviewing requests.")}</p> : null}
+    <header className={styles.summary}><strong>{t("Contract approvals")}</strong><span className={`${activity.badge} ${activity.pending}`}><ClockIcon size={13} />{t("{0} pending", count)}</span></header>
+    {hasUnsavedChanges ? <p className={`${activity.state} ${activity.pending}`} role="status">{t("Save your changes before reviewing requests.")}</p> : null}
     {error || query.error ? <ErrorBanner dismissible={false}>{error ?? getErrorMessage(query.error, t("Could not load approval requests."))}</ErrorBanner> : null}
     {query.isError ? <IosButton label={t("Retry")} variant="secondary" size="compact" onClick={() => client.invalidateQueries({ queryKey: queryKeys.shiftSwaps.graphApprovals(containerId, graphId) })} /> : null}
-    {query.isLoading ? <p className={styles.state} role="status">{t("Loading...")}</p> : null}
-    {query.data?.length === 0 ? <p className={styles.state}>{t("No contract approval requests.")}</p> : null}
+    {query.isLoading ? <p className={activity.state} role="status">{t("Loading...")}</p> : null}
+    {query.data?.length === 0 ? <p className={activity.state}>{t("No contract approval requests.")}</p> : null}
     <div className={styles.list}>{requests.map(item => {
       const { from, to } = participants(item);
       const requester = item.employeeName.trim() || t("Unknown employee");
-      const status = <span className={`${styles.status} ${styles[item.status]}`}><ClockIcon size={12} />{statusLabel(item.status)}</span>;
+      const StatusIcon = item.status === "approved" ? CheckIcon
+      : item.status === "rejected" || item.status === "cancelled" ? CloseIcon : ClockIcon;
+    const status = <span className={`${styles.status} ${styles[item.status] ?? ""}`}><StatusIcon size={12} />{statusLabel(item.status)}</span>;
       const period = `${item.fromTime} – ${item.toTime}`;
       return selectedId !== item.id ? <button key={item.id} type="button" className={styles.requestButton}
         aria-expanded={false} aria-controls={`contract-approval-${item.id}`} onClick={() => setSelectedId(item.id)}>
@@ -103,13 +107,13 @@ export function ContainerGraphContractApprovalsCard({ containerId, graphId, disa
         {item.kind === "claim" && item.status === "pending" ? <p className={styles.note}>{t("The offer is reserved while this pickup request awaits manager approval.")}</p> : null}
         {item.failureReason ? <p className={styles.note}>{translateServerMessage(item.failureReason)}</p> : null}
         {item.status === "pending" ? <div className={styles.actions}>
-          <IosButton label={mutation.isPending ? t("Applying...") : t("Reject")} variant="secondary" size="compact" icon={<CloseIcon size={15} />} disabled={blocked} onClick={() => review(item, "reject")} />
-          <IosButton label={mutation.isPending ? t("Applying...") : t("Approve")} size="compact" icon={<CheckIcon size={15} />} disabled={blocked} onClick={() => item.kind === "claim" ? setConfirm(item) : review(item, "approve")} />
+          <IosButton className={`${activity.action} ${activity.danger}`} label={mutation.isPending ? t("Applying...") : t("Reject")} variant="secondary" size="compact" icon={<CloseIcon size={15} />} disabled={blocked} onClick={() => review(item, "reject")} />
+          <IosButton className={`${activity.action} ${activity.success}`} label={mutation.isPending ? t("Applying...") : t("Approve")} size="compact" icon={<CheckIcon size={15} />} disabled={blocked} onClick={() => item.kind === "claim" ? setConfirm(item) : review(item, "approve")} />
         </div> : null}
       </article>;
     })}</div>
-    <ConfirmDialog open={confirm !== null} title={t("Approve shift transfer?")} message={t("Approval transfers the requested shifts and records schedule history.")}
+    {confirm && createPortal(<ConfirmDialog open={confirm !== null} title={t("Approve shift transfer?")} message={t("Approval transfers the requested shifts and records schedule history.")}
       confirmText={t("Approve")} confirmDisabled={blocked} cancelDisabled={mutation.isPending}
-      onCancel={() => setConfirm(null)} onConfirm={() => { if (confirm) review(confirm, "approve"); }} />
+      onCancel={() => setConfirm(null)} onConfirm={() => { if (confirm) review(confirm, "approve"); }} />, document.body)}
   </section>;
 }

@@ -424,7 +424,11 @@ public sealed class ShiftSwapSafetyTests
         await using var database = await SqliteTestDatabase.CreateAsync();
         var fixture = await SeedAsync(database, manual: true);
         await using var db = database.CreateContext();
-        (await db.Schedules.SingleAsync()).Note = "Visible note\n\n[[GF3_GRAPH_META:{\"m\":[[7,\"Manual\",{\"23\":\"09:00 - 22:00\",\"24\":\"09:00 - 15:00\"}]]}]]";
+        var sourceSchedule = await db.Schedules.SingleAsync();
+        var futureMonth = DateTimeOffset.UtcNow.AddMonths(1);
+        sourceSchedule.Year = futureMonth.Year;
+        sourceSchedule.Month = futureMonth.Month;
+        sourceSchedule.Note = "Visible note\n\n[[GF3_GRAPH_META:{\"m\":[[7,\"Manual\",{\"23\":\"09:00 - 22:00\",\"24\":\"09:00 - 15:00\"}]]}]]";
         (await db.ShiftSwapRequests.SingleAsync()).ManualColumnId = 7;
         await db.SaveChangesAsync();
         await Employee(db, fixture.Target).Accept(fixture.Swap, default);

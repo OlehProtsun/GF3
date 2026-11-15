@@ -66,6 +66,39 @@ public sealed class EmployeePushNotificationSourceTests
         Assert.DoesNotContain(await Source(db).GetCurrentAsync(outsider.Id, Now, default), x => x.Tone == "swap");
     }
 
+    [Fact]
+    public async Task RefreshedManagerOfferCreatesOneFreshPushEventForItsVisibleRecipients()
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        await using var db = database.CreateContext(new FixedClock());
+        var (owner, recipient, schedule, _) = await Seed(db);
+        schedule.Year = 2027;
+        schedule.Month = 1;
+        schedule.AllowSwap = true;
+        var slot = TestDataFactory.CreateDalSlot(schedule.Id, 21, 1, null, "09:00", "17:00");
+        db.Add(slot);
+        await db.SaveChangesAsync();
+        var offer = Offer(owner, schedule, slot);
+        offer.FromEmployeeId = null;
+        offer.IsManagerCreated = true;
+        offer.ManualColumnId = 1;
+        offer.CreatedAtUtc = Now.AddMinutes(-2);
+        offer.RefreshedAtUtc = Now.AddSeconds(-1);
+        db.Add(offer);
+        await db.SaveChangesAsync();
+
+        var first = Assert.Single(await Source(db).GetCurrentAsync(recipient, Now, default), x => x.NotificationId.StartsWith($"open-shift:{offer.Id}:", StringComparison.Ordinal));
+        var retry = Assert.Single(await Source(db).GetCurrentAsync(recipient, Now, default), x => x.NotificationId.StartsWith($"open-shift:{offer.Id}:", StringComparison.Ordinal));
+        Assert.Equal(first.NotificationId, retry.NotificationId);
+        Assert.Equal(offer.RefreshedAtUtc, first.OccurredAtUtc);
+
+        offer.Visibility = ShiftSwapVisibility.Private;
+        offer.TargetEmployeeId = owner;
+        await db.SaveChangesAsync();
+        Assert.DoesNotContain(await Source(db).GetCurrentAsync(recipient, Now, default), x => x.NotificationId.StartsWith($"open-shift:{offer.Id}:", StringComparison.Ordinal));
+        Assert.Contains(await Source(db).GetCurrentAsync(owner, Now, default), x => x.NotificationId == first.NotificationId);
+    }
+
     internal sealed class FixedClock : TimeProvider
     {
         public DateTimeOffset Value = Now;
@@ -111,9 +144,13 @@ public sealed class EmployeePushNotificationSourceTests
         await using var database = await SqliteTestDatabase.CreateAsync();
         await using var db = database.CreateContext(new FixedClock());
         var (owner, recipient, schedule, slot) = await Seed(db);
+        var futureScheduleMonth = Now.AddMonths(1);
+        schedule.Year = futureScheduleMonth.Year;
+        schedule.Month = futureScheduleMonth.Month;
+        await db.SaveChangesAsync();
         db.Add(new EmployeeAccountModel { EmployeeId = recipient, Username = "recipient", PasswordHash = "hash", Language = language });
         var ordinary = Offer(owner, schedule, slot);
-        var manualSlot = TestDataFactory.CreateDalSlot(schedule.Id, 2, 1, null, "08:00", "16:00"); db.Add(manualSlot); await db.SaveChangesAsync();
+        var manualSlot = TestDataFactory.CreateDalSlot(schedule.Id, 21, 1, null, "08:00", "16:00"); db.Add(manualSlot); await db.SaveChangesAsync();
         var manual = Offer(owner, schedule, manualSlot); manual.FromEmployeeId = null; manual.IsManagerCreated = true; manual.ManualColumnId = 1;
         var accepted = Offer(recipient, schedule, slot); accepted.Status = ShiftSwapStatus.Accepted; accepted.AcceptedAtUtc = Now; accepted.RequestKind = ShiftSwapRequestKind.Exchange;
         var group = new AvailabilityGroupModel { Name = "Push", Year = 2026, Month = 10, PublicationStatus = AvailabilityPublicationStatus.Public,

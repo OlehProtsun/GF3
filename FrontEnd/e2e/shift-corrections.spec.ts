@@ -1,9 +1,16 @@
 import { expect, test, type Page } from "@playwright/test";
 
-async function correctionFixture(page: Page, language: string) {
+const correctionComment = "Zażółć 🌙\nДругий рядок <strong>literal</strong> " + "W".repeat(70);
+const commentLabels = {
+  en: { detail: "Comment", input: "Comment (optional)" },
+  pl: { detail: "Komentarz", input: "Komentarz (opcjonalnie)" },
+  uk: { detail: "Коментар", input: "Коментар (необов’язково)" },
+};
+
+async function correctionFixture(page: Page, language: string, includeScheduleActivity = false) {
   await page.addInitScript(() => localStorage.setItem("gf3.auth.access-token", "correction-ui-test"));
   const graph = { id: 3, containerId: 1, shopId: 4, name: "Schedule", note: "", year: 2026, month: 10,
-    publicationStatus: "public", peoplePerShift: 1, shift1Time: "15:00 - 22:00", shift2Time: "08:00 - 14:00",
+    publicationStatus: "public", allowSwap: true, peoplePerShift: 1, shift1Time: "15:00 - 22:00", shift2Time: "08:00 - 14:00",
     maxHoursPerEmpMonth: 160, maxConsecutiveDays: 5, maxConsecutiveFull: 3, maxFullPerMonth: 10 };
   const requests = Array.from({ length: 25 }, (_, index) => ({
     id: index + 1, containerId: 1, scheduleId: 3, scheduleSlotId: 1, isDayOffRequest: false,
@@ -12,7 +19,21 @@ async function correctionFixture(page: Page, language: string) {
     year: 2026, month: 10, dayOfMonth: 21, originalFromTime: "15:00", originalToTime: "22:00",
     requestedFromTime: "14:00", requestedToTime: "22:00", createdAtUtc: "2026-10-21T12:26:00Z",
     status: index < 2 ? "pending" : index % 2 ? "approved" : "rejected", reviewedByManagerName: "Ada Manager",
+    comment: index === 0 || index === 2 ? correctionComment : null,
   }));
+  const pickup = { id: 4, kind: "claim", status: "pending", employeeId: 2, employeeName: "Pickup Worker",
+    fromEmployeeName: "Swap Giver", toEmployeeName: "Pickup Worker", scheduleId: 3, scheduleSlotId: 1,
+    scheduleName: "Schedule", shopName: "Central", year: 2026, month: 10, dayOfMonth: 21,
+    fromTime: "15:00", toTime: "22:00", createdAtUtc: "2026-10-21T12:26:00Z", isStale: false };
+  const accepted = { ...pickup, id: 6, status: "accepted", acceptedAtUtc: "2026-10-21T14:00:00Z",
+    fromEmployeeId: 2, acceptedByEmployeeId: 3, acceptedByEmployeeName: "Swap Receiver",
+    visibility: "public", isManagerCreated: false, shiftHours: 7,
+    beforeSnapshot: { rows: [{ employeeId: 2, employeeName: "Swap Giver", kind: "employee", dayValues: { 21: "15:00 - 22:00" } }] },
+    afterSnapshot: { rows: [{ employeeId: 3, employeeName: "Swap Receiver", kind: "employee", dayValues: { 21: "15:00 - 22:00" } }] },
+  };
+  const open = { ...accepted, id: 7, status: "open", isManagerCreated: true, manualColumnId: 1 };
+  const nonManual = { ...open, id: 8, manualColumnId: null };
+  const activityRequests: string[] = [];
   await page.route("**/api/**", async route => {
     const path = new URL(route.request().url()).pathname;
     if (!path.startsWith("/api/")) return route.continue();
@@ -25,14 +46,206 @@ async function correctionFixture(page: Page, language: string) {
     else if (path === "/api/containers/1/graphs/3/employees") body = [{ id: 1, scheduleId: 3, employeeId: 2, displayOrder: 0 }];
     else if (path === "/api/containers/1/graphs/3/slots") body = [{ id: 1, scheduleId: 3, employeeId: 2, dayOfMonth: 21, slotNo: 1, fromTime: "15:00", toTime: "22:00", status: "ASSIGNED" }];
     else if (path === "/api/containers/1/graphs/3/shift-corrections") body = requests;
+    else if (path === "/api/containers/1/graphs/3/shift-swap-approvals") body = includeScheduleActivity ? [pickup] : [];
+    else if (path === "/api/containers/1/graphs/3/shift-swap-approvals/4/reject") {
+      pickup.status = "rejected";
+      body = pickup;
+    }
+    else if (path === "/api/containers/1/graphs/3/shift-swaps") body = includeScheduleActivity ? [accepted, open, nonManual] : [];
+    else if (path.endsWith("/highlight-setting") || path.endsWith("/manual-highlight-setting")) body = { highlightColor: "#BBF7D0" };
     else if (path === "/api/manager-shift-correction-settings") body = { highlightColor: "#FDE68A" };
     else if (path === "/api/employees") body = [{ id: 2, firstName: "Oleh", lastName: "Protsun" }];
     else if (path === "/api/shops") body = [{ id: 4, name: "Central" }];
     else if (path.includes("notepad")) body = { notes: [], state: { isExpanded: false, isPinned: false, height: 700 } };
     else if (path.includes("negotiate")) return route.fulfill({ status: 503 });
+    if (/\/graphs\/\d+\/(shift-corrections|shift-swap-approvals|shift-swaps)/.test(path)) activityRequests.push(path);
     await route.fulfill({ json: body });
   });
+  return activityRequests;
 }
+
+async function showScheduleActivity(page: Page) {
+  const collapse = page.getByRole("button", { name: "Collapse sidebar", exact: true });
+  if (await collapse.isVisible()) {
+    await collapse.focus();
+    await page.keyboard.press("Enter");
+  }
+  const publication = page.getByRole("button", { name: "Expand Publication", exact: true });
+  await publication.focus();
+  await page.keyboard.press("Enter");
+  const trigger = page.getByRole("button", { name: "Open details", exact: true });
+  await trigger.focus();
+  await page.keyboard.press("Enter");
+  return { trigger, activity: page.getByRole("dialog", { name: "Schedule Activity", exact: true }) };
+}
+
+test("Schedule Activity preserves graph panels, live counts and overlay layering", async ({ page }) => {
+  test.setTimeout(60_000);
+  await page.setViewportSize({ width: 1694, height: 864 });
+  await correctionFixture(page, "en", true);
+  await page.goto("/container/1/graphs/3/edit");
+  await expect(page.getByRole("button", { name: "Expand Publication" })).toBeVisible({ timeout: 20_000 });
+  expect(await page.getByRole("button", { name: /^Expand (Manual shifts|Shift Corrections)$/ }).count()).toBe(0);
+  for (const label of ["Schedule Details", "Employees", "Bind Information"]) {
+    await expect(page.getByRole("button", { name: `Expand ${label}`, exact: true })).toBeVisible();
+  }
+  const { trigger, activity } = await showScheduleActivity(page);
+  const publication = trigger.locator("xpath=ancestor::section[1]");
+  await expect(publication).toContainText("Publication (3)");
+  await expect(publication.getByRole("radio")).toHaveCount(4);
+  await expect(publication.getByText("Swap log")).toHaveCount(0);
+  const tabs = activity.getByRole("tab");
+  await expect(tabs).toHaveText(["All28", "Shift Corrections26", "Manual shifts1", "Swap log1"]);
+  await expect(activity.getByText("Offered", { exact: true }).locator("..")).toHaveText("Offered1");
+  for (const [width, height] of [[1694, 864], [1920, 1080], [1366, 768], [1024, 768], [768, 1024], [390, 844]]) {
+    await page.setViewportSize({ width, height });
+    const box = (await activity.boundingBox())!;
+    expect(box.width).toBeLessThanOrEqual(width - 31);
+    expect(box.height).toBeLessThanOrEqual(height - 31);
+    expect(await activity.evaluate(element => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
+    const grid = activity.getByRole("tabpanel");
+    const columns = await grid.evaluate(element => getComputedStyle(element).gridTemplateColumns.split(" ").length);
+    expect(columns).toBe(width > 1050 ? 3 : width > 760 ? 2 : 1);
+    if (width <= 760) expect(await grid.evaluate(element => element.scrollHeight > element.clientHeight)).toBe(true);
+  }
+  const search = activity.getByRole("searchbox");
+  await search.fill("Swap Receiver");
+  await tabs.nth(3).click();
+  await expect(search).toHaveValue("Swap Receiver");
+  for (const [tab, control, childName] of [
+    [3, "View swap comparison for Swap Giver", "Swap Giver to Swap Receiver"],
+    [3, "Accepted swap highlight color", "Choose accepted swap color"],
+    [2, "Accepted manual shift highlight color", "Choose accepted shift color"],
+    [1, "Approved correction highlight color", "Choose approval color"],
+  ] as const) {
+    await tabs.nth(tab).click();
+    await activity.getByRole("button", { name: control, exact: true }).click();
+    const child = page.getByRole("dialog", { name: childName, exact: true });
+    await expect(child).toBeVisible();
+    await expect.poll(() => child.evaluate(element => Number(getComputedStyle(element).zIndex))).toBeGreaterThan(1500);
+    await expect.poll(() => child.evaluate(element => element.contains(document.elementFromPoint(innerWidth / 2, innerHeight / 2)))).toBe(true);
+    if (childName === "Swap Giver to Swap Receiver") {
+      await expect(child.getByRole("table")).toHaveCount(2);
+    }
+    await page.keyboard.press("Escape");
+    await expect(child).toHaveCount(0);
+    await expect(activity).toBeVisible();
+  }
+  const contract = activity.getByRole("region", { name: "Contract approvals" });
+  await contract.getByRole("button", { name: /Pickup Worker/ }).click();
+  await contract.getByRole("button", { name: "Approve", exact: true }).click();
+  const confirmation = page.getByRole("dialog", { name: "Approve shift transfer?" });
+  await expect(confirmation).toBeVisible();
+  expect(await confirmation.evaluate(element => element.parentElement === document.body)).toBe(true);
+  await page.keyboard.press("Escape");
+  await expect(confirmation).toHaveCount(0);
+  await contract.getByRole("button", { name: "Reject", exact: true }).click();
+  await expect(activity.getByText("Pending", { exact: true }).first().locator("..")).toHaveText("Pending2");
+  await expect(publication).toContainText("Publication (2)");
+  await page.keyboard.press("Escape");
+  await expect(activity).toHaveCount(0);
+  await expect(trigger).toBeFocused();
+});
+
+test("Schedule Activity compares cross-schedule exchanges one schedule at a time", async ({ page }, testInfo) => {
+  test.setTimeout(50_000);
+  await page.setViewportSize({ width: 1694, height: 864 });
+  await correctionFixture(page, "en");
+  const snapshot = (employeeId: number, employeeName: string, day: number, period: string) =>
+    ({ rows: [
+      { employeeId, employeeName, kind: "employee", dayValues: { [day]: period } },
+      { employeeId: 4, employeeName: "Backup", kind: "employee", dayValues: {} },
+    ] });
+  await page.route("**/api/containers/1/graphs/3/shift-swaps", route => route.fulfill({ json: [{
+    id: 9, status: "accepted", requestKind: "exchange", scheduleId: 3, scheduleName: "F27", shopName: "Central",
+    year: 2026, month: 10, dayOfMonth: 21, shiftHours: 7, fromTime: "15:00", toTime: "22:00",
+    fromEmployeeId: 2, fromEmployeeName: "Alice", acceptedByEmployeeId: 3, acceptedByEmployeeName: "Bob",
+    acceptedAtUtc: "2026-10-21T14:00:00Z", visibility: "private",
+    beforeSnapshot: snapshot(2, "Alice (F27)", 21, "15:00 - 22:00"),
+    afterSnapshot: snapshot(3, "Bob (F27)", 21, "15:00 - 22:00"),
+    returnScheduleId: 35, returnScheduleName: "F35", returnShopName: "West",
+    returnYear: 2026, returnMonth: 11, returnDayOfMonth: 3, returnFromTime: "09:30", returnToTime: "14:00", returnShiftHours: 4.5,
+    returnBeforeSnapshot: snapshot(3, "Bob (F35)", 3, "09:30 - 14:00"),
+    returnAfterSnapshot: snapshot(2, "Alice (F35)", 3, "09:30 - 14:00"),
+  }] }));
+  await page.goto("/container/1/graphs/3/edit");
+  const { activity } = await showScheduleActivity(page);
+  await activity.getByRole("tab", { name: /Swap log/ }).click();
+  await expect(activity.getByText("F27 · Central", { exact: true })).toBeVisible();
+  await expect(activity.getByText("F35 · West", { exact: true })).toBeVisible();
+  await expect(activity.getByRole("group", { name: "Alice", exact: true })).toContainText("Gives to Bob");
+  await expect(activity.getByRole("group", { name: "Bob", exact: true })).toContainText("Gives to Alice");
+  await activity.getByRole("button", { name: "View swap comparison for Alice" }).click();
+  const dialog = page.getByRole("dialog", { name: "Alice to Bob" });
+  const tables = dialog.getByRole("table");
+  const source = dialog.getByRole("button", { name: /Source schedule.*F27/ });
+  const returned = dialog.getByRole("button", { name: /Return schedule.*F35/ });
+  await expect(dialog.getByText("Exchange between different schedules")).toBeVisible();
+  await expect(tables).toHaveCount(2);
+  await expect(tables.nth(0).getByRole("columnheader", { name: "Alice (F27)" })).toBeVisible();
+  await returned.click();
+  await expect(tables).toHaveCount(2);
+  await expect(tables.nth(0).getByRole("columnheader", { name: "Bob (F35)" })).toBeVisible();
+  await expect(tables.nth(1).getByRole("columnheader", { name: "Alice (F35)" })).toBeVisible();
+  await expect(tables.getByRole("columnheader", { name: /F27/ })).toHaveCount(0);
+  await expect(returned.getByText("03 Nov 2026", { exact: true })).toBeVisible();
+  await expect(returned.getByText("09:30–14:00", { exact: true })).toBeVisible();
+  const holiday = tables.nth(0).getByRole("rowheader", { name: /Holiday/ }).first();
+  expect(await holiday.evaluate(cell => {
+    const label = cell.firstElementChild!;
+    return label.scrollWidth <= label.clientWidth + 1;
+  })).toBe(true);
+  await dialog.screenshot({ path: testInfo.outputPath("cross-schedule-desktop.png") });
+  const body = dialog.getByRole("region", { name: "Swap comparison" });
+  expect(await body.evaluate(element => element.scrollHeight <= element.clientHeight + 1)).toBe(true);
+  expect(await tables.first().evaluate(element => {
+    const tableViewport = element.parentElement!;
+    return tableViewport.scrollHeight > tableViewport.clientHeight;
+  })).toBe(true);
+  const desktopShadowSpace = await body.evaluate(element => {
+    const lastCard = element.firstElementChild!.lastElementChild!;
+    return element.getBoundingClientRect().bottom - lastCard.getBoundingClientRect().bottom;
+  });
+  expect(desktopShadowSpace).toBeGreaterThanOrEqual(30);
+  for (const width of [1024, 390]) {
+    await page.setViewportSize({ width, height: 844 });
+    expect(await dialog.evaluate(element => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
+    await expect(returned).toBeVisible();
+    await expect(tables).toHaveCount(2);
+  }
+  expect(await tables.first().evaluate(element => {
+    const tableViewport = element.parentElement!;
+    return tableViewport.scrollWidth > tableViewport.clientWidth &&
+      tableViewport.scrollHeight <= tableViewport.clientHeight + 1;
+  })).toBe(true);
+  await body.evaluate(element => { element.scrollTop = 0; });
+  await tables.first().getByRole("columnheader", { name: "Bob (F35)" }).hover();
+  await page.mouse.wheel(0, 280);
+  await expect.poll(() => body.evaluate(element => element.scrollTop)).toBeGreaterThan(0);
+  await body.focus();
+  await page.keyboard.press("End");
+  await expect.poll(() => body.evaluate(element => element.scrollTop)).toBeGreaterThan(0);
+  await source.click();
+  await expect(tables.nth(1).getByRole("columnheader", { name: "Bob (F27)" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  await expect(activity).toBeVisible();
+});
+
+test("Schedule Activity opens for a new graph and allows manual column editing without graph requests", async ({ page }) => {
+  const requests = await correctionFixture(page, "en");
+  await page.goto("/container/1/graphs/new");
+  const { activity } = await showScheduleActivity(page);
+  await expect(activity.getByText("No accepted swaps yet.")).toBeVisible();
+  await expect(activity.getByText("No correction requests yet.")).toBeVisible();
+  await activity.getByRole("tab", { name: /Manual shifts/ }).click();
+  const columns = activity.getByRole("region", { name: "Columns" });
+  await columns.getByRole("button", { name: "Add", exact: true }).click();
+  await expect(columns.getByRole("button", { name: /^Delete / })).toBeVisible();
+  await columns.getByRole("button", { name: /^Delete / }).click();
+  await expect(columns.getByText("No manual columns yet.")).toBeVisible();
+  expect(requests).toEqual([]);
+});
 
 for (const language of ["en", "pl", "uk"] as const) {
   test(`compact correction history and details in ${language}`, async ({ page, isMobile }, info) => {
@@ -41,7 +254,7 @@ for (const language of ["en", "pl", "uk"] as const) {
     await correctionFixture(page, language);
     await page.goto("/container/1/graphs/3/edit");
     const list = page.getByRole("list", { name: language === "en" ? "Shift correction requests" : language === "pl" ? "Wnioski o korektę zmiany" : "Запити на коригування змін" });
-    const expand = page.getByRole("button", { name: /^(Expand Shift Corrections|Rozwiń Korekty zmian|Розгорнути Коригування змін)$/ });
+    const expand = page.getByRole("button", { name: /^(Expand Publication|Rozwiń Publikacja|Розгорнути Публікація)$/ });
     await expect(expand).toBeVisible({ timeout: 20_000 });
     const collapseNavigation = page.getByRole("button", { name: language === "en" ? "Collapse sidebar" : language === "pl" ? "Zwiń pasek boczny" : "Згорнути бічну панель", exact: true });
     if (await collapseNavigation.isVisible()) {
@@ -52,6 +265,8 @@ for (const language of ["en", "pl", "uk"] as const) {
     // Keyboard activation avoids the app navigation's hover-to-open overlay.
     await expand.focus();
     await page.keyboard.press("Enter");
+    await page.getByRole("button", { name: /^(Open details|Otwórz szczegóły|Відкрити подробиці)$/ }).click();
+    await page.getByRole("tab", { name: /^(Shift Corrections|Korekty zmian|Коригування змін)/ }).click();
     await expect(list).toBeVisible();
     const shell = list.locator("..");
     for (const width of [320, 240]) {
@@ -60,6 +275,11 @@ for (const language of ["en", "pl", "uk"] as const) {
       await page.keyboard.press("Enter");
       const article = list.locator("article");
       await expect(article).toBeVisible();
+      const comment = article.getByText(commentLabels[language].detail, { exact: true }).locator("..").locator("p");
+      expect(await comment.textContent()).toBe(correctionComment);
+      await expect(comment.locator("strong")).toHaveCount(0);
+      await expect(comment).toHaveCSS("white-space", "pre-wrap");
+      expect(await comment.evaluate(element => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
       await expect(article.locator("svg")).toHaveCount(10);
       for (const icon of await article.locator("svg").all()) {
         await expect(icon).toBeVisible();
@@ -93,9 +313,10 @@ for (const language of ["en", "pl", "uk"] as const) {
       await list.getByRole("listitem").nth(index).focus();
       await page.keyboard.press("Enter");
       await expect(list.locator("article em")).toBeVisible();
+      await expect(list.locator("article").getByText(commentLabels[language].detail, { exact: true })).toHaveCount(index === 2 ? 1 : 0);
       await expect(list.locator("article svg")).toHaveCount(9);
       await expect(list.locator("article p svg")).toBeVisible();
-      await expect(list.locator("article p")).toContainText("Ada Manager");
+      await expect(list.locator("article p:has(svg)")).toContainText("Ada Manager");
       expect(await list.locator("article button").count()).toBe(1);
       await list.locator("article").screenshot({ path: info.outputPath(`resolved-${index}.png`) });
       await list.locator("article button").focus();
@@ -125,13 +346,16 @@ for (const language of ["en", "pl", "uk"] as const) {
 for (const [width, language] of [[320, "en"], [375, "pl"], [390, "uk"]] as const) {
   test(`employee requests a day-off shift at ${width}px in ${language}`, async ({ page, isMobile }, info) => {
     test.setTimeout(60_000);
+    await page.clock.setFixedTime(new Date("2026-08-12T10:00:00Z"));
     await page.setViewportSize({ width, height: 812 });
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.addInitScript(() => localStorage.setItem("gf3.auth.access-token", "day-off-fixture"));
     const requests: Record<string, unknown>[] = [];
     let submitted: unknown;
+    let attempts = 0;
     await page.route("**/api/**", async route => {
       const path = new URL(route.request().url()).pathname;
+      if (!path.startsWith("/api/")) return route.continue();
       let body: unknown = [];
       if (path === "/api/auth/session") body = { role: "employee", employeeId: 12, userName: "worker", displayName: "Worker" };
       else if (path === "/api/account-language") body = { language };
@@ -147,9 +371,14 @@ for (const [width, language] of [[320, "en"], [375, "pl"], [390, "uk"]] as const
       }];
       else if (path === "/api/employee-shift-corrections") {
         if (route.request().method() === "POST") {
-          submitted = route.request().postDataJSON();
-          requests.push({ ...(submitted as object), id: 1, containerId: 2, employeeId: 12, year: 2026, month: 8,
-            scheduleSlotId: null, originalFromTime: null, originalToTime: null, isDayOffRequest: true, status: "pending" });
+          const request = route.request().postDataJSON();
+          submitted = request;
+          if (++attempts === 1 && language === "en") {
+            return route.fulfill({ status: 503, json: { detail: "Could not send this test request." } });
+          }
+          requests.push({ ...request, id: 1, containerId: 2, employeeId: 12, year: 2026, month: 8,
+            scheduleSlotId: null, originalFromTime: null, originalToTime: null, isDayOffRequest: true, status: "pending",
+            comment: request.comment ?? null });
           return route.fulfill({ status: 201, json: requests[0] });
         }
         body = requests;
@@ -181,14 +410,25 @@ for (const [width, language] of [[320, "en"], [375, "pl"], [390, "uk"]] as const
     await expect(send).toBeDisabled();
     await inputs.first().fill("08:15"); await expect(send).toBeDisabled();
     await inputs.last().fill("16:45"); await expect(send).toBeEnabled();
+    const comment = dialog.getByRole("textbox", { name: commentLabels[language].input });
+    const draft = "  " + correctionComment + "  ";
+    await comment.fill(draft);
+    await expect(comment).toHaveValue(draft);
+    await expect(send).toBeInViewport();
     expect(await dialog.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
     const surface = dialog.locator('div').first();
     expect(await surface.evaluate(element => { const rect = element.getBoundingClientRect(); return element.scrollWidth <= element.clientWidth && rect.left >= 0 && rect.right <= innerWidth; })).toBe(true);
     await dialog.screenshot({ path: info.outputPath(`day-off-${width}-${language}.png`) });
     await send.click();
+    if (language === "en") {
+      await expect(dialog.getByText("Could not send this test request.")).toBeVisible();
+      await expect(comment).toHaveValue(draft);
+      await send.click();
+    }
     await expect(dialog).toHaveCount(0);
-    expect(submitted).toEqual({ scheduleId: 10, dayOfMonth: 13, requestedFromTime: "08:15", requestedToTime: "16:45" });
+    expect(submitted).toEqual({ scheduleId: 10, dayOfMonth: 13, requestedFromTime: "08:15", requestedToTime: "16:45", comment: correctionComment });
     await adjust.click(); await selectDay(12);
+    await expect(comment).toHaveValue("");
     await expect(dialog.locator('input[type="time"]').first()).toBeDisabled();
     await expect(dialog.getByRole("button").last()).toBeDisabled();
   });

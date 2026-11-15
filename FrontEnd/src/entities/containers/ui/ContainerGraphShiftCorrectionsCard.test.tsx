@@ -35,10 +35,11 @@ describe("ContainerGraphShiftCorrectionsCard", () => {
 
 
   test.each(["pending", "approved", "rejected"])("renders a %s day-off request without fabricated originals or deltas", async status => {
+    const comment = "An additional shift\n  <strong>More details</strong>";
     mocks.graphQuery.mockReturnValue({ data: [{ id: 4, containerId: 2, scheduleId: 9, scheduleSlotId: status === "approved" ? 25 : null,
       isDayOffRequest: true, scheduleName: "August", shopName: "Central", year: 2026, month: 8, dayOfMonth: 13,
       employeeId: 7, employeeName: "Oleh Protsun", originalFromTime: null, originalToTime: null,
-      requestedFromTime: "08:00", requestedToTime: "16:00", status, createdAtUtc: "2026-08-19T18:15:00Z", reviewedByManagerName: "Ada" }],
+      requestedFromTime: "08:00", requestedToTime: "16:00", comment, status, createdAtUtc: "2026-08-19T18:15:00Z", reviewedByManagerName: "Ada" }],
       isLoading: false, isError: false });
     const onApproved = vi.fn();
     mocks.commit.mockResolvedValue(undefined);
@@ -50,6 +51,9 @@ describe("ContainerGraphShiftCorrectionsCard", () => {
     expect(screen.getByText("Day off")).toBeVisible();
     expect(screen.getByText("08:00 – 16:00")).toBeVisible();
     expect(screen.getByText("Duration +8h")).toBeVisible();
+    const commentBlock = screen.getByText("Comment").parentElement!;
+    expect(commentBlock.querySelector("p")?.textContent).toBe(comment);
+    expect(commentBlock.querySelector("p strong")).toBeNull();
     expect(screen.getByRole("listitem")).not.toHaveTextContent(/NaN|undefined|null/);
     if (status === "pending") {
       await userEvent.click(screen.getByRole("button", { name: "Reject" }));
@@ -86,6 +90,7 @@ describe("ContainerGraphShiftCorrectionsCard", () => {
     expect(screen.getByText("End unchanged")).toBeVisible();
     expect(screen.getByText("Duration −1h")).toBeVisible();
     expect(screen.getByText("12.08.2026")).toBeVisible();
+    expect(screen.queryByText("Comment")).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Collapse request from Oleh Protsun" }));
     expect(screen.queryByText("Selected request")).not.toBeInTheDocument();

@@ -6,11 +6,14 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { EmployeeNotificationsPage } from "./EmployeeNotificationsPage";
 import { EmployeeWorkspaceLayout } from "@app/layouts/employee-workspace-layout/EmployeeWorkspaceLayout";
 import { writeEmployeeNotificationIdsForAccount } from "@shared/lib/employeeNotificationReadState";
+import styles from "./EmployeeNotificationsPage.module.css";
 
 beforeEnglishTest(() => setTestLanguage("en"));
 
 const mocks = vi.hoisted(() => ({
   schedules: [] as unknown[],
+  news: [] as { id: number; title: string; createdAtUtc: string; isRead: boolean }[],
+  markAllNews: vi.fn(),
   sync: vi.fn(), refetch: vi.fn(),
   ui: { data: { readNotificationIds: [] as string[] }, refetch: vi.fn() },
 }));
@@ -20,7 +23,7 @@ vi.mock("@entities/employee-schedule", () => ({useEmployeeScheduleListQuery: () 
 vi.mock("@entities/shift-swaps", () => ({useEmployeeShiftSwapsQuery: () => ({data: []})}));
 vi.mock("@entities/employee-availability", () => ({useEmployeeAvailabilityListQuery: () => ({data: []})}));
 vi.mock("@entities/employee-ui-state", () => ({useEmployeeUiStateQuery: () => mocks.ui, employeeUiStateApi: {markNotificationsRead: (...args: unknown[]) => mocks.sync(...args)}}));
-vi.mock("@entities/system-news", () => ({useSystemNewsQuery: () => ({data: []}), useMarkSystemNewsReadMutation: () => ({mutate: vi.fn()}), useMarkAllSystemNewsReadMutation: () => ({mutate: vi.fn()})}));
+vi.mock("@entities/system-news", () => ({useSystemNewsQuery: () => ({data: mocks.news}), useMarkSystemNewsReadMutation: () => ({mutate: vi.fn()}), useMarkAllSystemNewsReadMutation: () => ({mutate: mocks.markAllNews})}));
 vi.mock("@entities/communications/ui", () => ({EmployeeCommunicationDialog: () => null}));
 const now = Date.parse("2026-09-19T12:00:00Z");
 const published = new Date(now - 5 * 86_400_000 + 10_000).toISOString();
@@ -29,10 +32,38 @@ beforeEach(() => {
   vi.useFakeTimers(); vi.setSystemTime(now); localStorage.clear();
   mocks.sync.mockReset().mockResolvedValue(undefined);
   mocks.ui.data = {readNotificationIds: []};
+  mocks.news = [];
+  mocks.markAllNews.mockClear();
   mocks.schedules = [{id: 21, name: "September", year: 2026, month: 9, publishedAtUtc: published}];
 });
 afterEach(() => {cleanup(); vi.useRealTimers();});
-const show = () => render(<BrowserRouter><EmployeeWorkspaceLayout><EmployeeNotificationsPage /></EmployeeWorkspaceLayout></BrowserRouter>);
+const workspace = () => <BrowserRouter><EmployeeWorkspaceLayout><EmployeeNotificationsPage /></EmployeeWorkspaceLayout></BrowserRouter>;
+const show = () => render(workspace());
+it.each([[1, "1"], [12, "12"]])("shows a compact visual count for %i unread items", (count, countText) => {
+  mocks.schedules = Array.from({ length: count }, (_, index) => ({ id: index + 1, name: `Schedule ${index}`, year: 2026, month: 9, publishedAtUtc: published }));
+  show();
+  const badge = screen.getByRole("status", { name: `${count} unread` });
+  expect(badge.textContent).toBe(countText);
+  expect(badge).toHaveClass(styles.countBadgeUnread);
+  fireEvent.click(screen.getByRole("tab", { name: "News" }));
+  expect(screen.getByRole("status", { name: "0 read" })).not.toHaveClass(styles.countBadgeUnread);
+  fireEvent.click(screen.getByRole("tab", { name: /Inbox/ }));
+  expect(screen.getByRole("status", { name: `${count} unread` }).textContent).toBe(countText);
+});
+it("caps the News badge while announcing the actual unread and read totals", () => {
+  mocks.news = Array.from({ length: 100 }, (_, index) => ({ id: index + 1, title: `News ${index}`, createdAtUtc: published, isRead: false }));
+  const { rerender } = show();
+  fireEvent.click(screen.getByRole("tab", { name: /News/ }));
+  const badge = screen.getByRole("status", { name: "100 unread" });
+  expect(badge.textContent).toBe("99+");
+  expect(badge).toHaveClass(styles.countBadgeUnread);
+  fireEvent.click(screen.getByRole("button", { name: "Mark all read" }));
+  expect(mocks.markAllNews).toHaveBeenCalledOnce();
+  mocks.news = mocks.news.map(item => ({ ...item, isRead: true }));
+  rerender(workspace());
+  expect(screen.getByRole("status", { name: "100 read" }).textContent).toBe("99+");
+  expect(badge).not.toHaveClass(styles.countBadgeUnread);
+});
 it("expires the card and navigation indicators without reloading", () => {
   show();
   expect(screen.getByText("New schedule published")).toBeInTheDocument();
@@ -41,12 +72,14 @@ it("expires the card and navigation indicators without reloading", () => {
   expect(screen.queryByText("New schedule published")).not.toBeInTheDocument();
   expect(screen.queryByRole("link", {name: "Notifications, new updates"})).not.toBeInTheDocument();
   expect(screen.getByText("No notifications yet")).toBeInTheDocument();
+  expect(screen.getByRole("status", { name: "0 read" }).textContent).toBe("0");
 });
 it("marks a card read and clears navigation indicators", async () => {
   show();
   await act(async () => fireEvent.click(screen.getByRole("button", {name: "Mark as read"})));
   expect(mocks.sync).toHaveBeenCalledWith([id]);
   expect(screen.getByRole("button", {name: "Read"})).toBeDisabled();
+  expect(screen.getByRole("status", { name: "1 read" })).not.toHaveClass(styles.countBadgeUnread);
   expect(screen.queryByRole("link", {name: "Notifications, new updates"})).not.toBeInTheDocument();
 });
 it("updates the inbox after read state changes in another surface", () => {

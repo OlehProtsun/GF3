@@ -117,6 +117,7 @@ function SwapOfferCard({ swap, isPinned, highlighted, onTogglePin, onViewDetails
   onViewDetails: (swapId: number, trigger: HTMLElement) => void;
 }) {
   const isOpen = swap.status === "open";
+  const awaitingApproval = isOpen && (swap.isAwaitingManagerApproval || swap.approvalPendingForCurrentEmployee);
   const [shareStatus, setShareStatus] = useState<string | null>(null);
   useEffect(() => {
     if (!shareStatus) return;
@@ -135,8 +136,9 @@ function SwapOfferCard({ swap, isPinned, highlighted, onTogglePin, onViewDetails
   };
   const isManagerManual = swap.isManagerCreated === true && typeof swap.manualColumnId === "number" && swap.manualColumnId > 0;
   const availabilityLabel = !isOpen ? swap.status === "accepted" ? t("Accepted") : t("Cancelled")
+    : swap.isFinished ? t("Finished")
     : swap.isCreatedByCurrentEmployee ? t("My offer") : swap.canAccept ? t("Can") : t("Can’t");
-  const unavailableReason = isOpen && !swap.canAccept ? swap.acceptanceUnavailableReason ||
+  const unavailableReason = isOpen && !swap.canAccept ? swap.isFinished ? t("This manual shift offer has finished.") : swap.acceptanceUnavailableReason ||
     (swap.isScheduleLocked ? "Schedule is locked while a manager is editing it." : null) : null;
   return <article className={[styles.offerCard, isPinned ? styles.offerCardPinned : "", highlighted ? styles.deepLinkedOffer : ""].join(" ")} data-swap-id={swap.id} data-pinned={String(isPinned)} data-own={swap.isCreatedByCurrentEmployee}>
     <button type="button" className={styles.offerOpenButton} aria-label={t("View offer details for {0}", swap.scheduleName)}
@@ -155,14 +157,14 @@ function SwapOfferCard({ swap, isPinned, highlighted, onTogglePin, onViewDetails
               : <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9" /><ellipse cx="12" cy="12" rx="4" ry="9" /><path d="M3 12h18" /></svg>}
             <span>{t(swap.visibility === "private" ? "Private" : "Public")}</span>
           </span>
-          <span className={`${styles.badge} ${!isOpen ? styles.badgeMuted : swap.isCreatedByCurrentEmployee ? styles.badgeMine : swap.canAccept ? styles.badgeCan : styles.badgeCant}`}>
+          <span className={`${styles.badge} ${!isOpen || swap.isFinished ? styles.badgeMuted : swap.isCreatedByCurrentEmployee ? styles.badgeMine : swap.canAccept ? styles.badgeCan : styles.badgeCant}`}>
             {isOpen && swap.isCreatedByCurrentEmployee ? <EmployeeIcon size={12} /> : (isOpen ? swap.canAccept : swap.status === "accepted") ? <CheckIcon size={13} /> : <WarnIcon size={13} />}
             <span>{availabilityLabel}</span>
           </span>
-          {swap.pickupApprovalPolicyApplies && <span className={`${styles.badge} ${styles.badgeApproval}`} title={t("Manager approval is required when the shift owner or recipient has an employment contract.")}>
+          {isOpen && !awaitingApproval && !swap.isCreatedByCurrentEmployee && swap.requiresManagerApproval && <span className={`${styles.badge} ${styles.badgeApproval}`} title={t("Request manager approval to accept this shift.")}>
             {t("Manager approval")}
           </span>}
-          {isOpen && swap.isAwaitingManagerApproval && <span className={`${styles.badge} ${styles.badgeApproval}`}>
+          {awaitingApproval && <span className={`${styles.badge} ${styles.badgeApproval}`}>
             {t("Awaiting approval")}
           </span>}
           {swap.allowPartialAcceptance === true && swap.requestKind !== "exchange" && <span className={`${styles.badge} ${styles.badgePartial}`}>
@@ -222,6 +224,7 @@ export function EmployeeSwapPage() {
   const profileQuery = useEmployeeProfileQuery();
   const contractSettingsQuery = useEmploymentContractSettingsQuery();
   const approvalsQuery = useEmployeeContractApprovalsQuery();
+  const approvals = approvalsQuery.data ?? [];
   const claimApprovalMutation = useCreateContractClaimMutation();
   const exceptionMutation = useCreateGiveawayExceptionMutation();
   const cancelApprovalMutation = useCancelContractApprovalMutation();
@@ -560,21 +563,28 @@ export function EmployeeSwapPage() {
             </div>
             <button type="button" className={styles.dialogCloseButton} aria-label={t("Close")} onClick={() => setIsHistoryExpanded(false)}><CloseIcon size={20} /></button>
           </div>
-          <section aria-label={t("My approval requests")}>
-            <h3>{t("My approval requests")}</h3>
-            {approvalsQuery.error ? <ErrorBanner dismissible={false}>{getErrorMessage(approvalsQuery.error, t("Could not load approval requests."))}</ErrorBanner> : null}
-            {approvalsQuery.data?.map(item => <article key={item.id}>
-              <strong>{t(item.kind === "claim" ? "Shift pickup approval" : "Monthly minimum exception")}</strong>
-              <p>{item.scheduleName} · {item.dayOfMonth}.{item.month}.{item.year} · {item.fromTime}–{item.toTime}</p>
-              <span>{({ pending: t("Pending"), approved: t("Approved"), rejected: t("Rejected"), cancelled: t("Cancelled"), expired: t("Expired") } as const)[item.status]}</span>
-              {item.failureReason ? <p>{translateServerMessage(item.failureReason)}</p> : null}
-              {item.status === "pending" ? <><p>{t(item.kind === "claim" ? "The offer is reserved while this pickup request awaits manager approval." : "Monthly minimum exception required.")}</p>
-                <button type="button" disabled={cancelApprovalMutation.isPending} onClick={() => cancelApprovalMutation.mutate(item.id, {
-                  onError: error => setActionError(getErrorMessage(error, t("Could not cancel this request."))),
-                })}>{t("Cancel request")}</button></> : null}
-            </article>)}
-          </section>
-          <div ref={historyListRef} data-swap-history-scroll role="region" aria-label={t("Swap history")} tabIndex={0} data-motion-list className={[styles.offerList, swapHistory.length >= 5 ? styles.offerListScrollable : ""].filter(Boolean).join(" ")}>
+          <div ref={historyListRef} data-swap-history-scroll role="region" aria-label={t("Swap history")} tabIndex={0} data-motion-list className={[styles.offerList, swapHistory.length + approvals.length >= 5 ? styles.offerListScrollable : ""].filter(Boolean).join(" ")}>
+            {approvals.length > 0 || approvalsQuery.error || cancelApprovalMutation.error ? (
+              <section className={styles.approvalRequests} aria-label={t("My approval requests")}>
+                {approvalsQuery.error ? <ErrorBanner dismissible={false}>{getErrorMessage(approvalsQuery.error, t("Could not load approval requests."))}</ErrorBanner> : null}
+                {cancelApprovalMutation.error ? <ErrorBanner dismissible={false}>{getErrorMessage(cancelApprovalMutation.error, t("Could not cancel this request."))}</ErrorBanner> : null}
+                {approvals.map(item => <article key={item.id} className={styles.approvalRequest}>
+                  <strong>{t(item.kind === "claim" ? "Shift pickup approval" : "Monthly minimum exception")}</strong>
+                  <p>{item.scheduleName} · {item.dayOfMonth}.{item.month}.{item.year} · {item.fromTime}–{item.toTime}</p>
+                  <span>{({ pending: t("Pending"), approved: t("Approved"), rejected: t("Rejected"), cancelled: t("Cancelled"), expired: t("Expired") } as const)[item.status]}</span>
+                  {item.failureReason ? <p>{translateServerMessage(item.failureReason)}</p> : null}
+                  {item.status === "pending" ? <>
+                    <p>{t(item.kind === "claim" ? "The offer is reserved while this pickup request awaits manager approval." : "Monthly minimum exception required.")}</p>
+                    <button type="button" disabled={cancelApprovalMutation.isPending} onClick={() => {
+                      setActionError(null);
+                      cancelApprovalMutation.mutate(item.id, {
+                        onError: error => setActionError(getErrorMessage(error, t("Could not cancel this request."))),
+                      });
+                    }}>{t("Cancel request")}</button>
+                  </> : null}
+                </article>)}
+              </section>
+            ) : null}
             {swapHistory.length === 0 ? (
               <p className={styles.emptyText}>{t("Accepted and cancelled swaps will appear here.")}</p>
             ) : swapHistory.map(swap => (

@@ -114,11 +114,15 @@ public sealed class EmploymentContractEmployeeTests
         var options=new DbContextOptionsBuilder<DataAccessLayer.Models.DataBaseContext.AppDbContext>().UseSqlite($"Data Source={copyPath}").Options;
         await using var copy=new DataAccessLayer.Models.DataBaseContext.AppDbContext(options);
         var workspace=new DataAccessLayer.Administration.SqliteDatabaseWorkspace(copyPath);
+        var pendingMigrations=(await copy.Database.GetPendingMigrationsAsync()).ToArray();
         var migration=await WebApi.Infrastructure.DatabaseMigrationStartup.ApplyAsync(copy,workspace,true,true,Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance);
         Assert.NotNull(migration.BackupPath); Assert.True(File.Exists(migration.BackupPath));
-        Assert.Equal(6,migration.AppliedMigrations.Count);
+        Assert.Equal(pendingMigrations,migration.AppliedMigrations);
+        Assert.Contains("20261115135735_RefreshManualShiftOffer",migration.AppliedMigrations);
         Assert.Contains("20261101190152_AddDayOffShiftCorrectionRequests",migration.AppliedMigrations);
-        await WebApi.Infrastructure.DatabaseMigrationStartup.ApplyAsync(copy,workspace,true,true,Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance);
+        Assert.Contains("20261114225324_AddShiftCorrectionComment",migration.AppliedMigrations);
+        var secondMigration=await WebApi.Infrastructure.DatabaseMigrationStartup.ApplyAsync(copy,workspace,true,true,Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance);
+        Assert.Empty(secondMigration.AppliedMigrations); Assert.Null(secondMigration.BackupPath);
         Assert.All(await copy.Employees.AsNoTracking().ToListAsync(),employee=>Assert.Equal("zlecenie",employee.ContractType));
         Assert.Equal(history,(await copy.ShiftSwapHistories.AsNoTracking().SingleAsync()).AfterSnapshotJson);
         await copy.Database.OpenConnectionAsync();

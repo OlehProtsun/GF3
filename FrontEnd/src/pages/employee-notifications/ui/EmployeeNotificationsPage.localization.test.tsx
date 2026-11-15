@@ -35,6 +35,7 @@ it("updates fixed notification data immediately in both directions without losin
   const card = screen.getByText("New schedule published").closest("article");
   expect(screen.getByText(/is now available at your shop/)).toBeInTheDocument();
   expect(screen.getByRole("link", { name: "Open schedule" })).toHaveAttribute("href", "/schedule");
+  expect(screen.getByRole("status", { name: "1 unread" }).textContent).toBe("1");
   await act(async () => fireEvent.click(screen.getByRole("button", { name: "Mark as read" })));
   expect(mocks.sync).toHaveBeenCalledWith([id]);
   expect(readEmployeeNotificationIdsForAccount("worker", 12)).toEqual(new Set([id]));
@@ -43,11 +44,13 @@ it("updates fixed notification data immediately in both directions without losin
   expect(screen.getByText(/Twoim sklepie/)).toBeInTheDocument();
   expect(screen.getByRole("link", { name: t("Open schedule") })).toHaveAttribute("href", "/schedule");
   expect(screen.getByRole("button", { name: t("Read"), exact: true })).toBeDisabled();
+  expect(screen.getByRole("status", { name: "Przeczytane: 1" }).textContent).toBe("1");
   act(() => setLanguage("uk"));
   expect(screen.getByText("Опубліковано новий графік").closest("article")).toBe(card);
   expect(screen.getByText(/вашому магазині/)).toBeInTheDocument();
   expect(screen.getByRole("link", { name: "Відкрити графік" })).toHaveAttribute("href", "/schedule");
   expect(screen.getByRole("button", { name: "Прочитано", exact: true })).toBeDisabled();
+  expect(screen.getByRole("status", { name: "Прочитаних: 1" }).textContent).toBe("1");
   expect(readEmployeeNotificationIdsForAccount("worker", 12)).toEqual(new Set([id]));
   act(() => setLanguage("en"));
   expect(screen.getByText("New schedule published").closest("article")).toBe(card);

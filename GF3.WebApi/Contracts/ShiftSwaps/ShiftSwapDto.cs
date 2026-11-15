@@ -44,6 +44,9 @@ public sealed class ShiftSwapDto
     public string Visibility { get; set; } = "public";
     public string Status { get; set; } = "open";
     public DateTimeOffset CreatedAtUtc { get; set; }
+    public DateTimeOffset? RefreshedAtUtc { get; set; }
+    public string? ManualOfferRefreshStatus { get; set; }
+    public bool IsFinished { get; set; }
     public DateTimeOffset? AcceptedAtUtc { get; set; }
     public double ShiftHours { get; set; }
     public double CurrentEmployeeHoursBefore { get; set; }

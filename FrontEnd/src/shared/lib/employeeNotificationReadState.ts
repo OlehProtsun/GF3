@@ -22,8 +22,8 @@ export function getEmployeeNotificationReadStorageKeys(
   return [...new Set([employeeKey, legacyKey, normalizedUsernameKey])];
 }
 
-export function getEmployeeOpenShiftNotificationId(shiftSwapId: number | string | null | undefined) {
-  return `open-shift:${shiftSwapId ?? "current"}`;
+export function getEmployeeOpenShiftNotificationId(shiftSwapId: number | string | null | undefined, refreshedAtUtc?: string | null) {
+  return `open-shift:${shiftSwapId ?? "current"}${refreshedAtUtc ? `:${refreshedAtUtc}` : ""}`;
 }
 
 export function getEmployeeOpenShiftScheduleNotificationId(scheduleId: number | string | null | undefined) {

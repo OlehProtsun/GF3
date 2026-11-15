@@ -303,7 +303,6 @@ type DailyScheduleWorker = {
   employeeId: number;
   label: string;
   shifts: EmployeeScheduleSlot[];
-  relatedScheduleNames: string[];
   isAllDay: boolean;
   firstStartMinutes: number;
 };
@@ -322,31 +321,13 @@ function buildDailyScheduleWorkers(
 ) {
   const employeesById = new Map((schedule.employees ?? []).map(employee => [employee.employeeId, employee] as const));
   const slotsByEmployeeId = new Map<number, EmployeeScheduleSlot[]>();
-  const relatedScheduleNamesByEmployeeId = new Map<number, Set<string>>();
-
-  (schedule.relatedScheduleAssignments ?? [])
-    .filter(assignment => assignment.dayOfMonth === dayOfMonth)
-    .forEach(assignment => {
-      const scheduleName = assignment.scheduleName.trim() || t("Schedule #{0}", assignment.scheduleId);
-      const scheduleNames = relatedScheduleNamesByEmployeeId.get(assignment.employeeId) ?? new Set<string>();
-      scheduleNames.add(scheduleName);
-      relatedScheduleNamesByEmployeeId.set(assignment.employeeId, scheduleNames);
-    });
-
-  relatedScheduleNamesByEmployeeId.forEach((_, employeeId) => {
-    if (!slotsByEmployeeId.has(employeeId)) {
-      slotsByEmployeeId.set(employeeId, []);
-    }
-  });
-
-  schedule.slots
-    .filter(slot => slot.dayOfMonth === dayOfMonth)
-    .forEach(slot => {
-      const employeeId = slot.employeeId && slot.employeeId > 0 ? slot.employeeId : fallbackEmployeeId;
-      const employeeSlots = slotsByEmployeeId.get(employeeId) ?? [];
-      employeeSlots.push(slot);
-      slotsByEmployeeId.set(employeeId, employeeSlots);
-    });
+  for (const slot of schedule.slots) {
+    const employeeId = slot.employeeId;
+    if (slot.dayOfMonth !== dayOfMonth || !employeeId || employeeId < 0) continue;
+    const employeeSlots = slotsByEmployeeId.get(employeeId) ?? [];
+    employeeSlots.push(slot);
+    slotsByEmployeeId.set(employeeId, employeeSlots);
+  }
 
   const workers = [...slotsByEmployeeId.entries()].map<DailyScheduleWorker>(([employeeId, slots]) => {
     const sortedSlots = [...slots].sort((left, right) =>
@@ -362,8 +343,6 @@ function buildDailyScheduleWorkers(
         ? fallbackLabel
         : t("Employee #{0}", employeeId),
       shifts: sortedSlots,
-      relatedScheduleNames: [...(relatedScheduleNamesByEmployeeId.get(employeeId) ?? [])]
-        .sort((left, right) => left.localeCompare(right)),
       isAllDay: sortedSlots.some(isAllDayScheduleSlot),
       firstStartMinutes: parseTimeMinutes(sortedSlots[0]?.fromTime ?? "") ?? Number.MAX_SAFE_INTEGER,
     };
@@ -387,16 +366,9 @@ function buildDailyScheduleWorkers(
 }
 
 function formatDailyWorkerShifts(worker: DailyScheduleWorker) {
-  const relatedScheduleText = worker.relatedScheduleNames.join(", ");
-  if (worker.shifts.length === 0) {
-    return relatedScheduleText;
-  }
-
-  const shiftText = worker.isAllDay
+  return worker.isAllDay
     ? t("All day")
     : formatGraphIntervals(mergeGraphIntervalsForDisplay(worker.shifts, { mergeTouching: true }));
-
-  return relatedScheduleText ? `${shiftText}, ${relatedScheduleText}` : shiftText;
 }
 
 function buildScheduleMatrixColumns(
@@ -759,11 +731,9 @@ export function EmployeeSchedulePage() {
     return Array.from({ length: getDaysInMonth(selectedSchedule.year, selectedSchedule.month) }, (_, index) => {
       const dayOfMonth = index + 1;
       const date = new Date(Date.UTC(selectedSchedule.year, selectedSchedule.month - 1, dayOfMonth));
-      const isWorkingDay = selectedSchedule.slots.some(slot =>
-        slot.dayOfMonth === dayOfMonth && isCurrentEmployeeSlot(slot, currentEmployeeId),
-      ) || Boolean(currentEmployeeId && selectedSchedule.relatedScheduleAssignments?.some(assignment =>
-        assignment.dayOfMonth === dayOfMonth && assignment.employeeId === currentEmployeeId,
-      ));
+      const isWorkingDay = currentEmployeeId !== null && currentEmployeeId > 0 && selectedSchedule.slots.some(slot =>
+        slot.dayOfMonth === dayOfMonth && slot.employeeId === currentEmployeeId,
+      );
 
       return {
         dayOfMonth,
@@ -1140,9 +1110,6 @@ export function EmployeeSchedulePage() {
                   </div>
 
                   <div className={styles.dailyScheduleWorkers}>
-                    {(urlop.data ?? []).filter(x => Number(x.date.slice(8, 10)) === activeDailyScheduleDay).map(x => <article key={`urlop-${x.employeeId}`} className={styles.dailyScheduleWorker}>
-                      <span>{scheduleMatrixColumns.find(c => c.employeeId === x.employeeId)?.label ?? x.employeeName ?? t("Employee #{0}", x.employeeId)}</span><strong title={t("Urlop")}>UR</strong>
-                    </article>)}
                     {dailyScheduleWorkers.length > 0 ? dailyScheduleWorkers.map(worker => (
                       <article key={worker.employeeId} className={styles.dailyScheduleWorker}>
                         <span>{worker.label}</span>

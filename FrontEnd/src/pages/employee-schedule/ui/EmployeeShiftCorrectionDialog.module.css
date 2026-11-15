@@ -40,6 +40,7 @@
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
+  scroll-padding-block: 12px;
 }
 
 .titleBlock {
@@ -112,7 +113,8 @@
   gap: 2px;
 }
 
-.stepHeader strong {
+.stepHeader strong,
+.stepHeader label {
   color: #0f172a;
   font-size: 0.82rem;
   font-weight: 900;
@@ -319,7 +321,7 @@
   background: #ffffff;
   color: #0f172a;
   font: inherit;
-  font-size: 0.9rem;
+  font-size: max(16px, 0.9rem);
   font-weight: 900;
   text-align: center;
 }
@@ -396,11 +398,34 @@
   gap: 8px;
 }
 
+.commentInput {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  padding: 9px 11px;
+  border: 1px solid #c9d6e7;
+  border-radius: 14px;
+  background: #fff;
+  color: #0f172a;
+  font: inherit;
+  font-size: max(16px, 1em);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  resize: vertical;
+}
+
+.commentCount {
+  justify-self: end;
+  color: #64748b;
+  font-size: .72rem;
+}
+
 .closeButton:focus-visible,
 .dayList button:focus-visible,
 .boundaryChoices button:focus-visible,
 .timeEditor button:focus-visible,
-.timeEditor input:focus-visible {
+.timeEditor input:focus-visible,
+.commentInput:focus-visible {
   outline: none;
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18);
 }
@@ -457,16 +482,12 @@
 }
 
 @keyframes overlay-enter { from { opacity: 0; } to { opacity: 1; } }
-@keyframes surface-enter {
-  from { opacity: 0; transform: translateY(var(--surface-offset, 14px)) scale(var(--surface-scale, .99)); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
-}
 @keyframes item-enter {
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
 }
 .overlay { animation: overlay-enter 180ms ease; }
-.dialog { animation: surface-enter 300ms var(--motion-ease); }
+.dialog { animation: overlay-enter 180ms ease; }
 .dayList button, .shiftCard, .boundaryChoices button, .timeEditor > button, .closeButton { transition: background-color 180ms ease, border-color 180ms ease, color 180ms ease, box-shadow 180ms ease, transform 180ms var(--motion-ease); }
 .stepSection { animation: item-enter 280ms var(--motion-ease) 100ms backwards; }
 .stepSection:nth-of-type(1) { animation-delay: 30ms; }
@@ -491,8 +512,31 @@
   border: 0;
   padding: max(14px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(14px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
   overflow: hidden;
+  overflow: clip;
+  container-type: size;
   background: transparent;
   backdrop-filter: none;
 }
 .overlay::backdrop { background: rgba(10, 15, 28, .4); backdrop-filter: blur(12px); }
-.overlay .dialog { grid-template-rows: auto minmax(0, 1fr) auto; max-height: 100%; overflow: hidden; }
+.overlay .dialog { grid-template-rows: auto minmax(0, 1fr) auto; max-height: 100%; overflow: clip; }
+
+@container (max-height: 350px) {
+  .overlay .dialog {
+    gap: 6px;
+    padding: 8px;
+  }
+
+  .titleBlock p {
+    display: none;
+  }
+
+  .footer :global(button) {
+    height: auto;
+    min-height: 40px;
+    padding-block: 6px !important;
+  }
+
+  .commentInput {
+    max-height: max(42px, calc(100cqh - 124px));
+  }
+}

@@ -1,22 +1,9 @@
-.card {
-  min-width: 0;
-  padding: 14px;
-  border-radius: 32px;
-  background: linear-gradient(160deg, #fbfdff, #f5f7fb);
-  border-color: #e8edf4;
-  box-shadow: 0 6px 20px rgba(30, 55, 85, .05);
-}
-.layout { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
-.colorSetting { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: #52627b; font-size: 12px; }
-.colorButton { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; padding: 8px; border: 1px solid #cdddfd; border-radius: 999px; background: #fff; cursor: pointer; }
-.colorButton > span { width: 22px; height: 22px; border: 1px solid #64748b; border-radius: 50%; }
-.title { display: inline-flex; align-items: center; gap: 10px; min-width: 0; font-size: 15px; font-weight: 650; line-height: 1.3; }
-.calendarIcon { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; width: 36px; height: 36px; border-radius: 16px; color: #2563eb; background: #e9f3ff; }
+.card { box-sizing: border-box; }
+.layout { min-width: 0; }
 .badge, .autoBadge { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; min-width: 24px; padding: 3px 7px; box-sizing: border-box; border-radius: 999px; background: #f0f3f9; color: #586b88; font-size: 11px; line-height: 1.4; font-weight: 500; }
 .autoBadge { padding-inline: 8px; }
 .muted { margin: 0; color: #73819b; font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
-.panel, .offeredPanel { min-width: 0; padding: 12px; border-radius: 28px; background: #fff; border: 1px solid #edf1f7; box-shadow: 0 3px 12px rgba(30, 55, 85, .025); }
-.panel { display: flex; flex-direction: column; gap: 10px; }
+.panel { composes: panel from "./ContainerGraphActivity.module.css"; display: flex; flex-direction: column; gap: 10px; }
 .heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; font-size: 13px; font-weight: 650; color: #182236; }
 .heading > span { display: inline-flex; align-items: center; gap: 7px; min-width: 0; }
 .card .addButton { min-height: 40px; height: 40px; padding: 7px 10px !important; border: 1px solid #cdddfd; border-radius: 999px; background: #fff; color: #2563eb; font-size: 12px; box-shadow: 0 2px 6px rgba(30, 55, 85, .04); }
@@ -60,22 +47,32 @@
 .error { font-size: 12px; color: #b91c1c; margin: 0; overflow-wrap: anywhere; }
 .card .publishButton { width: 100%; min-height: 46px; height: 46px; padding: 10px 12px !important; border-radius: 999px; font-size: 13px; box-shadow: 0 5px 12px rgba(37, 99, 235, .18); }
 .card .publishButton:disabled { box-shadow: none; }
-.offeredPanel { padding: 0 10px; border-radius: 26px; }
+.offeredPanel { composes: panel from "./ContainerGraphActivity.module.css"; }
+.offeredPanel.offeredPanel { padding-block: 0; }
+.offeredPanel > .list { padding-bottom: 8px; }
 .offeredToggle { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 46px; gap: 8px; padding: 8px 2px; border: 0; background: transparent; color: #45556f; font: inherit; font-size: 12px; cursor: pointer; text-align: left; }
-.offeredTitle { display: inline-flex; align-items: center; gap: 8px; }
 .offeredChevron { flex-shrink: 0; transform: rotate(90deg); transition: transform 140ms ease; }
 .offeredToggle[aria-expanded="true"] .offeredChevron { transform: rotate(270deg); }
 .offer { display: flex; gap: 8px; align-items: center; min-width: 0; padding: 6px 8px; margin-bottom: 6px; border: 1px solid #e8edf5; border-radius: 22px; background: #fafcff; }
+.offerActions { display: inline-flex; align-items: center; justify-content: flex-end; gap: 5px; flex: 0 0 auto; margin-left: auto; }
+.offerStatuses { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.finishedBadge { --activity-tint: #eef1f5; --activity-border: #d9e0e8; --activity-ink: #596579; }
+.cancelButton, .refreshButton { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-height: 32px; padding: 5px 11px; border-radius: 999px; font: inherit; font-size: 11px; font-weight: 600; cursor: pointer; transition: background 140ms ease, border-color 140ms ease, transform 140ms ease, box-shadow 140ms ease; }
+.cancelButton { border: 1px solid #f3caca; background: #fff3f3; color: #c2414b; }
+.cancelButton:hover:not(:disabled) { border-color: #e9aeb2; background: #ffe8e8; }
+.refreshButton { border: 1px solid #c9dcff; background: #edf4ff; color: #2861ba; }
+.refreshButton:hover:not(:disabled) { border-color: #a7c5fa; background: #e2eeff; }
+.cancelButton:active:not(:disabled), .refreshButton:active:not(:disabled) { transform: scale(.97); }
+.spinner { width: 12px; height: 12px; border: 1.5px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: offer-spin 700ms linear infinite; }
+@keyframes offer-spin { to { transform: rotate(360deg); } }
 .layout button:focus-visible, .shiftList:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
 .layout button:disabled { opacity: .5; cursor: default; }
 @media (max-width: 430px) {
-  .card { padding: 12px; }
-  .layout { gap: 10px; }
-  .panel { padding: 10px; }
   .shiftList { max-height: clamp(170px, 38dvh, 300px); }
   .column { gap: 4px; }
   .offer { flex-wrap: wrap; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .shift, .segments button, .offeredChevron { transition: none; }
+  .shift, .segments button, .offeredChevron, .cancelButton, .refreshButton { transition: none; }
+  .spinner { animation: none; }
 }

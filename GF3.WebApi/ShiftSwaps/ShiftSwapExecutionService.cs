@@ -101,7 +101,10 @@ public sealed class ShiftSwapExecutionService(
             .Where(request => request.Status != ShiftSwapStatus.Open ||
                 request.Schedule.Slots.Any(slot => slot.Id == request.ScheduleSlotId))
             .OrderBy(request => request.Status == ShiftSwapStatus.Open ? 0 : 1)
-            .ThenByDescending(request => request.CreatedAtUtc)
+            .ThenByDescending(request => request.Status == ShiftSwapStatus.Open
+                ? request.RefreshedAtUtc ?? request.CreatedAtUtc
+                : request.CreatedAtUtc)
+            .ThenByDescending(request => request.Id)
             .ToList();
 
         var exchangeContext = await LoadExchangeReadContextAsync(orderedRequests, cancellationToken);

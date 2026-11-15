@@ -55,6 +55,9 @@ export type ShiftSwap = {
   visibility: ShiftSwapVisibility;
   status: ShiftSwapStatus;
   createdAtUtc: string;
+  refreshedAtUtc?: string | null;
+  manualOfferRefreshStatus?: "available" | "finished" | "unavailable" | null;
+  isFinished?: boolean;
   acceptedAtUtc?: string | null;
   shiftHours: number;
   currentEmployeeHoursBefore: number;

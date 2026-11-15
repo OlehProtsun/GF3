@@ -18,6 +18,7 @@ public sealed class ShiftCorrectionRequestDto
     public string? OriginalToTime { get; init; }
     public string RequestedFromTime { get; init; } = string.Empty;
     public string RequestedToTime { get; init; } = string.Empty;
+    public string? Comment { get; init; }
     public string Status { get; init; } = string.Empty;
     public DateTimeOffset CreatedAtUtc { get; init; }
     public DateTimeOffset? ReviewedAtUtc { get; init; }

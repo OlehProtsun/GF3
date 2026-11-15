@@ -9,7 +9,7 @@ beforeEach(() => setLanguage("en"));
 const employees = [{ id: 2, firstName: "Ada", lastName: "Lovelace", hasLoginAccount: true, isOnline: false }];
 const base = { highlightColor: "#BAE6FD", highlightSettingDisabled: false, onOpenHighlightColorPicker: vi.fn(), columns: [], employees, year: 2026, month: 2, onAddColumn: vi.fn(), onDeleteColumn: vi.fn(), onPublishShift: vi.fn() };
 const column = { columnId: 4, label: "Do obsadzenia", cells: { "1": "08:00 - 12:00", "3": "Notes", "31": "08:00 - 12:00" } };
-const offer = { id: 20, manualColumnId: 4, dayOfMonth: 1, year: 2026, month: 2, fromTime: "08:00:00", toTime: "12:00:00", status: "open", isManagerCreated: true, visibility: "public" } as ShiftSwap;
+const offer = { id: 20, manualColumnId: 4, dayOfMonth: 1, year: 2026, month: 2, fromTime: "08:00:00", toTime: "12:00:00", status: "open", isManagerCreated: true, visibility: "public", manualOfferRefreshStatus: "available" } as ShiftSwap;
 const pending = { allowPartialAcceptance: false, clientId: "pending-1", manualColumnId: 4, dayOfMonth: 2, fromTime: "08:00", toTime: "12:00" };
 
 describe("manual shifts card", () => {
@@ -109,6 +109,25 @@ describe("manual shifts card", () => {
     fireEvent.click(screen.getByRole("button", { name: /Offered \(2\)/ }));
     expect(screen.queryByText("Pending save", { exact: false })).toBeNull();
     expect(within(screen.getByRole("button", { name: /03 Feb/ })).getByText("Do obsadzenia")).toBeVisible();
+  });
+  test("refreshes an open published manual shift and disables it while the request is active", () => {
+    const onRefreshPublishedShift = vi.fn();
+    const { rerender } = render(<ContainerGraphManualColumnsCard {...base} publishedShifts={[offer]} onRefreshPublishedShift={onRefreshPublishedShift} />);
+    fireEvent.click(screen.getByRole("button", { name: /Offered \(1\)/ }));
+    const refresh = screen.getByRole("button", { name: "Refresh shift on 01 Feb" });
+    expect(refresh).toBeEnabled();
+    fireEvent.click(refresh);
+    expect(onRefreshPublishedShift).toHaveBeenCalledWith(offer);
+    rerender(<ContainerGraphManualColumnsCard {...base} publishedShifts={[offer]} refreshingPublishedShiftId={offer.id} onRefreshPublishedShift={onRefreshPublishedShift} />);
+    expect(screen.getByRole("button", { name: "Refresh shift on 01 Feb" })).toBeDisabled();
+    expect(screen.getByText("Refreshing...")).toBeVisible();
+    rerender(<ContainerGraphManualColumnsCard {...base} publishedShifts={[offer]} refreshedPublishedShiftId={offer.id} onRefreshPublishedShift={onRefreshPublishedShift} />);
+    expect(screen.getByText("Refreshed")).toBeVisible();
+    const finishedOffer = { ...offer, manualOfferRefreshStatus: "finished" } as ShiftSwap;
+    rerender(<ContainerGraphManualColumnsCard {...base} publishedShifts={[finishedOffer]} onRefreshPublishedShift={onRefreshPublishedShift} onCancelPublishedShift={vi.fn()} />);
+    expect(screen.getByText("Finished")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Refresh shift on 01 Feb" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Cancel shift on 01 Feb" })).toBeEnabled();
   });
 });
 

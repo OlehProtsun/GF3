@@ -1,0 +1,170 @@
+.card.card {
+  width: min(100%, 820px);
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid #e4e9f0;
+  border-radius: 32px;
+  background: linear-gradient(155deg, #fafbfd, #f0f3f7);
+  box-shadow: 0 5px 14px rgb(38 56 84 / 7%), inset 0 1px #fff;
+  overflow-wrap: anywhere;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.header {
+  padding: 0;
+  gap: 8px;
+}
+
+.title {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  min-width: 0;
+  margin: 0;
+  color: #182236;
+  font-size: .94rem;
+  font-weight: 750;
+  line-height: 1.25;
+}
+
+.sectionIcon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border: 1px solid #dce8fa;
+  border-radius: 14px;
+  background: #e9f2ff;
+  color: #245bc5;
+  box-shadow: inset 0 1px #fff;
+}
+
+.panel {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #e6ebf2;
+  border-radius: 26px;
+  background: #fcfdff;
+  box-shadow: 0 2px 8px rgb(38 56 84 / 4%), inset 0 1px #fff;
+}
+
+.panelHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  margin: 0;
+  color: #243147;
+  font-size: .8rem;
+  font-weight: 750;
+}
+
+.row {
+  min-width: 0;
+  border: 1px solid #e3e9f2;
+  border-radius: 20px;
+  background: linear-gradient(140deg, #fff, #f6f8fb);
+  box-shadow: 0 2px 5px rgb(38 56 84 / 6%), inset 0 1px #fff;
+  color: #243147;
+}
+
+.state {
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--activity-border, #e9edf3);
+  border-radius: 14px;
+  background: var(--activity-tint, #f4f6fa);
+  color: var(--activity-ink, #4d5e76);
+  font-size: .75rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.info { --activity-tint: #eaf2ff; --activity-border: #ccdffc; --activity-ink: #2452a4; }
+.pending { --activity-tint: #fff3e2; --activity-border: #f1d6ad; --activity-ink: #86440c; }
+.success { --activity-tint: #e8f7ee; --activity-border: #c7e6d0; --activity-ink: #206543; }
+.danger { --activity-tint: #fcecf0; --activity-border: #f2cdd6; --activity-ink: #9a2e4a; }
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: fit-content;
+  max-width: 100%;
+  min-width: 22px;
+  padding: 3px 7px;
+  box-sizing: border-box;
+  border: 1px solid var(--activity-border, #e4eaf2);
+  border-radius: 999px;
+  background: var(--activity-tint, #f0f3f9);
+  color: var(--activity-ink, #4b5e7b);
+  font-size: .67rem;
+  font-style: normal;
+  font-weight: 750;
+  line-height: 1.25;
+  font-variant-numeric: tabular-nums;
+}
+
+.badge svg { flex-shrink: 0; }
+
+.iconButton {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  box-sizing: border-box;
+  border: 1px solid #e0e6ef;
+  border-radius: 50%;
+  background: linear-gradient(145deg, #fff, #f0f3f8);
+  color: #245bc5;
+  box-shadow: 0 2px 6px rgb(38 56 84 / 9%), inset 0 1px #fff;
+  cursor: pointer;
+  transition: border-color 150ms ease, background-color 150ms ease, box-shadow 150ms ease;
+}
+
+.iconButton:hover:not(:disabled) { border-color: #bcceeb; background: #fff; }
+.iconButton:active:not(:disabled) { box-shadow: inset 0 2px 5px rgb(38 56 84 / 12%); }
+.iconButton:disabled { opacity: .55; cursor: default; }
+.iconButton:focus-visible, .action:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
+
+.swatch {
+  width: 15px;
+  height: 15px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px #8795a8;
+  pointer-events: none;
+}
+
+.action.action {
+  --btn-bg: var(--activity-tint);
+  --btn-bg-hover: color-mix(in srgb, var(--activity-tint) 75%, var(--activity-border));
+  --btn-border: var(--activity-border);
+  --btn-shadow: rgb(38 56 84 / 12%);
+  border-color: var(--activity-border);
+  border-radius: 999px;
+  background: var(--activity-tint);
+  color: var(--activity-ink);
+}
+
+@media (max-width: 430px) {
+  .card.card { padding: 12px; border-radius: 28px; }
+  .panel { padding: 10px; border-radius: 22px; }
+  .stack { gap: 10px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .iconButton { transition: none; }
+}

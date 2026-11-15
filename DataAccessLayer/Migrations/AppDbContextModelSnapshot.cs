@@ -1918,6 +1918,11 @@ namespace DataAccessLayer.Migrations
                         .HasColumnType("INTEGER")
                         .HasColumnName("id");
 
+                    b.Property<string>("Comment")
+                        .HasMaxLength(1000)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("comment");
+
                     b.Property<DateTimeOffset>("CreatedAtUtc")
                         .HasColumnType("TEXT")
                         .HasColumnName("created_at_utc");
@@ -2249,6 +2254,10 @@ namespace DataAccessLayer.Migrations
                     b.Property<string>("OfferedToTime")
                         .HasColumnType("TEXT")
                         .HasColumnName("offered_to_time");
+
+                    b.Property<long?>("RefreshedAtUtc")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("refreshed_at_utc");
 
                     b.Property<string>("RequestKind")
                         .IsRequired()

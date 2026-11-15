@@ -59,7 +59,7 @@ test("scroll cues follow overflow, scroll, content and resize without resetting 
   } finally { vi.unstubAllGlobals(); }
 });
 
-test("visible viewport geometry updates and listeners are removed on dismissal", () => {
+test("visible viewport geometry updates and listeners are removed on dismissal", async () => {
   const viewport = new EventTarget();
   Object.assign(viewport, { height: 844, offsetTop: 0 });
   const remove = vi.spyOn(viewport, "removeEventListener");
@@ -69,11 +69,11 @@ test("visible viewport geometry updates and listeners are removed on dismissal",
     expect(modal.style.getPropertyValue("--swap-visual-height")).toBe("844px");
     Object.assign(viewport, { height: 400, offsetTop: 50 });
     act(() => viewport.dispatchEvent(new Event("resize")));
-    expect(modal).toHaveAttribute("data-compact-viewport", "true");
+    await vi.waitFor(() => expect(modal).toHaveAttribute("data-compact-viewport", "true"));
     expect(modal.style.getPropertyValue("--swap-visual-top")).toBe("50px");
     Object.assign(viewport, { height: 667 });
     act(() => viewport.dispatchEvent(new Event("scroll")));
-    expect(modal).toHaveAttribute("data-compact-viewport", "false");
+    await vi.waitFor(() => expect(modal).toHaveAttribute("data-compact-viewport", "false"));
     result.unmount();
     expect(remove).toHaveBeenCalledWith("resize", expect.any(Function));
     expect(remove).toHaveBeenCalledWith("scroll", expect.any(Function));

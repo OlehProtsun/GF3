@@ -18,4 +18,7 @@ public sealed class CreateShiftCorrectionRequest
 
     [Required]
     public string RequestedToTime { get; init; } = string.Empty;
+
+    [MaxLength(1000)]
+    public string? Comment { get; init; }
 }

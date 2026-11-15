@@ -11,8 +11,6 @@ import { LoginPage } from "@pages/login/ui/LoginPage";
 
 beforeEnglishTest(() => setTestLanguage("en"));
 
-vi.mock("@entities/regulations", () => ({ useMyRegulationHistoryQuery: () => ({ data: [] }) }));
-vi.mock("@entities/regulations/ui/RegulationHistoryCard", () => ({ RegulationHistoryCard: () => <section aria-label="Regulation history" /> }));
 vi.mock("@shared/i18n/LanguageSelector", () => ({ LanguageSelector: () => <button type="button" aria-label="Application language">English</button> }));
 
 const session = { role: "employee", userName: "worker", displayName: "Worker", employeeId: 1, managerId: null };
@@ -63,6 +61,14 @@ beforeEach(() => {
 
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); setAuthAccessToken(null); });
 
+test("profile shows the locked regulation placeholder without loading private history", async () => {
+  render(<BrowserRouter><AuthProvider><QueryProvider><Workspace /></QueryProvider></AuthProvider></BrowserRouter>);
+  const card = await screen.findByRole("region", { name: "Regulation history" });
+  expect(within(card).getByText("Temporarily closed")).toBeVisible();
+  expect(within(card).queryByRole("button")).not.toBeInTheDocument();
+  expect(fetchMock.mock.calls.some(([url]) => url.includes("/regulations/") && !url.endsWith("/pending"))).toBe(false);
+});
+
 async function changePassword() {
   render(<BrowserRouter><AuthProvider><QueryProvider><Workspace /></QueryProvider></AuthProvider></BrowserRouter>);
   fireEvent.click(await screen.findByRole("button", { name: "Change password" }));
@@ -77,9 +83,9 @@ test("successful reset clears the revoked session, shows success at login and al
   expect(getAuthAccessToken()).toBeNull();
   expect(window.localStorage.getItem("gf3.auth.access-token")).toBeNull();
   expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
-    "/api/auth/session", "/api/employee-profile/me", "/api/regulations/pending", "/api/employee-push/config", "/api/public-holiday-settings", "/api/employee-profile/me/password/confirm",
+    "/api/auth/session", "/api/employee-profile/me", "/api/regulations/pending", "/api/public-holiday-settings", "/api/employee-profile/me/password/confirm",
   ]);
-  expect(JSON.parse(fetchMock.mock.calls[5][1].body)).toEqual({ code: "123456", newPassword: "654321" });
+  expect(JSON.parse(fetchMock.mock.calls[4][1].body)).toEqual({ code: "123456", newPassword: "654321" });
   fireEvent.change(screen.getByLabelText("Username"), { target: { value: "worker" } });
   fireEvent.change(screen.getByLabelText("Password"), { target: { value: "654321" } });
   fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
@@ -122,7 +128,7 @@ test("account editing is separate, mutually exclusive and cancellable without wr
   expect(screen.getByRole("region", { name: "Regulation history" })).toBeVisible();
   expect(within(account).getByText("Login")).toBeVisible();
   expect(within(account).getByText("Display name")).toBeVisible();
-  expect(screen.getByRole("region", { name: "Push notifications" })).toBeVisible();
+  expect(screen.queryByRole("region", { name: "Push notifications" })).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Edit account details" }));
   expect(screen.queryByLabelText("Verification code")).not.toBeInTheDocument();
   expect(screen.queryByLabelText("New password")).not.toBeInTheDocument();

@@ -65,6 +65,16 @@ test("container lists manager data, supports search and empty state without Add"
 });
 test("container detail includes private and public graphs and full manager worker counts", async () => {
  mount(<ManagerPhoneContainerDetailPage />, "/container/1"); await screen.findByText("Private schedule"); expect(screen.getByText("Public schedule")).toBeInTheDocument(); expect(await screen.findByText("Other Worker")).toBeInTheDocument();
+ const schedule = screen.getByRole("link", { name: /Private schedule/ });
+ expect(schedule).toHaveAttribute("href", "/container/1/graphs/3");
+ expect(within(schedule).getByText("Private", { exact: true })).toBeVisible();
+ expect(within(schedule).getByText("April 2026")).toBeVisible();
+ expect(within(schedule).getByText("1 employee")).toBeVisible();
+ expect(within(schedule).getByText("8h 0m")).toBeVisible();
+ expect(within(screen.getByRole("link", { name: /Public schedule/ })).getByText("Public", { exact: true })).toBeVisible();
+ expect(screen.queryByText(container.name)).not.toBeInTheDocument();
+ expect(screen.queryByText(container.note)).not.toBeInTheDocument();
+ expect(screen.getByRole("heading", { name: "Statistics" })).toBeVisible();
  expect(calls.every(call => call.method === "GET")).toBe(true);
 });
 test("graph uses manager matrix and summaries with no write or export actions", async () => {
@@ -168,7 +178,7 @@ test("containers descend within pinned and unpinned groups without mutating cach
  expect(client.getQueryState<typeof data>(key).data!.map(item => item.id)).toEqual([1, 9, 4, 7]);
 });
 
-test("statistics retain all employee, total and per-shop values in cards", async () => {
+test("statistics collapse by default and retain employee, total and per-shop values", async () => {
  const original = vi.mocked(fetch).getMockImplementation()!;
  vi.mocked(fetch).mockImplementation(async (input, init) => {
   const path = new URL(String(input), "http://localhost").pathname;
@@ -177,17 +187,22 @@ test("statistics retain all employee, total and per-shop values in cards", async
   return original(input, init);
  });
  const view = mount(<ManagerPhoneContainerDetailPage />, "/container/1"); await screen.findByText("Other Worker");
- const heading = screen.getByRole("heading", { name: "Statistics" }); const stats = heading.closest("section")!;
+ const heading = screen.getByRole("heading", { name: /Statistics/ }); const stats = heading.closest("section")!;
  expect(within(stats).queryByRole("table")).not.toBeInTheDocument();
+ const toggle = within(stats).getByRole("button", { name: /Statistics/ }); expect(toggle).toHaveAttribute("aria-expanded", "false");
+ expect(within(stats).queryAllByRole("article")).toHaveLength(0);
+ await userEvent.click(toggle); expect(toggle).toHaveAttribute("aria-expanded", "true");
  const cards = within(stats).getAllByRole("article"); expect(cards).toHaveLength(2);
- expect(within(cards[0]).getByRole("heading")).toHaveTextContent("Other Worker"); expect(within(cards[1]).getByRole("heading")).toHaveTextContent("TOTAL");
+ expect(within(cards[0]).getByRole("heading")).toHaveTextContent("Other Worker"); expect(within(cards[1]).getByRole("heading")).toHaveTextContent("Total");
  for (const card of cards) {
   expect(within(card).getByText("Work Days")).toBeInTheDocument(); expect(within(card).getByText("Free Days")).toBeInTheDocument(); expect(within(card).getByText("Hours")).toBeInTheDocument();
   expect(Array.from(card.querySelectorAll("dl:first-of-type dd")).slice(0, 4).map(node => node.textContent)).toEqual(["1", "29", "0", "16"]);
-  const details = card.querySelector("details")!; expect(details.open).toBe(false); await userEvent.click(details.querySelector("summary")!); expect(details.open).toBe(true);
-  expect(within(details).getByText("Central")).toBeInTheDocument(); expect(within(details).getByText("Second shop")).toBeInTheDocument(); expect(within(details).getAllByText("8")).toHaveLength(2);
+  const shopsToggle = within(card).getByRole("button", { name: "Shops" }); expect(shopsToggle).toHaveAttribute("aria-expanded", "false");
+  await userEvent.click(shopsToggle); expect(shopsToggle).toHaveAttribute("aria-expanded", "true");
+  expect(within(card).getByText("Central")).toBeInTheDocument(); expect(within(card).getByText("Second shop")).toBeInTheDocument(); expect(within(card).getAllByText("8")).toHaveLength(2);
  }
  expect(view.container.querySelectorAll("article")).toHaveLength(2);
+ await userEvent.click(toggle); expect(toggle).toHaveAttribute("aria-expanded", "false");
 });
 
 test.each(["items", "nested"])("availability uses %s base data despite optional hint failures", async source => {
@@ -245,6 +260,7 @@ test("phone schedule summary keeps metrics and every split shift in compact sear
    { id: 9, scheduleId: 3, employeeId: 2, dayOfMonth: 1, slotNo: 2, fromTime: "13:00", toTime: "16:00", status: "Working" }],
   employeesById: new Map([[2, employee]]), cellStyles: [], isLoading: false, hasLoadError: false, isDeleting: false, onEdit: () => {}, onDelete: () => {} };
  const view = mount(<ContainerGraphProfileWorkspace {...props} compactSize showManagementActions={false} />);
+ await userEvent.click(screen.getByRole("button", { name: /Schedule Summary/ }));
  const summary = view.container.querySelector("[data-phone-schedule-summary]")!;
  expect(within(summary as HTMLElement).queryByRole("table")).not.toBeInTheDocument();
  expect(within(summary as HTMLElement).getByRole("heading", { name: "Other Worker" })).toBeInTheDocument();

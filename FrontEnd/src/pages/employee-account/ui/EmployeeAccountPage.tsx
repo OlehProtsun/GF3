@@ -1,5 +1,4 @@
 import { t } from "@shared/i18n";
-import { EmployeePushSettings } from "@entities/employee-push/ui/EmployeePushSettings";
 import { useLanguageRevision } from "@shared/i18n/useLanguageRevision";
 import { LanguageSelector } from "@shared/i18n/LanguageSelector";
 import { useEffect, useState } from "react";
@@ -17,7 +16,6 @@ import { pushErrorAlertFromError } from "@shared/ui/feedback/error-alerts/errorA
 import { AccountSettingsIcon, CheckIcon, ChevronRightIcon, EmployeeIcon, LogoutIcon, SaveIcon } from "@shared/ui/icons";
 import sharedStyles from "@pages/shared/EmployeeWorkspacePage.module.css";
 import styles from "./EmployeeAccountPage.module.css";
-import { useMyRegulationHistoryQuery } from "@entities/regulations";
 import { RegulationHistoryCard } from "@entities/regulations/ui/RegulationHistoryCard";
 
 function getFallbackInitials(value?: string | null) {
@@ -54,7 +52,6 @@ export function EmployeeAccountPage() {
   const updateProfileMutation = useUpdateEmployeeProfileMutation();
   const sendPasswordCodeMutation = useSendEmployeePasswordResetCodeMutation();
   const confirmPasswordMutation = useConfirmEmployeePasswordResetMutation();
-  const regulationHistoryQuery = useMyRegulationHistoryQuery(`employee:${session?.employeeId ?? 0}`);
 
   const profile = profileQuery.data;
   const displayName = profile?.displayName ?? session?.displayName ?? t("Employee");
@@ -399,14 +396,8 @@ export function EmployeeAccountPage() {
           <div className={styles.loadingState}>{t("Your profile is not available yet.")}</div>
         )}
 
-        {profile ? <EmployeePushSettings employeeId={profile.employeeId} appearance="profile" /> : null}
-
         {profile ? (
-          <RegulationHistoryCard
-            appearance="profile"
-            acceptances={regulationHistoryQuery.data ?? []}
-            isLoading={regulationHistoryQuery.isLoading}
-          />
+          <RegulationHistoryCard appearance="temporarily-closed" />
         ) : null}
 
         {profile ? (

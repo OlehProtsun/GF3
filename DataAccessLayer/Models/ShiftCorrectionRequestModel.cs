@@ -42,6 +42,9 @@ public sealed class ShiftCorrectionRequestModel
     [Column("requested_to_time")]
     public string RequestedToTime { get; set; } = string.Empty;
 
+    [Column("comment")]
+    public string? Comment { get; set; }
+
     [Column("status")]
     public ShiftCorrectionStatus Status { get; set; } = ShiftCorrectionStatus.Pending;
 

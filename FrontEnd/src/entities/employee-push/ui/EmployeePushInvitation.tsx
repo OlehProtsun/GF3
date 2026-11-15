@@ -5,7 +5,7 @@ import { t } from "@shared/i18n";
 import { useLanguageRevision } from "@shared/i18n/useLanguageRevision";
 import { employeePushApi } from "../api/employeePushApi";
 import { enableEmployeePush } from "../lib/enablePush";
-import { employeePushStateChanged, pushSupport } from "../lib/pushSubscription";
+import { configuredPushKey, createPushOperation, employeePushStateChanged, pushSupport } from "../lib/pushSubscription";
 import styles from "./EmployeePushInvitation.module.css";
 
 const cooldownMs = 7 * 24 * 60 * 60 * 1000;
@@ -41,14 +41,14 @@ function EmployeeInvitation({ employeeId }: { employeeId: number }) {
   }, []);
 
   useEffect(() => {
-    const controller = new AbortController();
+    const controller = createPushOperation();
     operations.current = controller;
     if (isDismissed(employeeId) || pushSupport() !== "supported" || Notification.permission !== "default") return () => controller.abort();
     void (async () => {
       try {
         const config = await employeePushApi.getConfig(controller.signal);
-        if (controller.signal.aborted || !config.enabled || !config.publicKey || Notification.permission !== "default") return;
-        setPublicKey(config.publicKey);
+        if (controller.signal.aborted || Notification.permission !== "default") return;
+        setPublicKey(configuredPushKey(config));
       } catch { /* Optional invitation must never block the employee workspace. */ }
     })();
     return () => controller.abort();

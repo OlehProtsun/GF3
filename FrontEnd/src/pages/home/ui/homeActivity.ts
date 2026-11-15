@@ -64,12 +64,22 @@ function vacationRanges(days: readonly string[]) {
   }
   return ranges.join(", ");
 }
-export function getHomeActivityPresentation(item: ManagerHomeActivityItem) {
-  const name = item.employeeName;
+function participantName(value?: string | null) {
+  const name = value?.trim();
+  return name && !/^[-–—]+$/.test(name) ? name : "";
+}
+
+export function getHomeActivityPresentation(item: ManagerHomeActivityItem, employeeName?: string) {
+  const recordedName = participantName(item.employeeName);
+  const name = (recordedName === String(item.employeeId) ? "" : recordedName) || participantName(employeeName) ||
+    (positiveId(item.employeeId) ? t("Employee {0}", item.employeeId) : t("Unknown employee"));
+  const counterparty = participantName(item.counterpartyName);
   const titles = {
-    swap_created: item.returnShiftDate ? t("{0} requested a shift exchange", name) : t("{0} gave up a shift", name),
-    swap_accepted: t("{0} picked up a shift from {1}", item.counterpartyName ?? name, name),
-    swap_cancelled: t("{0} cancelled a shift offer", name),
+    swap_created: item.isManagerCreatedOffer ? t("Manager published an open shift")
+      : item.returnShiftDate ? t("{0} requested a shift exchange", name) : t("{0} gave up a shift", name),
+    swap_accepted: item.isManagerCreatedOffer ? t("{0} picked up an open shift", counterparty || t("Unknown employee"))
+      : t("{0} picked up a shift from {1}", counterparty || t("Unknown employee"), name),
+    swap_cancelled: item.isManagerCreatedOffer ? t("An open shift offer was cancelled") : t("{0} cancelled a shift offer", name),
     correction_requested: t("{0} requested a schedule correction", name), correction_reviewed: t("Schedule correction for {0} was reviewed", name),
     day_off_requested: t("{0} requested a day-off correction", name), day_off_reviewed: t("Day-off correction for {0} was reviewed", name),
     approval_requested: t("Shift approval requested for {0}", name), approval_reviewed: t("Shift approval for {0} was reviewed", name),
@@ -81,8 +91,10 @@ export function getHomeActivityPresentation(item: ManagerHomeActivityItem) {
   let description = interval(item.shiftDate, item.fromTime, item.toTime);
   if (item.returnFromTime && item.returnToTime) description = [description, interval(item.returnShiftDate, item.returnFromTime, item.returnToTime)].filter(Boolean).join(" → ");
   if (item.vacationDays?.length) description = vacationRanges(item.vacationDays);
-  if (item.kind === "swap_created" && item.counterpartyName) description = [item.counterpartyName, description].filter(Boolean).join(" · ");
-  description = [description, item.shopName, item.scheduleName].filter(Boolean).join(" · ");
+  if (item.kind === "swap_created" && counterparty) description = [counterparty, description].filter(Boolean).join(" · ");
+  const shop = item.shopName?.trim();
+  const schedule = item.scheduleName?.trim();
+  description = [description, shop, schedule?.toLowerCase() !== shop?.toLowerCase() ? schedule : null].filter(Boolean).join(" · ");
   const iconKind = item.kind.startsWith("swap_") ? "swap" : item.kind === "availability_updated" ? "availability" : item.kind.startsWith("urlop_") || item.kind.startsWith("day_off_") ? "calendar" : "correction";
   const tone = item.requiresApproval ? "pending" : ["rejected", "cancelled", "expired"].includes(item.status) ? "neutral" : ["approved", "accepted", "updated"].includes(item.status) ? "success" : "open";
   return { title: titles[item.kind], description, localizedStatus: statuses[item.status] ?? t("Unknown status"), iconKind, tone,

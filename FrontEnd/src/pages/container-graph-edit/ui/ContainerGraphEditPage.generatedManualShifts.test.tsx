@@ -1,4 +1,5 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render as rtlRender, screen, waitFor } from "@testing-library/react";
+import type { ReactElement } from "react";
 import { beforeEach, expect, test, vi } from "vitest";
 import type { ComponentProps } from "react";
 import type { ContainerGraphEditor } from "@entities/containers/ui/ContainerGraphEditor";
@@ -11,7 +12,7 @@ import { buildGraphNoteContent, parseGraphNoteContent } from "@entities/containe
 import { buildGraphDraftSlots } from "@entities/containers/model/graphWorkspace";
 import { setLanguage, t } from "@shared/i18n";
 import { ApiError, RequestCanceledError } from "@shared/api/httpClient";
-import { QueryClient } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ContainerGraphEditPage } from "./ContainerGraphEditPage";
 
 type EditorProps = ComponentProps<typeof ContainerGraphEditor>;
@@ -34,14 +35,14 @@ const mocks = vi.hoisted(() => ({
   offersByGraph: new Map<number, ShiftSwap[]>(),
   savedSlots: new Map<number, GraphSlot[]>(),
   savedEmployees: new Map<number, GraphEmployee[]>(),
-  editor: null as EditorProps | null, queryClient: null as QueryClient | null,
+  editor: null as EditorProps | null,
 }));
+let queryClient: QueryClient;
 
 vi.mock("@app/providers/AuthProvider", () => ({ useAuth: () => ({ session: null }) }));
 vi.mock("react-router-dom", async importOriginal => ({
   ...await importOriginal<object>(), useParams: () => mocks.params, useLocation: () => mocks.location, useNavigate: () => mocks.navigate,
 }));
-vi.mock("@tanstack/react-query", async importOriginal => ({ ...await importOriginal<object>(), useQueryClient: () => mocks.queryClient }));
 vi.mock("@app/providers/PresenceProvider", () => ({
   managerEditResourceTypes: { graph: "graph" }, useManagerEditLocks: () => ({ lockedByOtherState: null, isCheckingLocks: false }),
   buildManagerEditLockMessage: () => null,
@@ -106,6 +107,9 @@ const graph: Graph = { id: 1, containerId: 1, shopId: 1, name: "Graph one", year
 const preview = () => Array.from({ length: 28 }, (_, i): GraphSlot[] => ([{
   id: i + 1, scheduleId: 1, dayOfMonth: i + 1, slotNo: 1, employeeId: i ? 1 : null, status: i ? 1 : 0, fromTime: "08:00", toTime: "12:00",
 }, { id: i + 100, scheduleId: 1, dayOfMonth: i + 1, slotNo: 1, employeeId: 1, status: 1, fromTime: "12:00", toTime: "16:00" }])).flat();
+const render = (ui: ReactElement) => rtlRender(ui, {
+  wrapper: ({ children }) => <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>,
+});
 beforeEach(() => {
   setLanguage("en"); vi.clearAllMocks();
   mocks.contractSettings = { data: { automaticWeekdayAvailability: false }, isError: false };
@@ -117,7 +121,8 @@ beforeEach(() => {
   mocks.params = { containerId: "1", graphId: "1" };
   mocks.location.search = "?openGraphIds=1,2";
   mocks.graphs = [{ ...graph }, { ...graph, id: 2, name: "Graph two" }];
-  mocks.slots = []; mocks.offers = []; mocks.styles = []; mocks.editor = null; mocks.queryClient = new QueryClient();
+  queryClient = new QueryClient();
+  mocks.slots = []; mocks.offers = []; mocks.styles = []; mocks.editor = null;
   mocks.generate.mockImplementation((_variables, callbacks) => callbacks.onSuccess({ slots: preview() }));
   mocks.savedSlots.clear(); mocks.savedEmployees.clear(); mocks.offersByGraph.clear();
   mocks.save.mockImplementation((variables, callbacks) => {

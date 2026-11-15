@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { setLanguage } from "@shared/i18n";
+import { setAuthAccessToken } from "@shared/api/httpClient";
 import { EmployeePushInvitation } from "./EmployeePushInvitation";
 
 const mocks = vi.hoisted(() => ({
@@ -9,7 +10,9 @@ const mocks = vi.hoisted(() => ({
 }));
 vi.mock("@app/providers/AuthProvider", () => ({ useAuth: () => mocks.auth }));
 vi.mock("../api/employeePushApi", () => ({ employeePushApi: { getConfig: mocks.config, upsertSubscription: mocks.upsert } }));
-vi.mock("../lib/pushSubscription", () => ({
+vi.mock("../lib/pushSubscription", async importOriginal => ({
+  ...await importOriginal<typeof import("../lib/pushSubscription")>(),
+  configuredPushKey: ({ enabled, publicKey }: { enabled: boolean; publicKey: string | null }) => enabled ? publicKey : null,
   employeePushStateChanged: "gf3:employee-push-state-changed", pushSupport: mocks.support, getBrowserSubscription: mocks.subscription,
   pushAccount: mocks.account, registerWorker: mocks.worker, ensureSubscription: mocks.ensure, rememberPushAccount: mocks.remember,
   serializeSubscription: (value: unknown) => value,
@@ -21,14 +24,16 @@ function workspace(loading = false, otherModal = false) {
 }
 beforeEach(() => {
   vi.clearAllMocks(); localStorage.clear(); setLanguage("en");
+  setAuthAccessToken("employee-token");
   mocks.auth.status = "authenticated"; mocks.auth.session.role = "employee"; mocks.auth.session.employeeId++;
   mocks.config.mockResolvedValue({ enabled: true, publicKey: "key" }); mocks.upsert.mockResolvedValue(undefined);
   mocks.support.mockReturnValue("supported"); mocks.subscription.mockResolvedValue(null); mocks.account.mockReturnValue(null);
   mocks.worker.mockResolvedValue({}); mocks.ensure.mockResolvedValue({ endpoint: "device" });
   mocks.remember.mockImplementation(id => { mocks.account.mockReturnValue(id); window.dispatchEvent(new Event("gf3:employee-push-state-changed")); });
-  vi.stubGlobal("Notification", { permission: "default", requestPermission: vi.fn().mockResolvedValue("granted") });
+  const notification = { permission: "default", requestPermission: vi.fn(async () => { notification.permission = "granted"; return "granted"; }) };
+  vi.stubGlobal("Notification", notification);
 });
-afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); setLanguage("en"); });
+afterEach(() => { setAuthAccessToken(null); vi.restoreAllMocks(); vi.unstubAllGlobals(); setLanguage("en"); });
 
 describe("employee push welcome", () => {
   test("waits for auth, config and page readiness without requesting native permission", async () => {

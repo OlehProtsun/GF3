@@ -1,8 +1,30 @@
-.dialog { position: fixed; top: calc(var(--swap-visual-top, 0px) + var(--swap-visual-height, 100dvh) / 2); left: 50%; transform: translate(-50%, -50%); margin: 0; box-sizing: border-box; width: min(430px, calc(100vw - 24px)); max-width: calc(100vw - 16px); height: min(720px, calc(var(--swap-visual-height, 100dvh) - 24px)); max-height: none; padding: 0; border: 1px solid #e5eaf1; border-radius: 24px; overflow: hidden; overscroll-behavior: none; background: white; color: #23344e; box-shadow: 0 24px 80px #23344e22; }
+.dialog {
+  --dialog-visible-height: var(--swap-visual-height, 100dvh);
+  --dialog-inset: clamp(4px, calc((var(--dialog-visible-height) - 180px) / 8), 12px);
+  --dialog-height: min(720px, calc(var(--dialog-visible-height) - 2 * var(--dialog-inset)));
+  position: fixed;
+  inset: calc(var(--swap-visual-top, 0px) + (var(--dialog-visible-height) - var(--dialog-height)) / 2) 0 auto;
+  margin: 0 auto;
+  box-sizing: border-box;
+  width: min(430px, calc(100vw - 24px));
+  max-width: calc(100vw - 16px);
+  height: var(--dialog-height);
+  max-height: none;
+  padding: 0;
+  border: 1px solid #e5eaf1;
+  border-radius: 24px;
+  overflow: hidden;
+  overflow: clip;
+  overscroll-behavior: none;
+  background: white;
+  color: #23344e;
+  box-shadow: 0 24px 80px #23344e22;
+}
 .dialog::backdrop { background: #14264266; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
 .scheduleDialog, .recipientDialog, .reviewDialog, .pickerDialog, .typeDialog { background: white; }
 .shell { position: relative; height: 100%; min-height: 0; display: flex; flex-direction: column; }
 .body { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; padding: 4px 16px 0; overscroll-behavior: none; }
+.recipientDialog .body { overflow: clip; }
 .header { position: relative; display: flex; align-items: center; gap: 8px; flex: none; min-height: 52px; padding: 8px 12px 4px; z-index: 5; }
 .header > button:last-child { margin-left: auto; flex: none; }
 .dialog button { font: inherit; color: inherit; cursor: pointer; min-height: 44px; border: 1px solid #e5eaf1; border-radius: 14px; padding: 8px 12px; background: white; }
@@ -38,7 +60,7 @@
 .nested small { justify-self: start; border-radius: 8px; background: #e8efff; color: #246bff; padding: 4px 8px; font-size: 12px; }
 .nested button { grid-column: 2; grid-row: 1 / 4; align-self: center; max-width: 90px; color: #246bff; border-color: #bed3ff; font-size: 13px; }
 .chooseHint { display: block; margin: -5px 12px 12px 74px; color: #7b879b; font-size: 12px; }
-.recipientContent { padding: 2px; }
+.recipientContent { padding: 2px 2px 12px; }
 .recipientModes { display: grid; gap: 12px; margin-bottom: 14px; }
 .recipientModes > button, .recipientCard > button { display: flex; align-items: center; gap: 12px; padding: 12px; text-align: left; min-width: 0; }
 .recipientModes > button { border-radius: 20px; }
@@ -102,10 +124,12 @@
 .reviewInfo > span { font-size: 20px; color: #246bff; }
 .reviewInfo p { margin: 0; font-size: 12px; line-height: 1.5; }
 
-.dialog[data-compact-viewport="true"] .body { overflow-y: auto; display: block; }
-.dialog[data-compact-viewport="true"] .footer, .dialog[data-compact-viewport="true"] section > footer { position: sticky; bottom: 0; background: white; z-index: 3; }
-.dialog[data-compact-viewport="true"] .body > section { display: block; }
-.dialog[data-compact-viewport="true"] .body > section > * { margin-bottom: 12px; }
+.dialog[data-compact-viewport="true"]:not([data-recipient-step]) .body { overflow-y: auto; scroll-padding-block: 12px 84px; display: block; }
+.dialog[data-compact-viewport="true"]:not([data-recipient-step]) .footer,
+.dialog[data-compact-viewport="true"]:not([data-recipient-step]) section > footer { position: sticky; bottom: 0; background: white; z-index: 3; }
+.dialog[data-compact-viewport="true"]:not([data-recipient-step]) .body > section { display: block; }
+.dialog[data-compact-viewport="true"]:not([data-recipient-step]) .body > section > * { margin-bottom: 12px; }
+.recipientDialog[data-compact-viewport="true"] .footer { padding-block: 6px; }
 @media (max-width: 360px) {
   .dialog { width: calc(100vw - 16px); }
   .body { padding-right: 14px; padding-left: 14px; }

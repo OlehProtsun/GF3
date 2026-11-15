@@ -4,7 +4,7 @@ import uk from "./uk.json";
 export type Language = "en" | "pl" | "uk";
 export const languageNames: Record<Language, string> = { pl: "Polski", en: "English", uk: "Українська" };
 const dictionaries: Record<Exclude<Language, "en">, Record<string, string>> = { pl, uk };
-const englishLabels: Record<string, string> = { "Holiday short": "Hol." };
+const englishLabels: Record<string, string> = { "Holiday short": "Hol.", "Open status": "Open" };
 let language: Language = "pl";
 const listeners = new Set<() => void>();
 

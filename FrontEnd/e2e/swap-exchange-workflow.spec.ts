@@ -1,5 +1,6 @@
 import { writeFile } from "node:fs/promises";
 import { expect, test, type Page } from "@playwright/test";
+import { expectVisibleField, setVisualViewport } from "./fixtures/visualViewport";
 import pl from "../src/shared/i18n/pl.json" with { type: "json" };
 import uk from "../src/shared/i18n/uk.json" with { type: "json" };
 
@@ -219,6 +220,47 @@ async function sourceSteps(page: Page) {
   await page.getByRole("button", { name: "Confirm shift" }).click();
   await expect(page.getByText("Thu 01 Oct · 09:00–16:30")).toBeVisible();
   await page.getByRole("button", { name: "Continue", exact: true }).click();
+}
+
+for (const width of [320, 375, 430]) {
+  test(`swap search stays above the keyboard at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 812 });
+    await mockApi(page, 1, { offers: [], employeeCount: 25 });
+    await page.goto("/swap");
+    await sourceSteps(page);
+    const dialog = page.getByRole("dialog", { name: "Create a swap offer" });
+    await dialog.getByRole("button", { name: "Specific employee" }).click();
+    const search = dialog.getByRole("searchbox", { name: "Search employee..." });
+    const scroller = search.locator("../..");
+    const initialWidth = (await dialog.boundingBox())!.width;
+    const scroll = await page.evaluate(() => scrollY);
+
+    await search.evaluate(element => element.focus({ preventScroll: true }));
+    await setVisualViewport(page, { height: 300, top: 72 });
+    await expectVisibleField(search, scroller);
+    expect((await dialog.boundingBox())!.width).toBeCloseTo(initialWidth, 0);
+
+    const name = "Zuzanna Aleksandra Kowalska-Wiśniewska";
+    await page.keyboard.insertText(name);
+    await expect(search).toHaveValue(name);
+    await expectVisibleField(search, scroller);
+    const results = dialog.getByRole("group", { name: "Employees" }).getByRole("button");
+    await expect(results).toHaveCount(24);
+    await scroller.evaluate(element => { element.scrollTop = element.scrollHeight; });
+    await expect(results.last()).toBeInViewport({ ratio: 1 });
+    await expect(search).toBeFocused();
+
+    await search.blur();
+    await setVisualViewport(page, null);
+    await search.evaluate(element => element.focus({ preventScroll: true }));
+    await page.setViewportSize({ width: 670, height: 375 });
+    await setVisualViewport(page, { height: 190, top: 55 });
+    await expectVisibleField(search, scroller);
+    await expect(search).toHaveValue(name);
+    expect(await page.evaluate(() => ({ scrollY, locked: document.body.style.position }))).toEqual({ scrollY: scroll, locked: "fixed" });
+    await results.last().click();
+    await expect(dialog.getByRole("button", { name: "Save selection" })).toBeVisible();
+  });
 }
 
 test("custom private Give sends exact payload and cancellation appears in History", async ({ page }) => {
@@ -1167,6 +1209,7 @@ for (const viewport of [{ width: 320, height: 640 }, { width: 375, height: 812 }
     const launcher = page.getByRole("button", { name: "Swap history", exact: true }); await launcher.click();
     const history = page.getByRole("dialog", { name: "Recent swap activity" });
     const list = history.getByRole("region", { name: "Swap history", exact: true });
+    await expect(history.getByRole("region", { name: "My approval requests" })).toHaveCount(0);
     await expect(history).toBeVisible(); await expect(history).toHaveCSS("overflow-y", "hidden");
     await expect(list).toHaveCSS("overflow-y", "auto");
     if (await page.evaluate(() => CSS.supports("overscroll-behavior-y", "none"))) await expect(list).toHaveCSS("overscroll-behavior-y", "none");
@@ -1221,8 +1264,13 @@ for (const count of [0, 1, 4]) {
     await page.goto("/swap"); await page.getByRole("button", { name: "Swap history", exact: true }).click();
     const history = page.getByRole("dialog", { name: "Recent swap activity" });
     const list = history.getByRole("region", { name: "Swap history", exact: true });
+    await expect(history.getByRole("region", { name: "My approval requests" })).toHaveCount(0);
     const close = history.getByRole("button", { name: "Close", exact: true });
     await close.click({ trial: true });
+    expect(await list.evaluate(element => {
+      const header = element.previousElementSibling;
+      return Boolean(header?.querySelector("h2") && element.getBoundingClientRect().top - header.getBoundingClientRect().bottom <= 16);
+    })).toBe(true);
     const box = (await history.boundingBox())!;
     expect(box.y + box.height).toBeLessThanOrEqual(640);
     expect(await list.evaluate(el => el.scrollWidth <= el.clientWidth)).toBeTruthy();
@@ -1238,6 +1286,41 @@ for (const count of [0, 1, 4]) {
     await close.click(); await expect(history).not.toBeVisible();
   });
 }
+
+test("History retains pending and reviewed approvals and cancellation errors at 320px", async ({ page }, info) => {
+  await page.setViewportSize({ width: 320, height: 640 });
+  await mockApi(page, 1, { offers: [offer({ id: 20, status: "accepted" })] });
+  const shift = { scheduleName: "Scheduled pickup", dayOfMonth: 8, month: 10, year: 2026, fromTime: "08:00", toTime: "16:00" };
+  const pending = { ...shift, id: 31, kind: "claim", status: "pending" };
+  const rejected = { ...shift, id: 32, kind: "below_minimum_give", status: "rejected", failureReason: "Manager declined." };
+  let attempts = 0;
+  await page.route("**/api/employee-shift-swap-approvals", route => route.fulfill({ json: [pending, rejected] }));
+  await page.route("**/api/employee-shift-swap-approvals/31/cancel", route => {
+    if (++attempts === 1) return route.fulfill({ status: 503, json: { detail: "Cancellation temporarily unavailable." } });
+    pending.status = "cancelled";
+    return route.fulfill({ json: pending });
+  });
+  await page.goto("/swap");
+  const launcher = page.getByRole("button", { name: "Swap history", exact: true });
+  await launcher.click();
+  const history = page.getByRole("dialog", { name: "Recent swap activity" });
+  const approvals = history.getByRole("region", { name: "My approval requests" });
+  await expect(approvals.getByRole("heading")).toHaveCount(0);
+  await expect(approvals.getByText("Shift pickup approval")).toBeVisible();
+  await expect(approvals.getByText("Monthly minimum exception")).toBeVisible();
+  await expect(approvals.getByText("Manager declined.")).toBeVisible();
+  const cancel = approvals.getByRole("button", { name: "Cancel request" });
+  await cancel.click();
+  await expect(approvals.getByText("Cancellation temporarily unavailable.")).toBeVisible();
+  await cancel.click();
+  await expect(approvals.getByText("Cancelled")).toBeVisible();
+  await expect(cancel).toHaveCount(0);
+  expect(await approvals.evaluate(element => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
+  await history.screenshot({ path: info.outputPath("history-with-approvals.png") });
+  await page.keyboard.press("Escape");
+  await expect(history).not.toBeVisible();
+  await expect(launcher).toBeFocused();
+});
 
 
 for (const viewport of [{ width: 320, height: 640 }, { width: 375, height: 812 }, { width: 390, height: 844 }, { width: 430, height: 932 }, { width: 1280, height: 800 }]) {

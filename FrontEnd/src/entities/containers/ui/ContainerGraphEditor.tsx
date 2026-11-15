@@ -1,5 +1,5 @@
 import { ContainerGraphContractApprovalsCard } from "./ContainerGraphContractApprovalsCard";
-import { dateTimeFormat, numberFormat, t } from "@shared/i18n";
+import { dateTimeFormat, t } from "@shared/i18n";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { Employee } from "@entities/employees/model/types";
 import { getEmployeeFullName } from "@entities/employees/model/presentation";
@@ -34,7 +34,8 @@ import {
   useSaveGraphShiftSwapHighlightSettingMutation,
   type ShiftSwap,
 } from "@entities/shift-swaps";
-import { filterAcceptedShiftSwapHistory } from "@entities/shift-swaps/model/history";
+import { useGraphShiftCorrectionsQuery } from "@entities/shift-corrections";
+import { useGraphContractApprovalsQuery } from "@entities/shift-swap-approvals";
 import { getErrorMessage } from "@shared/api/httpClient";
 import { ErrorBanner } from "@shared/ui/components/ErrorBanner";
 import { IosButton } from "@shared/ui/components/IosButton";
@@ -47,12 +48,9 @@ import {
   CloseIcon,
   EmployeeIcon,
   EyeIcon,
-  InformationIcon,
   PlusIcon,
   SaveIcon,
-  ScheduleIcon,
   ScheduleDetailsIcon,
-  SearchIcon,
   SwapHistoryIcon,
 } from "@shared/ui/icons";
 import { CardSection } from "@shared/ui/sections/CardSection";
@@ -67,6 +65,8 @@ import {
 import { ContainerGraphMatrix } from "./ContainerGraphMatrix";
 import { ContainerGraphPresetDialog } from "./ContainerGraphPresetDialog";
 import { ContainerGraphRelatedHintDialog } from "./ContainerGraphRelatedHintDialog";
+import { ContainerGraphScheduleActivityDialog, type ScheduleActivitySummary } from "./ContainerGraphScheduleActivityDialog";
+import { ContainerGraphSwapLogPanel } from "./ContainerGraphSwapLogPanel";
 import { ContainerGraphShiftCorrectionsCard } from "./ContainerGraphShiftCorrectionsCard";
 import { ContainerGraphVersionsDialog } from "./ContainerGraphVersionsDialog";
 import { ContainerGraphPresetSelect } from "./ContainerGraphPresetSelect";
@@ -97,7 +97,7 @@ export type EditableGraphManualColumn = {
   cells: Record<string, string>;
 };
 
-type SidebarSectionKey = "details" | "publication" | "corrections" | "employees" | "bind" | "manualColumns";
+type SidebarSectionKey = "details" | "employees" | "publication" | "bind";
 type ColorDialogMode = "fill" | "text";
 type PreviewLayoutMode = "side" | "stacked";
 type ToolbarActionButtonProps = {
@@ -169,6 +169,8 @@ type ContainerGraphEditorProps = {
   isSchedulePresetsLoading: boolean;
   isPublishingManualShift?: boolean;
   isCancellingManualShift?: boolean;
+  refreshingManualShiftId?: number | null;
+  refreshedManualShiftId?: number | null;
   submitError?: string;
   bindErrorMessage?: string;
   manualShiftPublishError?: string | null;
@@ -189,6 +191,7 @@ type ContainerGraphEditorProps = {
   onDeleteManualColumn: (columnId: number) => void;
   onPublishManualShift: (input: ManualColumnShiftPublicationInput) => void;
   onCancelManualShift: (shiftId: number) => void;
+  onRefreshManualShift: (shift: ShiftSwap) => void;
   onCancelPendingManualShift: (clientId: string) => void;
   onEmployeePriorityChange: (employeeId: number, checked: boolean) => void;
   onEmployeeMinHoursChange: (employeeId: number, value: string) => void;
@@ -226,49 +229,6 @@ function formatGraphHintDateLabel(year: number, month: number, dayOfMonth: numbe
     year: "numeric",
     timeZone: "UTC",
   }).format(new Date(Date.UTC(year, month - 1, dayOfMonth)));
-}
-
-const shiftSwapLogDayFormatter = dateTimeFormat("en-GB", {
-  day: "2-digit",
-  month: "short",
-  timeZone: "UTC",
-});
-
-const shiftSwapLogAcceptedAtFormatter = dateTimeFormat("en-GB", {
-  day: "2-digit",
-  month: "short",
-  hour: "2-digit",
-  minute: "2-digit",
-  hourCycle: "h23",
-});
-
-function formatShiftSwapLogDay(item: ShiftSwap) {
-  return shiftSwapLogDayFormatter.format(new Date(Date.UTC(item.year, item.month - 1, item.dayOfMonth)));
-}
-
-function formatShiftSwapLogTime(value: string) {
-  return value.slice(0, 5);
-}
-
-function formatShiftSwapLogHours(value: number) {
-  const normalized = Math.abs(value) < 0.05 ? 0 : value;
-  return t("{0}h", numberFormat("en-GB", { maximumFractionDigits: 1 }).format(normalized));
-}
-
-function formatShiftSwapAcceptedAt(value?: string | null) {
-  if (!value) {
-    return t("Unknown");
-  }
-
-  return shiftSwapLogAcceptedAtFormatter.format(new Date(value));
-}
-
-function formatShiftSwapLogShift(item: ShiftSwap) {
-  const locationLabel = item.shopName || item.containerName || item.scheduleName;
-  const timeLabel = `${formatShiftSwapLogTime(item.fromTime)}-${formatShiftSwapLogTime(item.toTime)}`;
-  const baseLabel = `${formatShiftSwapLogDay(item)} ${timeLabel} (${formatShiftSwapLogHours(item.shiftHours)})`;
-
-  return locationLabel ? `${baseLabel} - ${locationLabel}` : baseLabel;
 }
 
 type SplitColorButtonProps = {
@@ -426,6 +386,8 @@ export function ContainerGraphEditor({
   isSchedulePresetsLoading,
   isPublishingManualShift = false,
   isCancellingManualShift = false,
+  refreshingManualShiftId = null,
+  refreshedManualShiftId = null,
   submitError,
   bindErrorMessage,
   manualShiftPublishError = null,
@@ -446,6 +408,7 @@ export function ContainerGraphEditor({
   onDeleteManualColumn,
   onPublishManualShift,
   onCancelManualShift,
+  onRefreshManualShift,
   onCancelPendingManualShift,
   onEmployeeMinHoursChange,
   onEmployeePriorityChange,
@@ -474,13 +437,10 @@ export function ContainerGraphEditor({
   const [collapsedSections, setCollapsedSections] = useState<Record<SidebarSectionKey, boolean>>({
     details: true,
     publication: true,
-    corrections: true,
     employees: true,
     bind: true,
-    manualColumns: true,
   });
-  const [pendingCorrectionCount, setPendingCorrectionCount] = useState(0);
-  const [pendingContractCount, setPendingContractCount] = useState(0);
+  const [isScheduleActivityOpen, setIsScheduleActivityOpen] = useState(false);
   const [swapHighlightColor, setSwapHighlightColor] = useState("#BBF7D0");
   const [isSwapColorDialogOpen, setIsSwapColorDialogOpen] = useState(false);
   const [swapColorError, setSwapColorError] = useState<string | null>(null);
@@ -492,7 +452,6 @@ export function ContainerGraphEditor({
   const [previewLayoutMode, setPreviewLayoutMode] = useState<PreviewLayoutMode>("stacked");
   const [isGenerationOverlayArmed, setIsGenerationOverlayArmed] = useState(false);
   const [activeRelatedHintCellKey, setActiveRelatedHintCellKey] = useState<string | null>(null);
-  const [shiftSwapLogSearch, setShiftSwapLogSearch] = useState("");
   const [selectedShiftSwapHistory, setSelectedShiftSwapHistory] = useState<ShiftSwap | null>(null);
   const [viewportHeight, setViewportHeight] = useState(() => {
     if (typeof window === "undefined") {
@@ -510,6 +469,8 @@ export function ContainerGraphEditor({
   });
   const graphContainerId = graph?.containerId ?? null;
   const persistedGraphId = graph && Number.isInteger(graph.id) && graph.id > 0 ? graph.id : null;
+  const correctionsQuery = useGraphShiftCorrectionsQuery(graphContainerId, persistedGraphId);
+  const contractQuery = useGraphContractApprovalsQuery(graphContainerId, persistedGraphId);
   const swapHighlightSettingQuery = useGraphShiftSwapHighlightSettingQuery(graphContainerId, persistedGraphId);
   const saveSwapHighlightSettingMutation = useSaveGraphShiftSwapHighlightSettingMutation();
   const manualHighlightSettingQuery = useGraphManualShiftHighlightSettingQuery(graphContainerId, persistedGraphId);
@@ -637,14 +598,26 @@ export function ContainerGraphEditor({
     () => shiftSwapLog.filter(item => item.status === "accepted"),
     [shiftSwapLog],
   );
-  const filteredAcceptedShiftSwapLog = useMemo(
-    () => filterAcceptedShiftSwapHistory(acceptedShiftSwapLog, shiftSwapLogSearch),
-    [acceptedShiftSwapLog, shiftSwapLogSearch],
-  );
   const openManagerManualShifts = useMemo(
-    () => shiftSwapLog.filter(item => item.status === "open" && item.isManagerCreated),
+    () => shiftSwapLog.filter(item => item.status === "open" && item.isManagerCreated && item.manualColumnId != null),
     [shiftSwapLog],
   );
+  const corrections = correctionsQuery.data ?? [];
+  const contractApprovals = contractQuery.data ?? [];
+  const requests = [...corrections, ...contractApprovals];
+  const pendingApprovals = requests.filter(item => item.status === "pending").length;
+  const manualActivityCount = openManagerManualShifts.length + pendingManualShiftPublishes.length;
+  const activitySummary: ScheduleActivitySummary = {
+    swaps: acceptedShiftSwapLog.length,
+    manual: manualActivityCount,
+    corrections: corrections.length,
+    contractApprovals: contractApprovals.length,
+    total: acceptedShiftSwapLog.length + manualActivityCount + requests.length,
+    pending: pendingApprovals + pendingManualShiftPublishes.length,
+    approvedOrAccepted: acceptedShiftSwapLog.length + requests.filter(item => item.status === "approved").length,
+    rejected: requests.filter(item => item.status === "rejected").length,
+    offered: openManagerManualShifts.length,
+  };
 
   if (isLoading) {
     return <div className={styles.state}>{t("Loading schedule editor...")}</div>;
@@ -740,6 +713,57 @@ export function ContainerGraphEditor({
       label={label}
       onCollapse={() => setSectionCollapsed(section, true)}
     />
+  );
+
+  const swapPanel = (
+    <ContainerGraphSwapLogPanel acceptedSwaps={acceptedShiftSwapLog} isLoading={isShiftSwapLogLoading}
+      highlightColor={swapHighlightColor} highlightError={swapColorError}
+      highlightSettingDisabled={persistedGraphId === null || saveSwapHighlightSettingMutation.isPending}
+      onOpenHighlightColorPicker={() => setIsSwapColorDialogOpen(true)}
+      onViewComparison={setSelectedShiftSwapHistory} />
+  );
+  const manualPanel = (
+    <>
+      <ContainerGraphManualColumnsCard
+        highlightColor={manualHighlightColor}
+        highlightSettingDisabled={persistedGraphId === null || saveManualHighlightSettingMutation.isPending}
+        onOpenHighlightColorPicker={() => { setManualColorError(null); setIsManualColorDialogOpen(true); }}
+        columns={manualColumns}
+        allowSwap={form.allowSwap}
+        isSchedulePublished={form.publicationStatus === "public"}
+        year={displayGraphYear}
+        month={displayGraphMonth}
+        employees={employees}
+        isPublishingShift={isPublishingManualShift || isGenerating || isSaving}
+        isCancellingPublishedShift={isCancellingManualShift}
+        refreshingPublishedShiftId={refreshingManualShiftId}
+        refreshedPublishedShiftId={refreshedManualShiftId}
+        publishError={manualShiftPublishError}
+        publishedShifts={openManagerManualShifts}
+        pendingPublishedShifts={pendingManualShiftPublishes}
+        onAddColumn={onAddManualColumn}
+        onDeleteColumn={onDeleteManualColumn}
+        onPublishShift={onPublishManualShift}
+        onCancelPublishedShift={onCancelManualShift}
+        onRefreshPublishedShift={onRefreshManualShift}
+        onCancelPendingPublishedShift={onCancelPendingManualShift}
+      />
+      {manualColorError || manualHighlightSettingQuery.error
+        ? <ErrorBanner>{manualColorError ?? getErrorMessage(manualHighlightSettingQuery.error, t("Could not load the accepted manual shift highlight color."))}</ErrorBanner>
+        : null}
+    </>
+  );
+  const correctionsPanel = (
+    <ContainerGraphShiftCorrectionsCard
+      containerId={graphContainerId}
+      graphId={persistedGraphId}
+      hasUnsavedChanges={Boolean(hasUnsavedChanges)}
+      disabled={isSaving || isGenerating}
+      onApproved={onVersionCheckoutComplete}
+    >
+      <ContainerGraphContractApprovalsCard containerId={graphContainerId} graphId={persistedGraphId}
+        disabled={isSaving || isGenerating} hasUnsavedChanges={Boolean(hasUnsavedChanges)} onApproved={onVersionCheckoutComplete} />
+    </ContainerGraphShiftCorrectionsCard>
   );
 
   return (
@@ -894,7 +918,7 @@ export function ContainerGraphEditor({
             <AvailabilitySidebarSection
               label={t("Publication")}
               preserveCollapsedOnMobile
-              attention={pendingContractCount > 0}
+              attention={pendingApprovals > 0}
               collapsed={collapsedSections.publication}
               collapsedIcon={<EyeIcon size={18} />}
               collapsedOffset={allSectionsCollapsed ? "flush" : "default"}
@@ -902,27 +926,11 @@ export function ContainerGraphEditor({
             >
               <CardSection
                 className={styles.sidebarCard}
-                title={`${t("Publication")}${pendingContractCount > 0 ? ` (${pendingContractCount})` : ""}`}
+                title={`${t("Publication")}${pendingApprovals > 0 ? ` (${pendingApprovals})` : ""}`}
                 icon={<EyeIcon size={18} />}
                 headerRightSlot={renderCollapseButton(t("Publication"), "publication")}
               >
-                <div className={styles.publicationHeaderTools}>
-                  <button type="button" className={styles.publicationColorControl}
-                    title={t("Accepted swap highlight color")} aria-label={t("Accepted swap highlight color")}
-                    disabled={persistedGraphId === null || saveSwapHighlightSettingMutation.isPending}
-                    onClick={() => setIsSwapColorDialogOpen(true)}>
-                    <span className={styles.publicationColorSwatch}
-                      style={{ backgroundColor: swapHighlightColor }} aria-hidden="true" />
-                  </button>
-                </div>
-
-                <ContainerGraphHighlightColorDialog open={isSwapColorDialogOpen} value={swapHighlightColor}
-                  eyebrow={t("Publication")} title={t("Choose accepted swap color")} inputLabel={t("Accepted swap highlight hex color")}
-                  isSaving={saveSwapHighlightSettingMutation.isPending}
-                  onCancel={() => setIsSwapColorDialogOpen(false)} onSave={handleSwapHighlightColorChange} />
-
                 <div className={styles.publicationCard}>
-                  {swapColorError ? <ErrorBanner dismissible={false}>{swapColorError}</ErrorBanner> : null}
                   <div className={styles.publicationControl} role="radiogroup" aria-label={t("Schedule publication status")}>
                     <button
                       type="button"
@@ -960,138 +968,13 @@ export function ContainerGraphEditor({
                     </div>
                   </div>
 
-                  <ContainerGraphContractApprovalsCard containerId={graph?.containerId ?? null} graphId={persistedGraphId}
-                    disabled={isSaving || isGenerating} hasUnsavedChanges={Boolean(hasUnsavedChanges)} onApproved={onVersionCheckoutComplete}
-                    onPendingCountChange={setPendingContractCount} />
-                  <div className={styles.publicationLog}>
-                    <div className={styles.publicationLogHeader}>
-                      <span>{t("Swap log")}</span>
-                      <strong>
-                        {shiftSwapLogSearch.trim()
-                          ? `${filteredAcceptedShiftSwapLog.length}/${acceptedShiftSwapLog.length}`
-                          : acceptedShiftSwapLog.length}
-                      </strong>
-                    </div>
-
-                    <label className={styles.publicationLogSearch}>
-                      <SearchIcon size={16} />
-                      <input
-                        type="search"
-                        value={shiftSwapLogSearch}
-                        placeholder={t("Search employee, date or schedule...")}
-                        aria-label={t("Search accepted swaps by giver, receiver, date or schedule")}
-                        onChange={event => setShiftSwapLogSearch(event.target.value)}
-                      />
-                    </label>
-
-                    {isShiftSwapLogLoading ? (
-                      <p className={styles.publicationLogState}>{t("Loading swap log...")}</p>
-                    ) : acceptedShiftSwapLog.length === 0 ? (
-                      <p className={styles.publicationLogState}>{t("No accepted swaps yet.")}</p>
-                    ) : filteredAcceptedShiftSwapLog.length === 0 ? (
-                      <p className={styles.publicationLogState}>{t("No swaps match this search.")}</p>
-                    ) : (
-                      <div className={styles.publicationLogList}>
-                        {filteredAcceptedShiftSwapLog.map(item => (
-                          <article key={item.id} className={styles.publicationLogItem}>
-                            <div className={styles.publicationLogItemHeader}>
-                              <div className={styles.publicationLogItemMain}>
-                                <strong>{item.fromEmployeeName}</strong>
-                                <span>{t("to")}</span>
-                                <strong>{item.acceptedByEmployeeName ?? t("Employee")}</strong>
-                              </div>
-                              <button
-                                type="button"
-                                className={styles.publicationLogViewButton}
-                                aria-label={t("View swap comparison for {0}", item.fromEmployeeName)}
-                                title={t("View before and after")}
-                                onClick={() => setSelectedShiftSwapHistory(item)}
-                              >
-                                <EyeIcon size={17} />
-                              </button>
-                            </div>
-                            <div className={styles.publicationLogDetails}>
-                              <div className={styles.publicationLogDetail}>
-                                <span>{t("Shift:")}</span>
-                                <strong>{formatShiftSwapLogShift(item)}</strong>
-                              </div>
-                              <div className={styles.publicationLogDetail}>
-                                <span>{t("When was accepted:")}</span>
-                                <strong>{formatShiftSwapAcceptedAt(item.acceptedAtUtc)}</strong>
-                              </div>
-                            </div>
-                          </article>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                  <button type="button" className={styles.openActivityButton} aria-haspopup="dialog" tabIndex={collapsedSections.publication ? -1 : undefined} onClick={event => {
+                    event.currentTarget.focus();
+                    setIsScheduleActivityOpen(true);
+                  }}>
+                    {t("Open details")}
+                  </button>
                 </div>
-              </CardSection>
-            </AvailabilitySidebarSection>
-
-          <AvailabilitySidebarSection
-            label={t("Manual shifts")}
-            preserveCollapsedOnMobile
-            collapsed={collapsedSections.manualColumns}
-            collapsedIcon={<InformationIcon size={18} />}
-            collapsedOffset={allSectionsCollapsed ? "flush" : "default"}
-            onExpand={() => setSectionCollapsed("manualColumns", false)}
-          >
-            <ContainerGraphManualColumnsCard
-              highlightColor={manualHighlightColor}
-              highlightSettingDisabled={persistedGraphId === null || saveManualHighlightSettingMutation.isPending}
-              onOpenHighlightColorPicker={() => { setManualColorError(null); setIsManualColorDialogOpen(true); }}
-              columns={manualColumns}
-              allowSwap={form.allowSwap}
-              isSchedulePublished={form.publicationStatus === "public"}
-              year={displayGraphYear}
-              month={displayGraphMonth}
-              employees={employees}
-              isPublishingShift={isPublishingManualShift || isGenerating || isSaving}
-              isCancellingPublishedShift={isCancellingManualShift}
-              publishError={manualShiftPublishError}
-              publishedShifts={openManagerManualShifts}
-              pendingPublishedShifts={pendingManualShiftPublishes}
-              headerRightSlot={renderCollapseButton(t("Manual shifts"), "manualColumns")}
-              onAddColumn={onAddManualColumn}
-              onDeleteColumn={onDeleteManualColumn}
-              onPublishShift={onPublishManualShift}
-              onCancelPublishedShift={onCancelManualShift}
-              onCancelPendingPublishedShift={onCancelPendingManualShift}
-            />
-            <ContainerGraphHighlightColorDialog open={isManualColorDialogOpen} value={manualHighlightColor}
-              eyebrow={t("Manual shifts")} title={t("Choose accepted shift color")}
-              inputLabel={t("Accepted manual shift highlight hex color")}
-              isSaving={saveManualHighlightSettingMutation.isPending}
-              onCancel={() => setIsManualColorDialogOpen(false)} onSave={handleManualHighlightColorChange} />
-            {manualColorError || manualHighlightSettingQuery.error
-              ? <ErrorBanner>{manualColorError ?? getErrorMessage(manualHighlightSettingQuery.error, t("Could not load the accepted manual shift highlight color."))}</ErrorBanner>
-              : null}
-          </AvailabilitySidebarSection>
-
-            <AvailabilitySidebarSection
-              label={t("Shift Corrections")}
-              preserveCollapsedOnMobile
-              collapsed={collapsedSections.corrections}
-              collapsedIcon={<ScheduleIcon size={18} />}
-              collapsedOffset={allSectionsCollapsed ? "flush" : "default"}
-              attention={pendingCorrectionCount > 0}
-              onExpand={() => setSectionCollapsed("corrections", false)}
-            >
-              <CardSection
-                className={styles.sidebarCard}
-                title={t("Shift Corrections")}
-                icon={<ScheduleDetailsIcon size={18} />}
-                headerRightSlot={renderCollapseButton(t("Shift Corrections"), "corrections")}
-              >
-                <ContainerGraphShiftCorrectionsCard
-                  containerId={graph?.containerId ?? null}
-                  graphId={persistedGraphId}
-                  hasUnsavedChanges={Boolean(hasUnsavedChanges)}
-                  disabled={isSaving || isGenerating}
-                  onApproved={onVersionCheckoutComplete}
-                  onPendingCountChange={setPendingCorrectionCount}
-                />
               </CardSection>
             </AvailabilitySidebarSection>
 
@@ -1301,6 +1184,8 @@ export function ContainerGraphEditor({
           </div>
         }
       />
+      <ContainerGraphScheduleActivityDialog open={isScheduleActivityOpen} onClose={() => setIsScheduleActivityOpen(false)}
+        summary={activitySummary} swapPanel={swapPanel} manualPanel={manualPanel} correctionsPanel={correctionsPanel} />
 
       <ContainerGraphColorDialog
         open={colorDialogMode !== null}
@@ -1349,6 +1234,15 @@ export function ContainerGraphEditor({
         swap={selectedShiftSwapHistory}
         onCancel={() => setSelectedShiftSwapHistory(null)}
       />
+      <ContainerGraphHighlightColorDialog open={isSwapColorDialogOpen} value={swapHighlightColor}
+        eyebrow={t("Publication")} title={t("Choose accepted swap color")} inputLabel={t("Accepted swap highlight hex color")}
+        isSaving={saveSwapHighlightSettingMutation.isPending}
+        onCancel={() => setIsSwapColorDialogOpen(false)} onSave={handleSwapHighlightColorChange} />
+      <ContainerGraphHighlightColorDialog open={isManualColorDialogOpen} value={manualHighlightColor}
+        eyebrow={t("Manual shifts")} title={t("Choose accepted shift color")}
+        inputLabel={t("Accepted manual shift highlight hex color")}
+        isSaving={saveManualHighlightSettingMutation.isPending}
+        onCancel={() => setIsManualColorDialogOpen(false)} onSave={handleManualHighlightColorChange} />
       {showGenerationOverlay ? (
         <div className={styles.generationOverlay} role="status" aria-live="polite" aria-label={t("Generating schedule")}>
           <div className={styles.generationOverlayCard}>

@@ -1,5 +1,5 @@
-import { dateTimeFormat, t } from "@shared/i18n";
-import { useEffect, useId, useMemo, type MouseEvent } from "react";
+import { t } from "@shared/i18n";
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import type { ShiftSwap, ShiftSwapScheduleSnapshot } from "@entities/shift-swaps";
 import {
   getGraphCellKey,
@@ -8,6 +8,14 @@ import {
 } from "@entities/containers/model/graphWorkspace";
 import { CloseIcon, EyeIcon } from "@shared/ui/icons";
 import { ContainerGraphMatrix } from "./ContainerGraphMatrix";
+import {
+  formatHistoryDate,
+  formatHistoryPeriod,
+  getHistoryMonth,
+  getSwapHistoryShifts,
+  isCrossScheduleExchange,
+} from "./shiftSwapHistoryPresentation";
+import activity from "./ContainerGraphActivity.module.css";
 import styles from "./ShiftSwapHistoryDialog.module.css";
 
 type ShiftSwapHistoryDialogProps = {
@@ -17,7 +25,6 @@ type ShiftSwapHistoryDialogProps = {
 };
 
 const NOOP = () => {};
-const MATRIX_STYLE = { height: "auto" } as const;
 
 function buildMatrix(snapshot?: ShiftSwapScheduleSnapshot | null) {
   const columns: GraphMatrixColumn[] = (snapshot?.rows ?? []).map(row => ({
@@ -40,140 +47,161 @@ function buildMatrix(snapshot?: ShiftSwapScheduleSnapshot | null) {
   return { columns, cellMap };
 }
 
-function formatSwapDate(swap: ShiftSwap) {
-  return dateTimeFormat("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    timeZone: "UTC",
-  }).format(new Date(Date.UTC(swap.year, swap.month - 1, swap.dayOfMonth)));
+function getSelectedKeys(
+  matrix: ReturnType<typeof buildMatrix>,
+  assignments: { employeeId?: number | null; employeeName?: string | null; day?: number | null }[],
+) {
+  const keys = new Set<string>();
+  for (const { employeeId, employeeName, day } of assignments) {
+    if (!day) continue;
+    const matches = matrix.columns.filter(column =>
+      employeeId != null ? column.employeeId === employeeId : employeeName && column.label === employeeName,
+    );
+    if (matches.length === 1) keys.add(getGraphCellKey(matches[0].employeeId, day));
+  }
+  return [...keys];
 }
 
-export function ShiftSwapHistoryDialog({ open, swap, onCancel }: ShiftSwapHistoryDialogProps) {
+function OpenShiftSwapHistoryDialog({ swap, onCancel }: { swap: ShiftSwap; onCancel: () => void }) {
   const titleId = useId();
   const descriptionId = useId();
-  const beforeMatrix = useMemo(() => buildMatrix(swap?.beforeSnapshot), [swap?.beforeSnapshot]);
-  const afterMatrix = useMemo(() => buildMatrix(swap?.afterSnapshot), [swap?.afterSnapshot]);
-  const returnBefore = useMemo(() => buildMatrix(swap?.returnBeforeSnapshot), [swap?.returnBeforeSnapshot]);
-  const returnAfter = useMemo(() => buildMatrix(swap?.returnAfterSnapshot), [swap?.returnAfterSnapshot]);
-  const selectedBeforeKeys = useMemo(
-    () => beforeMatrix.columns.flatMap(column => [getGraphCellKey(column.employeeId, swap?.dayOfMonth ?? 0),
-      ...(swap?.requestKind === "exchange" && swap.returnScheduleId === swap.scheduleId && swap.returnDayOfMonth
-        ? [getGraphCellKey(column.employeeId, swap.returnDayOfMonth)] : [])]),
-    [beforeMatrix.columns, swap],
-  );
-  const selectedAfterKeys = useMemo(
-    () => afterMatrix.columns.flatMap(column => [getGraphCellKey(column.employeeId, swap?.dayOfMonth ?? 0),
-      ...(swap?.requestKind === "exchange" && swap.returnScheduleId === swap.scheduleId && swap.returnDayOfMonth
-        ? [getGraphCellKey(column.employeeId, swap.returnDayOfMonth)] : [])]),
-    [afterMatrix.columns, swap],
-  );
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const [side, setSide] = useState<"source" | "returned">("source");
+  const shifts = getSwapHistoryShifts(swap);
+  const exchange = swap.requestKind === "exchange";
+  const crossSchedule = isCrossScheduleExchange(swap);
+  const returnSelected = crossSchedule && side === "returned";
+  const displayedSide = returnSelected ? "returned" : "source";
+  const graph = getHistoryMonth(shifts[displayedSide]);
+  const beforeSnapshot = returnSelected ? swap.returnBeforeSnapshot : swap.beforeSnapshot;
+  const afterSnapshot = returnSelected ? swap.returnAfterSnapshot : swap.afterSnapshot;
+  const before = useMemo(() => buildMatrix(beforeSnapshot), [beforeSnapshot]);
+  const after = useMemo(() => buildMatrix(afterSnapshot), [afterSnapshot]);
 
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
+  const giver = {
+    employeeId: swap.isManagerCreated ? -(swap.manualColumnId || 1) : swap.fromEmployeeId,
+    employeeName: shifts.source.employeeName,
+  };
+  const recipient = {
+    employeeId: swap.acceptedByEmployeeId ?? (exchange ? swap.targetEmployeeId : null),
+    employeeName: shifts.returned.employeeName,
+  };
+  const sourceBefore = { ...giver, day: shifts.source.day };
+  const sourceAfter = { ...recipient, day: shifts.source.day };
+  const returnBefore = { ...recipient, day: shifts.returned.day };
+  const returnAfter = { ...giver, day: shifts.returned.day };
+  const sameSchedule = exchange && swap.returnScheduleId === swap.scheduleId;
 
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        onCancel();
-      }
+  const handleOverlayMouseDown = (event: MouseEvent<HTMLDivElement>) => {
+    if (event.target === event.currentTarget) onCancel();
+  };
+  useLayoutEffect(() => {
+    const trigger = document.activeElement;
+    closeRef.current?.focus();
+    return () => {
+      if (trigger instanceof HTMLElement && trigger.isConnected) trigger.focus();
     };
-
+  }, []);
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onCancel();
+    };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onCancel, open]);
-
-  if (!open || !swap) {
-    return null;
-  }
-
-  const hasComparison = beforeMatrix.columns.length > 0 && afterMatrix.columns.length > 0;
-  const handleOverlayMouseDown = (event: MouseEvent<HTMLDivElement>) => {
-    if (event.target === event.currentTarget) {
-      onCancel();
-    }
-  };
+  }, [onCancel]);
 
   return (
-    <div
-      className={styles.overlay}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby={titleId}
-      aria-describedby={descriptionId}
-      onMouseDown={handleOverlayMouseDown}
-    >
-      <div className={styles.dialog}>
+    <div className={styles.overlay} role="dialog" aria-modal="true" aria-labelledby={titleId}
+      aria-describedby={descriptionId} onMouseDown={handleOverlayMouseDown}>
+      <div className={styles.dialog} data-paired-matrices={Boolean(graph && before.columns.length && after.columns.length) || undefined}>
         <header className={styles.header}>
-          <div className={styles.titleBlock}>
-            <div className={styles.eyebrow}>
-              <EyeIcon size={16} />
-              <span>{t("Swap comparison")}</span>
+          <div className={styles.headerRow}>
+            <div className={styles.titleBlock}>
+              <div className={styles.eyebrow}>
+                <EyeIcon size={16} />
+                <span>{t("Swap comparison")}</span>
+              </div>
+              <h3 id={titleId} className={styles.title}>
+                {swap.fromEmployeeName} {t("to")} {shifts.returned.employeeName || t("Employee")}
+              </h3>
+              {crossSchedule ? (
+                <p id={descriptionId} className={`${activity.badge} ${activity.info} ${styles.exchangeBadge}`}>
+                  {t("Exchange between different schedules")}
+                </p>
+              ) : (
+                <p id={descriptionId} className={styles.description}>
+                  {formatHistoryDate(shifts.source)} · {formatHistoryPeriod(shifts.source)} · {shifts.source.scheduleName || t("Not available")}
+                </p>
+              )}
+              {exchange && !crossSchedule && (
+                <p className={styles.description}>
+                  {t("In return")} · {formatHistoryDate(shifts.returned)} · {formatHistoryPeriod(shifts.returned)}
+                </p>
+              )}
             </div>
-            <h3 id={titleId} className={styles.title}>
-              {swap.fromEmployeeName}  {t("to")} {swap.acceptedByEmployeeName ?? t("Employee")}
-            </h3>
-            <p id={descriptionId} className={styles.description}>
-              {formatSwapDate(swap)} | {swap.fromTime.slice(0, 5)}-{swap.toTime.slice(0, 5)} | {swap.scheduleName}
-            </p>
-            {swap.requestKind === "exchange" && <p className={styles.description}>{t("Swap shifts")} · {t("In return")}: {swap.returnScheduleName} · {swap.returnDayOfMonth}.{swap.returnMonth}.{swap.returnYear} · {swap.returnFromTime}–{swap.returnToTime}</p>}
+            <button ref={closeRef} type="button" className={styles.closeButton} aria-label={t("Close swap comparison")} onClick={onCancel}>
+              <CloseIcon size={18} />
+            </button>
           </div>
-
-          <button type="button" className={styles.closeButton} aria-label={t("Close swap comparison")} onClick={onCancel}>
-            <CloseIcon size={18} />
-          </button>
+          {crossSchedule && (
+            <div className={styles.scheduleSwitcher} role="group" aria-label={t("Comparison schedule")}>
+              {(["source", "returned"] as const).map(key => {
+                const shift = shifts[key];
+                return (
+                  <button key={key} type="button" aria-pressed={displayedSide === key} onClick={() => setSide(key)}>
+                    <span className={styles.scheduleLabel}>
+                      <span className={styles.scheduleKind}>{t(key === "source" ? "Source schedule" : "Return schedule")}</span>
+                      <strong className={styles.scheduleIdentifier}>{shift.scheduleName || t("Not available")}</strong>
+                    </span>
+                    <span className={styles.scheduleMeta}>
+                      <strong>{shift.employeeName || t("Unknown employee")}</strong>
+                      <span>{formatHistoryDate(shift)}</span>
+                      <span className={styles.scheduleTime}>{formatHistoryPeriod(shift)}</span>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </header>
-
-        {hasComparison ? (
-          <div className={styles.matrixGrid}>
-            <ContainerGraphMatrix
-              className={styles.matrixCard}
-              style={MATRIX_STYLE}
-              graph={{ year: swap.year, month: swap.month }}
-              columns={beforeMatrix.columns}
-              cellMap={beforeMatrix.cellMap}
-              title={t("Before")}
-              helperText={t("Schedule immediately before the swap was accepted.")}
-              readOnly
-              compactSize
-              selectedCellKeys={selectedBeforeKeys}
-              enableSelectionWhenReadOnly
-              onSelectedCellKeysChange={NOOP}
-              emptyMessage={t("No before-swap schedule data is available.")}
-            />
-            <ContainerGraphMatrix
-              className={styles.matrixCard}
-              style={MATRIX_STYLE}
-              graph={{ year: swap.year, month: swap.month }}
-              columns={afterMatrix.columns}
-              cellMap={afterMatrix.cellMap}
-              title={t("After")}
-              helperText={t("Schedule immediately after the swap was accepted.")}
-              readOnly
-              compactSize
-              selectedCellKeys={selectedAfterKeys}
-              enableSelectionWhenReadOnly
-              onSelectedCellKeysChange={NOOP}
-              emptyMessage={t("No after-swap schedule data is available.")}
-            />
-          </div>
-        ) : (
-          <div className={styles.emptyComparison}>
-            {t("No one has accepted this swap yet. The comparison will appear after it is accepted.")}</div>
-        )}
-        {swap.requestKind === "exchange" && swap.returnScheduleId !== swap.scheduleId && swap.returnYear && swap.returnMonth && returnBefore.columns.length > 0 && <>
-          <h3>{swap.returnScheduleName}</h3>
-          <div className={styles.matrixGrid}>
-            {([{ matrix: returnBefore, title: t("Before") }, { matrix: returnAfter, title: t("After") }]).map(({ matrix, title }) =>
-              <ContainerGraphMatrix key={title} className={styles.matrixCard} style={MATRIX_STYLE}
-                graph={{ year: swap.returnYear!, month: swap.returnMonth! }} columns={matrix.columns} cellMap={matrix.cellMap}
-                title={title} readOnly compactSize enableSelectionWhenReadOnly
-                selectedCellKeys={matrix.columns.map(column => getGraphCellKey(column.employeeId, swap.returnDayOfMonth ?? 0))}
-                onSelectedCellKeysChange={NOOP} />)}
-          </div>
-        </>}
+        <div key={displayedSide} className={styles.comparisonBody} role="region" aria-label={t("Swap comparison")} tabIndex={0}>
+          {graph && (before.columns.length > 0 || after.columns.length > 0) ? (
+            <div className={styles.matrixGrid}>
+              {[
+                {
+                  matrix: before,
+                  title: t("Before"),
+                  description: t("Schedule immediately before the swap was accepted."),
+                  empty: t("No before-swap schedule data is available."),
+                  assignments: returnSelected ? [returnBefore] : sameSchedule ? [sourceBefore, returnBefore] : [sourceBefore],
+                },
+                {
+                  matrix: after,
+                  title: t("After"),
+                  description: t("Schedule immediately after the swap was accepted."),
+                  empty: t("No after-swap schedule data is available."),
+                  assignments: returnSelected ? [returnAfter] : sameSchedule ? [sourceAfter, returnAfter] : [sourceAfter],
+                },
+              ].map(({ matrix, title, description, empty, assignments }) => (
+                <ContainerGraphMatrix key={title} className={styles.matrixCard}
+                  graph={graph} columns={matrix.columns} cellMap={matrix.cellMap}
+                  title={title} helperText={description} emptyMessage={empty}
+                  readOnly compactSize enableSelectionWhenReadOnly
+                  selectedCellKeys={getSelectedKeys(matrix, assignments)} onSelectedCellKeysChange={NOOP} />
+              ))}
+            </div>
+          ) : (
+            <div className={styles.emptyComparison}>
+              {swap.status === "accepted" ? t("No comparison data is available for this schedule.")
+                : t("No one has accepted this swap yet. The comparison will appear after it is accepted.")}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
+}
+
+export function ShiftSwapHistoryDialog({ open, swap, onCancel }: ShiftSwapHistoryDialogProps) {
+  return open && swap ? <OpenShiftSwapHistoryDialog key={swap.id} swap={swap} onCancel={onCancel} /> : null;
 }

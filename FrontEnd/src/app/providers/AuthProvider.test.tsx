@@ -5,12 +5,17 @@ import { ApiError, getAuthAccessToken, request, setAuthAccessToken } from "@shar
 
 const api = vi.hoisted(() => ({ session: vi.fn(), login: vi.fn(), logout: vi.fn() }));
 vi.mock("@entities/auth", () => ({ authApi: api }));
+const push = vi.hoisted(() => ({ syncPushSubscription: vi.fn(), disableForDevice: vi.fn() }));
+vi.mock("@entities/employee-push/lib/pushSubscription", () => push);
 const session = { role: "employee" as const, userName: "worker", displayName: "Worker", employeeId: 1, managerId: null };
 function Harness() {
   const auth = useAuth();
   return <><output>{auth.status}</output><button onClick={() => void auth.login({ username: "worker", password: "123456" })}>login</button><button onClick={() => void auth.logout()}>logout</button></>;
 }
 beforeEach(() => {
+  vi.clearAllMocks();
+  push.syncPushSubscription.mockResolvedValue(undefined);
+  push.disableForDevice.mockResolvedValue(undefined);
   window.localStorage.clear();
   window.sessionStorage.clear();
   setAuthAccessToken(null);
@@ -21,6 +26,43 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.restoreAllMocks(); setAuthAccessToken(null); });
 
 describe("authentication lifecycle", () => {
+  it("syncs a restored employee and invalidates its push work on direct account switch", async () => {
+    window.localStorage.setItem("gf3.auth.access-token", "a-token");
+    render(<AuthProvider><Harness /></AuthProvider>);
+    await waitFor(() => expect(push.syncPushSubscription).toHaveBeenCalledOnce());
+    const [employeeId, signal, isCurrent] = push.syncPushSubscription.mock.calls[0];
+    expect(employeeId).toBe(1);
+    expect(isCurrent()).toBe(true);
+    api.login.mockResolvedValueOnce({ session: { ...session, employeeId: 2 }, accessToken: "b-token" });
+    fireEvent.click(screen.getByText("login"));
+    await waitFor(() => expect(push.syncPushSubscription).toHaveBeenCalledTimes(2));
+    expect(signal.aborted).toBe(true);
+    expect(isCurrent()).toBe(false);
+    expect(push.syncPushSubscription.mock.calls[1][0]).toBe(2);
+  });
+
+  it("aborts push sync before cleanup and protects a new login from slow cleanup", async () => {
+    let finish!: () => void;
+    let logoutIsCurrent!: () => boolean;
+    push.disableForDevice.mockImplementationOnce((isCurrent: () => boolean) => {
+      logoutIsCurrent = isCurrent;
+      return new Promise<void>(resolve => { finish = resolve; });
+    });
+    render(<AuthProvider><Harness /></AuthProvider>);
+    await screen.findByText("unauthenticated");
+    fireEvent.click(screen.getByText("login"));
+    await waitFor(() => expect(push.syncPushSubscription).toHaveBeenCalledOnce());
+    fireEvent.click(screen.getByText("logout"));
+    expect(push.syncPushSubscription.mock.calls[0][1].aborted).toBe(true);
+    expect(logoutIsCurrent()).toBe(true);
+    api.login.mockResolvedValueOnce({ session, accessToken: "new-token" });
+    fireEvent.click(screen.getByText("login"));
+    await waitFor(() => expect(push.syncPushSubscription).toHaveBeenCalledTimes(2));
+    expect(logoutIsCurrent()).toBe(false);
+    await act(async () => finish());
+    expect(getAuthAccessToken()).toBe("new-token");
+    expect(api.logout).not.toHaveBeenCalled();
+  });
   it("clears the signed-out manager session without unrelated storage changes", async () => {
     api.login.mockResolvedValueOnce({ session: { ...session, role: "manager", managerId: 7 }, accessToken: "token" });
     window.sessionStorage.setItem("gf3:graph-drafts:7:1", "draft");
