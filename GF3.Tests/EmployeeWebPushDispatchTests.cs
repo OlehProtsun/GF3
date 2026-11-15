@@ -173,6 +173,9 @@ public sealed class EmployeeWebPushDispatchTests
         await using var database = await SqliteTestDatabase.CreateAsync(); var clock = new Clock();
         await using var db = database.CreateContext(clock);
         var (owner, recipient, schedule, slot) = await EmployeePushNotificationSourceTests.Seed(db);
+        var futureMonth = clock.Now.AddMonths(1);
+        schedule.Year = futureMonth.Year;
+        schedule.Month = futureMonth.Month;
         var ordinary = EmployeePushNotificationSourceTests.Offer(owner, schedule, slot);
         var manualSlot = TestDataFactory.CreateDalSlot(schedule.Id, 2, 1, null, "08:00", "16:00"); db.Add(manualSlot); await db.SaveChangesAsync();
         var manual = EmployeePushNotificationSourceTests.Offer(owner, schedule, manualSlot);
@@ -195,6 +198,7 @@ public sealed class EmployeeWebPushDispatchTests
         });
         using var worker = Worker(provider, clock); await worker.ScanAsync(default); await worker.ScanAsync(default);
         var candidates = await EmployeePushNotificationSourceTests.Source(db).GetCurrentAsync(recipient, clock.Now, default);
+        Assert.Contains(candidates, candidate => candidate.NotificationId == "open-shift:" + manual.Id);
         Assert.Equal(5, sender.Calls);
         Assert.Equal(candidates.Select(x => x.NotificationId).Order(), sender.Messages.Select(x => x.Candidate.NotificationId).Order());
         var readSlot = TestDataFactory.CreateDalSlot(schedule.Id, 3, 1, owner, "08:00", "16:00"); db.Add(readSlot); await db.SaveChangesAsync();

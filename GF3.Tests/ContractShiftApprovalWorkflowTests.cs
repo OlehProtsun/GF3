@@ -594,15 +594,21 @@ public sealed class ContractShiftApprovalWorkflowTests
     {
         await using var database = await SqliteTestDatabase.CreateAsync(); await using var db = database.CreateContext();
         var migrator = db.GetService<IMigrator>();
-        await migrator.MigrateAsync("20261028182000_AddContractShiftApprovals");
         int? survivor = null;
+        SwapFixture? fixture = null;
         if (populated)
         {
-            var f = await ContractTestFactory.SeedAsync(db); var engine = ContractTestFactory.Engine(db);
+            var f = fixture = await ContractTestFactory.SeedAsync(db); var engine = ContractTestFactory.Engine(db);
             var offer = await engine.Create(f.Owner, ContractTestFactory.Employee(f.Owner), ShiftSwapScenarioFactory.Request(f, new()), default);
             var first = await ContractTestFactory.Approvals(db, engine).CreateClaimRequestAsync(f.Target,
                 new() { ShiftSwapRequestId = offer.Id }, ContractTestFactory.Employee(f.Target));
             survivor = first.Id;
+            db.ChangeTracker.Clear();
+        }
+        await migrator.MigrateAsync("20261028182000_AddContractShiftApprovals");
+        if (populated)
+        {
+            var f = fixture!;
             var original = await db.ContractShiftApprovalRequests.AsNoTracking().SingleAsync();
             var duplicate = new ContractShiftApprovalRequestModel();
             db.Entry(duplicate).CurrentValues.SetValues(original); duplicate.Id = 0; duplicate.EmployeeId = f.Third; db.Add(duplicate);
