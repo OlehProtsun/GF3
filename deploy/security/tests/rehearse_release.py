@@ -23,6 +23,9 @@ spec.loader.exec_module(release)
 spec = importlib.util.spec_from_file_location("gf3_guard", HERE / "gf3_guard.py")
 guard = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(guard)
+spec = importlib.util.spec_from_file_location("gf3_maintenance", HERE / "gf3_maintenance.py")
+maintenance = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(maintenance)
 if os.name == "nt":
     release.ENV = dict(os.environ)
     release.ENV.pop("DOCKER_HOST", None)
@@ -46,6 +49,47 @@ def free_port():
     with socket.socket() as listener:
         listener.bind(("127.0.0.1", 0))
         return listener.getsockname()[1]
+
+
+def rehearse_migrations(root, snapshot_path):
+    """Use a fresh copy of the synthetic CI database to exercise EF startup in Docker."""
+    added = ("20261114225324_AddShiftCorrectionComment", "20261115135735_RefreshManualShiftOffer")
+    columns = (("shift_correction_request", "comment", "TEXT"),
+               ("shift_swap_request", "refreshed_at_utc", "INTEGER"))
+    image, = release.docker_json("image", "inspect", "gf3-web:ci")
+    with closing(sqlite3.connect(snapshot_path)) as db:
+        target = tuple(row[0] for row in db.execute(
+            'SELECT MigrationId FROM "__EFMigrationsHistory" ORDER BY MigrationId'))
+    assert target[-2:] == added
+    before = target[:-2]
+    fixture = root / "maintenance-fixture.db"
+    frozen = root / "maintenance-backup.db"
+    maintenance.snapshot(snapshot_path, fixture, target)
+    with closing(sqlite3.connect(fixture)) as db, db:
+        for (table, name, _), migration in zip(columns, added, strict=True):
+            db.execute(f'ALTER TABLE "{table}" DROP COLUMN "{name}"')
+            db.execute('DELETE FROM "__EFMigrationsHistory" WHERE MigrationId=?', (migration,))
+    maintenance.snapshot(fixture, frozen, before, quiesced=True)
+    maintenance.rehearse(release.command, release.docker_json, image["Id"], root, frozen, before, target, columns)
+    print("Maintenance rehearsal passed: isolated EF startup, expected schema, integrity and logical row preservation")
+
+    # The migration is still pending, but the duplicate DDL causes the candidate to fail.
+    with closing(sqlite3.connect(fixture)) as db, db:
+        db.execute('ALTER TABLE shift_correction_request ADD COLUMN "comment" TEXT NULL')
+    try:
+        maintenance.rehearse(release.command, release.docker_json, image["Id"], root, fixture, before, target, columns)
+    except maintenance.MaintenanceError as error:
+        assert "Candidate stopped before rehearsal health passed" in str(error)
+    else:
+        raise AssertionError("Migration SQL failure passed the isolated rehearsal")
+    finally:
+        assert not list(root.glob("clone-*"))
+    recovered = root / "maintenance-recovered.db"
+    maintenance.snapshot(frozen, recovered, before)
+    maintenance.verify_migration(frozen, recovered, before, before, ())
+    with closing(sqlite3.connect(snapshot_path)) as db:
+        maintenance.verify(db, target)
+    print("Maintenance rehearsal passed: failed SQL left the source intact and verified recovery copy remained usable")
 
 
 def main():
@@ -222,6 +266,9 @@ def main():
                 assert backup.execute("SELECT id,contract_type,first_name,last_name,is_deleted FROM employee "
                                       "WHERE id=?", (employee_id,)).fetchall() == employee_rows
                 assert backup.execute("PRAGMA integrity_check").fetchall() == [("ok",)]
+
+            if os.name != "nt":
+                rehearse_migrations(root, previous / "SQLite.db")
 
             template = deploy / "nginx/https-templates/gf3.conf.template"
             for scenario in ("nginx-syntax", "https-failure", "activation-failure", "transient-worktree", "success"):

@@ -2,7 +2,7 @@
 
 ## Decision
 
-**NO-GO: the maintenance deployment path is disabled and is not present in the menu.** Keep ordinary `[11] Deploy PROD2` unchanged. It must continue to reject database migrations. Do not invoke `gf3_release.py deploy` directly, bypass either migration check, edit the production database by hand, or install a helper for this proposal. No production host action is part of this change.
+**NO-GO for live database deployment.** The implementation adds an interactive clone rehearsal. Both migration guards continue to reject these changes through ordinary deployment, and the host menu has no live maintenance action.
 
 The target PROD2 history includes `20261114225324_AddShiftCorrectionComment` and `20261115135735_RefreshManualShiftOffer`. Both add nullable SQLite columns, but that does not make the current cutover safe for a database change.
 
@@ -36,15 +36,49 @@ If implemented, the initial classifier should allow only regular tracked EF migr
 
 Deployment/security scripts, systemd units, Dockerfiles and Compose, secrets/settings, application entrypoint/startup outside the migration component, networking, TLS, authorization/security, and permissions remain out of scope. Changing any of them requires its own reviewed and checksum-verified bootstrap procedure before a maintenance deploy can be considered.
 
-## Operator runbook while disabled
+## Rehearsal implementation
+
+The helper's separate `--maintenance-rehearse SHA` operation requires a terminal, a yes/no confirmation and the full SHA typed again. It checks exact CI and installed tool identity before the prompt and rechecks Git, CI, active Compose and container identity, approval, review and environment after approval, build and rehearsal. It uses the same preflight checks as ordinary release preparation. It does not change the approval file.
+
+The first supported changes are new EF migration source/designer pairs and existing files listed in `gf3_maintenance.py::RELATED`. CI reviewers must confirm the exact nullable `TEXT` and `INTEGER` additions. Create a root-owned mode-0600 `/etc/gfctl/maintenance-review.json` inside the protected directory. Example only:
+
+```json
+{
+  "before": "<full active PROD2 SHA>",
+  "target": "<full reviewed PROD2 tip SHA>",
+  "add_nullable_columns": [
+    ["shift_correction_request", "comment", "TEXT"],
+    ["shift_swap_request", "refreshed_at_utc", "INTEGER"]
+  ]
+}
+```
+
+The example describes the two SQL changes, but it does not authorize the combined PROD2 application release. Its diff includes out-of-scope application files and the classifier refuses it. A reviewed tooling baseline must already be active before a later migration-only release can qualify.
+
+The build uses a clean detached worktree without the production environment file. The Docker image ID is recorded in the private audit. The temporary SQLite copy comes from the existing local named Docker volume through SQLite's read-only backup API. The container gets only that copy, synthetic configuration, no network or published ports, a read-only root filesystem and no Linux capabilities. The rehearsal checks startup health, exact EF history, full integrity, approved schema changes and logical row preservation. It removes the container and copies, and keeps a mode-0600 result under `/var/lib/gf3-deploy/maintenance-*/rehearsal.json`. If Docker cannot confirm cleanup, retain the private clone directory and inspect the corresponding disposable container locally. An interrupted rehearsal never authorizes deployment.
+
+## Review and install rehearsal tools
+
+Apply these steps only in a separate tooling review after Linux rehearsal CI passes and the installed host paths and baseline are confirmed. Start from a root-only staging and backup directory. Reuse the ownership checks, lock order and atomic `replace_file` procedure in [the existing gfctl installation runbook](gfctl-prod2-rollout.md). Keep both locks while checking and replacing tools.
+
+1. Review the exact PROD2 tooling commit and confirm its push CI and required jobs. Fetch the ref only. Verify the new files and the unchanged Guard program and units against that reviewed commit. Obtain the SHA-256 manifest for the three reviewed Python files through the tooling review and keep it outside the checkout.
+2. Write the reviewed Git blobs into the private staging directory with `git show "$reviewed_sha:deploy/security/$file"` for `gf3_prepare_release.py`, `gf3_release.py` and `gf3_maintenance.py`. Check each staged blob with `git hash-object --no-filters` against `git rev-parse "$reviewed_sha:deploy/security/$file"` and run `sha256sum -c` against the independent reviewed manifest. Compile the staged files with `python3 -m py_compile`.
+3. Confirm `/usr/local/libexec/gf3` and each existing destination pass the runbook's root ownership, symlink and permissions checks. Save each installed file and its mode in the private backup directory and record absent destinations. Atomically replace the reviewed files as root, mode 0644, and verify the installed checksums again before releasing either lock. If a replacement or checksum check fails, restore the recorded tools with the same locks and verify the prior hashes.
+4. After verifying the tool paths and available action number in the host-local menu, a separate menu review may add **Validate PROD2 DB migration on a copy**. Prompt for the target SHA and invoke `/usr/bin/python3 -I /usr/local/libexec/gf3/gf3_prepare_release.py --maintenance-rehearse "$sha"` with the terminal attached. Preserve its exit code and print success only if the helper reports a passed clone rehearsal. Install that menu change through the existing checksum and backup procedure.
+
+These steps install rehearsal tooling outside the live Git checkout. Establishing a new active tooling baseline is a separate reviewed release operation. The ordinary helper continues to classify deployment scripts as critical and there is no tooling-and-migration exception.
+
+## Operator runbook while live deployment is disabled
 
 - Do not use a release operation to apply the two pending migrations. The ordinary `[11]` action remains the only menu action and its existing critical-file rejection is expected.
 - Do not edit, copy, or restore the production SQLite database manually. The normal release rollback bundle is not a database-migration rollback guarantee.
 - For an unrelated ordinary release, continue to use the installed, reviewed host tooling and its existing runbook. Do not install changed security tooling from this proposal.
-- No maintenance-mode host installation steps can be run yet. Before a future enablement, a separate reviewed bootstrap must install the exact approved helper/engine by checksum as root-owned files outside the live Git checkout, under the established locks, with a recoverable backup. It must preserve `safe_path()` protections and prove installed hashes before exposing a menu action.
+- The rehearsal review and install procedure applies only to the clone operation. Live maintenance installation remains unavailable.
 - The eventual operator should verify the working database using SQLite `PRAGMA integrity_check`, confirm the expected `__EFMigrationsHistory` rows, and exercise application health before ingress reopens. The final backup should be inspectable as a root-only artifact under a private maintenance bundle. Those commands and paths must be supplied by the reviewed implementation; they are not established by the current host tooling.
 - Before traffic reopens, a failed migration may be rolled back only by restoring the verified final snapshot while ingress and every writer remain stopped, then verifying the database and previous app. After ingress reopens or any write may have happened, do not restore the snapshot; stop for manual intervention or forward repair.
 
-## Enablement gate
+## Live enablement gate
 
-The path remains disabled until the clone runner, writer/ingress gate, final backup/restore transaction, traffic-reopen boundary, direct-engine capability validation, guarded host-tool bootstrap, signal/timeout cleanup, and stage-by-stage failure rehearsal are implemented and pass the required Linux Docker, SQLite, CI, .NET migration, and frontend checks. This repository is not evidence that production host behavior was tested.
+- `EmployeeNotificationCleanupHostedService.ExecuteAsync()` can write before the first request. `EmployeeWebPushHostedService.ScanAsync()` can also write. The clone disables delivery and fails if any startup job changes existing rows. Live staging needs a reviewed way to start the candidate without background database writers, then start those writers at the commit boundary.
+- `gf3_release.py::start_nginx()` publishes ports before `finish_activation()` runs Guard and Git checks. A live maintenance transaction needs an ingress fence that stays closed during candidate HTTPS and Guard verification and across an interrupted process. Neither a stopped timer nor a successful SQLite `BEGIN IMMEDIATE` proves that all external writers will remain excluded after the lock is released.
+- The quiesced snapshot primitive takes a SQLite writer lock and checks migration history and integrity. The tests verify recovery into a fresh file. Live replacement requires durable fencing of ingress and all writers, validation against the original Docker volume and a persisted no-automatic-restore boundary. There is no live restore command or one-use live deployment authorization yet.

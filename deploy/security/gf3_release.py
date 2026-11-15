@@ -21,6 +21,7 @@ import sys
 import tarfile
 import tempfile
 import time
+from types import ModuleType
 
 
 ROOT = Path("/opt/gf")
@@ -858,6 +859,51 @@ def renew():
     verify_web(bundle)
 
 
+def preflight(source, sha, baseline):
+    verify_ipv6()
+    verify_ssh_and_certbot()
+    safe_path(source)
+    require(SHA.fullmatch(sha) and git("rev-parse", "refs/remotes/origin/PROD2").strip() == sha,
+            "Expected the full approved PROD2 SHA")
+    verified_checkout(source, sha)
+    check_git_target(sha)
+    check_git_write_ready()
+    safe_path(source / "deploy/.env", private=True)
+    verify_tooling(sha)
+    validate(render(source), baseline[1], baseline[2])
+    command("systemd-analyze", "verify", "/etc/systemd/system/gf3-guard.service",
+            "/etc/systemd/system/gf3-guard.timer")
+    print(f"Preflight OK: {baseline[1]}, volume {baseline[2]}")
+
+
+def maintenance_tool(target, helper):
+    """Load the installed rehearsal module only after verifying its reviewed Git blob."""
+    verify_tooling(target)
+    module_path = Path(__file__).absolute().with_name("gf3_maintenance.py")
+    for path in (module_path, helper):
+        safe_path(path)
+        require(stat.S_ISREG(path.stat().st_mode)
+                and git("hash-object", "--no-filters", str(path)).strip()
+                == git("rev-parse", f"{target}:deploy/security/{path.name}").strip(),
+                f"Installed {path.name} differs from the approved release")
+    module = ModuleType("gf3_maintenance")
+    exec(compile(module_path.read_bytes(), str(module_path), "exec"), module.__dict__)
+    return module
+
+
+def maintenance_database(volume):
+    metadata, = docker_json("volume", "inspect", volume)
+    mount = Path(metadata["Mountpoint"])
+    require(metadata["Name"] == volume and metadata["Driver"] == "local" and not metadata.get("Options")
+            and mount.is_absolute() and mount.name == "_data" and mount.parent.name == volume,
+            "Maintenance requires the existing local Docker data volume")
+    safe_path(mount.parent)
+    info = mount.lstat()
+    require(stat.S_ISDIR(info.st_mode) and not info.st_mode & 0o022,
+            "Unexpected SQLite volume permissions")
+    return mount / "SQLite.db"
+
+
 def main():
     parser = argparse.ArgumentParser()
     sub = parser.add_subparsers(dest="action", required=True)
@@ -884,22 +930,7 @@ def main():
                 return 0
             with lock(RUNTIME / "state/guard.lock"):
                 if args.action == "preflight":
-                    baseline = topology()
-                    verify_ipv6()
-                    verify_ssh_and_certbot()
-                    safe_path(args.source)
-                    require(SHA.fullmatch(args.sha)
-                            and git("rev-parse", "refs/remotes/origin/PROD2").strip() == args.sha,
-                            "Expected the full approved PROD2 SHA")
-                    verified_checkout(args.source, args.sha)
-                    check_git_target(args.sha)
-                    check_git_write_ready()
-                    safe_path(args.source / "deploy/.env", private=True)
-                    verify_tooling(args.sha)
-                    validate(render(args.source), baseline[1], baseline[2])
-                    command("systemd-analyze", "verify", "/etc/systemd/system/gf3-guard.service",
-                            "/etc/systemd/system/gf3-guard.timer")
-                    print(f"Preflight OK: {baseline[1]}, volume {baseline[2]}")
+                    preflight(args.source, args.sha, topology())
                 elif args.action == "renew":
                     renew()
                 else:

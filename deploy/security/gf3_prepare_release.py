@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import re
 import signal
+import sqlite3
 import stat
 import subprocess
 import sys
@@ -31,6 +32,7 @@ WORKFLOW_ID = 306281689
 WORKFLOW_PATH = ".github/workflows/ci.yml"
 JOBS = {"Build and test", "Docker image"}
 APPROVAL = Path("/etc/gfctl/approved-release.conf")
+MAINTENANCE_REVIEW = Path("/etc/gfctl/maintenance-review.json")
 DEPLOY_LOCK = Path("/run/lock/gf3-prod-deploy.lock")
 SYSTEM_PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 ALLOWED_ORIGINS = {
@@ -394,9 +396,99 @@ def prepare(check_only):
     return 0
 
 
+def maintenance_state(target):
+    current = check_checkout()
+    release.require(current != target and fetch_tip() == target, "Expected the exact incoming PROD2 tip")
+    bundle, manifest = active_release()
+    release.require(manifest["sha"] == current, "Git HEAD differs from the active release")
+    approval = read_approval()
+    environment = protected_file(release.ROOT / "deploy/.env")
+    review = protected_file(MAINTENANCE_REVIEW)
+    baseline = release.topology()
+    verify_health(current, baseline, approval[2])
+    containers = tuple(release.container(name)["Id"] for name in ("gf3-app", "nginx"))
+    compose_manifest = protected_file(bundle / "compose.json")
+    return (current, bundle, manifest, approval, environment, review, baseline, containers,
+            compose_manifest, verify_ci(target))
+
+
+def maintenance_rehearse(target):
+    release.require(sys.stdin.isatty() and release.SHA.fullmatch(target),
+                    "Maintenance rehearsal requires an interactive terminal and the full target SHA")
+    with release.lock(DEPLOY_LOCK):
+        reviewed = maintenance_state(target)
+        current, _, _, _, environment, review, baseline, *_ = reviewed
+        tool = release.maintenance_tool(target, Path(__file__).absolute())
+        try:
+            paths, before_ids, target_ids = tool.classify(release.git, current, target)
+            columns = tool.review_plan(review, current, target)
+        except tool.MaintenanceError as error:
+            raise release.ReleaseError(str(error)) from None
+        with candidate(target, environment) as source:
+            with release.lock(release.RUNTIME / "state/guard.lock"):
+                release.preflight(source, target, baseline)
+
+    print(f"Maintenance rehearsal: {current} -> {target}")
+    for path in paths:
+        print(f"  {ascii(path)}")
+    print(f"CI run {reviewed[-1][0]} attempt {reviewed[-1][1]}. The candidate runs against a private database copy.",
+          flush=True)
+    if input("Build and rehearse this release? [y/N] ").strip().lower() not in ("y", "yes"):
+        return 0
+    release.require(input("Enter the full target SHA: ").strip() == target, "Maintenance SHA confirmation did not match")
+    with release.lock(DEPLOY_LOCK):
+        release.require(maintenance_state(target) == reviewed, "Maintenance review changed after confirmation")
+        release.maintenance_tool(target, Path(__file__).absolute())
+    bundle = Path(tempfile.mkdtemp(prefix=f"maintenance-{target[:12]}-", dir=release.STATE))
+    audit = {"operation": "rehearse", "before": current, "target": target, "ci": reviewed[-1], "stage": "build"}
+    report = bundle / "rehearsal.json"
+
+    def stage(name):
+        audit["stage"] = name
+        release.store(report, audit)
+
+    stage("build")
+    try:
+        # The build worktree never receives the production environment file.
+        source = bundle / "source"
+        release.git("worktree", "add", "--detach", str(source), target)
+        try:
+            release.verified_checkout(source, target)
+            audit["image"] = tool.image_id(release.command, source, bundle, target)
+        finally:
+            release.git("worktree", "remove", "--force", str(source))
+        stage("snapshot")
+        snapshot = bundle / "SQLite.db"
+        try:
+            with release.lock(DEPLOY_LOCK):
+                release.require(maintenance_state(target) == reviewed, "Maintenance review changed during build")
+                release.maintenance_tool(target, Path(__file__).absolute())
+                tool.snapshot(release.maintenance_database(baseline[2]), snapshot, before_ids)
+            stage("isolated-startup")
+            tool.rehearse(release.command, release.docker_json, audit["image"], bundle,
+                          snapshot, before_ids, target_ids, columns)
+        finally:
+            snapshot.unlink(missing_ok=True)
+        with release.lock(DEPLOY_LOCK):
+            release.require(maintenance_state(target) == reviewed, "Maintenance review changed during rehearsal")
+            release.maintenance_tool(target, Path(__file__).absolute())
+    except (Exception, KeyboardInterrupt) as error:
+        audit["failure"] = type(error).__name__
+        release.store(report, audit)
+        print(f"Maintenance rehearsal audit: {report}", file=sys.stderr)
+        if isinstance(error, tool.MaintenanceError):
+            raise release.ReleaseError(str(error)) from None
+        raise
+    stage("passed")
+    print(f"Maintenance clone rehearsal passed. Audit: {report}", flush=True)
+    return 0
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--check-only", action="store_true", help="Verify CI and preflight without approving or deploying")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--check-only", action="store_true", help="Verify CI and preflight without approving or deploying")
+    mode.add_argument("--maintenance-rehearse", metavar="SHA", help="Rehearse an explicitly reviewed migration on a copy")
     options = parser.parse_args()
     os.umask(0o077)
     signal.signal(signal.SIGTERM, lambda *_: signal.raise_signal(signal.SIGINT))
@@ -408,9 +500,12 @@ def main():
         release.safe_path(release.ROOT)
         release.safe_path(release.STATE, private=True)
         with release.lock(release.STATE / "gfctl-prepare.lock"):
+            if options.maintenance_rehearse is not None:
+                release.safe_path(release.RUNTIME / "state/guard.lock", private=True)
+                return maintenance_rehearse(options.maintenance_rehearse)
             return prepare(options.check_only)
     except (release.ReleaseError, OSError, ValueError, KeyError, AttributeError, TypeError,
-            subprocess.TimeoutExpired, KeyboardInterrupt) as error:
+            subprocess.TimeoutExpired, sqlite3.Error, EOFError, KeyboardInterrupt) as error:
         detail = str(error) if isinstance(error, release.ReleaseError) else f"{type(error).__name__}; inspect local release state"
         print(f"GF3 deployment preparation: {detail}", file=sys.stderr)
         return 1

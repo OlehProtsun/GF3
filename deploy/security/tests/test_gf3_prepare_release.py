@@ -363,6 +363,31 @@ class ManagedDeploymentTests(unittest.TestCase):
         self.engine.assert_not_called()
         self.confirm.assert_not_called()
 
+    def test_maintenance_rehearsal_rejects_noninteractive_input(self):
+        with patch.object(prepare.sys.stdin, "isatty", return_value=False):
+            with self.assertRaisesRegex(release.ReleaseError, "interactive terminal"):
+                prepare.maintenance_rehearse(self.target)
+        self.confirm.assert_not_called()
+        self.engine.assert_not_called()
+        self.api.assert_not_called()
+
+    def test_maintenance_rehearsal_rejects_changed_review_after_typed_sha(self):
+        target = self.push()
+        reviewed = (self.current, self.previous, {}, (), b"env", b"review", BASELINE, (), b"compose", (34, 2))
+        changed = (*reviewed[:5], b"changed review", *reviewed[6:])
+        tool = patch.object(release, "maintenance_tool")
+        with (tool as load,
+              patch.object(prepare, "maintenance_state", side_effect=[reviewed, changed]),
+              patch.object(prepare, "candidate", return_value=contextlib.nullcontext(self.root)),
+              patch.object(release, "preflight"),
+              patch.object(prepare.sys.stdin, "isatty", return_value=True),
+              patch("builtins.input", side_effect=["y", target])):
+            load.return_value.classify.return_value = (["fixture"], ("before",), ("before", "added"))
+            with self.assertRaisesRegex(release.ReleaseError, "review changed after confirmation"):
+                prepare.maintenance_rehearse(target)
+        self.assertEqual(list(self.state.glob("maintenance-*")), [])
+        self.assertEqual(self.approval.read_bytes(), self.approval_contents)
+
     def test_new_helper_requires_the_exact_installed_blob(self):
         self.push(prepare.HELPER_PATH, "different helper")
         self.assert_preparation_failed("Separate manual maintenance approval")
