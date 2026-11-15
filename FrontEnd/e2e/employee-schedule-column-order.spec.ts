@@ -98,6 +98,7 @@ test("drag previews stay in the dialog and Apply persists one account's order", 
     await page.mouse.move(target.x, target.y, { steps: 6 });
   }
   const dropTarget = dialog.getByText("Drop here");
+  await expect(dialog.getByText(`Moving Ben Baker to position ${isMobile ? 3 : 1}.`, { exact: true })).toBeAttached();
   await expect(dropTarget).toBeVisible();
   await expect.poll(async () => {
     const labelBox = await dropTarget.boundingBox();
@@ -115,7 +116,7 @@ test("drag previews stay in the dialog and Apply persists one account's order", 
     await page.mouse.down();
     await page.mouse.move(middle.x - 8, middle.y);
     await page.mouse.move(bottom.x, bottom.y, { steps: 6 });
-    await expect(dialog.getByText("Drop here")).toBeVisible();
+    await expect(dialog.getByText("Moving Ada Able to position 3.", { exact: true })).toBeAttached();
     await page.mouse.up();
   }
   const order = isMobile ? [1, 3, 2] : [2, 3, 1];
@@ -127,6 +128,7 @@ test("drag previews stay in the dialog and Apply persists one account's order", 
     await page.mouse.move(reordered.x, reordered.y);
     await page.mouse.down();
     await page.mouse.move(reordered.x - 8, reordered.y);
+    await expect(handle).toHaveAttribute("aria-pressed", "true");
     await page.mouse.move(outsideList.x, outsideList.y, { steps: 4 });
     await expect(dialog.getByText("Drop here")).toHaveCount(0);
     await page.mouse.up();
