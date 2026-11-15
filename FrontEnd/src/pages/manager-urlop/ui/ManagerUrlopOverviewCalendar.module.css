@@ -1,0 +1,134 @@
+.card {
+  min-width: 0;
+  padding: 24px;
+  border: 1px solid var(--urlop-border, #e7ebf4);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, .94);
+  box-shadow: 0 3px 12px #28386b04, inset 0 1px 0 #fff;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.header h2 {
+  margin: 0;
+  font-size: clamp(20px, 1.7vw, 25px);
+  font-weight: 700;
+  letter-spacing: -.5px;
+  text-transform: capitalize;
+}
+
+.count {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border-radius: 12px;
+  background: #f1f4ff;
+  color: #405599;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.count svg { flex-shrink: 0; color: #6278da; }
+.scroll { min-width: 0; }
+.grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 7px; }
+.weekday { padding: 4px 0 10px; text-align: center; font-size: 12px; font-weight: 500; color: #7c88a5; }
+
+.day, .placeholder {
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 96px;
+  border: 1px solid #e9edf5;
+  border-radius: 14px;
+  background: #fff;
+}
+
+.day {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 3px;
+  padding: 7px 6px;
+  font: inherit;
+  text-align: left;
+  color: #25304d;
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.day strong {
+  display: grid;
+  place-items: center;
+  align-self: flex-start;
+  min-width: 22px;
+  height: 22px;
+  margin-bottom: 1px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 8px;
+}
+
+.day small { align-self: flex-start; padding: 1px 5px; color: #7583ad; font-size: 10px; font-weight: 600; }
+.day:hover { border-color: #cad5f4; background: #fafbff; }
+.day:active { background: #f0f4ff; }
+.day[aria-expanded=true] { border-color: #9aacf0; background: #f7f9ff; box-shadow: inset 0 0 0 1px #cbd5ff; }
+.day[aria-current=date] { border-color: #c2cff6; background: #fafbff; }
+.day[aria-current=date] strong { background: #5d73ea; color: #fff; }
+.day:focus-visible, .details button:focus-visible { outline: 3px solid #7087ed; outline-offset: 2px; }
+.placeholder { padding: 10px 11px; background: #f9faff; color: #b4bed3; font-size: 12px; }
+
+.chip {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  padding: 5px 6px;
+  border-radius: 8px;
+  font-size: 10px;
+  line-height: 1.25;
+  font-weight: 500;
+}
+
+.chip i { width: 5px; height: 5px; border-radius: 50%; background: var(--dot); flex-shrink: 0; }
+.chipText { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.tone0 { --dot: #428af2; background: #eaf2ff; color: #285995; }
+.tone1 { --dot: #9870e4; background: #f1eaff; color: #654291; }
+.tone2 { --dot: #2cb68d; background: #e6f7f0; color: #22735c; }
+.tone3 { --dot: #e878a7; background: #fcebf2; color: #9c4367; }
+.tone4 { --dot: #e6a13c; background: #fff3df; color: #896026; }
+.tone5 { --dot: #ad83d7; background: #f4edf9; color: #785198; }
+
+.details { margin-top: 18px; padding: 16px; background: #f7f9ff; border: 1px solid #e7ecf8; border-radius: 18px; }
+.details .header { margin-bottom: 10px; font-size: 13px; }
+.details .chip { margin-top: 6px; padding: 8px 10px; font-size: 12px; }
+.details .chipText { overflow: visible; white-space: normal; overflow-wrap: anywhere; }
+.details button { border: 1px solid #e0e6f3; border-radius: 10px; min-height: 36px; padding: 6px 12px; background: #fff; color: #536899; font: inherit; cursor: pointer; }
+
+@media (max-width: 640px) {
+  .card { padding: 16px 12px; border-radius: 24px; }
+  .header { gap: 10px; margin-bottom: 16px; }
+  .count { padding: 7px 9px; font-size: 10px; }
+  .grid { gap: 4px; }
+  .weekday { font-size: 10px; padding-bottom: 5px; }
+  .day, .placeholder { min-height: 86px; border-radius: 10px; }
+  .day { padding: 4px 2px; gap: 3px; }
+  .day strong { min-width: 20px; height: 20px; font-size: 11px; }
+  .placeholder { padding: 8px 5px; font-size: 11px; }
+  .chip { gap: 3px; padding: 4px 3px; border-radius: 5px; font-size: 9px; }
+  .chip i { width: 4px; height: 4px; }
+  .day small { padding: 0 3px; font-size: 9px; }
+}
+
+@media (prefers-reduced-motion: reduce) { .day { transition: none; } }
+
+.loading { height: 20px; color: #697791; font-size: 12px; }
+.day, .placeholder { height: 96px; }
+.day:disabled { cursor: default; }
+@media (max-width: 640px) { .day, .placeholder { height: 86px; } }

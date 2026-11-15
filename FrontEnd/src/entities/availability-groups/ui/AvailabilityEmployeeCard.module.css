@@ -308,3 +308,131 @@
     margin-left: 0;
   }
 }
+
+.assignedList {
+  display: grid;
+  gap: 8px;
+  max-height: calc((50px * 5) + (8px * 4));
+  overflow-y: auto;
+  padding-right: 4px;
+  scrollbar-gutter: stable;
+  overscroll-behavior: contain;
+}
+
+.employeeRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 10px;
+  min-height: 50px;
+  box-sizing: border-box;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 15px;
+  background: rgba(248, 250, 252, 0.9);
+}
+
+.employeeName {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: #1e293b;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.employeeActions {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 7px;
+  justify-content: flex-end;
+}
+
+.chooseFromAnotherButton {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid rgba(37, 99, 235, 0.22);
+  border-radius: 10px;
+  background: rgba(239, 246, 255, 0.96);
+  color: #2563eb;
+  cursor: pointer;
+  box-shadow: 0 5px 12px rgba(37, 99, 235, 0.1);
+  transition: transform 120ms ease, background-color 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.chooseFromAnotherButton:hover:not(:disabled) {
+  border-color: rgba(37, 99, 235, 0.38);
+  background: rgba(219, 234, 254, 0.98);
+  box-shadow: 0 7px 16px rgba(37, 99, 235, 0.16);
+}
+
+.chooseFromAnotherButton:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.chooseFromAnotherButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.16), 0 5px 12px rgba(37, 99, 235, 0.1);
+}
+
+.chooseFromAnotherButton:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.removeEmployeeButton {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid rgba(220, 38, 38, 0.22);
+  border-radius: 10px;
+  background: rgba(254, 242, 242, 0.96);
+  color: #dc2626;
+  cursor: pointer;
+  box-shadow: 0 5px 12px rgba(220, 38, 38, 0.1);
+  transition: transform 120ms ease, background-color 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.removeEmployeeButton:hover {
+  border-color: rgba(220, 38, 38, 0.38);
+  background: rgba(254, 226, 226, 0.98);
+  box-shadow: 0 7px 16px rgba(220, 38, 38, 0.16);
+}
+
+.removeEmployeeButton:active {
+  transform: translateY(1px);
+}
+
+.removeEmployeeButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.16), 0 5px 12px rgba(220, 38, 38, 0.1);
+}
+
+.removeEmployeeButton:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+@media (max-width: 680px) {
+  .employeeRow {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .employeeActions {
+    justify-content: stretch;
+  }
+}

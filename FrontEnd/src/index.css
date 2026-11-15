@@ -1,3 +1,5 @@
+@import "./shared/ui/motion.css";
+
 :root {
   --app-page-background: #f3f4f6;
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;

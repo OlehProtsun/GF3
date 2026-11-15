@@ -1,5 +1,8 @@
+import { useLanguageRevision } from "@shared/i18n/useLanguageRevision";
 import { AppRouter } from "@app/router";
+import { AppUpdateNotice } from "./ui/AppUpdateNotice";
 
 export function App() {
-  return <AppRouter />;
+  useLanguageRevision();
+  return <><AppRouter /><AppUpdateNotice /></>;
 }

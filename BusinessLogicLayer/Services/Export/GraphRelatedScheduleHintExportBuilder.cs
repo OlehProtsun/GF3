@@ -1,4 +1,5 @@
 using BusinessLogicLayer.Contracts.Models;
+using BusinessLogicLayer.Schedule;
 
 namespace BusinessLogicLayer.Services.Export;
 
@@ -23,13 +24,17 @@ internal static class GraphRelatedScheduleHintExportBuilder
         if (employeeIdSet.Count == 0 || relatedGraphs.Count == 0)
             return [];
 
-        var occupiedCells = currentSlots
-            .Where(slot => slot.EmployeeId is int employeeId && employeeIdSet.Contains(employeeId))
-            .Select(slot => (EmployeeId: slot.EmployeeId!.Value, slot.DayOfMonth))
+        var persistedCells = persistedTextCells
+            .Where(textCell => textCell.EmployeeId > 0 && textCell.DayOfMonth > 0)
+            .Select(textCell => (textCell.EmployeeId, textCell.DayOfMonth))
             .ToHashSet();
-
-        foreach (var textCell in persistedTextCells.Where(textCell => textCell.EmployeeId > 0 && textCell.DayOfMonth > 0))
-            occupiedCells.Add((textCell.EmployeeId, textCell.DayOfMonth));
+        var currentValuesByCell = currentSlots
+            .Where(slot => slot.EmployeeId is int employeeId && employeeIdSet.Contains(employeeId))
+            .GroupBy(slot => (EmployeeId: slot.EmployeeId!.Value, slot.DayOfMonth))
+            .ToDictionary(
+                group => group.Key,
+                group => string.Join(", ", ScheduleMatrixEngine.MergeIntervalsForDisplay(group)
+                    .Select(interval => $"{interval.from} - {interval.to}")));
 
         var graphNamesByCell = new Dictionary<(int EmployeeId, int DayOfMonth), HashSet<string>>();
 
@@ -54,7 +59,7 @@ internal static class GraphRelatedScheduleHintExportBuilder
                     continue;
 
                 var cellKey = (EmployeeId: employeeId, slot.DayOfMonth);
-                if (occupiedCells.Contains(cellKey) || !seenCellsInGraph.Add(cellKey))
+                if (persistedCells.Contains(cellKey) || !seenCellsInGraph.Add(cellKey))
                     continue;
 
                 if (!graphNamesByCell.TryGetValue(cellKey, out var graphNames))
@@ -70,10 +75,15 @@ internal static class GraphRelatedScheduleHintExportBuilder
         return graphNamesByCell
             .OrderBy(entry => entry.Key.EmployeeId)
             .ThenBy(entry => entry.Key.DayOfMonth)
-            .Select(entry => new GraphNoteExportTextCell(
-                entry.Key.EmployeeId,
-                entry.Key.DayOfMonth,
-                string.Join(", ", entry.Value.OrderBy(name => name, StringComparer.CurrentCultureIgnoreCase))))
+            .Select(entry =>
+            {
+                var relatedGraphNames = string.Join(", ", entry.Value.OrderBy(name => name, StringComparer.CurrentCultureIgnoreCase));
+                var value = currentValuesByCell.TryGetValue(entry.Key, out var currentValue) && !string.IsNullOrWhiteSpace(currentValue)
+                    ? $"{currentValue}, {relatedGraphNames}"
+                    : relatedGraphNames;
+
+                return new GraphNoteExportTextCell(entry.Key.EmployeeId, entry.Key.DayOfMonth, value);
+            })
             .ToList();
     }
 

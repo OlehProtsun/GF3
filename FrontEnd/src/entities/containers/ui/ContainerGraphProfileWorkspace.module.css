@@ -1,6 +1,7 @@
 .workspace {
   width: 100%;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 18px;
   min-height: 0;
   padding-top: 6px;
@@ -10,28 +11,6 @@
 
 .workspaceHeaderCollapsed {
   padding-top: 6px;
-}
-
-.topRow {
-  display: grid;
-  grid-template-columns: minmax(320px, 392px) minmax(0, 1fr);
-  gap: 18px;
-  align-items: start;
-}
-
-.topRowCollapsed {
-  grid-template-columns: 42px minmax(0, 1fr);
-  gap: 0.875px;
-}
-
-.sidebar {
-  min-width: 0;
-  min-height: 0;
-  align-self: start;
-}
-
-.sidebarCollapsed {
-  overflow: visible;
 }
 
 .mainColumn {
@@ -53,13 +32,16 @@
 
 .summaryCard {
   max-width: none;
-  height: 100%;
+  height: auto;
   margin-inline: 0;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.96));
-}
-
-.summaryCardMeasure {
-  width: 100%;
+  padding: 20px 20px 18px;
+  border-radius: 32px;
+  border-color: rgba(148, 163, 184, 0.16);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(248, 250, 252, 0.82));
+  box-shadow: 0 18px 50px rgba(15, 23, 42, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.82);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .summaryCardSection {
@@ -102,8 +84,128 @@
 .summaryContent {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  flex: 0 0 auto;
+  gap: 12px;
   min-height: 0;
+  overflow: visible;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.scheduleIdentity {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 2px;
+}
+
+.scheduleAvatar {
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  flex: 0 0 auto;
+  border-radius: 19px;
+  background: linear-gradient(180deg, #3b82f6, #2563eb);
+  border: 1px solid rgba(37, 99, 235, 0.32);
+  color: #ffffff;
+  font-size: 1.05rem;
+  font-weight: 900;
+  box-shadow: 0 12px 24px rgba(37, 99, 235, 0.18);
+}
+
+.scheduleIdentityText {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.scheduleName {
+  margin: 0;
+  color: #0f172a;
+  font-size: 1.15rem;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.scheduleId {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.scheduleNote {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-height: 9rem;
+  padding: 13px 14px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 18px;
+  background: rgba(248, 250, 252, 0.86);
+  box-sizing: border-box;
+}
+
+.scheduleNoteEmpty {
+  min-height: 9rem;
+}
+
+.scheduleNoteValue {
+  min-height: 6rem;
+  max-height: 8rem;
+  overflow: auto;
+  padding-right: 4px;
+  color: #0f172a;
+  font-size: 0.88rem;
+  font-weight: 600;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.scheduleInfoLabels {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.scheduleInfoItem {
+  display: grid;
+  align-content: center;
+  gap: 3px;
+  min-width: 0;
+  min-height: 52px;
+  padding: 8px 11px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 16px;
+  background: rgba(248, 250, 252, 0.9);
+  box-sizing: border-box;
+}
+
+.scheduleInfoLabel {
+  color: #64748b;
+  font-size: 0.72rem;
+  font-weight: 750;
+  line-height: 1.25;
+}
+
+.scheduleInfoValue {
+  min-width: 0;
+  color: #0f172a;
+  font-size: 0.82rem;
+  font-weight: 850;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.scheduleStatusPublic {
+  color: #15803d;
+}
+
+.scheduleStatusPrivate {
+  color: #dc2626;
 }
 
 .noteList,
@@ -148,6 +250,46 @@
   line-height: 1.35;
 }
 
+.lastUpdateField {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 10px;
+  padding: 11px 12px;
+  border: 1px solid rgba(37, 99, 235, 0.14);
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(239, 246, 255, 0.92), rgba(248, 250, 252, 0.96));
+}
+
+.lastUpdateLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #64748b;
+  font-size: 0.72rem;
+  font-weight: 850;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.lastUpdateDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: #2563eb;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
+}
+
+.lastUpdateValue {
+  color: #1e3a8a;
+  font-size: 0.82rem;
+  font-weight: 900;
+  line-height: 1.3;
+  text-align: right;
+}
+
 .mutedValue {
   color: rgba(71, 85, 105, 0.76);
 }
@@ -158,6 +300,57 @@
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 8px;
+}
+
+.summaryHeaderActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+}
+
+.summarySearchField {
+  position: relative;
+  display: flex;
+  flex: 1 1 280px;
+  width: auto;
+  min-width: min(100%, 260px);
+  max-width: 360px;
+}
+
+.summarySearchIcon {
+  position: absolute;
+  top: 50%;
+  left: 14px;
+  z-index: 1;
+  transform: translateY(-50%);
+  color: #64748b;
+  pointer-events: none;
+}
+
+.summarySearchInput {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 16px 0 44px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 999px;
+  background: rgba(248, 250, 252, 0.9);
+  color: #0f172a;
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 650;
+  box-sizing: border-box;
+  transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
+}
+
+.summarySearchInput:focus {
+  outline: none;
+  border-color: rgba(59, 130, 246, 0.65);
+  background: #ffffff;
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.12);
 }
 
 .badge,
@@ -242,7 +435,8 @@
 .stickyColumn,
 .stickyColumnSecondary,
 .stickyColumnTertiary,
-.stickyColumnQuaternary {
+.stickyColumnQuaternary,
+.stickyColumnQuinary {
   position: sticky;
   background-clip: padding-box;
   box-shadow: inset -1px 0 0 rgba(113, 113, 122, 0.12);
@@ -299,7 +493,8 @@
 .summaryTable tbody .stickyColumn,
 .summaryTable tbody .stickyColumnSecondary,
 .summaryTable tbody .stickyColumnTertiary,
-.summaryTable tbody .stickyColumnQuaternary {
+.summaryTable tbody .stickyColumnQuaternary,
+.summaryTable tbody .stickyColumnQuinary {
   background: #ffffff;
 }
 
@@ -311,7 +506,8 @@
 
 .summaryTable tbody .stickyColumnSecondary,
 .summaryTable tbody .stickyColumnTertiary,
-.summaryTable tbody .stickyColumnQuaternary {
+.summaryTable tbody .stickyColumnQuaternary,
+.summaryTable tbody .stickyColumnQuinary {
   width: var(--summary-stat-cell-width);
   min-width: var(--summary-stat-cell-width);
   max-width: var(--summary-stat-cell-width);
@@ -338,23 +534,6 @@
   width: 100%;
 }
 
-@media (max-width: 1180px) {
-  .topRow,
-  .topRowCollapsed {
-    grid-template-columns: 1fr;
-    gap: 18px;
-  }
-
-  .matrixCardShell {
-    min-height: 0;
-    height: auto;
-  }
-
-  .matrixCard {
-    height: auto;
-  }
-}
-
 @media (max-width: 960px) {
   .workspace,
   .workspaceHeaderCollapsed {
@@ -364,14 +543,37 @@
   .summaryCardSection {
     margin-top: 0;
   }
+
 }
 
 @media (max-width: 720px) {
+  .scheduleAvatar {
+    width: 52px;
+    height: 52px;
+    border-radius: 17px;
+  }
+
+  .scheduleInfoLabels {
+    grid-template-columns: 1fr;
+  }
+
   .badge,
   .metaBadge {
     width: 100%;
     justify-content: center;
     text-align: center;
+  }
+
+  .summaryHeaderActions,
+  .summarySearchField,
+  .summaryMeta {
+    width: 100%;
+    max-width: none;
+  }
+
+  .summarySearchField {
+    min-width: 100%;
+    flex-basis: 100%;
   }
 
   .profileNoteValue {
@@ -385,4 +587,480 @@
   .profileNoteValueEmpty {
     min-height: 8rem;
   }
+
+  .lastUpdateField {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .lastUpdateValue {
+    text-align: left;
+  }
+}
+.workspacePhone { width: 100%; max-width: 100%; min-width: 0; gap: 14px; }
+.workspacePhone .mainColumn, .phoneInformationWrap, .workspacePhone .summaryCard, .workspacePhone .matrixCard, .workspacePhone .summaryCardSection { width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; }
+.workspacePhone .summaryCard, .workspacePhone .summaryCardSection { padding: 14px; border-radius: 26px; background: var(--card-background, #fff); }
+.workspacePhone .summaryCardSection { margin-top: 0; }
+.workspacePhone .phoneSectionHeader { flex-direction: column; align-items: stretch; gap: 12px; }
+.workspacePhone .phoneSectionTitle { min-width: 0; color: var(--text-primary, #0f172a); font-size: 1rem; gap: 8px; }
+.workspacePhone .phoneSectionTitle > svg { flex-shrink: 0; padding: 7px; width: 32px; height: 32px; box-sizing: border-box; border-radius: 10px; background: #eff6ff; color: #2563eb; }
+.workspacePhone .phoneSummaryHeaderRight { width: 100%; min-width: 0; }
+.workspacePhone .summaryHeaderActions { width: 100%; min-width: 0; }
+.workspacePhone .summarySearchField { flex-basis: 100%; width: 100%; min-width: 0; max-width: none; }
+.workspacePhone .summarySearchInput { width: 100%; min-width: 0; color: var(--text-primary, #0f172a); background: var(--card-background, #f8fafc); }
+.workspacePhone .phoneMatrixHeader { flex-wrap: wrap; gap: 10px; }
+.workspacePhone .phoneMatrixHeaderRight { min-width: 0; max-width: 100%; margin-left: auto; }
+.workspacePhone .badges { gap: 6px; }
+.workspacePhone .badge { width: auto; padding: 6px 8px; max-width: 100%; font-size: .72rem; font-weight: 650; overflow-wrap: anywhere; background: #eff6ff; color: #1e40af; }
+.workspacePhone .matrixCard {
+  --matrix-cell-min-width: 104px;
+  --matrix-cell-min-height: 30px;
+  --matrix-cell-font-size: 0.76rem;
+  --matrix-shell-radius: 18px;
+  --matrix-header-padding: 7px 5px;
+  --matrix-day-header-padding: 7px 3px;
+  --matrix-header-font-size: 0.78rem;
+  --matrix-day-header-font-size: 0.68rem;
+  --matrix-value-header-padding-right: 5px;
+  --matrix-header-cell-gap: 2px;
+  --matrix-cell-padding: 2px 6px;
+  --matrix-scroll-max-height: min(560px, calc(100dvh - 190px));
+  padding: 12px 10px; border-radius: 24px;
+}
+.workspacePhone .phoneSummary { display: grid; gap: 10px; min-width: 0; }
+.workspacePhone .phoneSummaryEmployee { min-width: 0; border: 1px solid #94a3b829; border-radius: 20px; box-shadow: 0 3px 10px #0f172a05; background: var(--card-background, #f8fafc); overflow-wrap: anywhere; }
+.workspacePhone .phoneSummaryToggle { display: grid; grid-template-columns: 40px minmax(0, 1fr) 28px; gap: 8px; padding: 12px; min-height: 44px; list-style: none; cursor: pointer; align-items: center; }
+.workspacePhone .phoneSummaryToggle::-webkit-details-marker { display: none; }
+.workspacePhone :focus-visible { outline: 3px solid #60a5fa; outline-offset: 2px; border-radius: 12px; }
+.workspacePhone .phoneEmployeeAvatar { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; font-size: .9rem; }
+.workspacePhone .phoneAvatar0 { background: #dbeafe; color: #1d4ed8; }
+.workspacePhone .phoneAvatar1 { background: #ede9fe; color: #7c3aed; }
+.workspacePhone .phoneAvatar2 { background: #d1fae5; color: #047857; }
+.workspacePhone .phoneAvatar3 { background: #fef3c7; color: #92400e; }
+.workspacePhone .phoneAvatar4 { background: #fce7f3; color: #be185d; }
+.workspacePhone .phoneAvatar5 { background: #e0f2fe; color: #0369a1; }
+.workspacePhone .phoneEmployeeName { margin: 0; min-width: 0; color: var(--text-primary, #0f172a); font-size: .95rem; font-weight: 750; line-height: 1.3; }
+.workspacePhone .phoneEmployeeChevron { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: #eff6ff; color: #64748b; grid-column: 3; grid-row: 1 / 3; }
+.workspacePhone .phoneSummaryEmployee[open] .phoneEmployeeChevron svg { transform: rotate(90deg); }
+.workspacePhone .phoneSummaryMetrics { grid-column: 1 / 3; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin: 2px 0 0; min-width: 0; }
+.workspacePhone .phoneSummaryMetrics > div + div { border-left: 1px solid #94a3b829; padding-left: 6px; }
+.workspacePhone .phoneSummaryMetrics dt { color: var(--text-secondary, #64748b); font-size: .72rem; }
+.workspacePhone .phoneSummaryMetrics dd { margin: 4px 0 0; font-size: .95rem; font-weight: 750; color: var(--text-primary, #0f172a); }
+.workspacePhone .phoneSummaryDays { margin: 0; padding: 0 12px 12px; }
+.workspacePhone .phoneSummaryDays > div { padding: 8px 0; border-top: 1px solid #94a3b829; }
+.workspacePhone .phoneSummaryDays dt { font-size: .75rem; font-weight: 700; }
+.workspacePhone .phoneSummaryDays dd { margin: 4px 0 0; }
+.workspacePhone .phoneSummaryShift { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; padding: 3px 0; font-size: .78rem; }
+.workspacePhone .phoneSummaryShift small { display: block; color: var(--text-secondary, #64748b); font-size: .72rem; }
+.workspacePhone .scheduleIdentity { padding: 12px; border-radius: 18px; background: #eff6ff; }
+.workspacePhone .scheduleName { font-size: 1rem; }
+.workspacePhone .scheduleNote, .workspacePhone .scheduleNoteEmpty { min-height: 0; background: var(--card-background, #f8fafc); }
+.workspacePhone .scheduleNoteValue { min-height: 0; color: var(--text-primary, #0f172a); }
+.workspacePhone .scheduleNote .scheduleInfoLabel { display: flex; align-items: center; gap: 6px; }
+.workspacePhone .scheduleInfoLabels { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.workspacePhone .scheduleInfoItem { grid-template-columns: 24px minmax(0, 1fr); column-gap: 7px; padding: 10px 8px; background: var(--card-background, #f8fafc); }
+.detailIcon { grid-row: 1 / 3; align-self: start; display: grid; place-items: center; width: 24px; height: 28px; border-radius: 8px; color: #2563eb; background: #eff6ff; }
+.workspacePhone .scheduleInfoLabel { min-width: 0; overflow-wrap: anywhere; color: var(--text-secondary, #64748b); }
+.workspacePhone .scheduleInfoValue { min-width: 0; color: var(--text-primary, #0f172a); }
+.workspacePhone .phoneAvailabilityTile { grid-column: 1 / -1; }
+.workspacePhone .scheduleStatusPublic, .workspacePhone .scheduleStatusPrivate { justify-self: start; border-radius: 999px; padding: 3px 7px; }
+.workspacePhone .scheduleStatusPublic { background: #dcfce7; color: #166534; }
+.workspacePhone .scheduleStatusPrivate { background: #fee2e2; color: #991b1b; }
+.workspacePhone .lastUpdateField { flex-wrap: wrap; margin-top: 0; }
+.workspacePhone .lastUpdateValue { min-width: 0; overflow-wrap: anywhere; }
+.workspacePhone .emptyState { min-height: 100px; color: var(--text-secondary, #64748b); }
+@media (max-width: 350px) { .workspacePhone .scheduleInfoLabels { grid-template-columns: minmax(0, 1fr); } }
+
+.summaryTable thead .stickyColumnQuinary { z-index: 5; }
+.summaryTable tbody .stickyColumnQuinary { z-index: 4; }
+.stickyColumnQuinary {
+  left: calc(var(--summary-sticky-employee-offset) + (var(--summary-sticky-stat-offset) * 3));
+}
+.summaryTable .holidayStatColumn { white-space: normal; overflow-wrap: anywhere; }
+.workspacePhone .phoneSummaryMetricsWithHolidays { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.workspacePhone .phoneSummaryMetricsWithHolidays > div:nth-child(3) { border-left: 0; padding-left: 0; }
+.workspacePhone .phoneSummaryMetricsWithHolidays dt { overflow-wrap: anywhere; }
+
+.workspacePhone .phoneCollapsibleCard { width: 100%; min-width: 0; max-width: 100%; padding: 0; border: 1px solid #94a3b829; border-radius: 26px; background: var(--card-background, #fff); box-shadow: 0 4px 16px #0f172a0a; box-sizing: border-box; }
+.workspacePhone .phoneCollapsibleHeading { margin: 0; }
+.workspacePhone .phoneCollapsibleToggle { width: 100%; min-height: 62px; display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 0; border-radius: inherit; background: transparent; color: var(--text-primary, #0f172a); text-align: left; font: inherit; font-size: .96rem; font-weight: 750; cursor: pointer; }
+.workspacePhone .phoneCollapsibleIcon { width: 36px; height: 36px; flex: 0 0 36px; display: grid; place-items: center; border-radius: 12px; background: #eff6ff; color: #2563eb; }
+.workspacePhone .phoneEmployeeCount { margin-left: auto; padding: 4px 9px; border: 1px solid #dbeafe; border-radius: 999px; background: #f1f6ff; color: #315b9b; font-size: .7rem; font-weight: 700; white-space: nowrap; }
+.workspacePhone .phoneCollapsibleChevron { width: 32px; height: 32px; flex: 0 0 32px; display: grid; place-items: center; border: 1px solid #e2e8f0; border-radius: 50%; background: #f8fafc; color: #52647b; }
+.workspacePhone .phoneCollapsibleChevron svg { transition: transform 220ms ease; }
+.workspacePhone .phoneCollapsibleToggle[aria-expanded="true"] .phoneCollapsibleChevron svg { transform: rotate(90deg); }
+.workspacePhone .phoneCollapsiblePanel { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows 240ms ease, opacity 180ms ease; }
+.workspacePhone .phoneCollapsiblePanel[data-expanded="true"] { grid-template-rows: 1fr; opacity: 1; }
+.workspacePhone .phoneCollapsibleClip { min-height: 0; overflow: hidden; }
+.workspacePhone .phoneInformationContent { padding: 0 12px 12px; }
+.workspacePhone .phoneSummaryContent { display: grid; gap: 10px; min-width: 0; padding: 0 12px 12px; }
+.workspacePhone .phoneSummarySearch { width: 100%; max-width: none; }
+.workspacePhone .phoneSummary { display: grid; gap: 10px; min-width: 0; }
+.workspacePhone .phoneSummaryEmployee { position: relative; min-width: 0; border: 1px solid #94a3b829; border-radius: 24px; box-shadow: 0 4px 14px #0f172a08; background: #fff; overflow: hidden; overflow-wrap: anywhere; }
+.workspacePhone .phoneSummaryToggle { display: grid; grid-template-columns: 38px minmax(0, 1fr) 34px; gap: 8px; padding: 11px; min-height: 44px; list-style: none; cursor: pointer; align-items: center; }
+.workspacePhone .phoneSummaryToggle::-webkit-details-marker { display: none; }
+.workspacePhone .phoneSummaryToggle::marker { content: ""; }
+.workspacePhone .phoneEmployeeAvatar { width: 38px; height: 38px; border-radius: 13px; display: grid; place-items: center; font-weight: 800; font-size: .82rem; }
+.workspacePhone .phoneEmployeeName { margin: 0; min-width: 0; padding-right: 2px; color: var(--text-primary, #0f172a); font-size: .9rem; font-weight: 750; line-height: 1.3; overflow-wrap: anywhere; }
+.workspacePhone .phoneEmployeeChevron { grid-column: 3; grid-row: 1 / 3; width: 30px; height: 30px; display: grid; place-items: center; align-self: start; justify-self: center; border: 1px solid #dbeafe; border-radius: 50%; background: #f1f6ff; color: #52647b; }
+.workspacePhone .phoneSummaryMetrics { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin: 2px 0 0; min-width: 0; }
+.workspacePhone .phoneSummaryMetrics > div { min-width: 0; padding: 7px; border: 1px solid #e7ebf0; border-radius: 13px; background: #f7f8fa; }
+.workspacePhone .phoneSummaryMetrics > div:last-child:nth-child(odd) { grid-column: 1 / -1; }
+.workspacePhone .phoneSummaryMetrics dt { display: flex; align-items: center; gap: 4px; color: var(--text-secondary, #64748b); font-size: .66rem; line-height: 1.2; overflow-wrap: anywhere; }
+.workspacePhone .phoneSummaryMetrics dt svg { flex: 0 0 auto; color: #5b83c3; }
+.workspacePhone .phoneSummaryMetrics dd { margin: 4px 0 0; font-size: .9rem; font-weight: 750; color: var(--text-primary, #0f172a); overflow-wrap: anywhere; }
+.workspacePhone .phoneSummaryDays { margin: 0; padding: 0 11px 11px; }
+.workspacePhone .phoneSummaryDays > div { padding: 8px 0; border-top: 1px solid #e7ebf0; }
+.workspacePhone .phoneSummaryDays dt { font-size: .75rem; font-weight: 700; }
+.workspacePhone .phoneSummaryDays dd { margin: 4px 0 0; }
+.workspacePhone .phoneSummaryShift { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; padding: 3px 0; font-size: .78rem; }
+.workspacePhone .phoneSummaryShift small { display: block; color: var(--text-secondary, #64748b); font-size: .72rem; }
+.workspacePhone :focus-visible { outline: 3px solid #60a5fa; outline-offset: 2px; border-radius: 12px; }
+@media (max-width: 350px) {
+  .workspacePhone .phoneCollapsibleToggle { gap: 7px; padding-inline: 9px; font-size: .9rem; }
+  .workspacePhone .phoneEmployeeCount { padding-inline: 6px; font-size: .64rem; }
+  .workspacePhone .phoneSummaryMetrics { grid-template-columns: minmax(0, 1fr); }
+  .workspacePhone .phoneSummaryMetrics > div:last-child:nth-child(odd) { grid-column: auto; }
+}
+@media (prefers-reduced-motion: reduce) { .workspacePhone .phoneCollapsiblePanel, .workspacePhone .phoneCollapsibleChevron svg { transition: none; } }
+
+.matrixCard .matrixHeader {
+  --matrix-control-height: 38px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas:
+    "title actions"
+    "badges badges";
+  gap: 8px 16px;
+  padding-inline: 4px;
+}
+
+.matrixHeader .matrixTitle {
+  grid-area: title;
+  font-size: 1.15rem;
+  line-height: 1.2;
+}
+
+.matrixTitle > svg {
+  flex-shrink: 0;
+  box-sizing: content-box;
+  padding: 7px;
+  border-radius: 10px;
+  background: #eaf0fa;
+  color: #315b9d;
+}
+
+.matrixHeader .matrixHeaderRight {
+  display: contents;
+}
+
+.matrixActions {
+  grid-area: actions;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.matrixActions .lastUpdateField {
+  box-sizing: border-box;
+  min-height: var(--matrix-control-height);
+  min-width: 0;
+  margin: 0;
+  padding: 6px 12px;
+  flex-flow: row wrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 3px 9px;
+  border-color: #dce5f1;
+  border-radius: 999px;
+  background: #edf2f9;
+  box-shadow: 0 2px 5px #1e3a5f0a;
+}
+
+.matrixActions .lastUpdateLabel {
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+}
+
+.matrixActions .lastUpdateValue {
+  min-width: 0;
+  padding-inline-start: 9px;
+  border-inline-start: 1px solid #cbd8e8;
+  color: #1e4b99;
+  font-variant-numeric: tabular-nums;
+  text-align: start;
+  overflow-wrap: anywhere;
+}
+
+.matrixActions .lastUpdateDot {
+  width: 6px;
+  height: 6px;
+  box-shadow: 0 0 0 2px #2563eb14;
+}
+
+.roundButton {
+  min-height: 38px;
+  box-shadow: 0 2px 6px #0f172a12;
+}
+
+.matrixActions .matrixAction {
+  --ios-button-gap: 6px;
+  height: auto;
+  min-height: var(--matrix-control-height);
+  padding-block: 8px !important;
+  padding-inline: 12px;
+  font-size: 0.82rem;
+  line-height: 1.2;
+}
+
+.matrixActions .matrixAction > span:last-child {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.matrixActions .matrixAction svg {
+  width: 15px;
+  height: 15px;
+}
+
+.matrixActions .editAction {
+  --btn-shadow: #2563eb32;
+  background-image: linear-gradient(180deg, #ffffff0d, transparent);
+}
+
+.matrixActions .deleteAction {
+  --btn-bg-hover: #fce4e1;
+  --btn-shadow: #991b1b13;
+  --btn-focus: #ba413d40;
+  color: #a52e2c;
+}
+
+.roundButton {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: 1px solid #e2e8f0;
+  border-radius: 50%;
+  background: #f1f5f9;
+  color: #334155;
+  cursor: pointer;
+}
+
+.roundButton:hover {
+  background: #e2e8f0;
+}
+
+.roundButton:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+.matrixActions .infoAction {
+  width: var(--matrix-control-height);
+  height: var(--matrix-control-height);
+  background: #f1f4f8;
+  border-color: #dce4ee;
+  box-shadow: 0 2px 5px #1e3a5f13;
+  transition: background-color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
+}
+
+.matrixActions .infoAction:hover {
+  background-color: #e8eef6;
+}
+
+.matrixActions .infoAction:active {
+  transform: translateY(1px);
+  box-shadow: 0 1px 2px #1e3a5f13;
+}
+
+.matrixHeader .badges {
+  grid-area: badges;
+  justify-content: flex-start;
+  gap: 6px;
+}
+
+.matrixHeader .badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: auto;
+  padding: 5px 10px;
+  border: 1px solid #e0e7f1;
+  background: #eff3f8;
+  color: #374962;
+  box-shadow: 0 1px 3px #1e3a5f0a;
+  font-size: 0.75rem;
+  line-height: 1.2;
+}
+
+.matrixHeader .badge svg {
+  flex-shrink: 0;
+  color: #4a6894;
+}
+
+@media (max-width: 860px) {
+  .matrixCard .matrixHeader {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "title" "badges" "actions";
+  }
+
+  .matrixActions {
+    justify-content: flex-start;
+  }
+}
+
+:global(html):has(.informationDialog[open]) {
+  overflow: hidden;
+  overscroll-behavior: none;
+  scrollbar-gutter: stable;
+}
+
+.informationDialog {
+  box-sizing: border-box;
+  width: min(440px, calc(100% - 24px));
+  max-height: min(680px, calc(100dvh - 24px));
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  border-radius: 24px;
+  background: #fff;
+  color: #0f172a;
+  box-shadow: 0 20px 56px #0f172a38;
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 160ms ease, transform 160ms ease, display 160ms allow-discrete, overlay 160ms allow-discrete;
+}
+
+.informationDialog[open] {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.informationDialog::backdrop {
+  background: #0f172a52;
+  backdrop-filter: blur(4px);
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+
+.informationDialog[open]::backdrop {
+  opacity: 1;
+}
+
+@starting-style {
+  .informationDialog[open] {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  .informationDialog[open]::backdrop {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .informationDialog,
+  .informationDialog::backdrop {
+    transition: none;
+  }
+}
+
+.informationHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 16px 4px;
+}
+
+.informationHeader h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.informationBody {
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 8px 16px 16px;
+}
+
+.informationBody:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: -3px;
+}
+
+.informationBody .scheduleAvatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 13px;
+}
+
+.scheduleIdentityMeta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+}
+
+.publicationBadge {
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 750;
+}
+
+.publicationBadge.scheduleStatusPublic {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.publicationBadge.scheduleStatusPrivate {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.informationBody .scheduleNote,
+.informationBody .scheduleNoteValue {
+  min-height: 0;
+}
+
+.informationBody .scheduleNote {
+  padding: 9px 10px;
+}
+
+.informationBody .scheduleNoteValue {
+  max-height: none;
+  overflow: visible;
+}
+
+.informationBody .scheduleNote .scheduleInfoLabel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.informationBody .scheduleInfoLabels {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.informationBody .scheduleInfoItem {
+  grid-template-columns: 24px minmax(0, 1fr);
+  column-gap: 6px;
+  min-height: 46px;
+  padding: 6px 8px;
+  border-radius: 12px;
+}
+
+.informationBody .scheduleInfoItem:last-child {
+  grid-column: 1 / -1;
 }

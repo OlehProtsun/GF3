@@ -1,10 +1,13 @@
 using BusinessLogicLayer.Services.Abstractions;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using WebApi.Auth;
 
 namespace WebApi.Controllers;
 
 [ApiController]
 [Route("api")]
+[Authorize(Roles = AuthRoles.Manager)]
 /// <summary>
 /// Exposes export endpoints for SQL and Excel representations of graphs and containers.
 /// Export generation lives in business services; the controller only selects the correct

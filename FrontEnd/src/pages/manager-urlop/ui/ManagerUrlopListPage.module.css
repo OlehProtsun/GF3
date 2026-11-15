@@ -1,0 +1,31 @@
+.page {
+  width: 100%;
+  max-width: 1600px;
+  min-width: 0;
+  margin-inline: auto;
+  padding: 16px 24px 32px;
+  box-sizing: border-box;
+}
+
+.page .grid {
+  margin-top: 12px;
+  grid-template-columns: repeat(3, minmax(0, 360px));
+  justify-content: center;
+  gap: 24px;
+}
+
+@media (max-width: 1100px) {
+  .page .grid {
+    grid-template-columns: repeat(2, minmax(0, 360px));
+  }
+}
+
+@media (max-width: 680px) {
+  .page {
+    padding-inline: 12px;
+  }
+  .page .grid {
+    grid-template-columns: minmax(0, 360px);
+    gap: 20px;
+  }
+}

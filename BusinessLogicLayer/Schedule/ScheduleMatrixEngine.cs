@@ -111,18 +111,18 @@ public static class ScheduleMatrixEngine
 
         foreach (var shift in shifts)
         {
-            var coveredEmployeeIds = new HashSet<int>();
-            foreach (var (employeeId, intervals) in intervalsByEmployee)
+            var points = intervalsByEmployee.Values.SelectMany(intervals => intervals)
+                .SelectMany(interval => new[] { interval.from, interval.to })
+                .Where(point => point > shift.from && point < shift.to)
+                .Append(shift.from).Append(shift.to).Distinct().Order().ToArray();
+            for (var index = 0; index + 1 < points.Length; index++)
             {
-                if (intervals.Any(interval => interval.from <= shift.from && interval.to >= shift.to))
+                var workers = intervalsByEmployee.Count(pair => pair.Value.Any(interval =>
+                    interval.from <= points[index] && interval.to >= points[index + 1]));
+                if (workers != peoplePerShift)
                 {
-                    coveredEmployeeIds.Add(employeeId);
+                    return true;
                 }
-            }
-
-            if (coveredEmployeeIds.Count < peoplePerShift)
-            {
-                return true;
             }
         }
 
@@ -130,9 +130,8 @@ public static class ScheduleMatrixEngine
     }
 
     /// <summary>
-    /// Merges overlapping time ranges for one employee/day into user-friendly display intervals.
-    /// We deduplicate identical intervals first, then merge touching/overlapping windows so the
-    /// exported matrix shows the cleanest possible textual representation.
+    /// Merges overlapping or touching time ranges for one employee/day into display intervals,
+    /// preserving separate intervals only when there is a break.
     /// </summary>
     public static List<(string from, string to)> MergeIntervalsForDisplay(IEnumerable<ScheduleSlotModel> slots)
     {

@@ -1,4 +1,5 @@
-﻿import type { ReactNode } from "react";
+import { t } from "@shared/i18n";
+import type { ReactNode } from "react";
 import { ErrorBanner } from "@shared/ui/components/ErrorBanner";
 import styles from "./ListCardSection.module.css";
 
@@ -21,15 +22,15 @@ type ListCardSectionProps = {
 
 export function ListCardSection({
   error,
-  errorMessage = "Could not load data.",
+  errorMessage = t("Could not load data."),
   isFetching,
   hasData,
-  loadingMessage = "Loading...",
+  loadingMessage = t("Loading..."),
   searchQuery,
-  emptyTitle = "Nothing here yet",
+  emptyTitle = t("Nothing here yet"),
   emptyDescription,
   emptyAction,
-  searchEmptyTitle = "Nothing found",
+  searchEmptyTitle = t("Nothing found"),
   searchEmptyDescription,
   searchEmptyAction,
   className,

@@ -1,5 +1,6 @@
 using DataAccessLayer.Models;
 using DataAccessLayer.Models.DataBaseContext;
+using DataAccessLayer.Models.Enums;
 using DataAccessLayer.Repositories.Abstractions;
 using Microsoft.EntityFrameworkCore;
 
@@ -31,22 +32,63 @@ public class ScheduleSlotRepository : GenericRepository<ScheduleSlotModel>, ISch
     /// <inheritdoc />
     public async Task<int> ReplaceForScheduleAsync(int scheduleId, IEnumerable<ScheduleSlotModel> slots, bool overwrite, CancellationToken ct = default)
     {
-        var slotList = PrepareSlotBatch(scheduleId, slots);
+        var incomingSlots = slots?.ToList() ?? [];
 
-        await using var transaction = await _db.Database.BeginTransactionAsync(ct).ConfigureAwait(false);
+        await using var transaction = _db.Database.CurrentTransaction is null
+            ? await _db.Database.BeginTransactionAsync(ct).ConfigureAwait(false) : null;
 
         if (overwrite)
         {
-            await DeleteExistingScheduleSlotsAsync(scheduleId, ct).ConfigureAwait(false);
-        }
+            var protectedSlots = await GetProtectedManagerManualOfferSlotsAsync(scheduleId, ct).ConfigureAwait(false);
+            incomingSlots = ExcludeProtectedOpenOfferSlots(incomingSlots, protectedSlots);
+            var slotList = PrepareSlotBatch(scheduleId, incomingSlots);
+            ReserveProtectedSlotNumbers(slotList, protectedSlots);
+            var protectedIds = protectedSlots.Select(slot => slot.Id).ToHashSet();
+            var existing = await _set.AsNoTracking()
+                .Where(slot => slot.ScheduleId == scheduleId)
+                .ToListAsync(ct).ConfigureAwait(false);
+            var available = existing.Where(slot => !protectedIds.Contains(slot.Id))
+                .GroupBy(slot => (slot.ScheduleId, slot.DayOfMonth, slot.SlotNo, slot.EmployeeId,
+                    slot.Status, slot.FromTime, slot.ToTime))
+                .ToDictionary(group => group.Key, group => new Queue<ScheduleSlotModel>(group));
+            var retainedIds = new HashSet<int>(protectedIds);
+            var additions = new List<ScheduleSlotModel>();
+            foreach (var slot in slotList)
+            {
+                var key = (slot.ScheduleId, slot.DayOfMonth, slot.SlotNo, slot.EmployeeId,
+                    slot.Status, slot.FromTime, slot.ToTime);
+                if (available.TryGetValue(key, out var matches) && matches.TryDequeue(out var match))
+                {
+                    retainedIds.Add(match.Id);
+                }
+                else
+                {
+                    additions.Add(slot);
+                }
+            }
 
-        if (slotList.Count > 0)
+            foreach (var batch in existing.Where(slot => !retainedIds.Contains(slot.Id))
+                .Select(slot => slot.Id).Chunk(500))
+            {
+                await _set.Where(slot => slot.ScheduleId == scheduleId && batch.Contains(slot.Id))
+                    .ExecuteDeleteAsync(ct).ConfigureAwait(false);
+            }
+            if (additions.Count > 0)
+            {
+                await _set.AddRangeAsync(additions, ct).ConfigureAwait(false);
+            }
+        }
+        else
         {
-            await _set.AddRangeAsync(slotList, ct).ConfigureAwait(false);
+            var slotList = PrepareSlotBatch(scheduleId, incomingSlots);
+            if (slotList.Count > 0)
+            {
+                await _set.AddRangeAsync(slotList, ct).ConfigureAwait(false);
+            }
         }
 
         var written = await _db.SaveChangesAsync(ct).ConfigureAwait(false);
-        await transaction.CommitAsync(ct).ConfigureAwait(false);
+        if (transaction is not null) await transaction.CommitAsync(ct).ConfigureAwait(false);
 
         // Batch replacement can leave many tracked entries in the DbContext.
         // Clearing the tracker keeps the context lightweight for subsequent operations.
@@ -54,11 +96,27 @@ public class ScheduleSlotRepository : GenericRepository<ScheduleSlotModel>, ISch
         return written;
     }
 
-    private async Task DeleteExistingScheduleSlotsAsync(int scheduleId, CancellationToken ct)
+    private async Task<List<ScheduleSlotModel>> GetProtectedManagerManualOfferSlotsAsync(int scheduleId, CancellationToken ct)
     {
-        await _set
-            .Where(slot => slot.ScheduleId == scheduleId)
-            .ExecuteDeleteAsync(ct)
+        return await _db.ShiftSwapRequests
+            .AsNoTracking()
+            .Where(request =>
+                request.ScheduleId == scheduleId &&
+                request.IsManagerCreated &&
+                request.Status == ShiftSwapStatus.Open &&
+                request.ScheduleSlot!.EmployeeId == null)
+            .Select(request => new ScheduleSlotModel
+            {
+                Id = request.ScheduleSlot!.Id,
+                ScheduleId = request.ScheduleSlot!.ScheduleId,
+                DayOfMonth = request.ScheduleSlot!.DayOfMonth,
+                SlotNo = request.ScheduleSlot!.SlotNo,
+                EmployeeId = request.ScheduleSlot!.EmployeeId,
+                Status = request.ScheduleSlot!.Status,
+                FromTime = request.ScheduleSlot!.FromTime,
+                ToTime = request.ScheduleSlot!.ToTime,
+            })
+            .ToListAsync(ct)
             .ConfigureAwait(false);
     }
 
@@ -73,4 +131,49 @@ public class ScheduleSlotRepository : GenericRepository<ScheduleSlotModel>, ISch
 
         return slotList;
     }
+
+    private static List<ScheduleSlotModel> ExcludeProtectedOpenOfferSlots(
+        IEnumerable<ScheduleSlotModel> slots,
+        IReadOnlyCollection<ScheduleSlotModel> protectedSlots)
+    {
+        var protectedSlotIds = protectedSlots.Select(slot => slot.Id).ToHashSet();
+
+        return slots
+            .Where(slot => slot.Id <= 0 || !protectedSlotIds.Contains(slot.Id) || slot.EmployeeId is > 0)
+            .ToList();
+    }
+
+    private static void ReserveProtectedSlotNumbers(List<ScheduleSlotModel> slots, IReadOnlyCollection<ScheduleSlotModel> protectedSlots)
+    {
+        if (slots.Count == 0 || protectedSlots.Count == 0)
+        {
+            return;
+        }
+
+        var occupiedByTime = protectedSlots
+            .GroupBy(slot => new SlotTimeKey(slot.DayOfMonth, slot.FromTime, slot.ToTime))
+            .ToDictionary(
+                group => group.Key,
+                group => group.Select(slot => slot.SlotNo).ToHashSet());
+
+        foreach (var group in slots.GroupBy(slot => new SlotTimeKey(slot.DayOfMonth, slot.FromTime, slot.ToTime)))
+        {
+            if (!occupiedByTime.TryGetValue(group.Key, out var occupiedSlotNumbers))
+            {
+                continue;
+            }
+
+            foreach (var slot in group.OrderBy(slot => slot.SlotNo).ThenBy(slot => slot.EmployeeId ?? int.MaxValue))
+            {
+                while (occupiedSlotNumbers.Contains(slot.SlotNo))
+                {
+                    slot.SlotNo++;
+                }
+
+                occupiedSlotNumbers.Add(slot.SlotNo);
+            }
+        }
+    }
+
+    private readonly record struct SlotTimeKey(int DayOfMonth, string FromTime, string ToTime);
 }

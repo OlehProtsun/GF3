@@ -74,3 +74,16 @@
   }
 }
 
+
+/* Only the folder list uses the wider canvas; other page modes retain their widths. */
+.content.contentFolders {
+  width: min(100%, 1640px);
+  margin-inline: auto;
+}
+
+@media (min-width: 1101px) {
+  .content.contentFolders {
+    padding-left: 56px;
+    padding-right: 52px;
+  }
+}

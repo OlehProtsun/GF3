@@ -1,5 +1,4 @@
 /* eslint-disable react-refresh/only-export-components */
-/* eslint-disable react-hooks/set-state-in-effect */
 import {
   createContext,
   useCallback,
@@ -8,12 +7,19 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
 } from "react";
 import type { PropsWithChildren } from "react";
-import { isRequestCanceledError } from "@shared/api/httpClient";
+import { ApiError, getAuthGeneration, isRequestCanceledError, RequestCanceledError } from "@shared/api/httpClient";
+import { waitForReadRetry } from "@shared/api/retry429Read";
 
 type QueryKey = readonly unknown[];
-type QueryFilters = { queryKey?: QueryKey };
+type QueryFilters = {
+  queryKey?: QueryKey;
+  exact?: boolean;
+  refetchType?: "none";
+  predicate?: (query: { queryKey: QueryKey }) => boolean;
+};
 type QueryEvent =
   | { type: "invalidate"; key: string }
   | { type: "setData"; key: string; data: unknown };
@@ -36,7 +42,7 @@ type MutationOptions<TData, TVariables> = {
 
 type QueryClientOptions = {
   defaultOptions?: {
-    queries?: { staleTime?: number; retry?: number; refetchOnWindowFocus?: boolean };
+    queries?: { staleTime?: number; retry?: number; retryDelay?: (attempt: number, error: unknown) => number; refetchOnWindowFocus?: boolean };
     mutations?: { retry?: number };
   };
   queryCache?: QueryCache;
@@ -49,6 +55,9 @@ type CacheRecord = {
   updatedAt: number;
   promise?: Promise<unknown>;
   controller?: AbortController;
+  invalidatedWhileFetching?: boolean;
+  staleOnSettle?: boolean;
+  dataRevision?: number;
 };
 
 export class QueryCache {
@@ -87,23 +96,43 @@ function isQueryKeyPrefix(prefix: QueryKey | undefined, queryKey: QueryKey): boo
   return prefix.every((segment, index) => Object.is(segment, queryKey[index]));
 }
 
-async function runWithRetry<TData>(queryFn: () => Promise<TData>, retry: number): Promise<TData> {
+async function runWithRetry<TData>(
+  queryFn: () => Promise<TData>,
+  retry: number,
+  signal: AbortSignal,
+  retryDelay?: (attempt: number, error: unknown) => number,
+): Promise<TData> {
   let attempt = 0;
+  const generation = getAuthGeneration();
 
   while (true) {
+    if (signal.aborted || getAuthGeneration() !== generation) throw new RequestCanceledError();
     try {
       return await queryFn();
     } catch (error) {
-      if (isRequestCanceledError(error) || attempt >= retry) {
+      if (isRequestCanceledError(error) || (!retryDelay && error instanceof ApiError && error.status === 429) || attempt >= retry) {
         throw error;
       }
 
+      const delay = retryDelay?.(attempt, error) ?? 0;
+      if (delay > 0) await waitForReadRetry(delay, signal);
       attempt += 1;
     }
   }
 }
 
 export class QueryClient {
+  private mutationCount = 0;
+  private mutationListeners = new Set<() => void>();
+  getMutationCount = () => this.mutationCount;
+  subscribeMutations = (listener: () => void) => {
+    this.mutationListeners.add(listener);
+    return () => { this.mutationListeners.delete(listener); };
+  };
+  changeMutationCount(delta: number) {
+    this.mutationCount += delta;
+    this.mutationListeners.forEach(listener => listener());
+  }
   private listeners: Set<(event: QueryEvent) => void> = new Set();
   private bumps: Map<string, number> = new Map();
   private records: Map<string, CacheRecord> = new Map();
@@ -163,17 +192,29 @@ export class QueryClient {
   }
 
   invalidateQueries(filters: QueryFilters): void {
+    const exactKey = filters.exact && filters.queryKey ? hashQueryKey(filters.queryKey) : undefined;
     const matchingKeys = [...this.records.entries()]
-      .filter(([, record]) => isQueryKeyPrefix(filters.queryKey, record.queryKey))
+      .filter(([key, record]) => (exactKey === undefined ? isQueryKeyPrefix(filters.queryKey, record.queryKey) : key === exactKey) &&
+        (!filters.predicate || filters.predicate(record)))
       .map(([key]) => key);
 
-    if (matchingKeys.length === 0 && filters.queryKey) {
+    if (matchingKeys.length === 0 && filters.queryKey && !filters.predicate) {
       const fallbackKey = hashQueryKey(filters.queryKey);
       this.ensureRecord(filters.queryKey);
       matchingKeys.push(fallbackKey);
     }
 
     matchingKeys.forEach((key) => {
+      const record = this.records.get(key);
+      if (record) {
+        record.updatedAt = 0;
+        if (record.promise) {
+          if (filters.refetchType === "none") record.staleOnSettle = true;
+          else record.invalidatedWhileFetching = true;
+        }
+      }
+
+      if (filters.refetchType === "none") return;
       this.bumps.set(key, this.getBump(key) + 1);
       this.listeners.forEach((listener) => listener({ type: "invalidate", key }));
     });
@@ -185,6 +226,7 @@ export class QueryClient {
 
     record.data = data;
     record.updatedAt = Date.now();
+    record.dataRevision = (record.dataRevision ?? 0) + 1;
 
     this.listeners.forEach((listener) => listener({ type: "setData", key, data }));
   }
@@ -217,13 +259,23 @@ export class QueryClient {
 
     const controller = new AbortController();
     const retry = Math.max(0, options.retry ?? this.defaults?.queries?.retry ?? 0);
+    record.invalidatedWhileFetching = false;
+    record.staleOnSettle = false;
+    const dataRevision = record.dataRevision;
 
     const promise = runWithRetry(
       () => queryFn({ signal: controller.signal }),
       retry,
+      controller.signal,
+      this.defaults?.queries?.retryDelay,
     )
       .then((data) => {
-        this.setQueryData(queryKey, data);
+        const activeRecord = this.records.get(key);
+
+        if (activeRecord?.promise === promise && !activeRecord.invalidatedWhileFetching && activeRecord.dataRevision === dataRevision) {
+          this.setQueryData(queryKey, data);
+        }
+
         return data;
       })
       .finally(() => {
@@ -233,8 +285,18 @@ export class QueryClient {
           return;
         }
 
+        const shouldRefetch = activeRecord.invalidatedWhileFetching;
+        if (activeRecord.staleOnSettle) activeRecord.updatedAt = 0;
         activeRecord.promise = undefined;
         activeRecord.controller = undefined;
+        activeRecord.invalidatedWhileFetching = false;
+        activeRecord.staleOnSettle = false;
+
+        if (shouldRefetch) {
+          activeRecord.updatedAt = 0;
+          this.bumps.set(key, this.getBump(key) + 1);
+          this.listeners.forEach((listener) => listener({ type: "invalidate", key }));
+        }
       });
 
     record.promise = promise;
@@ -250,10 +312,15 @@ export class QueryClient {
       return;
     }
 
-    const controller = record.controller;
-    record.promise = undefined;
-    record.controller = undefined;
-    controller?.abort();
+    record.invalidatedWhileFetching = true;
+    record.controller?.abort();
+  }
+
+  clear(): void {
+    const records = [...this.records.values()];
+    this.records.clear();
+    this.bumps.clear();
+    records.forEach(record => record.controller?.abort());
   }
 }
 
@@ -330,9 +397,9 @@ export function useQuery<TData>(options: QueryOptions<TData>) {
   }, [client, keyString]);
 
   useEffect(() => {
-    client.trackQuery(options.queryKey);
+    client.trackQuery(queryKeyRef.current);
 
-    const snapshot = client.getQueryState<TData>(options.queryKey);
+    const snapshot = client.getQueryState<TData>(queryKeyRef.current);
     setData(snapshot.data);
     setError(null);
     setIsFetching(false);
@@ -344,7 +411,7 @@ export function useQuery<TData>(options: QueryOptions<TData>) {
     }
 
     setIsLoading(snapshot.data === undefined);
-  }, [client, keyString, options.enabled, options.queryKey]);
+  }, [client, keyString, options.enabled]);
 
   useEffect(() => {
     if (options.enabled === false) {
@@ -396,12 +463,19 @@ export function useQuery<TData>(options: QueryOptions<TData>) {
     };
   }, [bump, client, keyString, options.cancelOnUnmount, options.enabled, retry, staleTime]);
 
+  const refetchWithSignal = useCallback((signal: AbortSignal) => {
+    signal.throwIfAborted();
+    return client.fetchQuery(queryKeyRef.current, ({ signal: querySignal }) =>
+      queryFnRef.current({ signal: AbortSignal.any([querySignal, signal]) }), { retry: 0 });
+  }, [client]);
+
   return {
     data,
     error,
     isLoading,
     isFetching,
     isError: Boolean(error),
+    refetchWithSignal,
   };
 }
 
@@ -413,10 +487,16 @@ export function useMutation<TData, TVariables>(options: MutationOptions<TData, T
   const mutate = useCallback(
     (variables: TVariables, callbacks?: { onSuccess?: (data: TData) => void; onError?: (error: unknown) => void }) => {
       setIsPending(true);
+      client.changeMutationCount(1);
       setError(null);
 
-      options
-        .mutationFn(variables)
+      let mutation: Promise<TData>;
+      try {
+        mutation = options.mutationFn(variables);
+      } catch (reason) {
+        mutation = Promise.reject(reason);
+      }
+      mutation
         .then((data) => {
           options.onSuccess?.(data, variables);
           callbacks?.onSuccess?.(data);
@@ -427,10 +507,15 @@ export function useMutation<TData, TVariables>(options: MutationOptions<TData, T
           callbacks?.onError?.(reason);
           client.mutationCache?.config.onError?.(reason, variables, null, { options: { mutationKey: options.mutationKey } });
         })
-        .finally(() => setIsPending(false));
+        .finally(() => { client.changeMutationCount(-1); setIsPending(false); });
     },
     [client, options],
   );
 
   return { mutate, isPending, error };
+}
+
+export function useIsMutating() {
+  const client = useQueryClient();
+  return useSyncExternalStore(client.subscribeMutations, client.getMutationCount, client.getMutationCount);
 }

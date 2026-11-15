@@ -27,4 +27,41 @@ public class ScheduleEmployeeRepository : GenericRepository<ScheduleEmployeeMode
             .ThenBy(scheduleEmployee => scheduleEmployee.EmployeeId)
             .ToListAsync(ct)
             .ConfigureAwait(false);
+
+    /// <inheritdoc />
+    public async Task ReplaceForScheduleAsync(int scheduleId, IEnumerable<ScheduleEmployeeModel> employees, CancellationToken ct = default)
+    {
+        var employeeList = employees?.ToList() ?? [];
+        foreach (var employee in employeeList)
+        {
+            employee.Id = 0;
+            employee.ScheduleId = scheduleId;
+        }
+
+        await using var transaction = await _db.Database.BeginTransactionAsync(ct).ConfigureAwait(false);
+        await _set
+            .Where(employee => employee.ScheduleId == scheduleId)
+            .ExecuteDeleteAsync(ct)
+            .ConfigureAwait(false);
+
+        if (employeeList.Count > 0)
+        {
+            await _set.AddRangeAsync(employeeList, ct).ConfigureAwait(false);
+        }
+
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        await transaction.CommitAsync(ct).ConfigureAwait(false);
+        _db.ChangeTracker.Clear();
+    }
+
+    /// <inheritdoc />
+    public Task<bool> ExistsForScheduleAsync(int scheduleId, int employeeId, int? excludeId = null, CancellationToken ct = default)
+        => _set
+            .AsNoTracking()
+            .AnyAsync(
+                employee =>
+                    employee.ScheduleId == scheduleId &&
+                    employee.EmployeeId == employeeId &&
+                    (!excludeId.HasValue || employee.Id != excludeId.Value),
+                ct);
 }

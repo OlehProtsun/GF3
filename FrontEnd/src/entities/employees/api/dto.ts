@@ -1,14 +1,24 @@
+import type { EmploymentContractType } from "../model/types";
+
 export type EmployeeDto = {
+  contractType?: EmploymentContractType;
   id: number;
   firstName: string;
   lastName: string;
   phone?: string | null;
   email?: string | null;
+  username?: string | null;
+  hasLoginAccount: boolean;
+  isOnline: boolean;
+  lastLoginAtUtc?: string | null;
 };
 
 export type SaveEmployeeDto = {
+  contractType?: EmploymentContractType;
   firstName: string;
   lastName: string;
   phone?: string;
   email?: string;
+  username?: string;
+  password?: string;
 };

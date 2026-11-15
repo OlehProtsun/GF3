@@ -1,0 +1,18 @@
+/* Palette/font: src/index.css and employee workspace CSS; card radius: CardSection.
+   docs/design-system.json is reference metadata, never runtime configuration. */
+#promo-root {
+  --promo-blue: #2563eb;
+  --promo-ink: #0f172a;
+  --promo-muted: #64748b;
+  --promo-page: #f3f4f6;
+  --promo-surface: #fff;
+  --promo-line: #e2e8f0;
+  --promo-radius: 30px;
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  color: var(--promo-ink);
+  background: var(--promo-page);
+}
+html:has(#promo-root), body:has(#promo-root) { margin: 0; }
+#promo-root *, #promo-root *::before, #promo-root *::after { box-sizing: border-box; }
+#promo-root button, #promo-root input { font: inherit; }
+#promo-root button { cursor: pointer; }

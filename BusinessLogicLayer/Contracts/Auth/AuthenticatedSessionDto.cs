@@ -1,0 +1,25 @@
+namespace BusinessLogicLayer.Contracts.Auth;
+
+/// <summary>
+/// Authenticated session returned after a successful login or session lookup.
+/// </summary>
+public sealed class AuthenticatedSessionDto
+{
+    public string? WorkspaceMode { get; set; }
+
+    public bool IsSystemManager { get; set; }
+
+    public string Role { get; set; } = string.Empty;
+
+    public string UserName { get; set; } = string.Empty;
+
+    public string DisplayName { get; set; } = string.Empty;
+
+    public int? ManagerId { get; set; }
+
+    public int? EmployeeId { get; set; }
+
+    public int? SessionVersion { get; set; }
+
+    public long? CredentialVersion { get; set; }
+}

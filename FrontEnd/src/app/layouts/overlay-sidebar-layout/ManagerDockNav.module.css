@@ -1,0 +1,78 @@
+.rail {
+  --dock-scale-range: .2;
+  --dock-neighbor-push: 4px;
+  --dock-face-offset: 2px;
+  position: fixed;
+  left: calc(14px + env(safe-area-inset-left));
+  top: calc(14px + env(safe-area-inset-top));
+  bottom: calc(14px + env(safe-area-inset-bottom));
+  width: 86px;
+  box-sizing: border-box;
+  border: 1px solid rgba(0,0,0,.08);
+  border-radius: 28px;
+  background: rgba(242,243,245,.94);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  box-shadow: inset 1px 1px 2px #ffffffb3, 0 10px 30px rgba(0,0,0,.08);
+  display: flex;
+  flex-direction: column;
+  overflow: visible;
+  z-index: 1000;
+  isolation: isolate;
+  transform: translate3d(0, 0, 0);
+  transition: transform 320ms cubic-bezier(.2,.8,.2,1), visibility 320ms;
+  will-change: transform;
+}
+.rail::before, .rail::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: -1; }
+.rail::before { background: linear-gradient(120deg, #ffffff78, transparent 36%, transparent 70%, #ffffff45); }
+.rail::after { background: radial-gradient(ellipse 65px 110px at 20% var(--dock-glow-y, 50%), #fff9, transparent); }
+.navScroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 28px 24px; margin-inline: -24px; scroll-padding-block: 28px; scrollbar-width: none; transition: padding 320ms cubic-bezier(.2,.8,.2,1); }
+.navScroll::-webkit-scrollbar { display: none; }
+.navGroup { display: flex; flex-direction: column; align-items: center; gap: 12px; transition: gap 320ms cubic-bezier(.2,.8,.2,1); }
+.navItem { display: flex; flex-direction: column; align-items: center; }
+.navLabel { display: grid; grid-template-rows: 1fr; margin-top: 8px; max-width: 80px; overflow-wrap: anywhere; text-align: center; font-size: 11px; line-height: 1.1; font-weight: 600; color: rgba(0,0,0,.78); pointer-events: none; transition: grid-template-rows 320ms cubic-bezier(.2,.8,.2,1), margin-top 320ms cubic-bezier(.2,.8,.2,1), opacity 180ms ease, visibility 180ms; }
+.navLabel > span { min-height: 0; overflow: hidden; }
+.dockLink { position: relative; width: 56px; height: 56px; display: grid; place-items: center; border-radius: 18px; text-decoration: none; outline-offset: 4px; transition: width 320ms cubic-bezier(.2,.8,.2,1), height 320ms cubic-bezier(.2,.8,.2,1); }
+.dockLink:focus-visible { outline: 2px solid #334567; z-index: 3; }
+.dockLink:hover { z-index: 2; }
+.dockFace { width: 100%; height: 100%; position: relative; display: block; transform-origin: center; pointer-events: none; }
+.dockFaceInner { width: 100%; height: 100%; box-sizing: border-box; position: relative; display: grid; place-items: center; overflow: hidden; border: 1px solid rgba(0,0,0,.08); border-radius: 18px; color: rgba(0,0,0,.85);
+  background: linear-gradient(140deg, #ffffffd9, #ffffffb8);
+  box-shadow: inset 1px 1px 2px #fff, inset -1px -2px 2px #39425508, 0 4px 10px #00000008; transition: transform 100ms ease, box-shadow 200ms ease, border-color 200ms ease;
+}
+.dockFaceInner::after { content: ""; position: absolute; inset: -80%; background: linear-gradient(110deg, transparent 35%, #ffffffc4 48%, transparent 60%); transform: translateX(-100%) rotate(-20deg); }
+.dockLink:hover .dockFaceInner::after, .dockLink:focus-visible .dockFaceInner::after { animation: sheen 550ms ease-out; }
+.dockLink:hover .dockFaceInner { box-shadow: inset 1px 1px 3px #fff, inset -1px -2px 2px #3942550d, 0 6px 16px #00000012; }
+.dockLink:active .dockFaceInner { transform: scale(.96); }
+.dockLinkActive .dockFaceInner { border-color: rgba(59,130,246,.7); box-shadow: inset 1px 1px 2px #fff, 0 0 0 2px rgba(59,130,246,.2), 0 4px 10px #00000008; }
+.dockIcon { display: grid; place-items: center; }
+.dockIcon img { width: 38px; height: 38px; object-fit: contain; }
+.dockIcon svg { display: block; }
+.badge { position: absolute; top: -3px; right: -2px; min-width: 21px; height: 21px; padding: 0 3px; box-sizing: border-box; border: 1px solid #fff9; border-radius: 999px; background: #d93e48; color: #fff; font: 700 11px/19px system-ui, sans-serif; text-align: center; box-shadow: 0 2px 4px #80273340; pointer-events: none; animation: badgePop 180ms ease-out; }
+.profileFooter { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; padding: 18px 0 12px; border-top: 1px solid rgba(0,0,0,.08); background: linear-gradient(to top, #ffffff8c, #ffffff00); border-radius: 0 0 28px 28px; }
+.collapseControl { width: 64px; display: grid; grid-template-rows: 1fr; margin-top: 32px; transition: grid-template-rows 320ms cubic-bezier(.2,.8,.2,1), margin-top 320ms cubic-bezier(.2,.8,.2,1), opacity 180ms ease, visibility 180ms; }
+.collapseControl > div { min-height: 0; overflow: visible; display: grid; place-items: center; }
+.collapseButton { flex-shrink: 0; }
+.collapseButton:focus-visible { outline: 2px solid #334567; outline-offset: -4px; }
+.reopenButton { width: 56px; }
+.divider { width: 44px; height: 1px; background: #00000014; margin: 2px auto 12px; }
+.rail[data-collapsed="true"] { transform: translate3d(0, calc(-100% - 14px - env(safe-area-inset-top) - 64px), 0); visibility: hidden; pointer-events: none; }
+.tooltip, .toast { position: fixed; z-index: 1200; transform: translateY(-50%); box-sizing: border-box; padding: 10px 14px; border: 1px solid #fff; border-radius: 14px; background: rgba(255,251,248,.94); color: #3b3335; box-shadow: 0 8px 24px #49353324; pointer-events: none; font-size: 12px; line-height: 1.4; overflow-wrap: anywhere; animation: overlayEnter 180ms ease-out; }
+.tooltip::before, .toast::before { content: ""; position: absolute; left: -5px; top: calc(50% - 5px); width: 9px; height: 9px; background: #fffbf8; transform: rotate(45deg); border-left: 1px solid white; border-bottom: 1px solid white; }
+.tooltip span { display: block; margin-top: 3px; color: #76555b; font-size: 11px; }
+.toast { border-color: #f1c8c0; animation: toastEnter 200ms ease-out; }
+.srOnly { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+@keyframes sheen { to { transform: translateX(100%) rotate(-20deg); } }
+@keyframes badgePop { from { scale: .85; } to { scale: 1; } }
+@keyframes overlayEnter { from { opacity: 0; translate: -4px 0; } to { opacity: 1; translate: 0 0; } }
+@keyframes toastEnter { from { opacity: 0; translate: 10px 5px; } to { opacity: 1; translate: 0 0; } }
+@supports not (backdrop-filter: blur(1px)) { .rail { background: #f2f3f5; } }
+@media (prefers-reduced-motion: reduce) {
+  .rail, .navScroll, .navGroup, .dockLink, .navLabel, .collapseControl, .collapseButton, .reopenButton { transition: none; }
+}
+@media (prefers-reduced-motion: reduce), (hover: none) {
+  .rail::after { background: none; }
+  .dockFaceInner, .tooltip, .toast, .badge { animation: none; transition: none; }
+  .dockFaceInner::after { display: none; }
+  .dockLink:active .dockFaceInner { transform: none; }
+}

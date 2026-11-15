@@ -1,0 +1,54 @@
+.layout { --shell-max-width: 430px; --manager-phone-top-inset: calc(10px + env(safe-area-inset-top, 0px)); min-height: 100vh; min-height: 100dvh; background: var(--app-page-background, #f3f4f6); color: var(--text-primary, #0f172a); }
+/* Keep the document as the sticky scroll container. */
+:global(body):has(.layout) { overflow-x: visible; overflow-x: clip; }
+.shell { box-sizing: border-box; width: min(100%, var(--shell-max-width)); min-width: 0; margin: 0 auto; padding: var(--manager-phone-top-inset) clamp(14px, 3.6vw, 28px) calc(90px + env(safe-area-inset-bottom, 0px)); }
+.content { min-width: 0; padding: 0; margin: 0; overflow-wrap: anywhere; }
+.content > * { min-width: 0; max-width: 100%; }
+.shellCollapsed { padding-bottom: calc(66px + env(safe-area-inset-bottom, 0px)); }
+.nav {
+  composes: mobileTabs from "../employee-workspace-layout/EmployeeWorkspaceLayout.module.css";
+}
+.navExpanded {
+  composes: mobileTabsExpanded from "../employee-workspace-layout/EmployeeWorkspaceLayout.module.css";
+}
+.navCollapsed {
+  composes: mobileTabsCollapsed from "../employee-workspace-layout/EmployeeWorkspaceLayout.module.css";
+}
+.tab {
+  composes: mobileTab from "../employee-workspace-layout/EmployeeWorkspaceLayout.module.css";
+}
+.active {
+  composes: mobileTabActive from "../employee-workspace-layout/EmployeeWorkspaceLayout.module.css";
+}
+.tabIcon {
+  composes: tabIcon from "../employee-workspace-layout/EmployeeWorkspaceLayout.module.css";
+}
+.tabLabel {
+  composes: mobileTabLabel from "../employee-workspace-layout/EmployeeWorkspaceLayout.module.css";
+}
+.collapseButton {
+  composes: mobileToggleButton from "../employee-workspace-layout/EmployeeWorkspaceLayout.module.css";
+}
+.openButton {
+  composes: mobileOpenTab from "../employee-workspace-layout/EmployeeWorkspaceLayout.module.css";
+}
+.openVisible {
+  composes: mobileOpenTabVisible from "../employee-workspace-layout/EmployeeWorkspaceLayout.module.css";
+}
+.openHidden {
+  composes: mobileOpenTabHidden from "../employee-workspace-layout/EmployeeWorkspaceLayout.module.css";
+}
+.controlIcon {
+  composes: controlIcon from "../employee-workspace-layout/EmployeeWorkspaceLayout.module.css";
+}
+.controlIconExpand {
+  composes: controlIconExpand from "../employee-workspace-layout/EmployeeWorkspaceLayout.module.css";
+}
+@media (min-width: 431px) {
+  .shell { padding-left: 15px; padding-right: 15px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .layout :is(.nav, .tab, .tabIcon, .tabLabel, .collapseButton, .openButton) { transition: none; }
+}
+.homeIcon { transform: scaleY(-1); transform-origin: center; }
+@supports not ((backdrop-filter: blur(20px)) or (-webkit-backdrop-filter: blur(20px))) { .nav { background: #f1f5f9; } }

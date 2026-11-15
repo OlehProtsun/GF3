@@ -1,0 +1,46 @@
+.picker { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; gap: 12px; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.picker > h2, .picker > p, .info, .period, .footer { flex-shrink: 0; }
+.picker h2, .picker p { margin: 0; }
+.picker > p { overflow-wrap: anywhere; color: #66758c; font-size: 14px; line-height: 1.45; }
+.handle { position: absolute; top: 12px; left: calc(50% - 22px); width: 44px; height: 5px; border-radius: 5px; background: #cbd0da; }
+.list { display: flex; flex-direction: column; gap: 10px; padding: 2px; }
+.picker .row { position: relative; flex: none; display: grid; grid-template-columns: minmax(0, 1fr) 24px; gap: 5px 10px; min-height: 66px; padding: 10px 12px; text-align: left; border-radius: 14px; }
+.row > span:first-child { color: #66758c; font-size: 13px; }
+.row strong { grid-column: 1; font-size: 17px; font-weight: 600; color: #101a30; overflow-wrap: anywhere; }
+.row small { grid-column: 1 / -1; font-size: 12px; line-height: 1.4; overflow-wrap: anywhere; }
+.radio { box-sizing: border-box; grid-column: 2; grid-row: 1 / 3; align-self: center; position: relative; width: 24px; height: 24px; border: 1.5px solid #9aa6b8; border-radius: 50%; }
+.picker .row[aria-checked="true"] { border-color: #2f6df5; background: #f1f6ff; }
+.row[aria-checked="true"] .radio { border: 7px solid #246bff; background: white; }
+.picker .row:disabled { opacity: 1; background: #f7f8fa; color: #7b879b; }
+.row:disabled strong, .row:disabled > span:first-child { color: #7b879b; }
+.row:disabled .radio::after { content: ""; position: absolute; width: 23px; height: 1.5px; background: #9aa6b8; left: 0; top: 11px; transform: rotate(45deg); }
+.info { display: flex; align-items: flex-start; gap: 8px; padding: 10px; border-radius: 12px; background: #f0f4fa; color: #66758c; }
+.info > span { color: #3464cf; font-size: 18px; }
+.info p { font-size: 12px; line-height: 1.4; }
+.period { flex: 0 0 auto; align-self: stretch; box-sizing: border-box; width: 100%; min-width: 0; padding: 0; margin: 0; display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: 10px; }
+.period h3 { width: 100%; min-width: 0; margin: 0; padding: 0; font-size: 16px; font-weight: 600; line-height: 1.3; }
+.modes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; padding: 3px; background: #f0f3f8; border-radius: 12px; gap: 4px; }
+.picker .modes button { align-self: start; width: 100%; min-width: 0; min-height: 44px; height: auto; line-height: 1.3; padding: 6px; border: 0; background: transparent; font-size: 13px; border-radius: 9px; }
+.picker .modes [aria-pressed="true"] { background: white; color: #246bff; box-shadow: 0 1px 4px #23344e14; }
+/* Each time editor keeps three 44px targets in a deliberate grid. */
+.controls { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; padding: 10px; border: 1px solid #e5eaf1; border-radius: 14px; background: #f7f9fc; }
+.date { grid-column: 1 / -1; font-size: 13px; font-weight: 600; }
+.controls label { display: grid; min-width: 0; gap: 6px; font-size: 13px; color: #66758c; }
+.time { display: grid; grid-template-columns: 44px minmax(0, 1fr) 44px; align-items: center; min-width: 0; background: white; border: 1px solid #e5eaf1; border-radius: 10px; }
+.picker .time button { flex: none; width: 44px; padding: 0; border: 0; border-radius: 10px; font-size: 20px; }
+.time input { width: 100%; min-width: 0; min-height: 44px; box-sizing: border-box; padding: 2px; border: 0; background: transparent; color: #101a30; font: inherit; font-size: 16px; }
+.summary { display: flex; align-items: center; gap: 12px; padding: 12px; border: 1px solid #e5eaf1; border-radius: 14px; background: #f7f9fc; }
+.summary svg { flex: none; width: 28px; height: 28px; color: #66758c; }
+.summary > div { display: grid; gap: 4px; min-width: 0; overflow-wrap: anywhere; }
+.summary strong { font-size: 16px; color: #101a30; }
+.summary span { font-size: 13px; color: #66758c; }
+.footer { padding: 12px 0 max(12px, env(safe-area-inset-bottom, 0px)); border-top: 1px solid #edf0f5; background: #fffffff5; }
+.footer .confirm { width: 100%; height: 48px; border-color: #2f6df5; background: #2f6df5; color: white; font-size: 16px; font-weight: 600; }
+@media (max-height: 720px) { .picker { gap: 10px; } .picker > p { font-size: 13px; } .period, .controls { gap: 8px; } }
+
+@media (min-width: 375px) {
+  .controls { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .time { grid-template-columns: repeat(2, minmax(44px, 1fr)); }
+  .time input { grid-column: 1 / -1; grid-row: 1; text-align: center; }
+  .time button { justify-self: center; }
+}

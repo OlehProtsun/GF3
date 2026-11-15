@@ -1,4 +1,5 @@
 .overlay {
+  composes: overlay from "../../../shared/ui/ViewportOverlay.module.css";
   position: fixed;
   inset: 0;
   z-index: 1750;
@@ -11,8 +12,9 @@
 }
 
 .dialog {
+  composes: surface from "../../../shared/ui/ViewportOverlay.module.css";
   width: min(520px, calc(100vw - 20px));
-  max-height: calc(100vh - 36px);
+  max-height: calc(100dvh - 36px);
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
   gap: 14px;
@@ -137,7 +139,7 @@
 @media (max-width: 840px) {
   .dialog {
     width: min(100%, calc(100vw - 18px));
-    max-height: calc(100vh - 20px);
+    max-height: calc(100dvh - 20px);
     padding: 16px;
     border-radius: 24px;
   }

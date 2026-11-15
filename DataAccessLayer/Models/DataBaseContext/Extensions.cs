@@ -1,3 +1,4 @@
+using DataAccessLayer.Administration;
 using DataAccessLayer.Repositories;
 using DataAccessLayer.Repositories.Abstractions;
 using Microsoft.EntityFrameworkCore;
@@ -14,9 +15,16 @@ public static class Extensions
     /// Registers repositories and the EF Core <see cref="AppDbContext"/> for SQLite access.
     /// </summary>
     public static IServiceCollection AddDataAccess(this IServiceCollection serviceCollection, string connectionString)
+        => serviceCollection.AddDataAccess();
+
+    public static IServiceCollection AddDataAccess(this IServiceCollection serviceCollection)
     {
         serviceCollection.AddScoped<IContainerRepository, ContainerRepository>();
         serviceCollection.AddScoped<IEmployeeRepository, EmployeeRepository>();
+        serviceCollection.AddScoped<IEmployeeAccountRepository, EmployeeAccountRepository>();
+        serviceCollection.AddScoped<IManagerAccountRepository, ManagerAccountRepository>();
+        serviceCollection.AddScoped<ICommunicationRepository, CommunicationRepository>();
+        serviceCollection.AddScoped<IRegulationRepository, RegulationRepository>();
         serviceCollection.AddScoped<IShopRepository, ShopRepository>();
         serviceCollection.AddScoped<IScheduleRepository, ScheduleRepository>();
         serviceCollection.AddScoped<ISchedulePresetRepository, SchedulePresetRepository>();
@@ -27,10 +35,12 @@ public static class Extensions
         serviceCollection.AddScoped<IAvailabilityGroupRepository, AvailabilityGroupRepository>();
         serviceCollection.AddScoped<IAvailabilityGroupMemberRepository, AvailabilityGroupMemberRepository>();
         serviceCollection.AddScoped<IAvailabilityGroupDayRepository, AvailabilityGroupDayRepository>();
+        serviceCollection.AddScoped<IAvailabilityGroupTransferRepository, AvailabilityGroupTransferRepository>();
 
-        serviceCollection.AddDbContext<AppDbContext>(options =>
+        serviceCollection.AddDbContext<AppDbContext>((serviceProvider, options) =>
         {
-            options.UseSqlite(connectionString);
+            var workspace = serviceProvider.GetRequiredService<ISqliteDatabaseWorkspace>();
+            options.UseSqlite(workspace.ConnectionString);
         });
 
         return serviceCollection;

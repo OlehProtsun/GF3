@@ -33,6 +33,8 @@ public sealed class GenerateGraphPreviewRequest
 /// </summary>
 public sealed class GenerateGraphPreviewEmployeeRequest
 {
+    public bool IsPriority { get; set; }
+
     /// <summary>
     /// Employee that should participate in preview generation.
     /// </summary>

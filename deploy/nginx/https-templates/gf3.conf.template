@@ -1,0 +1,234 @@
+limit_req_zone $binary_remote_addr zone=gf3_api:10m rate=10r/s;
+limit_req_zone $binary_remote_addr zone=gf3_site:10m rate=30r/s;
+
+server_tokens off;
+# Nginx request diagnostics at lower levels can contain the original URL.
+error_log /dev/stderr crit;
+
+# Decoded request paths can contain arbitrary bytes. Keep both log sinks valid UTF-8 JSON.
+map $uri $gf3_log_path {
+    default "<invalid-utf8>";
+    "~^(?:[\x00-\x7f]|[\xc2-\xdf][\x80-\xbf]|\xe0[\xa0-\xbf][\x80-\xbf]|[\xe1-\xec\xee-\xef][\x80-\xbf]{2}|\xed[\x80-\x9f][\x80-\xbf]|\xf0[\x90-\xbf][\x80-\xbf]{2}|[\xf1-\xf3][\x80-\xbf]{3}|\xf4[\x80-\x8f][\x80-\xbf]{2})*$" $uri;
+}
+
+map $status $gf3_log_status {
+    default 0;
+    ~^[1-5][0-9][0-9]$ $status;
+}
+
+log_format gf3_security escape=json
+    '{"ts":"$time_iso8601","ip":"$remote_addr","method":"$request_method","path":"$gf3_log_path",'
+    '"status":$gf3_log_status,"probe":$gf3_sensitive_probe,"vhost":"$server_name","request_time":$request_time}';
+
+# Check the configured name, the request authority and the actual Host header.
+map "${GF3_SERVER_NAME}:$host:$http_host" $gf3_known_host {
+    default 0;
+    "~*^(localhost|(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?[.])+[a-z](?:[a-z0-9-]{0,61}[a-z0-9])?):\1:\1[.]?(?::[0-9]{1,5})?$" 1;
+}
+
+map $request_method $gf3_method_allowed {
+    default 0;
+    ~^(?:GET|HEAD|POST|PUT|PATCH|DELETE|OPTIONS)$ 1;
+}
+
+# Stop at the first query delimiter in the original request.
+map $request_uri $gf3_raw_probe {
+    default 0;
+    "~*^[^?]*%(?:25)?00" 1;
+    "~*^[^?]*?(?:/|%(?:25)?2f)(?:[.]|%(?:25)?2e)(?:env(?=[.]|%(?:25)?2e|/|%(?:25)?2f|[?]|$)|(?:git|svn|hg|ssh|aws|npmrc|circleci|gitlab-ci(?:[.]|%(?:25)?2e)yml|htaccess)(?=/|%(?:25)?2f|[?]|$))" 1;
+    "~*^[^?]*?(?:/|%(?:25)?2f)(?:laradock|wp-admin|wp-content|wp-includes|vendor)(?=/|%(?:25)?2f|[?]|$)" 1;
+    "~*^[^?]*?(?:/|%(?:25)?2f)(?:adminer|(?:docker-compose|parameters|development)(?:[.]|%(?:25)?2e)yml|tsconfig(?:[.]|%(?:25)?2e)json|backup(?:[.]|%(?:25)?2e)(?:tar(?:[.]|%(?:25)?2e)gz|zip)|app(?:/|%(?:25)?2f)config(?:[.]|%(?:25)?2e)json)(?=/|%(?:25)?2f|[?]|$)" 1;
+    "~*^[^?]*?(?:[.]|%(?:25)?2e)(?:sql|php)(?=/|%(?:25)?2f|[?]|$)" 1;
+}
+
+# After Nginx decodes once, encoded letters and separators can still be present.
+map $uri $gf3_normalized_probe {
+    default 0;
+    ~*%00 1;
+    "~*(?:/|%2f)(?:[.]|%2e)(?:e|%[46]5)(?:n|%[46]e)(?:v|%[57]6)(?=[.]|%2e|/|%2f|$)" 1;
+    "~*(?:/|%2f)(?:[.]|%2e)(?:g|%[46]7)(?:i|%[46]9)(?:t|%[57]4)(?=/|%2f|$)" 1;
+    "~*(?:/|%2f)(?:[.]|%2e)(?:s|%[57]3)(?:v|%[57]6)(?:n|%[46]e)(?=/|%2f|$)" 1;
+    "~*(?:/|%2f)(?:[.]|%2e)(?:h|%[46]8)(?:g|%[46]7)(?=/|%2f|$)" 1;
+    "~*(?:/|%2f)(?:[.]|%2e)(?:s|%[57]3)(?:s|%[57]3)(?:h|%[46]8)(?=/|%2f|$)" 1;
+    "~*(?:/|%2f)(?:[.]|%2e)(?:a|%[46]1)(?:w|%[57]7)(?:s|%[57]3)(?=/|%2f|$)" 1;
+    "~*(?:/|%2f)(?:[.]|%2e)(?:n|%[46]e)(?:p|%[57]0)(?:m|%[46]d)(?:r|%[57]2)(?:c|%[46]3)(?=/|%2f|$)" 1;
+    "~*(?:/|%2f)(?:[.]|%2e)(?:c|%[46]3)(?:i|%[46]9)(?:r|%[57]2)(?:c|%[46]3)(?:l|%[46]c)(?:e|%[46]5)(?:c|%[46]3)(?:i|%[46]9)(?=/|%2f|$)" 1;
+    "~*(?:/|%2f)(?:[.]|%2e)(?:g|%[46]7)(?:i|%[46]9)(?:t|%[57]4)(?:l|%[46]c)(?:a|%[46]1)(?:b|%[46]2)(?:-|%2d)(?:c|%[46]3)(?:i|%[46]9)(?:[.]|%2e)(?:y|%[57]9)(?:m|%[46]d)(?:l|%[46]c)(?=/|%2f|$)" 1;
+    "~*(?:/|%2f)(?:[.]|%2e)(?:h|%[46]8)(?:t|%[57]4)(?:a|%[46]1)(?:c|%[46]3)(?:c|%[46]3)(?:e|%[46]5)(?:s|%[57]3)(?:s|%[57]3)(?=/|%2f|$)" 1;
+    "~*(?:/|%2f)(?:l|%[46]c)(?:a|%[46]1)(?:r|%[57]2)(?:a|%[46]1)(?:d|%[46]4)(?:o|%[46]f)(?:c|%[46]3)(?:k|%[46]b)(?=/|%2f|$)" 1;
+    "~*(?:/|%2f)(?:w|%[57]7)(?:p|%[57]0)(?:-|%2d)(?:a|%[46]1)(?:d|%[46]4)(?:m|%[46]d)(?:i|%[46]9)(?:n|%[46]e)(?=/|%2f|$)" 1;
+    "~*(?:/|%2f)(?:w|%[57]7)(?:p|%[57]0)(?:-|%2d)(?:c|%[46]3)(?:o|%[46]f)(?:n|%[46]e)(?:t|%[57]4)(?:e|%[46]5)(?:n|%[46]e)(?:t|%[57]4)(?=/|%2f|$)" 1;
+    "~*(?:/|%2f)(?:w|%[57]7)(?:p|%[57]0)(?:-|%2d)(?:i|%[46]9)(?:n|%[46]e)(?:c|%[46]3)(?:l|%[46]c)(?:u|%[57]5)(?:d|%[46]4)(?:e|%[46]5)(?:s|%[57]3)(?=/|%2f|$)" 1;
+    "~*(?:/|%2f)(?:v|%[57]6)(?:e|%[46]5)(?:n|%[46]e)(?:d|%[46]4)(?:o|%[46]f)(?:r|%[57]2)(?=/|%2f|$)" 1;
+    "~*(?:/|%2f)(?:a|%[46]1)(?:d|%[46]4)(?:m|%[46]d)(?:i|%[46]9)(?:n|%[46]e)(?:e|%[46]5)(?:r|%[57]2)(?=/|%2f|$)" 1;
+    "~*(?:/|%2f)(?:d|%[46]4)(?:o|%[46]f)(?:c|%[46]3)(?:k|%[46]b)(?:e|%[46]5)(?:r|%[57]2)(?:-|%2d)(?:c|%[46]3)(?:o|%[46]f)(?:m|%[46]d)(?:p|%[57]0)(?:o|%[46]f)(?:s|%[57]3)(?:e|%[46]5)(?:[.]|%2e)(?:y|%[57]9)(?:m|%[46]d)(?:l|%[46]c)(?=/|%2f|$)" 1;
+    "~*(?:/|%2f)(?:p|%[57]0)(?:a|%[46]1)(?:r|%[57]2)(?:a|%[46]1)(?:m|%[46]d)(?:e|%[46]5)(?:t|%[57]4)(?:e|%[46]5)(?:r|%[57]2)(?:s|%[57]3)(?:[.]|%2e)(?:y|%[57]9)(?:m|%[46]d)(?:l|%[46]c)(?=/|%2f|$)" 1;
+    "~*(?:/|%2f)(?:d|%[46]4)(?:e|%[46]5)(?:v|%[57]6)(?:e|%[46]5)(?:l|%[46]c)(?:o|%[46]f)(?:p|%[57]0)(?:m|%[46]d)(?:e|%[46]5)(?:n|%[46]e)(?:t|%[57]4)(?:[.]|%2e)(?:y|%[57]9)(?:m|%[46]d)(?:l|%[46]c)(?=/|%2f|$)" 1;
+    "~*(?:/|%2f)(?:t|%[57]4)(?:s|%[57]3)(?:c|%[46]3)(?:o|%[46]f)(?:n|%[46]e)(?:f|%[46]6)(?:i|%[46]9)(?:g|%[46]7)(?:[.]|%2e)(?:j|%[46]a)(?:s|%[57]3)(?:o|%[46]f)(?:n|%[46]e)(?=/|%2f|$)" 1;
+    "~*(?:/|%2f)(?:b|%[46]2)(?:a|%[46]1)(?:c|%[46]3)(?:k|%[46]b)(?:u|%[57]5)(?:p|%[57]0)(?:[.]|%2e)(?:t|%[57]4)(?:a|%[46]1)(?:r|%[57]2)(?:[.]|%2e)(?:g|%[46]7)(?:z|%[57]a)(?=/|%2f|$)" 1;
+    "~*(?:/|%2f)(?:b|%[46]2)(?:a|%[46]1)(?:c|%[46]3)(?:k|%[46]b)(?:u|%[57]5)(?:p|%[57]0)(?:[.]|%2e)(?:z|%[57]a)(?:i|%[46]9)(?:p|%[57]0)(?=/|%2f|$)" 1;
+    "~*(?:/|%2f)(?:a|%[46]1)(?:p|%[57]0)(?:p|%[57]0)(?:/|%2f)(?:c|%[46]3)(?:o|%[46]f)(?:n|%[46]e)(?:f|%[46]6)(?:i|%[46]9)(?:g|%[46]7)(?:[.]|%2e)(?:j|%[46]a)(?:s|%[57]3)(?:o|%[46]f)(?:n|%[46]e)(?=/|%2f|$)" 1;
+    "~*(?:[.]|%2e)(?:(?:s|%[57]3)(?:q|%[57]1)(?:l|%[46]c)|(?:p|%[57]0)(?:h|%[46]8)(?:p|%[57]0))(?=/|%2f|$)" 1;
+}
+
+map "$gf3_raw_probe:$gf3_normalized_probe" $gf3_sensitive_probe {
+    default 1;
+    "0:0" 0;
+}
+
+geo $gf3_bad_ip {
+    default 0;
+    include /etc/nginx/gf3-security/blocked-*.geo;
+}
+
+geo $gf3_allow_ip {
+    default 0;
+    include /etc/nginx/gf3-security/allow-*.geo;
+}
+
+map "$gf3_bad_ip:$gf3_allow_ip" $gf3_effective_deny {
+    default 0;
+    "1:0" 1;
+}
+
+map $http_upgrade $connection_upgrade {
+    default upgrade;
+    '' close;
+}
+
+upstream gf3_app {
+    server gf3-app:8080;
+    keepalive 32;
+}
+
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    server_name _;
+    access_log /dev/stdout gf3_security;
+    access_log /var/log/nginx/gf3-security/access.jsonl gf3_security;
+    return 444;
+}
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name ${GF3_SERVER_NAME};
+    access_log /dev/stdout gf3_security;
+    access_log /var/log/nginx/gf3-security/access.jsonl gf3_security;
+
+    if ($gf3_known_host = 0) { return 444; }
+    if ($gf3_sensitive_probe) { return 404; }
+    if ($gf3_method_allowed = 0) { return 405; }
+
+    add_header X-Content-Type-Options nosniff always;
+    add_header Referrer-Policy strict-origin-when-cross-origin always;
+    add_header X-Frame-Options DENY always;
+
+    location ^~ /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+        default_type text/plain;
+        limit_except GET { deny all; }
+        try_files $uri =404;
+    }
+
+    location / {
+        if ($gf3_effective_deny) { return 403; }
+        return 301 https://${GF3_SERVER_NAME}$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl default_server;
+    listen [::]:443 ssl default_server;
+    server_name _;
+    access_log /dev/stdout gf3_security;
+    access_log /var/log/nginx/gf3-security/access.jsonl gf3_security;
+    ssl_certificate /etc/nginx/certs/fullchain.pem;
+    ssl_certificate_key /etc/nginx/certs/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    return 444;
+}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
+    server_name ${GF3_SERVER_NAME};
+    access_log /dev/stdout gf3_security;
+    access_log /var/log/nginx/gf3-security/access.jsonl gf3_security;
+
+    if ($gf3_known_host = 0) { return 444; }
+    if ($gf3_sensitive_probe) { return 404; }
+    if ($gf3_effective_deny) { return 403; }
+    if ($gf3_method_allowed = 0) { return 405; }
+
+    ssl_certificate /etc/nginx/certs/fullchain.pem;
+    ssl_certificate_key /etc/nginx/certs/privkey.pem;
+    ssl_session_cache shared:GF3SSL:10m;
+    ssl_session_timeout 1d;
+    ssl_session_tickets off;
+    ssl_protocols TLSv1.2 TLSv1.3;
+
+    add_header X-Content-Type-Options nosniff always;
+    add_header Referrer-Policy strict-origin-when-cross-origin always;
+    add_header X-Frame-Options DENY always;
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+
+    client_max_body_size 10m;
+
+    location ^~ /api/ {
+        limit_req zone=gf3_api burst=60 nodelay;
+        limit_req_status 429;
+        error_page 429 = @gf3_rate_limited;
+
+        proxy_pass http://gf3_app;
+        proxy_http_version 1.1;
+
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-Proto https;
+
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
+        proxy_cache_bypass $http_upgrade;
+
+        proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
+    }
+
+    location @gf3_rate_limited {
+        default_type application/problem+json;
+        add_header X-Content-Type-Options nosniff always;
+        add_header Referrer-Policy strict-origin-when-cross-origin always;
+        add_header X-Frame-Options DENY always;
+        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+        add_header Retry-After 3 always;
+        add_header Cache-Control no-store always;
+        return 429 '{"title":"Too many requests","status":429}';
+    }
+
+    location / {
+        limit_req zone=gf3_site burst=120 nodelay;
+        limit_req_status 429;
+        error_page 429 = @gf3_rate_limited;
+
+        proxy_pass http://gf3_app;
+        proxy_http_version 1.1;
+
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-Proto https;
+
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
+        proxy_cache_bypass $http_upgrade;
+
+        proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
+    }
+}

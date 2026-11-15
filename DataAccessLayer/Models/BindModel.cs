@@ -8,6 +8,10 @@ public class BindModel
 {
     public int Id { get; set; }
 
+    public int? ManagerAccountId { get; set; }
+
+    public ManagerAccountModel? ManagerAccount { get; set; }
+
     /// <summary>
     /// Availability code inserted by the shortcut, for example <c>+</c>, <c>-</c>, or <c>HH:mm - HH:mm</c>.
     /// </summary>

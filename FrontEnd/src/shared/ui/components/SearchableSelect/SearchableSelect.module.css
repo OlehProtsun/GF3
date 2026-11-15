@@ -49,6 +49,25 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.72),
     0 10px 24px rgba(15, 23, 42, 0.05);
 }
+.selectButtonSummary {
+  min-height: 42px;
+  padding: 8px 12px;
+  border-radius: 16px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.82),
+    0 6px 14px rgba(15, 23, 42, 0.05);
+}
+
+.selectButtonSummary .selectButtonText {
+  gap: 0;
+}
+
+.selectButtonSummary .selectButtonLabel {
+  color: #1e3a8a;
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
 
 .selectButtonField .selectButtonText {
   gap: 0;
@@ -119,12 +138,16 @@
 }
 
 .dropdownPortal {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
   position: fixed;
   z-index: 1900;
 }
 
 .dropdown {
-  overflow: hidden;
+  min-height: 0;
+  overscroll-behavior: contain;
+  overflow: auto;
   border-radius: 24px;
   border: 1px solid rgba(113, 113, 122, 0.14);
   background:
@@ -243,4 +266,39 @@
   padding: 18px 14px;
   color: rgba(17, 24, 39, 0.56);
   text-align: center;
+}
+
+.dropdown {
+  animation: var(--motion-reveal) 160ms var(--motion-ease);
+}
+
+.selectButtonWithIcon {
+  gap: 8px;
+}
+
+.selectButtonWithIcon .selectButtonText {
+  flex: 1 1 0;
+}
+
+.selectButtonWithIcon .selectButtonLabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.leadingIcon {
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  border-radius: 9px;
+  background: #eff6ff;
+  color: #2563eb;
+}
+@media (prefers-reduced-motion: reduce) {
+  .dropdown { animation: none; }
+  .selectButton, .option, .selectChevron { transition: none; }
+  .selectButton:active:not(:disabled), .option:active { transform: none; }
 }

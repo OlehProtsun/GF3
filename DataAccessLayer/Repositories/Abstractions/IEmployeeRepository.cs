@@ -7,6 +7,10 @@ namespace DataAccessLayer.Repositories.Abstractions;
 /// </summary>
 public interface IEmployeeRepository : IBaseRepository<EmployeeModel>
 {
+    Task SoftDeleteAsync(int employeeId, CancellationToken ct = default);
+    Task<bool> UpdateActiveProfileAsync(EmployeeModel employee, CancellationToken ct = default);
+    Task<bool> UpdateActiveContactAsync(int employeeId, string? email, string? phone, CancellationToken ct = default);
+
     /// <summary>
     /// Searches employees across the fields exposed in the UI.
     /// </summary>

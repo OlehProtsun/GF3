@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 namespace DataAccessLayer.Repositories;
 
 /// <summary>
-/// Repository for schedule presets saved under a container.
+/// Repository for schedule presets with optional container provenance.
 /// Preset queries eagerly load employees because edit forms usually need the full assignment snapshot.
 /// </summary>
 public class SchedulePresetRepository : GenericRepository<SchedulePresetModel>, ISchedulePresetRepository
@@ -19,14 +19,6 @@ public class SchedulePresetRepository : GenericRepository<SchedulePresetModel>, 
     /// <inheritdoc />
     public override async Task<List<SchedulePresetModel>> GetAllAsync(CancellationToken ct = default)
         => await CreateDetailedQuery()
-            .OrderBy(preset => preset.Name)
-            .ToListAsync(ct)
-            .ConfigureAwait(false);
-
-    /// <inheritdoc />
-    public async Task<List<SchedulePresetModel>> GetByContainerAsync(int containerId, CancellationToken ct = default)
-        => await CreateDetailedQuery()
-            .Where(preset => preset.ContainerId == containerId)
             .OrderBy(preset => preset.Name)
             .ToListAsync(ct)
             .ConfigureAwait(false);

@@ -1,0 +1,13 @@
+.wrap, .compact { min-width: 0; }
+.button { min-height: 44px; width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 10px; border-radius: 16px; border: 1px solid #93c5fd; background: var(--card-background, #eff6ff); color: inherit; cursor: pointer; }
+.button small { display: block; font-size: .7rem; opacity: .7; }
+.button:focus-visible { outline: 3px solid #60a5fa; outline-offset: 2px; }
+.button:disabled { opacity: .5; cursor: wait; }
+.compact { width: 100%; font-size: .75rem; }
+.pcButton { min-height: 60px; gap: 12px; padding: 12px 18px; border-radius: 999px; background: #eff6ff; text-align: left; font-weight: 700; transition: background 180ms; }
+.pcButton small { margin-top: 4px; font-weight: 400; font-size: .8rem; }
+.pcButton:hover { background: #dbeafe; }
+.homeIcon { transform: scaleY(-1); transform-origin: center; flex-shrink: 0; }
+@media (prefers-reduced-motion: reduce) { .pcButton { transition: none; } }
+
+.compact button:disabled { opacity: .5; cursor: wait; }

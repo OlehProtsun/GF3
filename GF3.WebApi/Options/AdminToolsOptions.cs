@@ -6,9 +6,21 @@ namespace WebApi.Options;
 public sealed class AdminToolsOptions
 {
     /// <summary>
+    /// Additional developer password required by every admin database request.
+    /// </summary>
+    public string DeveloperPassword { get; set; } = string.Empty;
+
+    /// <summary>
     /// Enables or disables the admin database endpoints completely.
     /// </summary>
     public bool Enabled { get; set; }
+
+    /// <summary>
+    /// Allows admin database endpoints to be called from remote machines.
+    /// Keeping this disabled by default preserves the safer local-only posture unless the
+    /// launcher explicitly opts into LAN access.
+    /// </summary>
+    public bool AllowRemoteAccess { get; set; }
 
     /// <summary>
     /// Indicates whether write-oriented SQL operations are allowed.

@@ -1,0 +1,28 @@
+.content { flex: 1; display: flex; flex-direction: column; gap: 12px; min-width: 0; min-height: 0; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.content h2, .content p { margin: 0; }
+.content > h2, .description, .footer { flex-shrink: 0; }
+.handle { position: absolute; top: 16px; left: calc(50% - 22px); width: 44px; height: 5px; background: #cbd0da; border-radius: 5px; }
+.description { font-size: 14px; line-height: 1.45; color: #66758c; overflow-wrap: anywhere; }
+.scroll { display: grid; align-content: start; gap: 14px; padding: 2px; }
+.person { display: flex; align-items: center; gap: 12px; padding: 10px; border: 1px solid #e5eaf1; border-radius: 14px; background: #f7f9fc; }
+.person > span { flex: none; display: grid; place-items: center; width: 36px; height: 36px; background: #edf3ff; color: #2f6df5; border-radius: 50%; font-size: 13px; }
+.person strong { min-width: 0; font-size: 15px; overflow-wrap: anywhere; color: #101a30; }
+.options { display: grid; gap: 12px; }
+.options button { display: flex; align-items: flex-start; gap: 12px; padding: 12px; text-align: left; }
+.options button > span:last-child { display: grid; gap: 5px; min-width: 0; overflow-wrap: anywhere; }
+.options strong { font-size: 16px; color: #101a30; }
+.options small { font-size: 13px; line-height: 1.45; color: #66758c; }
+.options [aria-checked="true"] { border-color: #2f6df5; background: #f1f6ff; }
+.radio { flex: none; width: 24px; height: 24px; border: 1.5px solid #9aa6b8; border-radius: 50%; box-sizing: border-box; }
+[aria-checked="true"] > .radio { border: 7px solid #246bff; background: white; }
+.selection { display: grid; gap: 10px; }
+.selection h3 { color: #101a30; font-size: 16px; }
+.shiftCard { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; border: 1px solid #e5eaf1; border-radius: 14px; padding: 10px; }
+.shiftCard svg { width: 28px; height: 28px; flex: none; color: #66758c; }
+.shiftCard > div { display: grid; gap: 5px; flex: 1; min-width: 0; font-size: 13px; overflow-wrap: anywhere; }
+.shiftCard strong { color: #101a30; font-size: 14px; }
+.shiftCard span { color: #66758c; }
+.content .shiftCard button { padding: 8px 10px; color: #246bff; background: #e8f1ff; border: 0; font-size: 13px; }
+.selection p { font-size: 12px; color: #66758c; line-height: 1.45; }
+.footer { padding: 12px 0 max(12px, env(safe-area-inset-bottom, 0px)); border-top: 1px solid #edf0f5; background: #fffffff5; }
+.content .footer button { width: 100%; height: 48px; background: #2f6df5; color: white; border-color: #2f6df5; font-size: 16px; font-weight: 600; }

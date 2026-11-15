@@ -8,25 +8,48 @@ type CardSectionProps = {
   headerRightSlot?: ReactNode;
   children: ReactNode;
   className?: string;
+  headerClassName?: string;
+  titleClassName?: string;
+  headerRightClassName?: string;
   style?: CSSProperties;
   elementRef?: Ref<HTMLElement>;
 };
 
-export function CardSection({ icon, title, headerCenterSlot, headerRightSlot, children, className, style, elementRef }: CardSectionProps) {
+export function CardSection({
+  icon,
+  title,
+  headerCenterSlot,
+  headerRightSlot,
+  children,
+  className,
+  headerClassName,
+  titleClassName,
+  headerRightClassName,
+  style,
+  elementRef,
+}: CardSectionProps) {
   const cardClassName = className ? `${styles.card} ${className}` : styles.card;
-  const headerClassName = headerCenterSlot ? `${styles.sectionHeader} ${styles.sectionHeaderCentered}` : styles.sectionHeader;
+  const resolvedHeaderClassName = [
+    styles.sectionHeader,
+    headerCenterSlot ? styles.sectionHeaderCentered : "",
+    headerClassName ?? "",
+  ].filter(Boolean).join(" ");
+  const resolvedTitleClassName = titleClassName ? `${styles.sectionTitle} ${titleClassName}` : styles.sectionTitle;
+  const resolvedHeaderRightClassName = headerRightClassName
+    ? `${styles.headerRight} ${headerRightClassName}`
+    : styles.headerRight;
 
   return (
     <section ref={elementRef} className={cardClassName} style={style}>
       {icon || title || headerCenterSlot || headerRightSlot ? (
-        <div className={headerClassName}>
-          <div className={styles.sectionTitle}>
+        <div className={resolvedHeaderClassName}>
+          <div className={resolvedTitleClassName}>
             {icon}
             {title ? <span>{title}</span> : null}
           </div>
 
           {headerCenterSlot ? <div className={styles.headerCenter}>{headerCenterSlot}</div> : null}
-          {headerRightSlot ? <div className={styles.headerRight}>{headerRightSlot}</div> : null}
+          {headerRightSlot ? <div className={resolvedHeaderRightClassName}>{headerRightSlot}</div> : null}
         </div>
       ) : null}
 

@@ -3,6 +3,8 @@
   display: grid;
   gap: 12px;
   min-height: 0;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr);
   padding: 18px;
   border: 1px solid rgba(113, 113, 122, 0.14);
   border-radius: 30px;
@@ -12,6 +14,12 @@
   box-shadow: 0 16px 36px rgba(15, 23, 42, 0.08);
   text-align: left;
   align-content: start;
+}
+
+.tileCompact {
+  gap: 11px;
+  padding: 16px;
+  border-radius: 26px;
 }
 
 .tileWithCornerSlot {
@@ -59,34 +67,80 @@
 
 .head {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: flex-start;
   gap: 12px;
 }
 
+.tileCompact .head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  column-gap: 10px;
+  row-gap: 8px;
+}
+
 .headActions {
   display: inline-flex;
+  flex-wrap: wrap;
   align-items: flex-start;
+  justify-content: flex-end;
   gap: 8px;
   flex-shrink: 0;
+  max-width: 100%;
+  margin-left: auto;
+}
+
+.tileCompact .headActions {
+  grid-column: 2;
+  grid-row: 1;
+  justify-self: end;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 7px;
+  padding: 4px;
+  padding-left: 8px;
+  border-radius: 999px;
+  background: rgba(248, 250, 252, 0.9);
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.82);
 }
 
 .headerSlot {
   display: inline-flex;
   align-items: center;
+  max-width: 100%;
 }
 
 .titleWrap {
+  max-width: 100%;
   min-width: 0;
-  flex: 1;
+  flex: 1 1 160px;
+}
+
+.tileCompact .titleWrap {
+  grid-column: 1;
+  grid-row: 1;
+  padding-right: 6px;
 }
 
 .title {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 1.25rem;
   line-height: 1.15;
   font-weight: 900;
   letter-spacing: -0.03em;
   color: #111827;
+  overflow-wrap: anywhere;
+}
+
+.tileCompact .title {
+  font-size: 1.14rem;
+  line-height: 1.1;
 }
 
 .badge {
@@ -101,6 +155,13 @@
   color: #1d4ed8;
   font-size: 0.75rem;
   font-weight: 800;
+}
+
+.tileCompact .badge {
+  padding: 6px 10px;
+  border-color: rgba(37, 99, 235, 0.14);
+  background: rgba(219, 234, 254, 0.82);
+  font-size: 0.73rem;
 }
 
 .pinButton {
@@ -123,6 +184,12 @@
     color 0.2s ease;
 }
 
+.tileCompact .pinButton {
+  width: 30px;
+  height: 30px;
+  background: rgba(255, 255, 255, 0.92);
+}
+
 .pinButton:hover {
   transform: translateY(-1px);
   border-color: rgba(59, 130, 246, 0.22);
@@ -137,9 +204,12 @@
 }
 
 .pinButtonActive {
-  border-color: rgba(37, 99, 235, 0.24);
-  background: rgba(219, 234, 254, 0.92);
+  border-color: rgba(37, 99, 235, 0.32);
+  background: linear-gradient(180deg, rgba(191, 219, 254, 0.98), rgba(147, 197, 253, 0.92));
   color: #1d4ed8;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.82),
+    0 0 0 1px rgba(37, 99, 235, 0.04);
 }
 
 .pinIcon {
@@ -147,6 +217,8 @@
 }
 
 .description {
+  min-width: 0;
+  overflow-wrap: anywhere;
   color: rgba(17, 24, 39, 0.66);
   line-height: 1.55;
   display: -webkit-box;
@@ -163,10 +235,20 @@
   margin-top: 2px;
 }
 
+.metaRowStacked {
+  display: grid;
+  gap: 8px;
+}
+
+.tileCompact .metaRowStacked {
+  gap: 7px;
+}
+
 .metaItem {
   display: inline-flex;
   align-items: center;
   flex-wrap: wrap;
+  box-sizing: border-box;
   gap: 6px;
   padding: 5px 8px;
   border-radius: 12px;
@@ -175,6 +257,28 @@
   color: rgba(17, 24, 39, 0.66);
   font-size: 0.82rem;
   line-height: 1.4;
+  max-width: 100%;
+}
+
+.tileCompact .metaItem {
+  padding: 5px 10px;
+  border-radius: 13px;
+  border-color: rgba(148, 163, 184, 0.12);
+  background: rgba(248, 250, 252, 0.88);
+  font-size: 0.8rem;
+}
+
+.metaItemStacked {
+  display: grid;
+  box-sizing: border-box;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  width: 100%;
+  gap: 8px;
+}
+
+.tileCompact .metaItemStacked {
+  gap: 8px;
 }
 
 .metaLabel {
@@ -183,8 +287,17 @@
 }
 
 .metaValue {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: rgba(17, 24, 39, 0.72);
   word-break: break-word;
+  min-width: 0;
+}
+
+.metaItemStacked .metaValue {
+  overflow-wrap: anywhere;
 }
 
 .cornerSlot {

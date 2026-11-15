@@ -9,5 +9,5 @@ type RecordGridProps = {
 export function RecordGrid({ children, className }: RecordGridProps) {
   const gridClassName = [styles.grid, className ?? ""].filter(Boolean).join(" ");
 
-  return <div className={gridClassName}>{children}</div>;
+  return <div className={gridClassName} data-motion-list>{children}</div>;
 }

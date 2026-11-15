@@ -9,6 +9,7 @@ type AvailabilityWorkspaceLayoutProps = {
   sidebarContentClassName?: string;
   mainColumnClassName?: string;
   mainBlockClassName?: string;
+  preserveSideLayoutOnMobile?: boolean;
 };
 
 function joinClassNames(...values: Array<string | undefined>) {
@@ -23,9 +24,14 @@ export function AvailabilityWorkspaceLayout({
   sidebarContentClassName,
   mainColumnClassName,
   mainBlockClassName,
+  preserveSideLayoutOnMobile = false,
 }: AvailabilityWorkspaceLayoutProps) {
   return (
-    <div className={joinClassNames(styles.layout, className)}>
+    <div className={joinClassNames(
+      styles.layout,
+      preserveSideLayoutOnMobile ? styles.layoutPreserveSideLayout : undefined,
+      className,
+    )}>
       {sidebar ? (
         <div className={joinClassNames(styles.sidebarColumn, sidebarColumnClassName)}>
           <div className={joinClassNames(styles.sidebarContent, sidebarContentClassName)}>{sidebar}</div>

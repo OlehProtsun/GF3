@@ -150,7 +150,7 @@
   height: 24px;
   display: inline-flex;
   align-items: center;
-  padding: 6px; /* було 3px */
+  padding: 6px;
   border-radius: 999px;
   background: rgba(209, 213, 219, 0.92);
   transition: background-color 160ms ease;

@@ -11,9 +11,9 @@ public sealed class SchedulePresetDto
     public int Id { get; set; }
 
     /// <summary>
-    /// Container that owns the preset.
+    /// Optional originating container.
     /// </summary>
-    public int ContainerId { get; set; }
+    public int? ContainerId { get; set; }
 
     /// <summary>
     /// Human-readable preset name.

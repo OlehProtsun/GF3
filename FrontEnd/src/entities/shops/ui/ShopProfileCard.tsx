@@ -1,3 +1,4 @@
+import { t } from "@shared/i18n";
 import type { Shop } from "@entities/shops/model/types";
 import {
   getShopDetailsState,
@@ -11,6 +12,7 @@ import { type ProfileSummaryDetail } from "@shared/ui/components/ProfileSummaryC
 import { ShopIcon } from "@shared/ui/icons";
 
 type ShopProfileCardProps = {
+  showManagementActions?: boolean;
   shop?: Shop;
   isLoading: boolean;
   hasLoadError: boolean;
@@ -20,6 +22,7 @@ type ShopProfileCardProps = {
 };
 
 export function ShopProfileCard({
+  showManagementActions = true,
   shop,
   isLoading,
   hasLoadError,
@@ -27,7 +30,7 @@ export function ShopProfileCard({
   onEditShop,
   onDeleteShop,
 }: ShopProfileCardProps) {
-  const displayName = getShopDisplayName(shop, "Shop Profile");
+  const displayName = getShopDisplayName(shop, t("Shop Profile"));
   const initials = getShopInitials(shop);
   const detailsState = getShopDetailsState(shop);
   const details: ProfileSummaryDetail[] = shop
@@ -40,23 +43,23 @@ export function ShopProfileCard({
 
   return (
     <RecordProfileCard
-      sectionTitle="Shop Profile"
+      sectionTitle={t("Shop Profile")}
       icon={<ShopIcon size={18} style={{ transform: "scaleY(-1)" }} />}
       headerMeta={shop ? `ID ${shop.id}` : undefined}
       isLoading={isLoading}
       hasLoadError={hasLoadError}
-      loadingMessage="Loading shop details..."
-      errorMessage="Could not load shop."
+      loadingMessage={t("Loading shop details...")}
+      errorMessage={t("Could not load shop.")}
       avatar={shop ? initials : undefined}
       name={shop ? displayName : undefined}
       subtitle={shop ? detailsState : undefined}
       details={details}
       actions={
-        shop ? (
+        shop && showManagementActions ? (
           <>
-            <IosButton label="Edit Shop" onClick={() => onEditShop(shop.id)} />
+            <IosButton label={t("Edit Shop")} onClick={() => onEditShop(shop.id)} />
             <IosButton
-              label={isDeleting ? "Deleting..." : "Delete Shop"}
+              label={isDeleting ? t("Deleting...") : t("Delete Shop")}
               variant="secondary"
               customColor="#ef4444"
               customBorderColor="#ef4444"

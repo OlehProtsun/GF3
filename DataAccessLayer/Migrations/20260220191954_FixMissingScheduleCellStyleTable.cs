@@ -56,7 +56,7 @@ namespace DataAccessLayer.Migrations
                 columns: new[] { "schedule_id", "day_of_month", "employee_id" },
                 unique: true);
 
-            // опціонально, якщо хочеш підчистити старий слід
+            // Optionally clean up the previous leftover index.
             migrationBuilder.Sql("""
         DROP INDEX IF EXISTS "IX_schedule_cell_style_schedule_id";
         """);

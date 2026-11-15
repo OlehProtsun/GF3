@@ -16,22 +16,24 @@ public static class GraphEmployeeMapper
         EmployeeId = model.EmployeeId,
         MinHoursMonth = model.MinHoursMonth,
         DisplayOrder = model.DisplayOrder,
+        IsPriority = model.IsPriority,
     };
 
     public static ScheduleEmployeeModel ToAddModel(this AddGraphEmployeeRequest request, int graphId)
-        => MapGraphEmployeeModel(graphId, request.EmployeeId, request.MinHoursMonth, request.DisplayOrder);
+        => MapGraphEmployeeModel(graphId, request.EmployeeId, request.MinHoursMonth, request.DisplayOrder, request.IsPriority);
 
-    public static ScheduleEmployeeModel ToUpdateModel(this UpdateGraphEmployeeRequest request, int graphId, int graphEmployeeId)
-        => MapGraphEmployeeModel(graphId, request.EmployeeId, request.MinHoursMonth, request.DisplayOrder, graphEmployeeId);
+    public static ScheduleEmployeeModel ToUpdateModel(this UpdateGraphEmployeeRequest request, int graphId, int graphEmployeeId, bool existingIsPriority = false)
+        => MapGraphEmployeeModel(graphId, request.EmployeeId, request.MinHoursMonth, request.DisplayOrder, request.IsPriority ?? existingIsPriority, graphEmployeeId);
 
     public static ScheduleEmployeeModel ToPreviewModel(this GenerateGraphPreviewEmployeeRequest request, int graphId)
-        => MapGraphEmployeeModel(graphId, request.EmployeeId, request.MinHoursMonth, request.DisplayOrder);
+        => MapGraphEmployeeModel(graphId, request.EmployeeId, request.MinHoursMonth, request.DisplayOrder, request.IsPriority);
 
     private static ScheduleEmployeeModel MapGraphEmployeeModel(
         int graphId,
         int employeeId,
         int? minHoursMonth,
         int displayOrder,
+        bool isPriority,
         int id = 0)
         => new()
         {
@@ -40,5 +42,6 @@ public static class GraphEmployeeMapper
             EmployeeId = employeeId,
             MinHoursMonth = minHoursMonth,
             DisplayOrder = displayOrder,
+            IsPriority = isPriority,
         };
 }

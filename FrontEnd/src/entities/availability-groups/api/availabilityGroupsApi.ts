@@ -1,10 +1,18 @@
-import { request } from "@shared/api/httpClient";
+import { ApiError, request } from "@shared/api/httpClient";
+import { t } from "@shared/i18n";
+import type {
+  AvailabilityTransferHint,
+  AvailabilityTransferResult,
+  AvailabilityTransferSource,
+} from "@entities/availability-groups/model/transfer";
 import type {
   AvailabilityGroupDto,
   AvailabilityGroupItemDto,
   AvailabilityGroupMemberDto,
   AvailabilitySlotDto,
   SaveAvailabilityGroupDto,
+  SaveAvailabilityGroupGraphDto,
+  SaveAvailabilityGroupGraphResult,
   SaveAvailabilityGroupMemberDto,
   SaveAvailabilitySlotDto,
 } from "./dto";
@@ -18,6 +26,22 @@ export const availabilityGroupsApi = {
   create: (payload: SaveAvailabilityGroupDto) => request<AvailabilityGroupDto>(endpoint, { method: "POST", body: payload }),
   update: (id: number, payload: SaveAvailabilityGroupDto) => request<void>(`${endpoint}/${id}`, { method: "PUT", body: payload }),
   remove: (id: number) => request<void>(`${endpoint}/${id}`, { method: "DELETE" }),
+  async saveGraph(payload: SaveAvailabilityGroupGraphDto): Promise<SaveAvailabilityGroupGraphResult> {
+    const unconfirmed = () => new Error(t("Availability save could not be confirmed. Check the Availability list before trying again."));
+    const result = await request<SaveAvailabilityGroupGraphResult>(`${endpoint}/save-graph`, { method: "POST", body: payload })
+      .catch((error: unknown) => {
+        if (error instanceof ApiError && error.status !== 502 && error.status !== 504) throw error;
+        throw unconfirmed();
+      });
+
+    if (!result || !Number.isInteger(result.id) || result.id <= 0 ||
+        (payload.id !== null && result.id !== payload.id) ||
+        !Array.isArray(result.sourceGroupIds) || typeof result.changed !== "boolean") {
+      throw unconfirmed();
+    }
+
+    return result;
+  },
 
   members: (groupId: number, signal?: AbortSignal) => request<AvailabilityGroupMemberDto[]>(`${endpoint}/${groupId}/members`, { signal }),
   createMember: (groupId: number, payload: SaveAvailabilityGroupMemberDto) =>
@@ -32,4 +56,32 @@ export const availabilityGroupsApi = {
   updateSlot: (groupId: number, slotId: number, payload: SaveAvailabilitySlotDto) =>
     request<void>(`${endpoint}/${groupId}/slots/${slotId}`, { method: "PUT", body: payload }),
   removeSlot: (groupId: number, slotId: number) => request<void>(`${endpoint}/${groupId}/slots/${slotId}`, { method: "DELETE" }),
+
+  transferSources: (groupId: number, memberId: number, signal?: AbortSignal) =>
+    request<AvailabilityTransferSource[]>(endpoint + "/" + groupId + "/members/" + memberId + "/transfer-sources", { signal }),
+  transferPreview: (
+    employeeIds: number[],
+    year: number,
+    month: number,
+    targetGroupId: number | null,
+    signal?: AbortSignal,
+  ) => request<AvailabilityTransferSource[]>(endpoint + "/transfer-preview", {
+    signal,
+    query: {
+      employeeIds: [...new Set(employeeIds)].sort((left, right) => left - right).join(","),
+      year,
+      month,
+      targetGroupId,
+    },
+  }),
+  transferHints: (groupId: number, signal?: AbortSignal) =>
+    request<AvailabilityTransferHint[]>(endpoint + "/" + groupId + "/transfer-hints", { signal }),
+  transferDays: (
+    groupId: number,
+    memberId: number,
+    payload: { sourceGroupId: number; dayOfMonths: number[] },
+  ) => request<AvailabilityTransferResult>(
+    endpoint + "/" + groupId + "/members/" + memberId + "/transfer-days",
+    { method: "POST", body: payload },
+  ),
 };

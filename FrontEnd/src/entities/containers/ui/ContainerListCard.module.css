@@ -1,0 +1,21 @@
+.folderGrid.folderGrid {
+  grid-template-columns: repeat(2, minmax(0, 360px));
+  justify-content: center;
+  column-gap: 28px;
+  row-gap: 104px;
+  padding-top: 96px;
+}
+
+@media (min-width: 1200px) {
+  .folderGrid.folderGrid {
+    grid-template-columns: repeat(3, minmax(0, 360px));
+  }
+}
+
+@media (max-width: 760px) {
+  .folderGrid.folderGrid {
+    grid-template-columns: minmax(0, 360px);
+    row-gap: 100px;
+    padding-top: 96px;
+  }
+}

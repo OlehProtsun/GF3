@@ -1,3 +1,4 @@
+import { t } from "@shared/i18n";
 import { useEffect, useId, useState, type MouseEvent } from "react";
 import type {
   ContainerGraphFormErrors,
@@ -142,7 +143,7 @@ export function ContainerGraphPresetDialog({
   };
 
   const submit = async () => {
-    const nextPresetNameError = presetName.trim() ? undefined : "Name is required.";
+    const nextPresetNameError = presetName.trim() ? undefined : t("Name is required.");
     const nextFormErrors = buildGraphFormErrors(form, shopIdSet, new Set<number>());
 
     setPresetNameError(nextPresetNameError);
@@ -164,7 +165,7 @@ export function ContainerGraphPresetDialog({
         setFormErrors(current => ({ ...current, ...dialogErrors.formErrors }));
         setSubmitError(error.message);
       } else {
-        setSubmitError(error instanceof Error ? error.message : "Could not save this preset.");
+        setSubmitError(error instanceof Error ? error.message : t("Could not save this preset."));
       }
     } finally {
       setIsSaving(false);
@@ -185,12 +186,11 @@ export function ContainerGraphPresetDialog({
           <div className={styles.titleBlock}>
             <div className={styles.eyebrow}>
               <ScheduleDetailsIcon size={16} />
-              <span>Schedule Preset</span>
+              <span>{t("Schedule Preset")}</span>
             </div>
-            <h3 id={titleId} className={styles.title}>Add preset</h3>
+            <h3 id={titleId} className={styles.title}>{t("Add preset")}</h3>
             <p id={descriptionId} className={styles.description}>
-              Save the core schedule setup so it can be reused without filling the same values from scratch each time.
-            </p>
+              {t("Save the core schedule setup so it can be reused without filling the same values from scratch each time.")}</p>
           </div>
         </div>
 
@@ -208,23 +208,23 @@ export function ContainerGraphPresetDialog({
               graphEmployeeRows={[]}
               topSlot={(
                 <div className={styles.nameGrid}>
-                  <LabeledField id="preset-graph-name" label="Graph name" error={formErrors.name} className={styles.nameField}>
+                  <LabeledField id="preset-graph-name" label={t("Graph name")} error={formErrors.name} className={styles.nameField}>
                     <TextInput
                       id="preset-graph-name"
                       className={styles.presetNameInput}
                       value={form.name}
-                      placeholder="Example: Main shop weekday schedule"
+                      placeholder={t("Example: Main shop weekday schedule")}
                       aria-invalid={formErrors.name ? true : undefined}
                       onChange={event => handleFieldChange("name")(event.target.value)}
                     />
                   </LabeledField>
 
-                  <LabeledField id="schedule-preset-name" label="Preset name" error={presetNameError} className={styles.nameField}>
+                  <LabeledField id="schedule-preset-name" label={t("Preset name")} error={presetNameError} className={styles.nameField}>
                     <TextInput
                       id="schedule-preset-name"
                       className={styles.presetNameInput}
                       value={presetName}
-                      placeholder="Example: Main shop weekday preset"
+                      placeholder={t("Example: Main shop weekday preset")}
                       aria-invalid={presetNameError ? true : undefined}
                       onChange={event => {
                         setPresetName(event.target.value);
@@ -258,14 +258,14 @@ export function ContainerGraphPresetDialog({
 
         <div className={styles.footer}>
           <IosButton
-            label="Cancel"
+            label={t("Cancel")}
             variant="secondary"
             icon={<CloseIcon size={16} />}
             disabled={isSaving}
             onClick={onCancel}
           />
           <IosButton
-            label={isSaving ? "Saving..." : "Save preset"}
+            label={isSaving ? t("Saving...") : t("Save preset")}
             icon={<CheckIcon size={16} />}
             disabled={isSaving}
             onClick={() => {

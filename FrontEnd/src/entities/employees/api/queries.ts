@@ -60,3 +60,15 @@ export function useDeleteEmployeeMutation() {
     },
   });
 }
+
+export function useKickEmployeeMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: number) => employeesApi.kick(id),
+    onSuccess: (_, id) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.employees.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.employees.byId(id) });
+    },
+  });
+}

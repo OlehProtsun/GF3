@@ -8,6 +8,8 @@ namespace WebApi.Contracts.Containers.Graphs.Employees;
 /// </summary>
 public sealed class UpdateGraphEmployeeRequest
 {
+    public bool? IsPriority { get; set; }
+
     /// <summary>
     /// Employee that should participate in the graph.
     /// </summary>
