@@ -133,6 +133,11 @@ public sealed class EmployeeShiftSwapVersionTests
         await using var database = await SqliteTestDatabase.CreateAsync();
         await using var db = database.CreateContext();
         var f = await SeedAsync(db, manual: true);
+        var schedule = await db.Schedules.SingleAsync(s => s.Id == f.Schedule);
+        var futureMonth = DateTimeOffset.UtcNow.AddMonths(1);
+        schedule.Year = futureMonth.Year;
+        schedule.Month = futureMonth.Month;
+        await db.SaveChangesAsync();
         await Employee(db, f.Target).Accept(f.Swap, default);
         db.ChangeTracker.Clear();
         var versions = await db.ScheduleVersions.OrderBy(v => v.VersionNumber).ToListAsync();
