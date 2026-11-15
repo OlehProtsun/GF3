@@ -12,6 +12,40 @@ import gf3_release as release
 
 
 class ActivationTests(unittest.TestCase):
+    def test_release_engine_independently_rejects_migration_changes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "checkout"
+            state = Path(directory) / "state"
+            root.mkdir()
+            state.mkdir()
+            subprocess.run(["git", "init", "-b", "PROD2", str(root)], check=True, capture_output=True)
+            migration = root / "DataAccessLayer/Migrations/20260101000000_Initial.cs"
+            migration.parent.mkdir(parents=True)
+            migration.write_text("migration-v1\n", encoding="utf-8")
+
+            def commit(message):
+                subprocess.run(["git", "-C", str(root), "add", "-A"], check=True, capture_output=True)
+                subprocess.run(["git", "-C", str(root), "-c", "user.name=GF3 test",
+                                "-c", "user.email=gf3@example.test", "commit", "-m", message],
+                               check=True, capture_output=True)
+                return subprocess.check_output(["git", "-C", str(root), "rev-parse", "HEAD"], text=True).strip()
+
+            before = commit("initial migration")
+            migration.write_text("migration-v2\n", encoding="utf-8")
+            target = commit("change migration")
+
+            real_command = release.command
+
+            def allow_git_only(*args, **kwargs):
+                if args[0] != "git":
+                    self.fail(f"staging reached an external build/deploy command: {args[0]}")
+                return real_command(*args, **kwargs)
+
+            with (patch.object(release, "ROOT", root), patch.object(release, "STATE", state),
+                  patch.object(release, "command", side_effect=allow_git_only),
+                  self.assertRaisesRegex(release.ReleaseError, "changes SQLite migrations")):
+                release.stage(target, before, "172.18.0.0/16", "production-volume", "nginx@sha256:" + "a" * 64)
+
     def test_each_activation_failure_restores_prior_stack_and_timer(self):
         candidate, previous = Path("candidate"), Path("previous")
         baseline = ("network", "172.18.0.0/16", "volume")

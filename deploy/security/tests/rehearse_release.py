@@ -1,5 +1,6 @@
 """Disposable deployment/recovery exercise. Run only on a local or CI Docker engine."""
 
+import ast
 import importlib.util
 from contextlib import closing, nullcontext
 import json
@@ -173,8 +174,22 @@ def main():
                                        "import sqlite3,sys; c=sqlite3.connect('/data/SQLite.db'); "
                                        "print(c.execute(sys.argv[1]).fetchall()); c.commit()", statement)
 
+            def rows(statement):
+                return ast.literal_eval(sql(statement).strip())
+
             sql("CREATE TABLE rehearsal_marker(value TEXT)")
             sql(f"INSERT INTO rehearsal_marker VALUES ('{marker}')")
+            migration_history = rows("SELECT MigrationId, ProductVersion FROM __EFMigrationsHistory ORDER BY MigrationId")
+            assert migration_history, "rehearsal database has no EF migration history"
+            sql("CREATE TABLE IF NOT EXISTS employee "
+                "(id INTEGER PRIMARY KEY, contract_type TEXT NOT NULL, first_name TEXT NOT NULL, "
+                "last_name TEXT NOT NULL, is_deleted INTEGER NOT NULL DEFAULT 0)")
+            employee_id = rows("SELECT COALESCE(MAX(id),0)+1 FROM employee")[0][0]
+            sql("INSERT INTO employee(id,contract_type,first_name,last_name,is_deleted) "
+                f"VALUES ({employee_id},'zlecenie','GF3 rehearsal','Employee',0)")
+            employee_rows = rows(f"SELECT id,contract_type,first_name,last_name,is_deleted FROM employee WHERE id={employee_id}")
+            assert employee_rows == [(employee_id, "zlecenie", "GF3 rehearsal", "Employee", 0)]
+            assert rows("PRAGMA integrity_check") == [("ok",)]
             previous = release.STATE / ("rollback-" + project)
             previous.mkdir()
             with patch.object(release, "safe_path"):
@@ -202,6 +217,11 @@ def main():
             release.backup(previous, volume, db)
             with closing(sqlite3.connect(previous / "SQLite.db")) as backup:
                 assert backup.execute("SELECT value FROM rehearsal_marker").fetchall() == [(marker,)]
+                assert backup.execute("SELECT MigrationId, ProductVersion FROM __EFMigrationsHistory "
+                                      "ORDER BY MigrationId").fetchall() == migration_history
+                assert backup.execute("SELECT id,contract_type,first_name,last_name,is_deleted FROM employee "
+                                      "WHERE id=?", (employee_id,)).fetchall() == employee_rows
+                assert backup.execute("PRAGMA integrity_check").fetchall() == [("ok",)]
 
             template = deploy / "nginx/https-templates/gf3.conf.template"
             for scenario in ("nginx-syntax", "https-failure", "activation-failure", "transient-worktree", "success"):
@@ -371,7 +391,10 @@ def main():
                     assert (release.STATE / "active").resolve() == previous
                 elif scenario != "nginx-syntax":
                     assert activated[-1] == previous
-                assert marker in sql("SELECT value FROM rehearsal_marker")
+                assert rows("SELECT value FROM rehearsal_marker") == [(marker,)]
+                assert rows("SELECT MigrationId, ProductVersion FROM __EFMigrationsHistory ORDER BY MigrationId") == migration_history
+                assert rows(f"SELECT id,contract_type,first_name,last_name,is_deleted FROM employee WHERE id={employee_id}") == employee_rows
+                assert rows("PRAGMA integrity_check") == [("ok",)]
                 for service, desired in json.loads((previous / "compose.json").read_text())["services"].items():
                     if scenario != "nginx-syntax":
                         expected = release.docker_json("image", "inspect", desired["image"])[0]["Id"]

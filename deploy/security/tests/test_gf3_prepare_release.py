@@ -50,6 +50,7 @@ class ManagedDeploymentTests(unittest.TestCase):
         self.git("clone", "-b", "PROD2", str(self.remote), str(self.writer), root=self.base)
         self.git("config", "user.name", "Disposable CI", root=self.writer)
         self.git("config", "user.email", "ci@example.invalid", root=self.writer)
+        self.git("config", "core.autocrlf", "false", root=self.writer)
         self.env = self.root / "deploy/.env"
         self.env.write_bytes(b"SECRET=never-print-this\n")
         self.env.chmod(0o600)
@@ -360,6 +361,7 @@ class ManagedDeploymentTests(unittest.TestCase):
                 self.assertIn(path, self.output.getvalue())
         self.api.assert_not_called()
         self.engine.assert_not_called()
+        self.confirm.assert_not_called()
 
     def test_new_helper_requires_the_exact_installed_blob(self):
         self.push(prepare.HELPER_PATH, "different helper")
