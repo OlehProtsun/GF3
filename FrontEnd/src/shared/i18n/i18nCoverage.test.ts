@@ -26,6 +26,8 @@ const mappings: Record<string, Record<string, readonly string[]>> = {
   "pages/employee-schedule/ui/EmployeeSchedulePage.tsx": { "holiday.name": holidayNames },
   "pages/manager-settings/ui/PublicHolidayListDialog.tsx": { "holiday.name": holidayNames },
   "app/layouts/manager-phone-layout/ManagerPhoneLayout.tsx": { label: ["Home", "Containers", "Dispo", "Employees", "More"] },
+  "pages/home/ui/HomePage.tsx": { label: ["All Activity", "Swaps", "Vacations", "Corrections", "Requires Approval"] },
+  "pages/manager-phone/ui/ManagerPhoneContainerDetailPage.tsx": { label: ["Work Days", "Free Days", "Urlop Days", "Hours"] },
   "entities/availability-groups/ui/AvailabilityPublicationCard.tsx": { value: ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"] },
   "entities/containers/ui/ContainerGraphPresetSelect.tsx": {
     "MONTH_LABELS[Math.min(Math.max(month - 1, 0), MONTH_LABELS.length - 1)]": ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
@@ -51,6 +53,8 @@ function stringLiterals(node: ts.Node): string[] {
 // Check the declarations too: adding a new label to a finite map requires review.
 const declarations: Record<string, string> = {
   "app/layouts/manager-phone-layout/ManagerPhoneLayout.tsx": "tabs",
+  "pages/home/ui/HomePage.tsx": "activityTabs",
+  "pages/manager-phone/ui/ManagerPhoneContainerDetailPage.tsx": "statisticMetrics",
   "entities/availability-groups/ui/AvailabilityPublicationCard.tsx": "weekdayLabels",
   "entities/containers/ui/ContainerGraphPresetSelect.tsx": "MONTH_LABELS",
   "pages/container-graph-edit/ui/ContainerGraphEditPage.tsx": "GENERATE_AVAILABILITY_GROUP_REQUIRED_MESSAGE",
@@ -66,7 +70,7 @@ it("covers literal and reviewed finite translation calls in application source",
       let values: string[] = [];
       const visitDeclaration = (node: ts.Node) => {
         if (ts.isVariableDeclaration(node) && node.name.getText(source) === declarations[name] && node.initializer) {
-          if (declarations[name] === "tabs") {
+          if (declarations[name] === "tabs" || declarations[name] === "activityTabs" || declarations[name] === "statisticMetrics") {
             const labels = (child: ts.Node) => {
               if (ts.isPropertyAssignment(child) && child.name.getText(source) === "label") values.push(...stringLiterals(child.initializer));
               ts.forEachChild(child, labels);
