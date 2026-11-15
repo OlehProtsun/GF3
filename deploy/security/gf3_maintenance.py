@@ -181,14 +181,22 @@ def row_digest(db, table, fields):
     names = list(map(quoted, fields))
     order = ", ".join(f"typeof({name}), {name} COLLATE BINARY" for name in names)
     digest = hashlib.sha256()
-    for row in db.execute(f"SELECT {', '.join(names)} FROM {quoted(table)} ORDER BY {order}"):
-        digest.update(repr(row).encode("utf-8"))
-        digest.update(b"\n")
+    deadline = time.monotonic() + 120
+    db.set_progress_handler(lambda: int(time.monotonic() >= deadline), 10000)
+    try:
+        for row in db.execute(f"SELECT {', '.join(names)} FROM {quoted(table)} ORDER BY {order}"):
+            digest.update(repr(row).encode("utf-8"))
+            digest.update(b"\n")
+    finally:
+        db.set_progress_handler(None, 0)
     return digest.digest()
 
 
 def verify_migration(snapshot_path, clone, before_ids, target_ids, columns):
     with closing(open_db(snapshot_path, "ro")) as before, closing(open_db(clone, "ro")) as after:
+        # Keep sorter output containing employee data out of host temporary files.
+        before.execute("PRAGMA temp_store=MEMORY")
+        after.execute("PRAGMA temp_store=MEMORY")
         prior_history = verify(before, before_ids)
         history = verify(after, target_ids)
         require(history[:len(prior_history)] == prior_history, "Existing migration history changed")
@@ -282,6 +290,8 @@ def rehearse(command, inspect, image, bundle, snapshot_path, before_ids, target_
     clone = data / "SQLite.db"
     name = "gf3-db-rehearsal-" + secrets.token_hex(12)
     try:
+        with closing(open_db(snapshot_path, "ro")) as snapshot_db:
+            verify(snapshot_db, before_ids)
         shutil.copyfile(snapshot_path, clone)
         clone.chmod(0o600)
         start_clone(command, inspect, name, image, data)
