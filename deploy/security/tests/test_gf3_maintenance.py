@@ -10,6 +10,7 @@ from unittest.mock import Mock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import gf3_maintenance as maintenance
+import gf3_release as release
 
 
 BEFORE = ("20260101000000_Initial",)
@@ -172,7 +173,7 @@ class MaintenanceTests(unittest.TestCase):
         journal.advance("MIGRATING")
         with closing(sqlite3.connect(self.live)) as db, db:
             self.apply(db)
-        maintenance.verify_no_data_drift(bundle / "final.db", self.live)
+        maintenance.verify_no_data_drift(bundle / "final.db", self.live, COLUMNS, AFTER)
         maintenance.restore_database(self.live, bundle, backup, quiet, lambda: journal.advance("RESTORING"))
         with closing(sqlite3.connect(self.live)) as db:
             maintenance.verify(db, BEFORE)
@@ -203,9 +204,43 @@ class MaintenanceTests(unittest.TestCase):
             db.execute("INSERT INTO employee VALUES (2, 'Later write', NULL)")
         with self.assertRaisesRegex(maintenance.MaintenanceError, "writes may have occurred"):
             maintenance.verify_no_data_drift(bundle / "final.db", self.live)
+        with closing(sqlite3.connect(self.live)) as db, db:
+            db.execute("DELETE FROM employee WHERE id = 2")
+            self.apply(db)
+            db.execute("UPDATE employee SET comment = 'new data'")
+        with self.assertRaisesRegex(maintenance.MaintenanceError, "data in a new column"):
+            maintenance.verify_no_data_drift(bundle / "final.db", self.live, COLUMNS, AFTER)
         (bundle / "final.db").write_bytes(b"damaged")
         with self.assertRaisesRegex(maintenance.MaintenanceError, "checksum"):
             maintenance.verify_final_backup(bundle, metadata)
+
+    def test_process_death_keeps_the_persisted_reopen_boundary(self):
+        source = """
+import sys, time
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+import gf3_maintenance as maintenance
+import gf3_release as release
+state = Path(sys.argv[2])
+journal = maintenance.Journal(state, state / "bundle", release.store)
+journal.begin({})
+for phase in ("FENCING", "FENCED", "BACKED_UP", "MIGRATING", "VERIFYING",
+              "ACTIVATING_GIT", "READY_TO_REOPEN", "WRITES_MAY_RESUME"):
+    journal.advance(phase)
+print("ready", flush=True)
+time.sleep(10)
+"""
+        with subprocess.Popen([sys.executable, "-c", source, str(Path(maintenance.__file__).parent), str(self.root)],
+                              stdout=subprocess.PIPE, text=True) as process:
+            self.assertEqual(process.stdout.readline().strip(), "ready")
+            process.kill()
+            process.wait(timeout=5)
+        with patch.object(release, "STATE", self.root), self.assertRaisesRegex(release.ReleaseError, "unfinished"):
+            release.no_active_maintenance()
+        journal = maintenance.Journal(self.root, self.root / "bundle", release.store)
+        self.assertTrue(journal.read()["writes_may_resume"])
+        with self.assertRaises(maintenance.MaintenanceError):
+            journal.advance("RESTORING")
 
 
 if __name__ == "__main__":

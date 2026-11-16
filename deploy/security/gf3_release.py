@@ -1157,7 +1157,9 @@ def maintenance_cutover(tool, transaction, candidate, previous, current, target,
         migrate_fenced(migration, database, baseline, quiet, assert_unchanged)
         transaction.advance("VERIFYING")
         tool.verify_migration(transaction.bundle / "final.db", database, before_ids, target_ids, columns)
-        verify_fence(fence)
+        quiet()
+        tool.checkpoint_for_read_only_health(database)
+        stable_database = tool.database_stamp(database)
         address = private_health(private, baseline)
         # Guard uses the same project and Nginx instance while ingress is private.
         (private / "guard-enabled").touch()
@@ -1167,6 +1169,7 @@ def maintenance_cutover(tool, transaction, candidate, previous, current, target,
             verify_fence(fence)
             verify_web(private, address=address)
         require(topology() == baseline, "Docker topology changed before activation")
+        require(tool.database_stamp(database) == stable_database, "Database changed during read-only verification")
         transaction.advance("ACTIVATING_GIT")
         finalize_git(candidate, target)
         transaction.advance("READY_TO_REOPEN")
@@ -1180,9 +1183,10 @@ def maintenance_cutover(tool, transaction, candidate, previous, current, target,
                 with lock(RUNTIME / "state/guard.lock"):
                     stop_maintenance_stack(previous)
                     quiet()
-                    tool.verify_no_data_drift(transaction.bundle / "final.db", database)
+                    stable_database = tool.database_stamp(database)
+                    tool.verify_no_data_drift(transaction.bundle / "final.db", database, columns, target_ids)
                     tool.restore_database(database, transaction.bundle, state["backup"], quiet,
-                                          lambda: transaction.advance("RESTORING"))
+                                          lambda: transaction.advance("RESTORING"), stable_database)
                     restore_geo(previous)
                     transaction.advance("RECOVERY_READY")
                 reopen(previous, previous_closed, current, "RECOVERED")

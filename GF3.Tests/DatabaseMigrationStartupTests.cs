@@ -45,6 +45,21 @@ public sealed class DatabaseMigrationStartupTests
                 Assert.Empty(await clone.ShiftSwapRequests.Select(request => request.RefreshedAtUtc).ToListAsync());
                 Assert.Equal("ok", await IntegrityAsync(cloneWorkspace.ConnectionString));
             }
+            SqliteConnection.ClearAllPools();
+            var verificationConnection = new SqliteConnectionStringBuilder
+            {
+                DataSource = new Uri(clonePath).AbsoluteUri + "?immutable=1",
+                Mode = SqliteOpenMode.ReadOnly,
+                Pooling = false,
+            }.ToString();
+            await using (var verification = CreateContext(verificationConnection))
+            {
+                Assert.Empty(await verification.Database.GetPendingMigrationsAsync());
+                Assert.Equal("Fixture", (await verification.Employees.SingleAsync()).FirstName);
+                verification.Employees.Add(new EmployeeModel { FirstName = "Unexpected", LastName = "Write" });
+                var error = await Assert.ThrowsAsync<DbUpdateException>(() => verification.SaveChangesAsync());
+                Assert.Equal(8, Assert.IsType<SqliteException>(error.InnerException).SqliteErrorCode);
+            }
             await using var unchanged = CreateContext(workspace.ConnectionString);
             Assert.Equal(prior, (await unchanged.Database.GetAppliedMigrationsAsync()).Last());
             Assert.Equal("Fixture", (await unchanged.Employees.SingleAsync()).FirstName);

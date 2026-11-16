@@ -28,7 +28,7 @@ if (maintenanceHealth)
     // and never registers the ordinary API routes or the application's background services.
     var connectionString = new SqliteConnectionStringBuilder
     {
-        DataSource = "/data/SQLite.db",
+        DataSource = "file:/data/SQLite.db?immutable=1",
         Mode = SqliteOpenMode.ReadOnly,
         Pooling = false,
     }.ToString();

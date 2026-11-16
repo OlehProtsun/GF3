@@ -234,6 +234,17 @@ def database_stamp(path):
     return result
 
 
+def checkpoint_for_read_only_health(path):
+    # The health process uses an immutable SQLite URI on a read-only mount. It must see
+    # a checkpointed main file, including the final committed WAL pages.
+    with closing(open_db(path, "rw", timeout=0)) as database:
+        if database.execute("PRAGMA journal_mode").fetchone() == ("wal",):
+            require(database.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchone() == (0, 0, 0),
+                    "SQLite WAL could not be fully checkpointed for health verification")
+    wal = sqlite_files(path)[1]
+    require(not wal.exists() or wal.stat().st_size == 0, "SQLite contains uncheckpointed WAL changes")
+
+
 def final_backup(database, bundle, history, assert_quiet, record):
     assert_quiet()
     backup = bundle / "final.db"
@@ -260,11 +271,12 @@ def verify_final_backup(bundle, metadata):
     return backup
 
 
-def restore_database(database, bundle, metadata, assert_quiet, consume_restore):
+def restore_database(database, bundle, metadata, assert_quiet, consume_restore, expected_stamp=None):
     """Replace a fenced database once and preserve the failed database and its journals."""
     backup = verify_final_backup(bundle, metadata)
     assert_quiet()
     files = database_stamp(database)
+    require(expected_stamp is None or expected_stamp == files, "Database changed after recovery verification")
     saved_main = metadata["source"][database.name]
     require(files[database.name][:2] == saved_main[:2], "Recovery database was replaced outside maintenance")
     failed = bundle / "failed-database"
@@ -446,16 +458,35 @@ def verify_migration(snapshot_path, clone, before_ids, target_ids, columns):
                     "Existing SQLite rows changed during rehearsal")
 
 
-def verify_no_data_drift(backup, database):
+def verify_no_data_drift(backup, database, columns=(), target_ids=None):
     """Refuse automatic restore if rows might have changed outside the migration."""
     with closing(open_db(backup, "ro")) as before, closing(open_db(database, "ro")) as after:
         before.execute("PRAGMA temp_store=MEMORY")
         after.execute("PRAGMA temp_store=MEMORY")
-        for kind, table in schema(before):
+        before_schema, after_schema = schema(before), schema(after)
+        if ("table", LOCK) not in before_schema:
+            after_schema.pop(("table", LOCK), None)
+        query = f'SELECT MigrationId, ProductVersion FROM "{HISTORY}" ORDER BY MigrationId'
+        original_history, current_history = tuple(before.execute(query)), tuple(after.execute(query))
+        expected_ids = tuple(row[0] for row in original_history) if target_ids is None else target_ids
+        require(len(current_history) >= len(original_history) and current_history[:len(original_history)] == original_history
+                and tuple(row[0] for row in current_history) == expected_ids[:len(current_history)],
+                "SQLite history changed outside the reviewed migrations")
+        present = []
+        for kind, table in before_schema:
             if kind == "table" and table not in {HISTORY, LOCK}:
                 names = [row[1] for row in before.execute(f"PRAGMA table_xinfo({quoted(table)})")]
+                updated = [row[1] for row in after.execute(f"PRAGMA table_xinfo({quoted(table)})")]
+                for item in columns:
+                    if item[0] == table and item[1] not in names and item[1] in updated:
+                        present.append(item)
+                        require(not after.execute(f"SELECT 1 FROM {quoted(table)} "
+                                                  f"WHERE {quoted(item[1])} IS NOT NULL LIMIT 1").fetchone(),
+                                "There is data in a new column. Automatic recovery would discard it.")
                 require(row_digest(before, table, names) == row_digest(after, table, names),
                         "Database writes may have occurred since the final backup")
+        require(expected_schema(before_schema, present) == after_schema,
+                "Database schema changed outside the reviewed migration")
 
 
 def image_id(command, source, bundle, target):
@@ -540,6 +571,7 @@ def rehearse(command, inspect, image, bundle, snapshot_path, before_ids, target_
         if verify_modes:
             start_clone(command, inspect, name, image, data, mode="migrate")
             remove_clone(command, name)
+            checkpoint_for_read_only_health(clone)
             start_clone(command, inspect, name, image, data, mode="health")
             # A legacy image that ignores the mode must not qualify for the live path.
             code = command("docker", "exec", name, "curl", "-sS", "-o", "/dev/null", "-w", "%{http_code}",
