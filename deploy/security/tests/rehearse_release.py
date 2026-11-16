@@ -71,6 +71,8 @@ def rehearse_migrations(root, snapshot_path):
             db.execute('DELETE FROM "__EFMigrationsHistory" WHERE MigrationId=?', (migration,))
     maintenance.snapshot(fixture, frozen, before, quiesced=True)
     maintenance.rehearse(release.command, release.docker_json, image["Id"], root, frozen, before, target, columns)
+    maintenance.rehearse(release.command, release.docker_json, image["Id"], root, frozen, before, target, columns,
+                         verify_modes=True)
     print("Maintenance rehearsal passed: isolated EF startup, expected schema, integrity and logical row preservation")
 
     # The migration is still pending, but the duplicate DDL causes the candidate to fail.
@@ -92,7 +94,128 @@ def rehearse_migrations(root, snapshot_path):
     print("Maintenance rehearsal passed: failed SQL left the source intact and verified recovery copy remained usable")
 
 
-def main():
+def maintenance_scenario(root, previous, candidate, baseline, git_dir, before, sha, scenario, sql, tags):
+    """Run the real maintenance engine on the runner's disposable Docker volume and nftables."""
+    database = release.maintenance_database(baseline[2])
+    added = ("20261114225324_AddShiftCorrectionComment", "20261115135735_RefreshManualShiftOffer")
+    columns = (("shift_correction_request", "comment", "TEXT"),
+               ("shift_swap_request", "refreshed_at_utc", "INTEGER"))
+    with closing(sqlite3.connect(database)) as db:
+        historical = tuple(row[0] for row in db.execute('SELECT MigrationId FROM "__EFMigrationsHistory" ORDER BY MigrationId'))
+    expected = historical + added
+    assert not set(historical).intersection(added)
+    if scenario == "migration-failure":
+        sql('ALTER TABLE shift_correction_request ADD COLUMN "comment" TEXT NULL')
+    data = root / "recovery"
+    data.mkdir(mode=0o700)
+    journal = maintenance.Journal(release.STATE, data, release.store)
+    journal.begin({"before": before, "target": sha})
+    release.activate(previous)
+    timer = [True, True]
+    real_command = release.command
+    original_git = release.git
+    original_verify = release.verify_web
+    final_verify_failed = False
+    real_migrate = release.migrate_fenced
+    assert subprocess.run(["nft", "list", "table", "inet", "gf3_maintenance"], capture_output=True).returncode != 0
+
+    def local_command(*args, **kwargs):
+        if args[0] != "systemctl":
+            return real_command(*args, **kwargs)
+        if args[1] == "show" and args[2].endswith(".service"):
+            return "inactive\n"
+        if args[1] == "show":
+            return (f"ActiveState={'active' if timer[1] else 'inactive'}\n"
+                    f"UnitFileState={'enabled' if timer[0] else 'disabled'}\n")
+        if args[2].endswith(".timer"):
+            if args[1] in ("enable", "disable"):
+                timer[0] = args[1] == "enable"
+            else:
+                timer[1] = args[1] == "start"
+        return ""
+
+    def git(*args, root=None):
+        if scenario == "git-failure" and "merge" in args:
+            raise release.ReleaseError("synthetic Git activation failure")
+        return original_git(*args, root=root or git_dir)
+
+    def guard_result(bundle, *args):
+        if scenario == "guard-failure":
+            raise release.ReleaseError("synthetic Guard failure")
+        def fixture_feed(_):
+            raise OSError("offline synthetic fixture")
+
+        updater = guard.Guard(release.RUNTIME, root, fetch=fixture_feed,
+                              run_command=lambda args, **options: subprocess.run(args, env=release.ENV, **options))
+        updater.compose = ["docker", *release.compose_args(), "-f", str(bundle / "compose.json"), "exec", "-T", "nginx"]
+        if args[0] == "run":
+            state = updater.state()
+            state["bans"]["8.8.8.8"] = {"expires": time.time() + 3600, "reason": "manual"}
+            updater.save_state(state)
+        return updater.execute(guard.arguments(args))
+
+    def observe_web(bundle, acme=True, address=None):
+        nonlocal final_verify_failed
+        if scenario == "failure-after-open" and not final_verify_failed:
+            journal_state = journal.read()
+            result = subprocess.run(["nft", "list", "table", "inet", "gf3_maintenance"], capture_output=True)
+            if journal_state["writes_may_resume"] and result.returncode != 0:
+                sql("INSERT INTO rehearsal_marker VALUES ('arrived-after-reopen')")
+                final_verify_failed = True
+                raise release.ReleaseError("synthetic failure after reopening")
+        return original_verify(bundle, acme, address)
+
+    def simulate_restart(*args):
+        if scenario == "fence-lost":
+            # Exercise the same hazards as a reboot without rebooting the GitHub runner:
+            # the kernel table disappears and the Docker daemon re-reads restart policies.
+            real_command("nft", "delete", "table", "inet", "gf3_maintenance")
+            real_command("systemctl", "restart", "docker")
+        return real_migrate(*args)
+
+    try:
+        with (patch.object(release, "command", local_command), patch.object(release, "git", git),
+              patch.object(release, "guard_result", guard_result), patch.object(release, "verify_web", observe_web),
+              patch.object(release, "migrate_fenced", simulate_restart)):
+            try:
+                release.maintenance_cutover(maintenance, journal, candidate, previous, before, sha, baseline,
+                                            historical, expected, columns)
+            except release.ReleaseError as error:
+                if scenario in {"migration-failure", "git-failure", "guard-failure"}:
+                    assert "were recovered" in str(error), str(error)
+                elif scenario == "fence-lost":
+                    assert journal.read()["phase"] == "RECOVERY_REQUIRED" and not (data / "failed-database").exists()
+                    assert all(not release.container(name)["State"]["Running"] for name in ("gf3-app", "nginx"))
+                    with closing(sqlite3.connect(database)) as db:
+                        maintenance.verify(db, historical)
+                    print("Maintenance transaction remained offline after losing the fence and restarting Docker")
+                    return
+                elif scenario == "failure-after-open":
+                    assert journal.read()["writes_may_resume"] and not (data / "failed-database").exists()
+                    assert final_verify_failed, str(error)
+                else:
+                    raise
+            else:
+                assert scenario == "success"
+        assert release.topology() == baseline
+        recovered = scenario in {"migration-failure", "git-failure", "guard-failure"}
+        activated = previous if recovered else candidate
+        assert release.active_bundle() == activated
+        with closing(sqlite3.connect(database)) as db:
+            maintenance.verify(db, historical if recovered else expected)
+            values = [row[0] for row in db.execute("SELECT value FROM rehearsal_marker")]
+            assert len(values) == (2 if scenario == "failure-after-open" else 1)
+            assert ("arrived-after-reopen" in values) == (scenario == "failure-after-open")
+        if recovered:
+            assert json.loads((data / "transaction.json").read_text())["phase"] == "RECOVERED"
+            assert release.container("gf3-app")["Image"] == release.docker_json("image", "inspect", tags[0])[0]["Id"]
+        print(f"Maintenance transaction passed on Linux Docker: {scenario}")
+    finally:
+        # This test operates only on a disposable runner and must clean up any fenced failure case.
+        subprocess.run(["nft", "delete", "table", "inet", "gf3_maintenance"], capture_output=True)
+
+
+def main(scenario=None):
     release.command = diagnostic_command
     project = "gf3-rehearsal-" + secrets.token_hex(5)
     network = project + "_gf3-internal"
@@ -123,7 +246,8 @@ def main():
                         "-keyout", str(key), "-out", str(cert)], check=True, capture_output=True)
         env_file = deploy / ".env"
         env_file.write_text("\n".join([
-            "GF3_IMAGE=gf3-web:ci", "GF3_SERVER_NAME=localhost", "GF3_REQUIRE_EXISTING_DATABASE=false",
+            f"GF3_IMAGE={'gf3-web:maintenance-prior' if scenario else 'gf3-web:ci'}", "GF3_SERVER_NAME=localhost",
+            "GF3_REQUIRE_EXISTING_DATABASE=false",
             "GF3_BACKUP_BEFORE_MIGRATE=true", f"GF3_DATA_VOLUME={volume}",
             "GF3_ADMIN_DEVELOPER_PASSWORD=disposable-only", "GF3_BOOTSTRAP_MANAGER_PASSWORD=743961",
             f"Jwt__SigningKey={secrets.token_hex(48)}", f"GF3_TLS_CERT_PATH={cert.as_posix()}",
@@ -144,8 +268,16 @@ def main():
 
         real_verify = release.verify_web
 
-        def verify(bundle, acme=True):
+        def verify(bundle, acme=True, address=None):
             current[0] = bundle
+            if address is not None:
+                real_curl_at = release.curl_at
+
+                def trusted_curl(address, scheme, path, *args):
+                    return real_curl_at(address, scheme, path, "--cacert", str(cert), *args)
+
+                with patch.object(release, "curl_at", trusted_curl):
+                    return real_verify(bundle, acme, address=address)
             # The ephemeral port is different from production's port. Keep the real certificate, HTTP and ACME checks.
             def command(*args, **kwargs):
                 if args[:2] == ("openssl", "s_client"):
@@ -241,6 +373,21 @@ def main():
             tags.extend(service["image"] for service in json.loads((previous / "compose.json").read_text())["services"].values())
             release.nginx_test(previous)
             verify(previous)
+
+            if scenario:
+                candidate = release.STATE / "release-maintenance"
+                candidate.mkdir(mode=0o700)
+                config = release.render(root)
+                release.freeze(config, volume)
+                app_service = config["services"]["gf3-app"]
+                app_service["image"] = "gf3-web:ci"
+                app_service["environment"]["DatabaseStartup__RequireExistingDatabase"] = "true"
+                release.save_compose(candidate, config)
+                (candidate / "guard-enabled").touch()
+                with patch.object(release, "verify_web", verify):
+                    maintenance_scenario(root, previous, candidate, baseline, git_dir, before, sha,
+                                         scenario, sql, tags)
+                return
             # Certbot replaces symlinks under live/. Recreate Nginx so its file bind follows the replacement.
             for name in (cert, key):
                 name.rename(name.with_suffix(".previous"))
@@ -454,4 +601,30 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    import sys
+
+    scenarios = ("success", "migration-failure", "git-failure", "guard-failure", "failure-after-open", "fence-lost")
+    if len(sys.argv) == 2 and sys.argv[1] in scenarios:
+        assert os.geteuid() == 0 and os.environ.get("GF3_DISPOSABLE_CI_RUNNER") == "true"
+        main(sys.argv[1])
+    else:
+        assert len(sys.argv) == 1
+        main()
+        if os.environ.get("GITHUB_ACTIONS") == "true":
+            # Exercise production primitives with real Docker, kernel fence, Git and SQLite on a
+            # fresh runner. Use a pinned previous application that predates the pending migrations.
+            if not shutil.which("nft"):
+                subprocess.run(["sudo", "-n", "apt-get", "update"], check=True)
+                subprocess.run(["sudo", "-n", "apt-get", "install", "-y", "nftables"], check=True)
+            prior = "353f8e23dbd3f6c9989e7df2198346b72c700487"
+            repo = HERE.parents[1]
+            subprocess.run(["git", "fetch", "--no-tags", "--depth=1", "origin", prior], cwd=repo, check=True)
+            with tempfile.TemporaryDirectory(prefix="gf3-prior-source-") as worktree:
+                subprocess.run(["git", "worktree", "add", "--detach", worktree, prior], cwd=repo, check=True)
+                try:
+                    subprocess.run(["docker", "build", "-t", "gf3-web:maintenance-prior", worktree], check=True)
+                finally:
+                    subprocess.run(["git", "worktree", "remove", "--force", worktree], cwd=repo, check=True)
+            for case in scenarios:
+                subprocess.run(["sudo", "-n", "env", "GF3_DISPOSABLE_CI_RUNNER=true",
+                                "/usr/bin/python3", "-u", str(Path(__file__).resolve()), case], check=True)
