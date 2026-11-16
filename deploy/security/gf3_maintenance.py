@@ -236,11 +236,11 @@ def probe(command, inspect, name):
     while time.monotonic() < deadline:
         state = inspect("container", "inspect", name)[0]["State"]
         require(state["Running"], "Candidate stopped before rehearsal health passed")
-        response = command("docker", "exec", name, "curl", "-fsS", "--max-time", "3",
-                           "http://127.0.0.1:8080/api/health", timeout=10, check=False)
-        if response:
+        if state["Health"]["Status"] == "healthy":
+            response = command("docker", "exec", name, "curl", "-fsS", "--max-time", "3",
+                               "http://127.0.0.1:8080/api/health", timeout=10)
             health = json.loads(response)
-            require(health.get("status") == "ok" and health.get("canConnect") is True,
+            require(isinstance(health, dict) and health.get("status") == "ok" and health.get("canConnect") is True,
                     "Candidate rehearsal health failed")
             return
         time.sleep(1)
@@ -264,6 +264,7 @@ def start_clone(command, inspect, name, image, data, *, require_existing=True):
     command("docker", "create", "--name", name, "--pull", "never", "--network", "none",
             "--cap-drop", "ALL", "--security-opt", "no-new-privileges", "--log-driver", "none",
             "--read-only", "--tmpfs", "/tmp:rw,noexec,nosuid,nodev", "--user", f"{uid}:{gid}",
+            "--health-interval", "1s", "--health-timeout", "4s",
             "--mount", f"type=bind,source={data},destination=/data",
             *(arg for key, value in environment.items() for arg in ("--env", f"{key}={value}")), image)
     config, = inspect("container", "inspect", name)

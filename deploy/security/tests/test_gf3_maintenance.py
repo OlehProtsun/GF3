@@ -102,6 +102,26 @@ class MaintenanceTests(unittest.TestCase):
                 with closing(sqlite3.connect(self.live)) as db:
                     maintenance.verify(db, BEFORE)
 
+    def test_health_probe_does_not_exec_into_container_with_failed_startup(self):
+        command = Mock()
+        inspect = Mock(side_effect=[
+            [{"State": {"Running": True, "Health": {"Status": "starting"}}}],
+            [{"State": {"Running": False, "Health": {"Status": "unhealthy"}}}],
+        ])
+        with (patch.object(maintenance.time, "sleep"),
+              self.assertRaisesRegex(maintenance.MaintenanceError, "Candidate stopped")):
+            maintenance.probe(command, inspect, "candidate")
+        command.assert_not_called()
+
+    def test_health_probe_requires_expected_application_response(self):
+        command = Mock(return_value='{"status":"ok", "canConnect":false}')
+        inspect = Mock(return_value=[{"State": {"Running": True, "Health": {"Status": "healthy"}}}])
+        with self.assertRaisesRegex(maintenance.MaintenanceError, "health failed"):
+            maintenance.probe(command, inspect, "candidate")
+        command.return_value = '{"status":"ok", "canConnect":true}'
+        maintenance.probe(command, inspect, "candidate")
+        self.assertNotIn("check", command.call_args.kwargs)
+
     def test_changed_sha_and_duplicate_review_keys_fail(self):
         def review(target):
             return json.dumps({"before": "before", "target": target, "add_nullable_columns": COLUMNS})
