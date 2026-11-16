@@ -1,4 +1,4 @@
-"""SQLite migration rehearsal. All candidate writes are confined to disposable copies."""
+"""SQLite migration rehearsal and maintenance recovery primitives."""
 
 from contextlib import closing
 import hashlib
@@ -23,6 +23,13 @@ RELATED = {
     "DataAccessLayer/Models/ShiftSwapRequestModel.cs",
     "GF3.Tests/DatabaseMigrationStartupTests.cs",
 }
+BOOTSTRAP_PATHS = {
+    "GF3.WebApi/Program.cs",
+    "deploy/security/gf3_prepare_release.py",
+    "deploy/security/gf3_release.py",
+    "deploy/security/gf3_maintenance.py",
+    "deploy/security/gfctl-prod2-maintenance-menu.patch",
+}
 IDENTIFIER = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 HISTORY = "__EFMigrationsHistory"
 LOCK = "__EFMigrationsLock"
@@ -46,7 +53,7 @@ def migration_ids(git, sha):
     return tuple(sorted(ids))
 
 
-def classify(git, before, target):
+def classify(git, before, target, ordinary=None):
     git("merge-base", "--is-ancestor", before, target)
     diff = git("diff", "--raw", "--no-abbrev", "--no-renames", "--no-ext-diff", "-z",
                before, target, "--").split("\0")
@@ -59,9 +66,15 @@ def classify(git, before, target):
         else:
             name = path.removeprefix(MIGRATIONS + "/")
             match = PAIR.fullmatch(name) if name != path else None
-            require(match and (status, old, new) == ("A", "000000", "100644"),
-                    f"Migration rehearsal refuses path {ascii(path)}")
-            pairs.setdefault(match[1], set()).add(bool(match[2]))
+            if match:
+                require((status, old, new) == ("A", "000000", "100644"),
+                        f"Migration rehearsal refuses path {ascii(path)}")
+                pairs.setdefault(match[1], set()).add(bool(match[2]))
+            else:
+                require(name == path and ordinary and ordinary(path)
+                        and (status, old, new) in {("A", "000000", "100644"), ("M", "100644", "100644"),
+                                                   ("D", "100644", "000000")},
+                        f"Migration rehearsal refuses path {ascii(path)}")
         paths.append(path)
     before_ids, target_ids = migration_ids(git, before), migration_ids(git, target)
     require(pairs and all(parts == {False, True} for parts in pairs.values())
@@ -96,6 +109,46 @@ def review_plan(raw, before, target):
         keys.add(key)
         reviewed.append(tuple(entry))
     return tuple(reviewed)
+
+
+def bootstrap_paths(git, before, target, raw):
+    if not raw:
+        return set()
+    record = json.loads(raw)
+    if record.get("target") != target:
+        return set()
+    require(set(record) == {"before", "target", "blobs"} and record["before"] == before
+            and isinstance(record["blobs"], dict), "Tool installation review does not match this transition")
+    blobs = record["blobs"]
+    require(set(blobs) <= BOOTSTRAP_PATHS, "Tool installation review contains an unsupported path")
+    for path, blob in blobs.items():
+        require(re.fullmatch(r"[0-9a-f]{40}", blob) and git("rev-parse", f"{target}:{path}").strip() == blob,
+                "Reviewed installation blob differs from the candidate")
+    return set(blobs)
+
+
+ADD_COLUMN = re.compile(
+    r'migrationBuilder\.AddColumn<(string|long)>\s*\(\s*'
+    r'name:\s*"([A-Za-z_][A-Za-z0-9_]*)",\s*table:\s*"([A-Za-z_][A-Za-z0-9_]*)",\s*'
+    r'type:\s*"(TEXT|INTEGER)",\s*(?:maxLength:\s*[1-9][0-9]*,\s*)?nullable:\s*true\s*\);'
+)
+
+
+def migration_plan(git, before, target, pending):
+    columns = []
+    for migration in pending:
+        source = git("show", f"{target}:{MIGRATIONS}/{migration}.cs")
+        up = re.search(r"protected override void Up\(MigrationBuilder migrationBuilder\)\s*\{([^{}]*)\}", source)
+        require(up is not None, "Maintenance supports generated nullable column migrations")
+        operations = ADD_COLUMN.findall(up[1])
+        require(operations and not ADD_COLUMN.sub("", up[1]).strip(),
+                "Maintenance migration contains an unsupported operation")
+        for clr, column, table, affinity in operations:
+            require((clr, affinity) in {("string", "TEXT"), ("long", "INTEGER")},
+                    "Unexpected SQLite affinity in maintenance migration")
+            columns.append((table, column, affinity))
+    return review_plan(json.dumps({"before": before, "target": target, "add_nullable_columns": columns}),
+                       before, target)
 
 
 def open_db(path, mode, timeout=5):
@@ -152,6 +205,177 @@ def snapshot(source, destination, expected_ids, *, quiesced=False):
     except BaseException:
         destination.unlink(missing_ok=True)
         raise
+
+
+def digest_file(path):
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for block in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def sqlite_files(path):
+    return (path, *(path.with_name(path.name + suffix) for suffix in ("-wal", "-shm", "-journal")))
+
+
+def database_stamp(path):
+    result = {}
+    for entry in sqlite_files(path):
+        try:
+            info = entry.lstat()
+        except FileNotFoundError:
+            require(entry != path, "SQLite database is missing")
+            continue
+        require(stat.S_ISREG(info.st_mode) and info.st_nlink == 1, "Unexpected SQLite file type")
+        if entry.name.endswith("-shm"):
+            continue  # Shared-memory locking metadata does not represent database contents.
+        result[entry.name] = [info.st_dev, info.st_ino, info.st_size, digest_file(entry)]
+    return result
+
+
+def final_backup(database, bundle, history, assert_quiet, record):
+    assert_quiet()
+    backup = bundle / "final.db"
+    snapshot(database, backup, history, quiesced=True)
+    assert_quiet()
+    metadata = {"sha256": digest_file(backup), "source": database_stamp(database), "history": list(history)}
+    # Prove the checkpoint includes every committed row at the same recovery point.
+    verify_migration(backup, database, history, history, ())
+    assert_quiet()
+    require(database_stamp(database) == metadata["source"], "Database changed during final backup")
+    record(metadata)
+    return metadata
+
+
+def verify_final_backup(bundle, metadata):
+    backup = bundle / "final.db"
+    info = backup.lstat()
+    require(stat.S_ISREG(info.st_mode) and info.st_nlink == 1
+            and (os.name == "nt" or (info.st_uid == os.geteuid() and stat.S_IMODE(info.st_mode) == 0o600)),
+            "Final backup permissions are unsafe")
+    require(digest_file(backup) == metadata["sha256"], "Final backup checksum mismatch")
+    with closing(open_db(backup, "ro")) as database:
+        verify(database, tuple(metadata["history"]))
+    return backup
+
+
+def restore_database(database, bundle, metadata, assert_quiet, consume_restore):
+    """Replace a fenced database once and preserve the failed database and its journals."""
+    backup = verify_final_backup(bundle, metadata)
+    assert_quiet()
+    files = database_stamp(database)
+    saved_main = metadata["source"][database.name]
+    require(files[database.name][:2] == saved_main[:2], "Recovery database was replaced outside maintenance")
+    failed = bundle / "failed-database"
+    failed.mkdir(mode=0o700)
+    descriptor, pending = tempfile.mkstemp(dir=database.parent, prefix=".gf3-restore-")
+    os.close(descriptor)
+    replacement = Path(pending)
+    try:
+        info = database.lstat()
+        shutil.copyfile(backup, replacement)
+        require(digest_file(replacement) == metadata["sha256"], "Recovery copy checksum mismatch")
+        if os.name != "nt":
+            os.chown(replacement, info.st_uid, info.st_gid)
+        replacement.chmod(stat.S_IMODE(info.st_mode))
+        with replacement.open("r+b") as stream:
+            os.fsync(stream.fileno())
+        assert_quiet()
+        require(database_stamp(database) == files, "Database changed immediately before recovery")
+        consume_restore()
+        # Keep a byte-for-byte forensic copy, including any uncheckpointed data. Copying
+        # across filesystems is safe here because the writer fence has been verified.
+        for entry in sqlite_files(database):
+            if entry.exists():
+                shutil.copyfile(entry, failed / entry.name)
+                (failed / entry.name).chmod(0o600)
+                with (failed / entry.name).open("r+b") as stream:
+                    os.fsync(stream.fileno())
+        sync_dir(failed)
+        sync_dir(bundle)
+        assert_quiet()
+        require(database_stamp(database) == files, "Database changed while preserving recovery evidence")
+        for entry in sqlite_files(database)[1:]:
+            entry.unlink(missing_ok=True)
+        os.replace(replacement, database)
+        sync_dir(database.parent)
+        with closing(open_db(database, "ro")) as restored:
+            verify(restored, tuple(metadata["history"]))
+        verify_migration(backup, database, tuple(metadata["history"]), tuple(metadata["history"]), ())
+    finally:
+        replacement.unlink(missing_ok=True)
+
+
+def sync_dir(directory):
+    if os.name != "nt":
+        descriptor = os.open(directory, os.O_RDONLY | os.O_DIRECTORY)
+        try:
+            os.fsync(descriptor)
+        finally:
+            os.close(descriptor)
+
+
+TRANSITIONS = {
+    "REHEARSED": {"FENCING"},
+    "FENCING": {"FENCED"},
+    "FENCED": {"BACKED_UP"},
+    "BACKED_UP": {"MIGRATING"},
+    "MIGRATING": {"VERIFYING", "RESTORING"},
+    "VERIFYING": {"RESTORING", "ACTIVATING_GIT"},
+    "ACTIVATING_GIT": {"READY_TO_REOPEN", "RESTORING"},
+    "READY_TO_REOPEN": {"WRITES_MAY_RESUME"},
+    "RESTORING": {"RECOVERY_READY"},
+    "RECOVERY_READY": {"WRITES_MAY_RESUME"},
+    "WRITES_MAY_RESUME": {"COMPLETED", "RECOVERED"},
+}
+
+
+class Journal:
+    """Root-owned durable journal. The active record blocks every managed mutator."""
+
+    def __init__(self, state, bundle, store):
+        self.bundle = bundle
+        self.path = state / "maintenance-active.json"
+        self.store = store
+
+    def begin(self, identity):
+        require(not os.path.lexists(self.path), "An unfinished maintenance transaction already exists")
+        self.write({**identity, "bundle": self.bundle.name, "phase": "REHEARSED", "writes_may_resume": False})
+
+    def read(self):
+        state = json.loads(self.path.read_bytes())
+        require(state["bundle"] == self.bundle.name, "Maintenance journal belongs to a different transaction")
+        return state
+
+    def write(self, state):
+        self.store(self.path, state)
+        sync_dir(self.path.parent)
+
+    def advance(self, phase, **fields):
+        state = self.read()
+        prior = state["phase"]
+        require(phase in TRANSITIONS.get(prior, ()), f"Invalid maintenance transition {prior} -> {phase}")
+        require(phase != "RESTORING" or state["writes_may_resume"] is False,
+                "Automatic database recovery is unsafe after writers may resume")
+        state.update(fields, phase=phase,
+                     writes_may_resume=state["writes_may_resume"] or phase == "WRITES_MAY_RESUME")
+        self.write(state)
+
+    def require_phase(self, phase):
+        require(self.read()["phase"] == phase, f"Expected maintenance phase {phase}")
+
+    def fail(self, stage):
+        state = self.read()
+        self.write({**state, "phase": "RECOVERY_REQUIRED", "failed_in": state["phase"], "failure": stage})
+
+    def finish(self):
+        state = self.read()
+        require(state["phase"] in {"COMPLETED", "RECOVERED"}, "Do not release an incomplete maintenance transaction")
+        self.store(self.bundle / "transaction.json", state)
+        sync_dir(self.bundle)
+        self.path.unlink()
+        sync_dir(self.path.parent)
 
 
 def quoted(value):
@@ -222,6 +446,18 @@ def verify_migration(snapshot_path, clone, before_ids, target_ids, columns):
                     "Existing SQLite rows changed during rehearsal")
 
 
+def verify_no_data_drift(backup, database):
+    """Refuse automatic restore if rows might have changed outside the migration."""
+    with closing(open_db(backup, "ro")) as before, closing(open_db(database, "ro")) as after:
+        before.execute("PRAGMA temp_store=MEMORY")
+        after.execute("PRAGMA temp_store=MEMORY")
+        for kind, table in schema(before):
+            if kind == "table" and table not in {HISTORY, LOCK}:
+                names = [row[1] for row in before.execute(f"PRAGMA table_xinfo({quoted(table)})")]
+                require(row_digest(before, table, names) == row_digest(after, table, names),
+                        "Database writes may have occurred since the final backup")
+
+
 def image_id(command, source, bundle, target):
     path = bundle / "app.iid"
     command("docker", "build", "--iidfile", str(path), "--label", f"org.opencontainers.image.revision={target}",
@@ -247,7 +483,7 @@ def probe(command, inspect, name):
     raise MaintenanceError("Candidate rehearsal health timed out")
 
 
-def start_clone(command, inspect, name, image, data, *, require_existing=True):
+def start_clone(command, inspect, name, image, data, *, require_existing=True, mode=None):
     uid, gid = os.getuid() or 1654, os.getgid() or 1654
     if os.geteuid() == 0:
         os.chown(data, uid, gid)
@@ -261,21 +497,27 @@ def start_clone(command, inspect, name, image, data, *, require_existing=True):
         "DatabaseStartup__BackupBeforeMigrate": "true", "Push__Enabled": "false",
         "Jwt__SigningKey": secrets.token_hex(48),
     }
+    arguments = [f"--gf3-maintenance-{mode}"] if mode else []
+    readonly = ",readonly" if mode == "health" else ""
     command("docker", "create", "--name", name, "--pull", "never", "--network", "none",
             "--cap-drop", "ALL", "--security-opt", "no-new-privileges", "--log-driver", "none",
             "--read-only", "--tmpfs", "/tmp:rw,noexec,nosuid,nodev", "--user", f"{uid}:{gid}",
             "--health-interval", "1s", "--health-timeout", "4s",
-            "--mount", f"type=bind,source={data},destination=/data",
-            *(arg for key, value in environment.items() for arg in ("--env", f"{key}={value}")), image)
+            "--mount", f"type=bind,source={data},destination=/data{readonly}",
+            *(arg for key, value in environment.items() for arg in ("--env", f"{key}={value}")), image, *arguments)
     config, = inspect("container", "inspect", name)
     host = config["HostConfig"]
     mounts = config["Mounts"]
     require(config["Image"] == image and host["NetworkMode"] == "none" and not host["PortBindings"]
             and not host["Privileged"] and host["ReadonlyRootfs"] and set(host["CapDrop"]) == {"ALL"}
             and len(mounts) == 1 and mounts[0]["Source"] == str(data) and mounts[0]["Destination"] == "/data"
-            and mounts[0]["Type"] == "bind", "Candidate container is not isolated from production")
+            and mounts[0]["Type"] == "bind" and mounts[0]["RW"] == (mode != "health"),
+            "Candidate container is not isolated from production")
     command("docker", "start", name)
-    probe(command, inspect, name)
+    if mode == "migrate":
+        require(command("docker", "wait", name, timeout=120).strip() == "0", "Isolated EF migration failed")
+    else:
+        probe(command, inspect, name)
 
 
 def remove_clone(command, name):
@@ -286,7 +528,7 @@ def remove_clone(command, name):
         command("docker", "rm", "-f", ids[0])
 
 
-def rehearse(command, inspect, image, bundle, snapshot_path, before_ids, target_ids, columns):
+def rehearse(command, inspect, image, bundle, snapshot_path, before_ids, target_ids, columns, *, verify_modes=False):
     data = Path(tempfile.mkdtemp(prefix="clone-", dir=bundle))
     clone = data / "SQLite.db"
     name = "gf3-db-rehearsal-" + secrets.token_hex(12)
@@ -295,7 +537,16 @@ def rehearse(command, inspect, image, bundle, snapshot_path, before_ids, target_
             verify(snapshot_db, before_ids)
         shutil.copyfile(snapshot_path, clone)
         clone.chmod(0o600)
-        start_clone(command, inspect, name, image, data)
+        if verify_modes:
+            start_clone(command, inspect, name, image, data, mode="migrate")
+            remove_clone(command, name)
+            start_clone(command, inspect, name, image, data, mode="health")
+            # A legacy image that ignores the mode must not qualify for the live path.
+            code = command("docker", "exec", name, "curl", "-sS", "-o", "/dev/null", "-w", "%{http_code}",
+                           "--max-time", "5", "http://127.0.0.1:8080/")
+            require(code == "404", "Maintenance verification host serves ordinary application routes")
+        else:
+            start_clone(command, inspect, name, image, data)
         command("docker", "stop", "--time", "15", name, timeout=25)
         verify_migration(snapshot_path, clone, before_ids, target_ids, columns)
     finally:

@@ -2,7 +2,25 @@
 
 ## Decision
 
-**NO-GO for live database deployment.** The implementation adds an interactive clone rehearsal. Both migration guards continue to reject these changes through ordinary deployment, and the host menu has no live maintenance action.
+**Live installation requires separate review and authorization.** The repository implements the maintenance transaction behind the existing `[11] Deploy PROD2` action. A green disposable rehearsal qualifies the tested revision for review. Production compatibility and installation are distinct operator actions.
+
+## Managed deployment through [11]
+
+The helper detects appended EF migration pairs from the exact PROD2 diff. The ordinary deployment engine retains its migration fingerprint guard. Maintenance accepts ordinary application changes alongside complete generated migration pairs for nullable SQLite `TEXT` and `INTEGER` columns. It independently derives the reviewed column plan from the checked-out migration and compares schema, data and migration history after rehearsal. Unsupported critical files, existing migration edits and unsafe Git file modes block the update.
+
+The helper builds the exact image and runs both the EF startup process and a read-only health host on a private database copy. It prints the SHA, the number of pending migrations, the rehearsal result and the downtime warning. The operator then confirms the maintenance and types the complete target SHA. The engine consumes a protected capability once after checking the exact tip, current release, installed tools, review digest, migration fingerprint, CI attempt and image ID again.
+
+The one-time tooling transition may require a separate `/etc/gfctl/maintenance-tooling-review.json` record. It binds `before` and `target` SHAs to a `blobs` object containing the exact reviewed Git object ID of each changed member of `BOOTSTRAP_PATHS`. It must be root-owned and mode 0600. Routine schema updates derive the column plan from Git and require no per-deploy review file. The optional [13] operation retains its independent clone-only review file.
+
+## Fence and recovery boundary
+
+1. The release engine records a root-only journal at `/var/lib/gf3-deploy/maintenance-active.json`, takes the shared deployment lock and installs a dedicated `inet gf3_maintenance` nftables table. It blocks public inbound HTTP/HTTPS and forwarded access to the existing Docker bridge. GF3 stops Nginx first to close HTTP and SignalR connections, drains Guard, disables container restart policies and stops the old app.
+2. The engine checks the kernel rule set, container mounts, restart policies and host SQLite file descriptors and mappings. It then takes a SQLite backup while holding a reserved writer lock. The backup, migration history, original file identities and SHA-256 are recorded in the journal. The full integrity check and logical row comparison must pass before migration. The original named volume and bridge are retained.
+3. The candidate runs existing EF startup with no network, no published ports and no hosted background jobs. A separate read-only process then serves only health, using the same volume mounted read-only behind an Nginx instance with no published ports. The engine verifies schema, history, existing rows, TLS, ACME, topology, Guard and Git before it permits ordinary application startup.
+4. The durable `WRITES_MAY_RESUME` transition is written **before** starting the ordinary writable application. The kernel fence stays in place through its health, HTTPS and Guard timer checks. The engine removes the fence only after these succeed and checks HTTPS again. Once the marker is written, a failed deployment cannot automatically restore SQLite, even if public ports were still blocked.
+5. Before that boundary, a failure can restore the final backup if Git is still at the previous release, the kernel fence is intact, all writers are stopped and the original rows are intact. The journal consumes the restore transition before modifying the database. The engine retains the failed database and its journals, atomically installs the checksum-verified replacement, checks the original history and integrity, then verifies and reopens the prior release. Failed or unprovable recovery leaves `RECOVERY_REQUIRED` and the evidence on disk. [12] is code rollback only and refuses to cross a migration boundary.
+
+An unfinished journal blocks managed deploy, code rollback and certificate renewal after process exit or reboot. A reboot can clear nftables state. The pre-open containers have restart policy `no`, and the engine never infers a safe rollback from the journal alone. Reconcile the stored phase, actual firewall, Git, Docker and SQLite state through a controlled incident procedure. In particular, do not delete the journal or restore a retained SQLite snapshot after the write boundary. The Linux disposable rehearsal simulates kernel fence loss and Docker restart separately from ordinary failure recovery.
 
 The target PROD2 history includes `20261114225324_AddShiftCorrectionComment` and `20261115135735_RefreshManualShiftOffer`. Both add nullable SQLite columns, but that does not make the current cutover safe for a database change.
 
@@ -12,14 +30,14 @@ The target PROD2 history includes `20261114225324_AddShiftCorrectionComment` and
 2. `gf3_release.py::stage()` compares `migration_fingerprint()` for the running release and candidate. A changed EF migration or `DatabaseMigrationStartup.cs` is rejected before build/cutover. That guard is intentionally unchanged.
 3. `backup()` makes an online SQLite snapshot while the current application may still write, and checks it with `quick_check`. This is useful for ordinary release recovery; it is not the required final backup after writers have stopped, and it does not perform the requested full `integrity_check`.
 4. `recover()` restores the prior Compose configuration and containers. It does not restore `SQLite.db`. `DatabaseMigrationStartup.ApplyAsync()` applies EF migrations automatically when the candidate app starts. Therefore a failed migration can leave the database changed while the old app is restored.
-5. Current cutover has no explicit traffic-quiesce boundary. It starts the candidate app while Nginx remains part of the live stack, then starts/recreates Nginx and performs Guard and Git activation afterward. The current code does not prove that all request writers and background writers stayed stopped through those later checks.
+5. Ordinary cutover starts the candidate while Nginx is part of the live stack. It performs Guard and Git activation after starting ingress. The maintenance transaction uses its own ordering and fence.
 6. `verify_tooling()` requires host-installed security scripts and Guard units to match the target commit. The ordinary rollout notes do not constitute a separately reviewed maintenance-tool bootstrap. An unreviewed helper cannot safely install itself into the live checkout.
 
 These are independent gates. A helper-only bypass would still stop in `stage()`, and bypassing both would expose production data to a migration without a quiesced final backup or database-aware recovery.
 
-## Required state machine before enabling a future mode
+## Release safety contract
 
-The following is a design contract, **not an available operator procedure**. Each transition must be persistent, SHA-scoped, audited, and fail closed. Any failed check returns to a safe stopped state; it must never print a success state for work that did not run.
+Each transition must be persistent, bound to the approved SHAs, audited and fail closed. This table describes the checks used to review the implementation.
 
 | State | Required action and evidence | Failure handling |
 | --- | --- | --- |
@@ -68,17 +86,15 @@ Apply these steps only in a separate tooling review after Linux rehearsal CI pas
 
 These steps install rehearsal tooling outside the live Git checkout. Establishing a new active tooling baseline is a separate reviewed release operation. The ordinary helper continues to classify deployment scripts as critical and there is no tooling-and-migration exception.
 
-## Operator runbook while live deployment is disabled
+## Operator runbook before tool installation
 
-- Do not use a release operation to apply the two pending migrations. The ordinary `[11]` action remains the only menu action and its existing critical-file rejection is expected.
+- Use the existing managed release tools until the exact new tools and their bootstrap record have passed separate operator review.
 - Do not edit, copy, or restore the production SQLite database manually. The normal release rollback bundle is not a database-migration rollback guarantee.
 - For an unrelated ordinary release, continue to use the installed, reviewed host tooling and its existing runbook. Do not install changed security tooling from this proposal.
 - The rehearsal review and install procedure applies only to the clone operation. Live maintenance installation remains unavailable.
 - The eventual operator should verify the working database using SQLite `PRAGMA integrity_check`, confirm the expected `__EFMigrationsHistory` rows, and exercise application health before ingress reopens. The final backup should be inspectable as a root-only artifact under a private maintenance bundle. Those commands and paths must be supplied by the reviewed implementation; they are not established by the current host tooling.
 - Before traffic reopens, a failed migration may be rolled back only by restoring the verified final snapshot while ingress and every writer remain stopped, then verifying the database and previous app. After ingress reopens or any write may have happened, do not restore the snapshot; stop for manual intervention or forward repair.
 
-## Live enablement gate
+## Host compatibility required at installation
 
-- `EmployeeNotificationCleanupHostedService.ExecuteAsync()` can write before the first request. `EmployeeWebPushHostedService.ScanAsync()` can also write. The clone disables delivery and fails if any startup job changes existing rows. Live staging needs a reviewed way to start the candidate without background database writers, then start those writers at the commit boundary.
-- `gf3_release.py::start_nginx()` publishes ports before `finish_activation()` runs Guard and Git checks. A live maintenance transaction needs an ingress fence that stays closed during candidate HTTPS and Guard verification and across an interrupted process. Neither a stopped timer nor a successful SQLite `BEGIN IMMEDIATE` proves that all external writers will remain excluded after the lock is released.
-- The quiesced snapshot primitive takes a SQLite writer lock and checks migration history and integrity. The tests verify recovery into a fresh file. Live replacement requires durable fencing of ingress and all writers, validation against the original Docker volume and a persisted no-automatic-restore boundary. There is no live restore command or one-use live deployment authorization yet.
+The host needs nftables, a local Docker daemon with file-backed volumes, the current managed release layout and access to the host process table. Any unrecognized writer, privileged container with data access, changed fence or changed rollout state blocks maintenance. The protection assumes trusted root and Docker operators. Direct Docker commands, database tools and other privileged automation must share the deployment coordination or stay out of the maintenance window.

@@ -4,10 +4,12 @@
 import argparse
 from contextlib import contextmanager
 import importlib.util
+import hashlib
 import json
 import os
 from pathlib import Path
 import re
+import secrets
 import signal
 import sqlite3
 import stat
@@ -33,6 +35,7 @@ WORKFLOW_PATH = ".github/workflows/ci.yml"
 JOBS = {"Build and test", "Docker image"}
 APPROVAL = Path("/etc/gfctl/approved-release.conf")
 MAINTENANCE_REVIEW = Path("/etc/gfctl/maintenance-review.json")
+MAINTENANCE_TOOLING_REVIEW = Path("/etc/gfctl/maintenance-tooling-review.json")
 DEPLOY_LOCK = Path("/run/lock/gf3-prod-deploy.lock")
 SYSTEM_PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 ALLOWED_ORIGINS = {
@@ -221,6 +224,17 @@ def rollback_status(manifest):
     return "Active manifest has no retained rollback bundle with a SQLite snapshot."
 
 
+def critical_path(name, build_inputs=False):
+    path = name.lower()
+    return ((path.startswith(MAINTENANCE_DIRS) and not path.startswith("deploy/security/tests/"))
+            or path in MAINTENANCE_FILES
+            or path.startswith(("gf3.webapi/appsettings", "dockerfile.", "docker-compose", "compose."))
+            or path.rsplit("/", 1)[-1].startswith(("gf3_release", "gf3_guard", "databasemigration"))
+            or path.endswith((".service", ".timer", ".socket"))
+            or (build_inputs and (path.endswith((".csproj", ".props", ".targets", ".sln", ".sh"))
+                                  or path in {"nuget.config", "global.json"})))
+
+
 def changed_paths(before, target):
     try:
         release.git("merge-base", "--is-ancestor", before, target)
@@ -230,7 +244,6 @@ def changed_paths(before, target):
     paths = []
     maintenance = []
     for header, name in zip(changes[:-1:2], changes[1::2], strict=True):
-        path = name.lower()
         old_mode, new_mode, _, _, status = header[1:].split()
         paths.append((status, name))
         if name == HELPER_PATH and new_mode == "100644" and (
@@ -238,12 +251,7 @@ def changed_paths(before, target):
                 == release.git("rev-parse", f"{target}:{HELPER_PATH}").strip()):
             # The reviewed helper can enter the live tree once it has been installed explicitly.
             continue
-        if ((path.startswith(MAINTENANCE_DIRS) and not path.startswith("deploy/security/tests/"))
-                or path in MAINTENANCE_FILES
-                or path.startswith(("gf3.webapi/appsettings", "dockerfile.", "docker-compose", "compose."))
-                or path.rsplit("/", 1)[-1].startswith(("gf3_release", "gf3_guard", "databasemigration"))
-                or path.endswith((".service", ".timer", ".socket"))
-                or {old_mode, new_mode}.intersection(("120000", "160000"))):
+        if critical_path(name) or {old_mode, new_mode}.intersection(("120000", "160000")):
             maintenance.append(name)
     if maintenance:
         print("Changed paths requiring maintenance:", flush=True)
@@ -325,11 +333,35 @@ def confirm(sha):
 
 def prepare(check_only):
     with release.lock(DEPLOY_LOCK):
+        release.no_active_maintenance()
+        current = check_checkout()
+        target = fetch_tip()
+        migrations = release.git("diff", "--no-ext-diff", "--no-renames", "--diff-filter=A", "--name-only", "-z",
+                                 current, target, "--", "DataAccessLayer/Migrations").split("\0")
+    if any(re.fullmatch(r"DataAccessLayer/Migrations/[0-9]{14}_[A-Za-z][A-Za-z0-9_]*\.Designer\.cs", name)
+           for name in migrations):
+        if check_only:
+            with release.lock(DEPLOY_LOCK):
+                reviewed = maintenance_state(target, live=True)
+                tool = release.maintenance_tool(target, Path(__file__).absolute())
+                try:
+                    maintenance_changes(tool, reviewed[0], target, reviewed[5], True)
+                except tool.MaintenanceError as error:
+                    raise release.ReleaseError(str(error)) from None
+            print(f"PROD2 {target} contains a supported EF migration. Interactive rehearsal and approval are required.")
+            return 0
+        return maintenance_rehearse(target, deploy=True)
+    return prepare_ordinary(check_only, current, target)
+
+
+def prepare_ordinary(check_only, initial_current, initial_target):
+    with release.lock(DEPLOY_LOCK):
         current = check_checkout()
         bundle, manifest = active_release()
         release.require(manifest["sha"] == current,
                         "Git HEAD differs from the active release. Reconcile the managed rollback before deploying.")
         target = fetch_tip()
+        release.require((current, target) == (initial_current, initial_target), "Release changed during classification")
         if current == target and not check_only:
             print(f"PROD2 is already up to date at {current}.", flush=True)
             return 0
@@ -396,14 +428,16 @@ def prepare(check_only):
     return 0
 
 
-def maintenance_state(target):
+def maintenance_state(target, live=False):
+    release.no_active_maintenance()
     current = check_checkout()
     release.require(current != target and fetch_tip() == target, "Expected the exact incoming PROD2 tip")
     bundle, manifest = active_release()
     release.require(manifest["sha"] == current, "Git HEAD differs from the active release")
     approval = read_approval()
     environment = protected_file(release.ROOT / "deploy/.env")
-    review = protected_file(MAINTENANCE_REVIEW)
+    review = (protected_file(MAINTENANCE_TOOLING_REVIEW) if os.path.lexists(MAINTENANCE_TOOLING_REVIEW) else b""
+              ) if live else protected_file(MAINTENANCE_REVIEW)
     baseline = release.topology()
     verify_health(current, baseline, approval[2])
     containers = tuple(release.container(name)["Id"] for name in ("gf3-app", "nginx"))
@@ -412,32 +446,49 @@ def maintenance_state(target):
             compose_manifest, verify_ci(target))
 
 
-def maintenance_rehearse(target):
+def review_digest(review):
+    return hashlib.sha256(repr(review).encode()).hexdigest()
+
+
+def maintenance_changes(tool, current, target, review, live):
+    bootstrap = tool.bootstrap_paths(release.git, current, target, review) if live else set()
+    ordinary = (lambda path: path in bootstrap or not critical_path(path, build_inputs=True)) if live else None
+    paths, before_ids, target_ids = tool.classify(release.git, current, target, ordinary)
+    columns = (tool.migration_plan(release.git, current, target, target_ids[len(before_ids):])
+               if live else tool.review_plan(review, current, target))
+    return paths, before_ids, target_ids, columns
+
+
+def maintenance_rehearse(target, deploy=False):
     release.require(sys.stdin.isatty() and release.SHA.fullmatch(target),
                     "Maintenance rehearsal requires an interactive terminal and the full target SHA")
+    def state():
+        return maintenance_state(target, live=True) if deploy else maintenance_state(target)
+
     with release.lock(DEPLOY_LOCK):
-        reviewed = maintenance_state(target)
+        reviewed = state()
         current, _, _, _, environment, review, baseline, *_ = reviewed
         tool = release.maintenance_tool(target, Path(__file__).absolute())
         try:
-            paths, before_ids, target_ids = tool.classify(release.git, current, target)
-            columns = tool.review_plan(review, current, target)
+            paths, before_ids, target_ids, columns = maintenance_changes(tool, current, target, review, deploy)
         except tool.MaintenanceError as error:
             raise release.ReleaseError(str(error)) from None
         with candidate(target, environment) as source:
             with release.lock(release.RUNTIME / "state/guard.lock"):
                 release.preflight(source, target, baseline)
 
-    print(f"Maintenance rehearsal: {current} -> {target}")
+    print(f"Database maintenance: {current} -> {target}. Pending migrations: {len(target_ids) - len(before_ids)}")
     for path in paths:
         print(f"  {ascii(path)}")
     print(f"CI run {reviewed[-1][0]} attempt {reviewed[-1][1]}. The candidate runs against a private database copy.",
           flush=True)
-    if input("Build and rehearse this release? [y/N] ").strip().lower() not in ("y", "yes"):
-        return 0
-    release.require(input("Enter the full target SHA: ").strip() == target, "Maintenance SHA confirmation did not match")
+    if not deploy:
+        if input("Build and rehearse this release? [y/N] ").strip().lower() not in ("y", "yes"):
+            return 0
+        release.require(input("Enter the full target SHA: ").strip() == target,
+                        "Maintenance SHA confirmation did not match")
     with release.lock(DEPLOY_LOCK):
-        release.require(maintenance_state(target) == reviewed, "Maintenance review changed after confirmation")
+        release.require(state() == reviewed, "Maintenance review changed after confirmation")
         release.maintenance_tool(target, Path(__file__).absolute())
     bundle = Path(tempfile.mkdtemp(prefix=f"maintenance-{target[:12]}-", dir=release.STATE))
     audit = {"operation": "rehearse", "before": current, "target": target, "ci": reviewed[-1], "stage": "build"}
@@ -461,16 +512,16 @@ def maintenance_rehearse(target):
         snapshot = bundle / "SQLite.db"
         try:
             with release.lock(DEPLOY_LOCK):
-                release.require(maintenance_state(target) == reviewed, "Maintenance review changed during build")
+                release.require(state() == reviewed, "Maintenance review changed during build")
                 release.maintenance_tool(target, Path(__file__).absolute())
                 tool.snapshot(release.maintenance_database(baseline[2]), snapshot, before_ids)
             stage("isolated-startup")
             tool.rehearse(release.command, release.docker_json, audit["image"], bundle,
-                          snapshot, before_ids, target_ids, columns)
+                          snapshot, before_ids, target_ids, columns, verify_modes=deploy)
         finally:
             snapshot.unlink(missing_ok=True)
         with release.lock(DEPLOY_LOCK):
-            release.require(maintenance_state(target) == reviewed, "Maintenance review changed during rehearsal")
+            release.require(state() == reviewed, "Maintenance review changed during rehearsal")
             release.maintenance_tool(target, Path(__file__).absolute())
     except (Exception, KeyboardInterrupt) as error:
         audit["failure"] = type(error).__name__
@@ -481,6 +532,23 @@ def maintenance_rehearse(target):
         raise
     stage("passed")
     print(f"Maintenance clone rehearsal passed. Audit: {report}", flush=True)
+    if deploy:
+        print("Deployment will interrupt HTTP requests and SignalR sessions. "
+              "Traffic stays closed through backup, migration and verification.")
+        if input("Begin database maintenance deployment? [y/N] ").strip().lower() not in ("y", "yes"):
+            return 0
+        release.require(input("Enter the full target SHA to authorize live migration: ").strip() == target,
+                        "Maintenance deployment SHA confirmation did not match")
+        nonce = secrets.token_hex(32)
+        with release.lock(DEPLOY_LOCK):
+            release.require(state() == reviewed, "Maintenance review changed before deployment")
+            release.store(bundle / "capability.json", {"nonce": nonce, "target": target, "before": current,
+                          "review": review_digest(reviewed), "image": audit["image"],
+                          "migrations": release.migration_fingerprint(release.ROOT, target),
+                          "expires": int(release.time.time()) + 180})
+            sync_directory(bundle)
+            sync_directory(release.STATE)
+        return engine("maintenance-deploy", bundle, target, nonce)
     return 0
 
 

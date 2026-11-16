@@ -3,6 +3,7 @@
 
 import argparse
 from contextlib import closing, contextmanager
+from copy import deepcopy
 from datetime import datetime, timezone
 import hashlib
 import ipaddress
@@ -41,6 +42,7 @@ TEMPLATE = "/etc/nginx/templates/default.conf.template"
 CONFIG = "/etc/nginx"
 SHA = re.compile(r"[0-9a-f]{40}")
 IMAGE_DIGEST = re.compile(r"nginx@sha256:[0-9a-f]{64}")
+DEPLOY_LOCK = Path("/run/lock/gf3-prod-deploy.lock")
 ENV = {key: os.environ[key] for key in ("HOME", "PATH", "LANG", "LC_ALL", "SSH_AUTH_SOCK")
        if key in os.environ}
 ENV.update(GIT_TERMINAL_PROMPT="0", DOCKER_HOST="unix:///var/run/docker.sock")
@@ -457,20 +459,28 @@ def start_nginx(bundle):
 
 
 def curl(scheme, path, *args):
+    return curl_at("127.0.0.1", scheme, path, *args)
+
+
+def curl_at(address, scheme, path, *args):
     port = 443 if scheme == "https" else 80
     return command("curl", "--noproxy", "*", "-sS", "--max-time", "8", "--retry", "2", "--retry-connrefused",
-                   "--resolve", f"{DOMAIN}:{port}:127.0.0.1", *args, f"{scheme}://{DOMAIN}{path}", timeout=35)
+                   "--resolve", f"{DOMAIN}:{port}:{address}", *args, f"{scheme}://{DOMAIN}{path}", timeout=35)
 
 
-def verify_web(bundle, acme=True):
-    result = curl("https", "/api/health", "--fail")
+def verify_web(bundle, acme=True, address=None):
+    def probe(scheme, path, *args):
+        return curl(scheme, path, *args) if address is None else curl_at(address, scheme, path, *args)
+
+    result = probe("https", "/api/health", "--fail")
     require(json.loads(result).get("canConnect") is True, "HTTPS health failed")
     config = docker_json(*compose_args(), "-f", str(bundle / "compose.json"), "config", "--format", "json")
     bound = mounts(config["services"]["nginx"])
     cert = bound.get(CERT)
     if cert:
         expected = command("openssl", "x509", "-in", cert["source"], "-noout", "-fingerprint", "-sha256")
-        chain = command("openssl", "s_client", "-connect", "127.0.0.1:443", "-servername", DOMAIN, data="", timeout=15)
+        chain = command("openssl", "s_client", "-connect", f"{address or '127.0.0.1'}:443",
+                        "-servername", DOMAIN, data="", timeout=15)
         served = command("openssl", "x509", "-noout", "-fingerprint", "-sha256", data=chain)
         require(served == expected, "Nginx serves a different TLS certificate")
     if acme:
@@ -481,7 +491,7 @@ def verify_web(bundle, acme=True):
             fixture.write(b"gf3-acme-proof")
         try:
             path.chmod(0o644)
-            result = curl("http", "/.well-known/acme-challenge/" + path.name, "--fail", "-w", "\n%{http_code}")
+            result = probe("http", "/.well-known/acme-challenge/" + path.name, "--fail", "-w", "\n%{http_code}")
             require(result == "gf3-acme-proof\n200", "HTTP-01 response was not the exact challenge")
         finally:
             path.unlink(missing_ok=True)
@@ -515,30 +525,35 @@ def stage(sha, before, cidr, volume, nginx_image):
         require(migration_fingerprint(ROOT, before) == migration_fingerprint(work, sha),
                 "Release changes SQLite migrations or startup migration code. Rehearse and approve that separately.")
         shutil.copyfile(ROOT / "deploy/.env", work / "deploy/.env")
-        config = render(work)
-        bound = validate(config, cidr, volume)
-        template = bundle / "gf3.conf.template"
-        shutil.copyfile(bound[TEMPLATE]["source"], template)
-        template.chmod(0o644)
-        bound[TEMPLATE]["source"] = str(template)
-        bound[GEO]["source"] = str(RUNTIME / "nginx")
-        bound[LOG]["source"] = str(RUNTIME / "logs")
-        try:
-            command("docker", "image", "inspect", nginx_image)
-        except ReleaseError:
-            command("docker", "pull", nginx_image, timeout=600)
-        config["services"]["nginx"]["image"] = local_image(nginx_image, f"gf3-nginx:{bundle.name}")
         tag = f"gf3-app:{bundle.name}"
-        command("docker", "build", "-t", tag, str(work), timeout=1800, capture=False)
-        config["services"]["gf3-app"]["image"] = tag
-        freeze(config, volume)
-        save_compose(bundle, config)
-        shutil.copyfile(ROOT / "deploy/.env", bundle / "deploy.env")
-        (bundle / "guard-enabled").touch()
-        nginx_test(bundle)
-        return bundle
+        return stage_bundle(bundle, work, cidr, volume, nginx_image, tag, build=True)
     finally:
         git("worktree", "remove", "--force", str(work))
+
+
+def stage_bundle(bundle, work, cidr, volume, nginx_image, app_image, *, build=False):
+    config = render(work)
+    bound = validate(config, cidr, volume)
+    template = bundle / "gf3.conf.template"
+    shutil.copyfile(bound[TEMPLATE]["source"], template)
+    template.chmod(0o644)
+    bound[TEMPLATE]["source"] = str(template)
+    bound[GEO]["source"] = str(RUNTIME / "nginx")
+    bound[LOG]["source"] = str(RUNTIME / "logs")
+    try:
+        command("docker", "image", "inspect", nginx_image)
+    except ReleaseError:
+        command("docker", "pull", nginx_image, timeout=600)
+    config["services"]["nginx"]["image"] = local_image(nginx_image, f"gf3-nginx:{bundle.name}")
+    if build:
+        command("docker", "build", "-t", app_image, str(work), timeout=1800, capture=False)
+    config["services"]["gf3-app"]["image"] = app_image
+    freeze(config, volume)
+    save_compose(bundle, config)
+    shutil.copyfile(work / "deploy/.env", bundle / "deploy.env")
+    (bundle / "guard-enabled").touch()
+    nginx_test(bundle)
+    return bundle
 
 
 def recover(bundle, acme):
@@ -904,12 +919,366 @@ def maintenance_database(volume):
     return mount / "SQLite.db"
 
 
+def no_active_maintenance():
+    require(not os.path.lexists(STATE / "maintenance-active.json"),
+            "An unfinished database maintenance transaction blocks deployment, renewal and code rollback. "
+            "Inspect the protected maintenance journal.")
+
+
+def fence_rules(baseline):
+    bridge, = docker_json("network", "inspect", NETWORK)
+    require(bridge["Id"] == baseline[0] and bridge["Driver"] == "bridge" and
+            re.fullmatch(r"[0-9a-f]{64}", bridge["Id"]), "Unexpected production bridge")
+    name = bridge.get("Options", {}).get("com.docker.network.bridge.name", "br-" + bridge["Id"][:12])
+    require(re.fullmatch(r"[a-zA-Z0-9_.-]{1,15}", name) and Path("/sys/class/net", name, "bridge").is_dir(),
+            "Cannot identify the kernel interface for the production bridge")
+    return (
+        "create table inet gf3_maintenance\n"
+        "add chain inet gf3_maintenance input { type filter hook input priority -190; policy accept; }\n"
+        "add chain inet gf3_maintenance forward { type filter hook forward priority -190; policy accept; }\n"
+        'add rule inet gf3_maintenance input iifname != "lo" tcp dport { 80, 443 } drop\n'
+        f'add rule inet gf3_maintenance forward iifname != "{name}" oifname "{name}" drop\n'
+    )
+
+
+def read_fence():
+    # Listing an absent or unreadable table fails; leave the journal in place.
+    return command("nft", "-nn", "list", "table", "inet", "gf3_maintenance")
+
+
+def install_fence(baseline):
+    command("nft", "-f", "-", data=fence_rules(baseline))
+    return hashlib.sha256(read_fence().encode()).hexdigest()
+
+
+def verify_fence(digest):
+    require(hashlib.sha256(read_fence().encode()).hexdigest() == digest, "The kernel ingress fence changed")
+
+
+def docker_data_users(database, volume, permitted):
+    ids = command("docker", "ps", "-aq", "--no-trunc").splitlines()
+    for start in range(0, len(ids), 64):
+        for item in docker_json("container", "inspect", *ids[start:start + 64]):
+            if item["Id"] in permitted:
+                continue
+            host = item["HostConfig"]
+            require(not item["State"]["Running"] or not host["Privileged"],
+                    "An unmanaged privileged container can access the data volume")
+            for mount in item["Mounts"]:
+                source = Path(mount["Source"]).resolve()
+                require(mount.get("Name") != volume and not source.is_relative_to(database.parent)
+                        and not database.parent.is_relative_to(source)
+                        and source != Path("/var/run/docker.sock").resolve(),
+                        "An unmanaged container can access the data volume")
+
+
+def host_database_users(database, sqlite_files):
+    identities = set()
+    for path in sqlite_files(database):
+        try:
+            item = path.lstat()
+        except FileNotFoundError:
+            continue
+        require(stat.S_ISREG(item.st_mode) and item.st_nlink == 1, "Unexpected SQLite sidecar type")
+        identities.add((os.major(item.st_dev), os.minor(item.st_dev), item.st_ino))
+    for name in Path("/proc").iterdir():
+        if not name.name.isdecimal():
+            continue
+        try:
+            for descriptor in (name / "fd").iterdir():
+                try:
+                    item = descriptor.stat()
+                except FileNotFoundError:
+                    continue
+                require((os.major(item.st_dev), os.minor(item.st_dev), item.st_ino) not in identities,
+                        f"SQLite is still in use by host PID {name.name}")
+            for line in (name / "maps").read_text(errors="replace").splitlines():
+                _, _, _, device, inode, *_ = line.split(maxsplit=5)
+                if inode != "0":
+                    major, minor = (int(part, 16) for part in device.split(":"))
+                    require((major, minor, int(inode)) not in identities,
+                            f"SQLite is still mapped by host PID {name.name}")
+        except (FileNotFoundError, ProcessLookupError):
+            continue
+
+
+def stop_maintenance_stack(bundle):
+    command("systemctl", "stop", "gf3-guard.timer")
+    command("systemctl", "stop", "gf3-guard.service")
+    verify_guard_quiet()
+    # Explicitly disable restart policies before stopping. A daemon or host reboot cannot
+    # restart a stopped service during the transaction, even if the kernel fence is lost.
+    for name in ("nginx", "gf3-app"):
+        instance = container(name)
+        command("docker", "update", "--restart=no", instance["Id"])
+        compose(bundle, "stop", "--timeout", "30", name, timeout=50)
+        stopped = container(name)
+        require(stopped["Id"] == instance["Id"] and not stopped["State"]["Running"]
+                and not stopped["State"]["Restarting"] and stopped["HostConfig"]["RestartPolicy"]["Name"] == "no",
+                f"{name} did not stop or still has a restart policy")
+
+
+def maintenance_compose(bundle, mode):
+    config = deepcopy(docker_json(*compose_args(), "-f", str(bundle / "compose.json"), "config", "--format", "json"))
+    app, nginx = (config["services"][name] for name in ("gf3-app", "nginx"))
+    require(app.get("entrypoint") in (None, ["dotnet", "WebApi.dll"]) and not app.get("command"),
+            "Unexpected application entrypoint in maintenance")
+    path = bundle / mode
+    path.mkdir(mode=0o700)
+    for service in (app, nginx):
+        service["restart"] = "no"
+    if mode != "closed-public":
+        nginx.pop("ports", None)
+        app["command"] = ["--gf3-maintenance-" + mode]
+    if mode == "migrate":
+        app.pop("networks")
+        app["network_mode"] = "none"
+        app["cap_drop"] = ["ALL"]
+        app["security_opt"] = ["no-new-privileges:true"]
+        app["read_only"] = True
+        app["tmpfs"] = ["/tmp:rw,noexec,nosuid,nodev"]
+        app["logging"] = {"driver": "none"}
+    elif mode == "health":
+        mounts(app)["/data"]["read_only"] = True
+    save_compose(path, config)
+    return path
+
+
+def migrate_fenced(bundle, database, baseline, assert_quiet, assert_unchanged):
+    compose(bundle, "create", "--no-deps", "--no-build", "--pull", "never", "--force-recreate", "gf3-app")
+    item = container("gf3-app")
+    data, = item["Mounts"]
+    configuration = item["HostConfig"]
+    require(data["Name"] == baseline[2] and Path(data["Source"]) == database.parent and data["RW"]
+            and data["Destination"] == "/data" and configuration["NetworkMode"] == "none"
+            and not configuration["PortBindings"] and configuration["RestartPolicy"]["Name"] == "no"
+            and not configuration["Privileged"] and configuration["ReadonlyRootfs"]
+            and configuration["CapDrop"] == ["ALL"]
+            and item["Config"]["Cmd"] == ["--gf3-maintenance-migrate"],
+            "Migration container is not isolated")
+    assert_quiet()
+    assert_unchanged()
+    command("docker", "start", item["Id"])
+    try:
+        require(command("docker", "wait", item["Id"], timeout=900).strip() == "0", "EF migration startup failed")
+    finally:
+        if container("gf3-app")["State"]["Running"]:
+            command("docker", "stop", "--time", "15", item["Id"], timeout=25)
+    assert_quiet()
+
+
+def private_health(bundle, baseline):
+    compose(bundle, "create", "--no-build", "--pull", "never", "--force-recreate", "gf3-app", "nginx")
+    app = container("gf3-app")
+    nginx = container("nginx")
+    data, = app["Mounts"]
+    require(not data["RW"] and data["Name"] == baseline[2] and data["Destination"] == "/data"
+            and app["Config"]["Cmd"] == ["--gf3-maintenance-health"]
+            and not app["HostConfig"]["PortBindings"]
+            and not nginx["HostConfig"]["PortBindings"]
+            and all(instance["HostConfig"]["RestartPolicy"]["Name"] == "no" for instance in (app, nginx)),
+            "Maintenance health stack is not read-only and private")
+    backend(bundle)
+    compose(bundle, "up", "-d", "--no-deps", "--no-build", "--pull", "never", "nginx")
+    compose(bundle, "exec", "-T", "nginx", "nginx", "-t")
+    require(topology() == baseline, "Maintenance health stack changed Docker topology")
+    nginx = container("nginx")
+    address = str(ipaddress.IPv4Address(nginx["NetworkSettings"]["Networks"][NETWORK]["IPAddress"]))
+    verify_web(bundle, address=address)
+    return address
+
+
+def maintenance_cutover(tool, transaction, candidate, previous, current, target, baseline,
+                        before_ids, target_ids, columns):
+    database = maintenance_database(baseline[2])
+    volume_directory = database.parent.stat()
+    migration = maintenance_compose(candidate, "migrate")
+    private = maintenance_compose(candidate, "health")
+    closed = maintenance_compose(candidate, "closed-public")
+    previous_closed = maintenance_compose(previous, "closed-public")
+    previous_active = active_bundle()
+    previous_timer = timer_state()
+    command("nft", "-c", "-f", "-", data=fence_rules(baseline))
+    docker_data_users(database, baseline[2], {container("gf3-app")["Id"]})
+    transaction.advance("FENCING")
+    fence = install_fence(baseline)
+
+    def quiet():
+        verify_fence(fence)
+        require(maintenance_database(baseline[2]) == database, "Docker volume was replaced")
+        current_directory = database.parent.stat()
+        require((current_directory.st_dev, current_directory.st_ino) == (volume_directory.st_dev, volume_directory.st_ino),
+                "Docker volume directory changed")
+        known = [container(name) for name in ("gf3-app", "nginx")]
+        require(all(not item["State"]["Running"] and not item["State"]["Restarting"]
+                    and item["HostConfig"]["RestartPolicy"]["Name"] == "no" for item in known),
+                "Application or ingress can still restart")
+        docker_data_users(database, baseline[2], {item["Id"] for item in known})
+        host_database_users(database, tool.sqlite_files)
+
+    def reopen(bundle, staged, sha, complete):
+        verify_fence(fence)
+        # Commit this boundary before starting a writable application, even behind the kernel fence.
+        transaction.advance("WRITES_MAY_RESUME")
+        backend(staged)
+        verify_backend_env(bundle)
+        start_nginx(staged)
+        require(topology() == baseline and git("rev-parse", "HEAD").strip() == sha,
+                "Release identity or Docker topology changed before traffic reopened")
+        verify_web(bundle)
+        active = candidate if complete == "COMPLETED" else previous_active
+        activate(active)
+        restore_timer(previous_timer)
+        verify_fence(fence)
+        command("nft", "delete", "table", "inet", "gf3_maintenance")
+        verify_web(bundle)
+        original = json.loads((bundle / "compose.json").read_text())["services"]
+        for service in ("gf3-app", "nginx"):
+            restart = original[service].get("restart", "no")
+            require(restart in {"no", "unless-stopped", "always"}, "Unrecognized restart policy")
+            command("docker", "update", "--restart=" + restart, container(service)["Id"])
+        transaction.advance(complete)
+        transaction.finish()
+
+    try:
+        with lock(RUNTIME / "state/guard.lock"):
+            stop_maintenance_stack(previous)
+        quiet()
+        transaction.advance("FENCED", fence=fence)
+        backup = tool.final_backup(database, transaction.bundle, before_ids, quiet,
+                                   lambda metadata: transaction.advance("BACKED_UP", backup=metadata))
+        tool.verify_final_backup(transaction.bundle, backup)
+        quiet()
+        def assert_unchanged():
+            require(tool.database_stamp(database) == backup["source"], "Database changed after the final backup")
+
+        assert_unchanged()
+        transaction.advance("MIGRATING")
+        migrate_fenced(migration, database, baseline, quiet, assert_unchanged)
+        transaction.advance("VERIFYING")
+        tool.verify_migration(transaction.bundle / "final.db", database, before_ids, target_ids, columns)
+        verify_fence(fence)
+        address = private_health(private, baseline)
+        # Guard uses the same project and Nginx instance while ingress is private.
+        (private / "guard-enabled").touch()
+        run_id = run_initial_guard(private)
+        with lock(RUNTIME / "state/guard.lock"):
+            approve_guard(private, run_id)
+            verify_fence(fence)
+            verify_web(private, address=address)
+        require(topology() == baseline, "Docker topology changed before activation")
+        transaction.advance("ACTIVATING_GIT")
+        finalize_git(candidate, target)
+        transaction.advance("READY_TO_REOPEN")
+        reopen(candidate, closed, target, "COMPLETED")
+    except (Exception, KeyboardInterrupt) as error:
+        try:
+            state = transaction.read()
+            if (state["phase"] in {"MIGRATING", "VERIFYING", "ACTIVATING_GIT"}
+                    and not state["writes_may_resume"]
+                    and git("rev-parse", "HEAD").strip() == current):
+                with lock(RUNTIME / "state/guard.lock"):
+                    stop_maintenance_stack(previous)
+                    quiet()
+                    tool.verify_no_data_drift(transaction.bundle / "final.db", database)
+                    tool.restore_database(database, transaction.bundle, state["backup"], quiet,
+                                          lambda: transaction.advance("RESTORING"))
+                    restore_geo(previous)
+                    transaction.advance("RECOVERY_READY")
+                reopen(previous, previous_closed, current, "RECOVERED")
+                raise ReleaseError("Maintenance failed and the verified prior database and release were recovered") from None
+        except ReleaseError:
+            if not os.path.lexists(transaction.path):
+                raise
+        except (Exception, KeyboardInterrupt):
+            pass
+        transaction.fail(type(error).__name__)
+        raise ReleaseError(f"Maintenance needs intervention. Retained transaction: {transaction.bundle}") from None
+
+
+def protected_json(path):
+    safe_path(path, private=True)
+    mode = path.lstat().st_mode
+    require(stat.S_ISREG(mode) and stat.S_IMODE(mode) == 0o600, "Expected a protected maintenance file")
+    return json.loads(path.read_bytes())
+
+
+def maintenance_deploy(bundle, target, nonce):
+    require(SHA.fullmatch(target) and re.fullmatch(r"[0-9a-f]{64}", nonce), "Invalid maintenance authorization")
+    require(bundle.parent == STATE and re.fullmatch(rf"maintenance-{target[:12]}-[A-Za-z0-9_]+", bundle.name),
+            "Invalid maintenance transaction bundle")
+    safe_path(bundle, private=True)
+    capability = bundle / "capability.json"
+    permit = protected_json(capability)
+    audit = protected_json(bundle / "rehearsal.json")
+    require(set(permit) == {"nonce", "target", "before", "review", "image", "migrations", "expires"}
+            and permit["nonce"] == nonce and permit["target"] == target and type(permit["expires"]) is int
+            and int(time.time()) <= permit["expires"] <= int(time.time()) + 180
+            and audit["stage"] == "passed" and audit["target"] == target and audit["image"] == permit["image"],
+            "Maintenance authorization does not match the completed rehearsal")
+    helper_path = Path(__file__).absolute().with_name("gf3_prepare_release.py")
+    # Establish the current ref before hashing and loading the installed review code.
+    origin = git("remote", "get-url", "--all", "origin").lower().splitlines()
+    require(len(origin) == 1 and origin[0] in {
+        f"{prefix}olehprotsun/gf3{suffix}" for prefix in
+        ("https://github.com/", "git@github.com:", "ssh://git@github.com/") for suffix in ("", ".git")
+    }, "Maintenance requires the approved GitHub origin")
+    git("fetch", "origin", "refs/heads/PROD2:refs/remotes/origin/PROD2")
+    require(git("rev-parse", "refs/remotes/origin/PROD2").strip() == target, "Maintenance target changed")
+    tool = maintenance_tool(target, helper_path)
+    helper = ModuleType("gf3_installed_review")
+    helper.__file__ = str(helper_path)
+    exec(compile(helper_path.read_bytes(), str(helper_path), "exec"), helper.__dict__)
+    helper.release = sys.modules[__name__]
+    reviewed = helper.maintenance_state(target, live=True)
+    current, _, _, approval, environment, review, baseline, *_ = reviewed
+    require(permit["before"] == current == audit["before"] and permit["review"] == helper.review_digest(reviewed)
+            and permit["migrations"] == migration_fingerprint(ROOT, target)
+            and permit["migrations"] != migration_fingerprint(ROOT, current)
+            and list(reviewed[-1]) == audit["ci"], "Production state changed after maintenance approval")
+    try:
+        _, before_ids, target_ids, columns = helper.maintenance_changes(tool, current, target, review, True)
+    except tool.MaintenanceError as error:
+        raise ReleaseError(str(error)) from None
+    image = permit["image"]
+    require(re.fullmatch(r"sha256:[0-9a-f]{64}", image), "Invalid maintenance image ID")
+    artifact, = docker_json("image", "inspect", image)
+    require(artifact["Id"] == image and artifact["Config"]["Labels"]["org.opencontainers.image.revision"] == target,
+            "Rehearsed image does not match the approved SHA")
+    used = bundle / "capability-consumed.json"
+    require(not os.path.lexists(used), "Maintenance authorization was already consumed")
+    os.replace(capability, used)
+    tool.sync_dir(bundle)
+    candidate = Path(tempfile.mkdtemp(prefix=f"release-{target[:12]}-", dir=STATE))
+    with helper.candidate(target, environment) as work:
+        preflight(work, target, baseline)
+        stage_bundle(candidate, work, baseline[1], baseline[2], approval[2], image)
+    previous = Path(tempfile.mkdtemp(prefix="rollback-", dir=STATE))
+    snapshot(previous, baseline[2])
+    store(previous / "baseline.json", baseline)
+    store(previous / "release.json", {"sha": current})
+    store(candidate / "release.json", {"sha": target, "previous": str(previous), "baseline": baseline,
+                                       "maintenance": str(bundle)})
+    require(helper.maintenance_state(target, live=True) == reviewed, "Production changed during maintenance staging")
+    helper.approve(approval, target)
+    transaction = tool.Journal(STATE, bundle, store)
+    transaction.begin({"before": current, "target": target, "volume": baseline[2],
+                       "previous": str(previous), "candidate": str(candidate), "image": image})
+    maintenance_cutover(tool, transaction, candidate, previous, current, target, baseline,
+                        before_ids, target_ids, columns)
+    print(f"Deployed PROD2 {target}. Production health verified. Maintenance recovery evidence: {bundle}", flush=True)
+
+
 def main():
     parser = argparse.ArgumentParser()
     sub = parser.add_subparsers(dest="action", required=True)
     release = sub.add_parser("deploy")
     release.add_argument("sha")
     release.add_argument("nginx_image")
+    maintenance = sub.add_parser("maintenance-deploy")
+    maintenance.add_argument("bundle", type=Path)
+    maintenance.add_argument("sha")
+    maintenance.add_argument("nonce")
     preflight = sub.add_parser("preflight")
     preflight.add_argument("source", type=Path)
     preflight.add_argument("sha")
@@ -924,9 +1293,13 @@ def main():
         safe_path(ROOT)
         safe_path(STATE, private=True)
         safe_path(RUNTIME / "state/guard.lock", private=True)
-        with lock(Path("/run/lock/gf3-prod-deploy.lock")):
+        with lock(DEPLOY_LOCK):
+            no_active_maintenance()
             if args.action == "deploy":
                 deploy_and_activate(args.sha, args.nginx_image)
+                return 0
+            if args.action == "maintenance-deploy":
+                maintenance_deploy(args.bundle, args.sha, args.nonce)
                 return 0
             with lock(RUNTIME / "state/guard.lock"):
                 if args.action == "preflight":
@@ -937,6 +1310,11 @@ def main():
                     safe_path(args.bundle, private=True)
                     require(args.bundle.parent == STATE and args.bundle.name.startswith("rollback-"),
                             "Use a retained rollback bundle")
+                    active = protected_json(active_bundle() / "release.json")
+                    prior = protected_json(args.bundle / "release.json")
+                    require(SHA.fullmatch(active["sha"]) and SHA.fullmatch(prior["sha"])
+                            and migration_fingerprint(ROOT, active["sha"]) == migration_fingerprint(ROOT, prior["sha"]),
+                            "Code rollback cannot cross a SQLite migration. Keep current data for controlled recovery.")
                     config = json.loads((args.bundle / "compose.json").read_text())
                     recorded = json.loads((args.bundle / "baseline.json").read_text())
                     bridge, = docker_json("network", "inspect", NETWORK)
@@ -947,8 +1325,8 @@ def main():
                     require(topology() == tuple(recorded), "Recovered topology differs from backup")
                     if not (args.bundle / "guard-enabled").is_file():
                         command("systemctl", "disable", "--now", "gf3-guard.timer")
-    except (ReleaseError, OSError, ValueError, KeyError, subprocess.TimeoutExpired, sqlite3.Error, tarfile.TarError,
-            KeyboardInterrupt) as error:
+    except (ReleaseError, OSError, ValueError, KeyError, TypeError, subprocess.TimeoutExpired, sqlite3.Error,
+            tarfile.TarError, KeyboardInterrupt) as error:
         detail = str(error) if isinstance(error, ReleaseError) else f"{type(error).__name__}; check local release state"
         print(f"GF3 release: {detail}", file=sys.stderr)
         return 1

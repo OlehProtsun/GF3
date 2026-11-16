@@ -1,13 +1,49 @@
 using BusinessLogicLayer;
 using DataAccessLayer.Models.DataBaseContext;
 using Microsoft.AspNetCore.SpaServices.Extensions;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using WebApi.Infrastructure;
 using WebApi.Middleware;
 using WebApi.Realtime;
 using WebApi.Services;
 
-var builder = WebApplication.CreateBuilder(args);
+var maintenanceMigration = args is ["--gf3-maintenance-migrate"];
+var maintenanceHealth = args is ["--gf3-maintenance-health"];
+var builder = WebApplication.CreateBuilder(maintenanceMigration || maintenanceHealth ? [] : args);
+if (maintenanceMigration || maintenanceHealth)
+{
+    if (!builder.Environment.IsProduction() ||
+        !builder.Configuration.GetValue<bool>("DatabaseStartup:RequireExistingDatabase") ||
+        !builder.Configuration.GetValue<bool>("DatabaseStartup:BackupBeforeMigrate") ||
+        builder.Configuration.GetConnectionString("Default") != "Data Source=/data/SQLite.db")
+    {
+        throw new InvalidOperationException("Maintenance requires the protected production SQLite configuration.");
+    }
+}
+
+if (maintenanceHealth)
+{
+    // The deployment engine also mounts the volume read-only. This host serves only health
+    // and never registers the ordinary API routes or the application's background services.
+    var connectionString = new SqliteConnectionStringBuilder
+    {
+        DataSource = "/data/SQLite.db",
+        Mode = SqliteOpenMode.ReadOnly,
+        Pooling = false,
+    }.ToString();
+    builder.Services.AddDbContext<AppDbContext>(options => options.UseSqlite(connectionString));
+    var healthApp = builder.Build();
+    healthApp.MapGet("/api/health", async (AppDbContext db, CancellationToken cancellationToken) =>
+    {
+        var canConnect = await db.Database.CanConnectAsync(cancellationToken) &&
+            !(await db.Database.GetPendingMigrationsAsync(cancellationToken)).Any();
+        return Results.Json(new { status = canConnect ? "ok" : "unavailable", canConnect },
+            statusCode: canConnect ? 200 : 503);
+    });
+    await healthApp.RunAsync();
+    return;
+}
 SchedulePdfFontResolver.ConfigureOnce(builder.Configuration["PdfExport:FontFilePath"]);
 if (builder.Environment.IsProduction())
 {
@@ -22,6 +58,11 @@ TrustedProxyConfiguration.Configure(builder.Services, builder.Configuration, bui
 var app = builder.Build();
 
 await DatabaseMigrationStartup.ApplyAsync(app);
+if (maintenanceMigration)
+{
+    await app.DisposeAsync();
+    return;
+}
 ConfigureCommonMiddleware(app);
 ConfigureFrontendHosting(app);
 

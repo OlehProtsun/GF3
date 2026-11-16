@@ -150,11 +150,62 @@ class MaintenanceTests(unittest.TestCase):
         valid = record("A", migration + ".cs") + record("A", migration + ".Designer.cs")
         diff = valid
         self.assertEqual(maintenance.classify(git, "before", "target")[1:], (BEFORE, AFTER))
+        diff = valid + record("M", "FrontEnd/app.txt", old="100644")
+        self.assertEqual(maintenance.classify(git, "before", "target", lambda path: path.startswith("FrontEnd/"))[0][-1],
+                         "FrontEnd/app.txt")
         for diff in (record("A", migration + ".cs"), valid + record("M", "Dockerfile", old="100644"),
                      valid + record("A", migration + "Link.cs", new="120000"),
                      valid + record("D", "DataAccessLayer/Migrations/old.cs", new="000000", old="100644")):
             with self.subTest(diff=diff), self.assertRaises(maintenance.MaintenanceError):
                 maintenance.classify(git, "before", "target")
+
+    def test_final_backup_and_once_only_recovery_preserve_rows(self):
+        bundle = self.root / "bundle"
+        bundle.mkdir()
+        journal = maintenance.Journal(self.root, bundle, lambda path, body: path.write_text(json.dumps(body)))
+        journal.begin({"before": BEFORE[0], "target": AFTER[-1]})
+        journal.advance("FENCING")
+        journal.advance("FENCED")
+        quiet = Mock()
+        backup = maintenance.final_backup(self.live, bundle, BEFORE, quiet,
+                                          lambda metadata: journal.advance("BACKED_UP", backup=metadata))
+        journal.advance("MIGRATING")
+        with closing(sqlite3.connect(self.live)) as db, db:
+            self.apply(db)
+        maintenance.verify_no_data_drift(bundle / "final.db", self.live)
+        maintenance.restore_database(self.live, bundle, backup, quiet, lambda: journal.advance("RESTORING"))
+        with closing(sqlite3.connect(self.live)) as db:
+            maintenance.verify(db, BEFORE)
+            self.assertEqual(db.execute("SELECT name FROM employee").fetchone(), ("Fixture Employee",))
+        with closing(sqlite3.connect(bundle / "failed-database" / "live.db")) as db:
+            maintenance.verify(db, AFTER)
+        journal.advance("RECOVERY_READY")
+        journal.advance("WRITES_MAY_RESUME")
+        restarted = maintenance.Journal(self.root, bundle, journal.store)
+        self.assertTrue(restarted.read()["writes_may_resume"])
+        with self.assertRaises(maintenance.MaintenanceError):
+            restarted.advance("RESTORING")
+        restarted.fail("interrupted")
+        self.assertTrue(restarted.read()["writes_may_resume"])
+        with self.assertRaises(maintenance.MaintenanceError):
+            restarted.begin({})
+
+    def test_failed_or_tampered_backup_and_new_writes_fail_closed(self):
+        bundle = self.root / "backup"
+        bundle.mkdir()
+        with patch.object(maintenance, "snapshot", side_effect=OSError("no space")):
+            record = Mock()
+            with self.assertRaises(OSError):
+                maintenance.final_backup(self.live, bundle, BEFORE, Mock(), record)
+            record.assert_not_called()
+        metadata = maintenance.final_backup(self.live, bundle, BEFORE, Mock(), Mock())
+        with closing(sqlite3.connect(self.live)) as db, db:
+            db.execute("INSERT INTO employee VALUES (2, 'Later write', NULL)")
+        with self.assertRaisesRegex(maintenance.MaintenanceError, "writes may have occurred"):
+            maintenance.verify_no_data_drift(bundle / "final.db", self.live)
+        (bundle / "final.db").write_bytes(b"damaged")
+        with self.assertRaisesRegex(maintenance.MaintenanceError, "checksum"):
+            maintenance.verify_final_backup(bundle, metadata)
 
 
 if __name__ == "__main__":
