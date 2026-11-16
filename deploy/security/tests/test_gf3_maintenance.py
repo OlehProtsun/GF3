@@ -214,6 +214,22 @@ class MaintenanceTests(unittest.TestCase):
         with self.assertRaisesRegex(maintenance.MaintenanceError, "checksum"):
             maintenance.verify_final_backup(bundle, metadata)
 
+    def test_final_backup_accepts_empty_wal_sidecars_but_detects_committed_writes(self):
+        bundle = self.root / "backup"
+        bundle.mkdir()
+        with closing(sqlite3.connect(self.live)) as writer:
+            writer.execute("PRAGMA journal_mode=WAL")
+            writer.execute("INSERT INTO employee VALUES (2, 'Committed before the fence', NULL)")
+            writer.commit()
+        backup = maintenance.final_backup(self.live, bundle, BEFORE, Mock(), Mock())
+        self.assertEqual(maintenance.database_stamp(self.live), backup["source"])
+        with closing(sqlite3.connect(self.live)) as writer:
+            writer.execute("INSERT INTO employee VALUES (3, 'Unexpected later write', NULL)")
+            writer.commit()
+            self.assertNotEqual(maintenance.database_stamp(self.live), backup["source"])
+        with closing(maintenance.open_db(bundle / "final.db", "ro")) as snapshot:
+            self.assertEqual(snapshot.execute("SELECT id FROM employee ORDER BY id").fetchall(), [(1,), (2,)])
+
     def test_process_death_keeps_the_persisted_reopen_boundary(self):
         source = """
 import sys, time

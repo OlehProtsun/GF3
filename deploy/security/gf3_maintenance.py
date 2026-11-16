@@ -228,8 +228,10 @@ def database_stamp(path):
             require(entry != path, "SQLite database is missing")
             continue
         require(stat.S_ISREG(info.st_mode) and info.st_nlink == 1, "Unexpected SQLite file type")
-        if entry.name.endswith("-shm"):
-            continue  # Shared-memory locking metadata does not represent database contents.
+        if entry != path and (entry.name.endswith("-shm") or info.st_size == 0):
+            # Readers of a checkpointed WAL database can create empty journal files.
+            # Their presence and the shared-memory index do not represent data changes.
+            continue
         result[entry.name] = [info.st_dev, info.st_ino, info.st_size, digest_file(entry)]
     return result
 

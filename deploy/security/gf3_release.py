@@ -1200,8 +1200,11 @@ def maintenance_cutover(tool, transaction, candidate, previous, current, target,
                 raise
         except (Exception, KeyboardInterrupt):
             pass
-        transaction.fail(type(error).__name__)
-        raise ReleaseError(f"Maintenance needs intervention. Retained transaction: {transaction.bundle}") from None
+        detail = str(error) if isinstance(error, (ReleaseError, tool.MaintenanceError)) else type(error).__name__
+        if isinstance(error, sqlite3.Error):
+            detail += f" ({getattr(error, 'sqlite_errorname', 'SQLite failure')})"
+        transaction.fail(detail)
+        raise ReleaseError(f"Maintenance needs intervention: {detail}. Retained transaction: {transaction.bundle}") from None
 
 
 def protected_json(path):
