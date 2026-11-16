@@ -14,6 +14,7 @@ from urllib.error import URLError
 
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import gf3_maintenance as maintenance
 import gf3_prepare_release as prepare
 
 
@@ -50,6 +51,7 @@ class ManagedDeploymentTests(unittest.TestCase):
         self.git("clone", "-b", "PROD2", str(self.remote), str(self.writer), root=self.base)
         self.git("config", "user.name", "Disposable CI", root=self.writer)
         self.git("config", "user.email", "ci@example.invalid", root=self.writer)
+        self.git("config", "core.autocrlf", "false", root=self.writer)
         self.env = self.root / "deploy/.env"
         self.env.write_bytes(b"SECRET=never-print-this\n")
         self.env.chmod(0o600)
@@ -360,6 +362,81 @@ class ManagedDeploymentTests(unittest.TestCase):
                 self.assertIn(path, self.output.getvalue())
         self.api.assert_not_called()
         self.engine.assert_not_called()
+        self.confirm.assert_not_called()
+
+    def test_maintenance_rehearsal_rejects_noninteractive_input(self):
+        with patch.object(prepare.sys.stdin, "isatty", return_value=False):
+            with self.assertRaisesRegex(release.ReleaseError, "interactive terminal"):
+                prepare.maintenance_rehearse(self.target)
+        self.confirm.assert_not_called()
+        self.engine.assert_not_called()
+        self.api.assert_not_called()
+
+    def test_menu_deploy_dispatches_combined_release_to_maintenance(self):
+        self.push()
+        target = self.push("DataAccessLayer/Migrations/20261114225324_AddComment.Designer.cs")
+        with patch.object(prepare, "maintenance_rehearse", return_value=0) as rehearse:
+            self.assertEqual(prepare.prepare(False), 0)
+        rehearse.assert_called_once_with(target, deploy=True)
+        self.engine.assert_not_called()
+        self.assertEqual(self.approval.read_bytes(), self.approval_contents)
+
+    def test_maintenance_check_only_blocks_failed_ci_without_rehearsing_or_approving(self):
+        self.push("DataAccessLayer/Migrations/20261114225324_AddComment.Designer.cs")
+        self.job_overrides["Docker image"] = {"conclusion": "failure"}
+        with patch.object(prepare, "maintenance_rehearse") as rehearse:
+            with self.assertRaises(release.ReleaseError):
+                prepare.prepare(True)
+        rehearse.assert_not_called()
+        self.engine.assert_not_called()
+        self.assertEqual(self.approval.read_bytes(), self.approval_contents)
+
+    def test_live_maintenance_requires_exact_sha_and_rechecks_ci_after_approval(self):
+        target = self.push("DataAccessLayer/Migrations/20261114225324_AddComment.Designer.cs")
+        changes = (["DataAccessLayer/Migrations/20261114225324_AddComment.Designer.cs"],
+                   ("before",), ("before", "added"), ())
+
+        def reply(prompt):
+            if "Begin" in prompt:
+                return "yes"
+            if rerun:
+                self.newer_run = {"run_number": 13, "status": "queued", "conclusion": None}
+                return target
+            return "0" * 40
+
+        with (patch.object(release, "maintenance_tool") as load,
+              patch.object(prepare, "maintenance_changes", return_value=changes),
+              patch.object(release, "preflight"),
+              patch.object(release, "maintenance_database", return_value=self.root / "fixture.db"),
+              patch.object(prepare.sys.stdin, "isatty", return_value=True),
+              patch("builtins.input", side_effect=reply)):
+            load.return_value.MaintenanceError = maintenance.MaintenanceError
+            load.return_value.image_id.return_value = "sha256:" + "f" * 64
+            for rerun, failure in ((False, "SHA confirmation did not match"), (True, "pending or unsuccessful")):
+                with self.subTest(rerun=rerun), self.assertRaisesRegex(release.ReleaseError, failure):
+                    prepare.prepare(False)
+            self.assertEqual(load.return_value.rehearse.call_count, 2)
+        self.engine.assert_not_called()
+        self.assertEqual(self.approval.read_bytes(), self.approval_contents)
+        self.assertEqual(list(self.state.glob("maintenance-*/capability.json")), [])
+        self.assertNotIn("never-print-this", self.output.getvalue())
+
+    def test_maintenance_rehearsal_rejects_changed_review_after_typed_sha(self):
+        target = self.push()
+        reviewed = (self.current, self.previous, {}, (), b"env", b"review", BASELINE, (), b"compose", (34, 2))
+        changed = (*reviewed[:5], b"changed review", *reviewed[6:])
+        tool = patch.object(release, "maintenance_tool")
+        with (tool as load,
+              patch.object(prepare, "maintenance_state", side_effect=[reviewed, changed]),
+              patch.object(prepare, "candidate", return_value=contextlib.nullcontext(self.root)),
+              patch.object(release, "preflight"),
+              patch.object(prepare.sys.stdin, "isatty", return_value=True),
+              patch("builtins.input", side_effect=["y", target])):
+            load.return_value.classify.return_value = (["fixture"], ("before",), ("before", "added"))
+            with self.assertRaisesRegex(release.ReleaseError, "review changed after confirmation"):
+                prepare.maintenance_rehearse(target)
+        self.assertEqual(list(self.state.glob("maintenance-*")), [])
+        self.assertEqual(self.approval.read_bytes(), self.approval_contents)
 
     def test_new_helper_requires_the_exact_installed_blob(self):
         self.push(prepare.HELPER_PATH, "different helper")

@@ -15,6 +15,73 @@ namespace GF3.Tests;
 public sealed class DatabaseMigrationStartupTests
 {
     [Fact]
+    public async Task AdditiveMigrations_OnCopy_PreserveRowsAndLeaveSourceUnmigrated()
+    {
+        const string prior = "20261101190152_AddDayOffShiftCorrectionRequests";
+        const string correction = "20261114225324_AddShiftCorrectionComment";
+        const string refresh = "20261115135735_RefreshManualShiftOffer";
+        var root = CreateTempRoot();
+        var sourcePath = Path.Combine(root, "SQLite.db");
+        var clonePath = Path.Combine(root, "clone.db");
+        try
+        {
+            var workspace = new SqliteDatabaseWorkspace(sourcePath);
+            await using (var source = CreateContext(workspace.ConnectionString))
+            {
+                await source.GetService<IMigrator>().MigrateAsync(prior);
+                source.Employees.Add(new EmployeeModel { FirstName = "Fixture", LastName = "Employee" });
+                await source.SaveChangesAsync();
+            }
+            var snapshot = await workspace.CreateAutomaticBackupAsync(default);
+            File.Copy(snapshot.Path, clonePath);
+            var cloneWorkspace = new SqliteDatabaseWorkspace(clonePath);
+            await using (var clone = CreateContext(cloneWorkspace.ConnectionString))
+            {
+                var result = await DatabaseMigrationStartup.ApplyAsync(clone, cloneWorkspace, true, true,
+                    NullLogger.Instance);
+                Assert.Equal(new[] { correction, refresh }, result.AppliedMigrations);
+                Assert.Equal("Fixture", (await clone.Employees.SingleAsync()).FirstName);
+                Assert.Empty(await clone.ShiftCorrectionRequests.Select(request => request.Comment).ToListAsync());
+                Assert.Empty(await clone.ShiftSwapRequests.Select(request => request.RefreshedAtUtc).ToListAsync());
+                Assert.Equal("ok", await IntegrityAsync(cloneWorkspace.ConnectionString));
+            }
+            SqliteConnection.ClearAllPools();
+            var verificationConnection = new SqliteConnectionStringBuilder
+            {
+                DataSource = new Uri(clonePath).AbsoluteUri + "?immutable=1",
+                Mode = SqliteOpenMode.ReadOnly,
+                Pooling = false,
+            }.ToString();
+            await using (var verification = CreateContext(verificationConnection))
+            {
+                Assert.Empty(await verification.Database.GetPendingMigrationsAsync());
+                Assert.Equal("Fixture", (await verification.Employees.SingleAsync()).FirstName);
+                verification.Employees.Add(new EmployeeModel { FirstName = "Unexpected", LastName = "Write" });
+                var error = await Assert.ThrowsAsync<DbUpdateException>(() => verification.SaveChangesAsync());
+                Assert.Equal(8, Assert.IsType<SqliteException>(error.InnerException).SqliteErrorCode);
+            }
+            await using var unchanged = CreateContext(workspace.ConnectionString);
+            Assert.Equal(prior, (await unchanged.Database.GetAppliedMigrationsAsync()).Last());
+            Assert.Equal("Fixture", (await unchanged.Employees.SingleAsync()).FirstName);
+            Assert.Equal("ok", await IntegrityAsync(workspace.ConnectionString));
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+            Directory.Delete(root, recursive: true);
+        }
+
+        static async Task<string?> IntegrityAsync(string connectionString)
+        {
+            await using var connection = new SqliteConnection(connectionString);
+            await connection.OpenAsync();
+            await using var command = connection.CreateCommand();
+            command.CommandText = "PRAGMA integrity_check";
+            return (string?)await command.ExecuteScalarAsync();
+        }
+    }
+
+    [Fact]
     public async Task DayOffMigration_PreservesHistoryAndEnforcesBothPendingIndexesAndSnapshotChecks()
     {
         await using var database = await GF3.Tests.Infrastructure.SqliteTestDatabase.CreateAsync();

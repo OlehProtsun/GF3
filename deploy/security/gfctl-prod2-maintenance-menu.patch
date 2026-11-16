@@ -1,0 +1,40 @@
+--- a/gfctl
++++ b/gfctl
+@@ -381,6 +381,14 @@
+     /usr/bin/python3 -I /usr/local/libexec/gf3/gf3_prepare_release.py
+ }
+
++rehearse_database_maintenance() {
++    require_root
++    section "GF3 PROD2 DATABASE MAINTENANCE REHEARSAL"
++    local sha
++    read -r -p "  Full reviewed PROD2 target SHA: " sha || return 1
++    /usr/bin/python3 -I /usr/local/libexec/gf3/gf3_prepare_release.py --maintenance-rehearse "$sha"
++}
++
+
+ # =========================================================
+ # ROLLBACK
+@@ -1131,6 +1139,7 @@
+     printf "  ${CYAN}[10]${RESET} %-25s ${RED}[12]${RESET} %s\n" \
+         "Monitoring check" \
+         "Rollback code"
++    printf "  ${YELLOW}[13]${RESET} Rehearse PROD2 database maintenance on a copy\n"
+
+     echo
+
+@@ -1288,7 +1297,14 @@
+                 menu_pause
+                 ;;
+
++            13|maintenance-rehearse)
++                if ! rehearse_database_maintenance; then
++                    warn "Database maintenance rehearsal did not pass."
++                fi
++                menu_pause
++                ;;
++
+             r|refresh)
+                 ;;
+
+             0|q|quit|exit)
