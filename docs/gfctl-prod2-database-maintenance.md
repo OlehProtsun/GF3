@@ -18,83 +18,193 @@ The one-time tooling transition may require a separate `/etc/gfctl/maintenance-t
 2. The engine checks the kernel rule set, container mounts, restart policies and host SQLite file descriptors and mappings. It then takes a SQLite backup while holding a reserved writer lock. The backup, migration history, original file identities and SHA-256 are recorded in the journal. The full integrity check and logical row comparison must pass before migration. The original named volume and bridge are retained.
 3. The candidate runs existing EF startup with no network, no published ports and no hosted background jobs. A separate read-only process then serves only health, using the same volume mounted read-only behind an Nginx instance with no published ports. The engine verifies schema, history, existing rows, TLS, ACME, topology, Guard and Git before it permits ordinary application startup.
 4. The durable `WRITES_MAY_RESUME` transition is written **before** starting the ordinary writable application. The kernel fence stays in place through its health, HTTPS and Guard timer checks. The engine removes the fence only after these succeed and checks HTTPS again. Once the marker is written, a failed deployment cannot automatically restore SQLite, even if public ports were still blocked.
-5. Before that boundary, a failure can restore the final backup if Git is still at the previous release, the kernel fence is intact, all writers are stopped and the original rows are intact. The journal consumes the restore transition before modifying the database. The engine retains the failed database and its journals, atomically installs the checksum-verified replacement, checks the original history and integrity, then verifies and reopens the prior release. Failed or unprovable recovery leaves `RECOVERY_REQUIRED` and the evidence on disk. [12] is code rollback only and refuses to cross a migration boundary.
+5. Before that boundary, a failure can restore the final backup if Git is still at the previous release, the kernel fence is intact, all writers are stopped and logical comparison with the backup finds no unrelated data changes. The journal consumes the restore transition before modifying the database. The engine retains the failed database and its journals, atomically installs the checksum-verified replacement, checks the original history and integrity, then verifies and reopens the prior release. Failed or unprovable recovery leaves `RECOVERY_REQUIRED` and the evidence on disk. [12] is code rollback only and refuses to cross a migration boundary.
 
 An unfinished journal blocks managed deploy, code rollback and certificate renewal after process exit or reboot. A reboot can clear nftables state. The pre-open containers have restart policy `no`, and the engine never infers a safe rollback from the journal alone. Reconcile the stored phase, actual firewall, Git, Docker and SQLite state through a controlled incident procedure. In particular, do not delete the journal or restore a retained SQLite snapshot after the write boundary. The Linux disposable rehearsal simulates kernel fence loss and Docker restart separately from ordinary failure recovery.
 
-The target PROD2 history includes `20261114225324_AddShiftCorrectionComment` and `20261115135735_RefreshManualShiftOffer`. Both add nullable SQLite columns, but that does not make the current cutover safe for a database change.
+## Why the ordinary path stays guarded
 
-## Independent blockers and rollback risk
+The prepare helper used to stop database-sensitive changes during diff review. The release engine separately rejects a changed migration fingerprint during ordinary staging. Normal cutover uses an online SQLite backup and restores the previous app and proxy on failure. The normal recovery code cannot undo startup EF migrations. The maintenance transaction uses a separate quiesced backup, its own recovery rules, and verifies the candidate before public cutover.
 
-1. `gf3_prepare_release.py::changed_paths()` classifies database and deployment-sensitive paths as manual-maintenance changes and stops before CI review, approval, or deployment. Removing only that check would leave the release engine's independent guard in place.
-2. `gf3_release.py::stage()` compares `migration_fingerprint()` for the running release and candidate. A changed EF migration or `DatabaseMigrationStartup.cs` is rejected before build/cutover. That guard is intentionally unchanged.
-3. `backup()` makes an online SQLite snapshot while the current application may still write, and checks it with `quick_check`. This is useful for ordinary release recovery; it is not the required final backup after writers have stopped, and it does not perform the requested full `integrity_check`.
-4. `recover()` restores the prior Compose configuration and containers. It does not restore `SQLite.db`. `DatabaseMigrationStartup.ApplyAsync()` applies EF migrations automatically when the candidate app starts. Therefore a failed migration can leave the database changed while the old app is restored.
-5. Ordinary cutover starts the candidate while Nginx is part of the live stack. It performs Guard and Git activation after starting ingress. The maintenance transaction uses its own ordering and fence.
-6. `verify_tooling()` requires host-installed security scripts and Guard units to match the target commit. The ordinary rollout notes do not constitute a separately reviewed maintenance-tool bootstrap. An unreviewed helper cannot safely install itself into the live checkout.
+The first supported PROD2 migration pair adds `shift_correction_request.comment` (`TEXT`) and `shift_swap_request.refreshed_at_utc` (`INTEGER`). Additional releases qualify when the target contains complete append-only generated migration pairs for supported nullable columns, changes to the related model files listed in `gf3_maintenance.py`, and regular files allowed by the complete-diff review. Changes to existing migrations, database startup logic, deployment or infrastructure outside the bootstrap allowlist, and unsafe Git modes stop deployment.
 
-These are independent gates. A helper-only bypass would still stop in `stage()`, and bypassing both would expose production data to a migration without a quiesced final backup or database-aware recovery.
+## Install the reviewed host tools
 
-## Release safety contract
+Schedule a separate authorized root tooling window. The existing one-click runbook must already be installed with [11] invoking the protected libexec helper. Either reviewed menu checksum below is accepted. If the current menu uses a checkout-local helper or has another checksum, start with a separately reviewed transition using [the one-click rollout](gfctl-prod2-rollout.md). The commands below expect the managed Ubuntu layout, nftables, local Docker volumes, an active Guard timer, a known running release, and a clean checkout. Coordinate any other privileged automation before starting.
 
-Each transition must be persistent, bound to the approved SHAs, audited and fail closed. This table describes the checks used to review the implementation.
+Wait for a reviewed merge and successful **PROD2 push CI** on the exact currently fetched target. Verify both required jobs. Draft PR CI is only rehearsal evidence. Separately provide `/root/gf3-maintenance-reviewed` (root-owned, mode 0700) containing these three root-owned mode-0600 files:
 
-| State | Required action and evidence | Failure handling |
-| --- | --- | --- |
-| Review | Confirm the exact current PROD2 tip, latest successful CI run and attempt plus required jobs, candidate and checkout SHA, clean/trusted Git state, active manifest, mode-0600 environment and approval files, pinned Nginx image, live topology/data volume, installed-tool hashes, and both deployment/Guard locks. Classify the complete before/target diff. | Reject stale or ambiguous CI, any changed gate, combined unrelated critical changes, deletes/renames, symlinks, submodules, or unreviewed paths. |
-| Validate on DB clone | Build the exact candidate image. Take a consistent SQLite snapshot of the existing production volume, run full integrity and migration-history checks, and copy it to a private temporary directory. Run candidate startup migrations and health checks against only that clone with no network, no published ports, and no shared production Docker network. Verify the source volume is logically unchanged. | Stop and remove all clone containers/files; retain sanitized audit data. Never mount the production volume in the rehearsal container. |
-| Backup | Warn about expected downtime. Stop external ingress first, drain/stop Guard and app/background writers, prove no other container or host process can write the named production volume, then make a final WAL-consistent snapshot. Require root ownership, a mode-0700 directory, mode-0600 files, full integrity, and verified migration history. Keep previous backups and release bundles. | Keep ingress closed and writers stopped if state is uncertain. Do not report a completed backup or continue. |
-| Approve SHA | Re-read CI, checkout, Git cleanliness/origin, active manifest, environment/approval bytes and modes, topology, tool hashes, and locks. Show the downtime warning and exact target SHA. Require an interactive confirmation and a second entry of the full target SHA. Re-read all gates immediately after confirmation. | Any difference invalidates the approval and requires a fresh review. Never allow `--check-only`, noninteractive input, environment flags, or generic force options to authorize maintenance. |
-| Deploy | Consume a one-use maintenance capability tied to the exact SHA and operation. The release engine independently validates it and the allowed diff. Keep ingress closed while the candidate starts, migrations run, full SQLite integrity/history checks and app health succeed, Guard checks complete, and Git activation is verified. | Before traffic is reopened, stop writers, restore only the verified final SQLite snapshot, verify integrity/history, then start and verify the prior app. If restore cannot be proven, remain offline for intervention. |
-| Reopen traffic | This is the irreversible data boundary. Reopen ingress only after every pre-open check succeeds; record the boundary before the first public request can reach the candidate. | If traffic has reopened or writes may have occurred, never automatically restore an older database snapshot. Keep the service stopped or in maintenance mode and require manual intervention/forward repair. |
+- `PROD2.sha` with one line containing the full reviewed target.
+- `maintenance-tooling-review.json` with `before`, `target` and `blobs` as described above. Include each changed bootstrap path and its exact target Git blob ID. Compare against the actual active release, including any application changes that accompany the migrations.
+- `SHA256SUMS` with one standard `sha256sum` text entry for each of `gf3_release.py`, `gf3_prepare_release.py`, `gf3_maintenance.py`, `Program.cs`, `gfctl-prod2-maintenance-menu.patch` and `maintenance-tooling-review.json`. Obtain it independently from the tooling review.
 
-### Proposed sensitive-file scope
+Use a root Bash session. Run this shared block for either installation or tool rollback.
 
-The initial classifier accepts new append-only EF migration source/designer pairs under `DataAccessLayer/Migrations/`, plus edits to existing related model, snapshot and test files listed in `gf3_maintenance.py::RELATED`. Review each migration source together with its designer. Moves, deletions, symlinks, submodules, edits to existing migrations and changes to database startup code require separate review.
-
-Deployment/security scripts, systemd units, Dockerfiles and Compose, secrets/settings, application entrypoint/startup outside the migration component, networking, TLS, authorization/security, and permissions remain out of scope. Changing any of them requires its own reviewed and checksum-verified bootstrap procedure before a maintenance deploy can be considered.
-
-## Rehearsal implementation
-
-The helper's separate `--maintenance-rehearse SHA` operation requires a terminal, a yes/no confirmation and the full SHA typed again. It checks exact CI and installed tool identity before the prompt and rechecks Git, CI, active Compose and container identity, approval, review and environment after approval, build and rehearsal. It uses the same preflight checks as ordinary release preparation. It does not change the approval file.
-
-The first supported changes are new EF migration source/designer pairs and existing files listed in `gf3_maintenance.py::RELATED`. CI reviewers must confirm the exact nullable `TEXT` and `INTEGER` additions. Create a root-owned mode-0600 `/etc/gfctl/maintenance-review.json` inside the protected directory. Example only:
-
-```json
-{
-  "before": "<full active PROD2 SHA>",
-  "target": "<full reviewed PROD2 tip SHA>",
-  "add_nullable_columns": [
-    ["shift_correction_request", "comment", "TEXT"],
-    ["shift_swap_request", "refreshed_at_utc", "INTEGER"]
-  ]
+```bash
+set -euo pipefail
+umask 077
+test "$(id -u)" -eq 0
+cd /opt/gf
+state=/var/lib/gf3-deploy
+lib=/usr/local/libexec/gf3
+policy=/etc/gfctl/maintenance-tooling-review.json
+tools=(gf3_release.py gf3_prepare_release.py gf3_maintenance.py)
+paths=("$lib/gf3_release.py" "$lib/gf3_prepare_release.py" "$lib/gf3_maintenance.py" "$policy")
+protected() {
+    test "$(readlink -e -- "$1")" = "$1" &&
+        test "$(stat -c %u "$1")" = 0 &&
+        test -z "$(find "$1" -maxdepth 0 -perm /022 -print)"
+}
+lock_tools() {
+    for p in /opt /opt/gf /etc /etc/gfctl /usr /usr/local /usr/local/libexec "$lib" /var /var/lib "$state" "$state/gfctl-prepare.lock" /run/lock/gf3-prod-deploy.lock; do
+        protected "$p"
+    done
+    test "$(stat -c '%u:%a' "$state")" = 0:700
+    test -f "$state/gfctl-prepare.lock"
+    test -f /run/lock/gf3-prod-deploy.lock
+    exec 8<>"$state/gfctl-prepare.lock"
+    flock -w 120 8
+    exec 9<>/run/lock/gf3-prod-deploy.lock
+    flock -w 120 9
+    test ! -e "$state/maintenance-active.json" && test ! -L "$state/maintenance-active.json"
+}
+unlock_tools() { exec 9>&-; exec 8>&-; }
+replace_file() {
+    local source=$1 destination=$2 mode=$3 pending
+    if [[ -e "$destination" || -L "$destination" ]]; then
+        protected "$destination" && test -f "$destination" || return 1
+    fi
+    pending=$(mktemp "$(dirname "$destination")/.gf3-install.XXXXXXXX") || return 1
+    if install -o root -g root -m "$mode" -- "$source" "$pending" && mv -fT -- "$pending" "$destination"; then
+        return 0
+    fi
+    rm -f -- "$pending"
+    return 1
 }
 ```
 
-The example describes the two SQL changes, but it does not authorize the combined PROD2 application release. Its diff includes out-of-scope application files and the classifier refuses it. A reviewed tooling baseline must already be active before a later migration-only release can qualify.
+Run the installation block in that same shell. It checks the staged helper against the live layout before replacing existing Python tools. Dry runs may fetch Git refs, make and remove a detached worktree and query external health. They do not approve or deploy a release. The menu, Guard definitions and existing approval file stay in place. If any check fails after the rollback bundle is created, stop and use the rollback section before allowing deployment.
 
-The build uses a clean detached worktree without the production environment file. The Docker image ID is recorded in the private audit. The temporary SQLite copy comes from the existing local named Docker volume through SQLite's read-only backup API. The container gets only that copy, synthetic configuration, no network or published ports, a read-only root filesystem and no Linux capabilities. The rehearsal checks startup health, exact EF history, full integrity, approved schema changes and logical row preservation. It removes the container and copies, and keeps a mode-0600 result under `/var/lib/gf3-deploy/maintenance-*/rehearsal.json`. If Docker cannot confirm cleanup, retain the private clone directory and inspect the corresponding disposable container locally. An interrupted rehearsal never authorizes deployment.
+```bash
+review=/root/gf3-maintenance-reviewed
+for p in "$review" "$review/PROD2.sha" "$review/SHA256SUMS" "$review/maintenance-tooling-review.json"; do protected "$p"; done
+test "$(stat -c '%u:%a' "$review")" = 0:700
+for p in "$review/PROD2.sha" "$review/SHA256SUMS" "$review/maintenance-tooling-review.json"; do
+    test -f "$p"
+    test "$(stat -c '%u:%a' "$p")" = 0:600
+done
+read -r sha < "$review/PROD2.sha"
+[[ "$sha" =~ ^[0-9a-f]{40}$ ]]
+command -v nft >/dev/null
+for p in /usr /usr/local /usr/local/bin; do protected "$p"; done
+test "$(stat -c %u /usr/local/bin/gfctl)" = 0
+menu=$(readlink -e /usr/local/bin/gfctl)
+case "$menu" in
+    /opt/gf/ops/gfctl)
+        for p in /opt /opt/gf /opt/gf/ops; do protected "$p"; done ;;
+    /usr/local/bin/gfctl) ;;
+    *) printf 'Unreviewed gfctl path\\n' >&2; exit 1 ;;
+esac
+protected "$menu"
+bash -n "$menu"
+case "$(sha256sum "$menu" | cut -d' ' -f1)" in
+    582200f62900359d7e7593ba430c3d35ce10129e47842826bd585bab9b7b995a|b54f28e0e4e4a36c2296e96e069d0f4cb0a179eb18847fda91eb8d88e6759313) ;;
+    *) printf 'Unreviewed gfctl menu\n' >&2; exit 1 ;;
+esac
+lock_tools
+case "$(git remote get-url --all origin)" in
+    https://github.com/OlehProtsun/GF3|https://github.com/OlehProtsun/GF3.git|git@github.com:OlehProtsun/GF3|git@github.com:OlehProtsun/GF3.git|ssh://git@github.com/OlehProtsun/GF3|ssh://git@github.com/OlehProtsun/GF3.git) ;;
+    *) printf 'Unreviewed Git origin\n' >&2; exit 1 ;;
+esac
+test -z "$(git --no-optional-locks status --porcelain --untracked-files=all)"
+git fetch --no-tags origin refs/heads/PROD2:refs/remotes/origin/PROD2
+test "$(git rev-parse refs/remotes/origin/PROD2)" = "$sha"
+test "$(git symbolic-ref HEAD)" = refs/heads/PROD2
+approval_before=$(sha256sum /etc/gfctl/approved-release.conf)
+stage=$(mktemp -d /root/gf3-maintenance-stage.XXXXXXXX)
+backup=$(mktemp -d /root/gf3-maintenance-backup.XXXXXXXX)
+printf 'Tool rollback bundle: %s\n' "$backup"
+git rev-parse HEAD > "$backup/HEAD"
+for dst in "${paths[@]}"; do
+    name=$(basename "$dst")
+    if [[ -e "$dst" || -L "$dst" ]]; then
+        protected "$dst"
+        test -f "$dst"
+        stat -c %a "$dst" > "$backup/$name.mode"
+        install -o root -g root -m 0600 "$dst" "$backup/$name"
+    else
+        touch "$backup/$name.absent"
+    fi
+done
+(cd "$backup" && sha256sum -- * > SHA256SUMS && sha256sum -c --strict SHA256SUMS)
+for file in "${tools[@]}" gfctl-prod2-maintenance-menu.patch; do
+    path="deploy/security/$file"
+    git show "$sha:$path" > "$stage/$file"
+    test "$(git hash-object --no-filters "$stage/$file")" = "$(git rev-parse "$sha:$path")"
+done
+git show "$sha:GF3.WebApi/Program.cs" > "$stage/Program.cs"
+install -m 0600 "$review/maintenance-tooling-review.json" "$stage/maintenance-tooling-review.json"
+test "$(awk 'END { print NR }' "$review/SHA256SUMS")" -eq 6
+for name in "${tools[@]}" Program.cs gfctl-prod2-maintenance-menu.patch maintenance-tooling-review.json; do
+    test "$(awk -v file="$name" '$2 == file { count++ } END { print count+0 }' "$review/SHA256SUMS")" -eq 1
+done
+(cd "$stage" && sha256sum -c --strict "$review/SHA256SUMS")
+for dst in "$lib/gf3_guard.py" /etc/systemd/system/gf3-guard.service /etc/systemd/system/gf3-guard.timer; do
+    protected "$dst"
+    test "$(git hash-object --no-filters "$dst")" = "$(git rev-parse "$sha:deploy/security/$(basename "$dst")")"
+done
+install -m 0644 "$lib/gf3_guard.py" "$stage/gf3_guard.py"
+systemd-analyze verify /etc/systemd/system/gf3-guard.service /etc/systemd/system/gf3-guard.timer
+python3 -m py_compile "$stage/gf3_release.py" "$stage/gf3_prepare_release.py" "$stage/gf3_maintenance.py"
+replace_file "$stage/maintenance-tooling-review.json" "$policy" 0600
+unlock_tools
+/usr/bin/python3 -I "$stage/gf3_prepare_release.py" --check-only
+lock_tools
+test "$(git rev-parse HEAD)" = "$(cat "$backup/HEAD")"
+test "$(git rev-parse refs/remotes/origin/PROD2)" = "$sha"
+test -z "$(git --no-optional-locks status --porcelain --untracked-files=all)"
+cmp -s "$policy" "$stage/maintenance-tooling-review.json"
+(cd "$stage" && sha256sum -c --strict "$review/SHA256SUMS")
+for file in "${tools[@]}"; do
+    replace_file "$stage/$file" "$lib/$file" 0644
+    cmp -s "$stage/$file" "$lib/$file"
+done
+unlock_tools
+/usr/bin/python3 -I "$lib/gf3_prepare_release.py" --check-only
+test "$(sha256sum /etc/gfctl/approved-release.conf)" = "$approval_before"
+```
 
-## Review and install rehearsal tools
+### Roll back the tooling installation
 
-Apply these steps only in a separate tooling review after Linux rehearsal CI passes and the installed host paths and baseline are confirmed. Start from a root-only staging and backup directory. Reuse the ownership checks, lock order and atomic `replace_file` procedure in [the existing gfctl installation runbook](gfctl-prod2-rollout.md). Keep both locks while checking and replacing tools.
+Use a fresh root Bash session with the shared block above. Select the recorded rollback bundle. This procedure is only for a failed installation before the production release advances or a maintenance transaction begins. An unfinished journal or changed Git release stops it. A release rollback requires the recovery procedure below.
 
-1. Review the exact PROD2 tooling commit and confirm its push CI and required jobs. Fetch the ref only. Verify the new files and the unchanged Guard program and units against that reviewed commit. Obtain the SHA-256 manifest for the three reviewed Python files through the tooling review and keep it outside the checkout.
-2. Write the reviewed Git blobs into the private staging directory with `git show "$reviewed_sha:deploy/security/$file"` for `gf3_prepare_release.py`, `gf3_release.py` and `gf3_maintenance.py`. Check each staged blob with `git hash-object --no-filters` against `git rev-parse "$reviewed_sha:deploy/security/$file"` and run `sha256sum -c` against the independent reviewed manifest. Compile the staged files with `python3 -m py_compile`.
-3. Confirm `/usr/local/libexec/gf3` and each existing destination pass the runbook's root ownership, symlink and permissions checks. Save each installed file and its mode in the private backup directory and record absent destinations. Atomically replace the reviewed files as root, mode 0644, and verify the installed checksums again before releasing either lock. If a replacement or checksum check fails, restore the recorded tools with the same locks and verify the prior hashes.
-4. Back up the host-local menu and require SHA-256 `582200f62900359d7e7593ba430c3d35ce10129e47842826bd585bab9b7b995a`. Stage and verify the reviewed Git blob `deploy/security/gfctl-prod2-maintenance-menu.patch` as above. Apply with `patch --batch --forward --fuzz=0 -o "$stage/gfctl" "$backup/gfctl" "$stage/gfctl-prod2-maintenance-menu.patch"`. Run `bash -n "$stage/gfctl"` and verify the result has SHA-256 `b54f28e0e4e4a36c2296e96e069d0f4cb0a179eb18847fda91eb8d88e6759313`. Stop on a mismatch. Install through the existing menu backup and atomic replacement procedure. This adds **[13] Rehearse PROD2 database maintenance on a copy**.
+```bash
+backup=/root/gf3-maintenance-backup.REPLACE_WITH_RECORDED_BUNDLE
+protected "$backup"
+test "$(stat -c '%u:%a' "$backup")" = 0:700
+lock_tools
+test "$(git rev-parse HEAD)" = "$(cat "$backup/HEAD")"
+(cd "$backup" && sha256sum -c --strict SHA256SUMS)
+for dst in "${paths[@]}"; do
+    name=$(basename "$dst")
+    if [[ -f "$backup/$name.absent" ]]; then
+        if [[ -e "$dst" || -L "$dst" ]]; then protected "$dst"; rm -- "$dst"; fi
+    else
+        mode=$(cat "$backup/$name.mode")
+        [[ "$mode" =~ ^[0-7]{3,4}$ ]]
+        replace_file "$backup/$name" "$dst" "$mode"
+        cmp -s "$backup/$name" "$dst"
+    fi
+done
+unlock_tools
+```
 
-These steps install rehearsal tooling outside the live Git checkout. Establishing a new active tooling baseline is a separate reviewed release operation. The ordinary helper continues to classify deployment scripts as critical and there is no tooling-and-migration exception.
+## Deploy and inspect the result
 
-## Operator runbook before tool installation
+In an approved deployment window, launch `sudo /usr/local/bin/gfctl` and choose `[11] Deploy PROD2`. Ordinary releases use the existing prompts and cutover. For a supported migration, review the exact SHA, pending migrations, isolated rehearsal result and downtime warning. Confirm and enter the full SHA. Downtime begins when production ingress is fenced after approval. Its duration depends on SQLite size, the health checks and any recovery. Keep the second operator session available.
 
-- Use the existing managed release tools until the exact new tools and their bootstrap record have passed separate operator review.
-- Do not edit, copy, or restore the production SQLite database manually. The normal release rollback bundle is not a database-migration rollback guarantee.
-- For an unrelated ordinary release, continue to use the installed, reviewed host tooling and its existing runbook. Do not install changed security tooling from this proposal.
-- The rehearsal review and install procedure applies only to the clone operation. Live maintenance installation remains unavailable.
-- The eventual operator should verify the working database using SQLite `PRAGMA integrity_check`, confirm the expected `__EFMigrationsHistory` rows, and exercise application health before ingress reopens. The final backup should be inspectable as a root-only artifact under a private maintenance bundle. Those commands and paths must be supplied by the reviewed implementation; they are not established by the current host tooling.
-- Before traffic reopens, a failed migration may be rolled back only by restoring the verified final snapshot while ingress and every writer remain stopped, then verifying the database and previous app. After ingress reopens or any write may have happened, do not restore the snapshot; stop for manual intervention or forward repair.
+Verify the reported SHA and HTTPS health, then compare Git HEAD with the root-only active release manifest under `/var/lib/gf3-deploy/active`. The final backup is `final.db` in the printed maintenance bundle. The completed or recovered bundle stores the recorded backup digest and original EF history in `transaction.json`. For an unfinished transaction, the root-only `/var/lib/gf3-deploy/maintenance-active.json` is the active record. Use disposable copies for offline backup inspection. Compare SHA-256 with the journal and run `PRAGMA integrity_check;` and `SELECT MigrationId FROM __EFMigrationsHistory ORDER BY MigrationId;`. Limit output to integrity results, migration IDs and release metadata because the backups contain production employee data.
 
-## Host compatibility required at installation
+For a failed or interrupted deployment, start with the engine outcome, active journal, actual firewall, Docker process and mount state, Git HEAD and the retained bundle. Pause competing privileged automation. A verified automatic recovery reopens the previous app and keeps evidence of the attempt. `RECOVERY_REQUIRED` or an unfinished journal needs incident review before reopening traffic. If `writes_may_resume` is true, use controlled forward repair or a data recovery plan that accounts for subsequent writes. Do not remove the journal, restart writers or manually restore the backup as a shortcut. The optional [13] remains a clone-only diagnostic with its own review file and cannot approve a live release.
 
-The host needs nftables, a local Docker daemon with file-backed volumes, the current managed release layout and access to the host process table. Any unrecognized writer, privileged container with data access, changed fence or changed rollout state blocks maintenance. The protection assumes trusted root and Docker operators. Direct Docker commands, database tools and other privileged automation must share the deployment coordination or stay out of the maintenance window.
+The disposable Linux CI uses real Docker, nftables, Nginx and SQLite with prior and candidate images. Guard timer operations use a test double. The fence-loss rehearsal restarts Docker, and process-death coverage verifies the journal persists. A full guest OS reboot and production-specific installed Guard/host compatibility require separate verification.
