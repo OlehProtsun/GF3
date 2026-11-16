@@ -222,7 +222,9 @@ def main(scenario=None):
     volume = project + "-data"
     app = f"{project}-gf3-app-1"
     marker = secrets.token_hex(16)
-    with tempfile.TemporaryDirectory(prefix=project) as temporary:
+    # The engine rejects active bundles below world-writable parents. Use the real
+    # entrypoint's permissions in the root-only hosted integration fixture.
+    with tempfile.TemporaryDirectory(prefix=project, dir="/var/lib" if scenario else None) as temporary:
         root = Path(temporary)
         release.ROOT = root
         release.STATE = root / "releases"
@@ -230,12 +232,14 @@ def main(scenario=None):
         release.DOMAIN = "localhost"
         release.PROJECT = project
         release.NETWORK = network
-        release.STATE.mkdir()
+        release.STATE.mkdir(mode=0o700)
         for name in ("nginx", "logs", "state"):
             (release.RUNTIME / name).mkdir(parents=True)
         deploy = root / "deploy"
         web = root / "certbot"
         (web / ".well-known/acme-challenge").mkdir(parents=True)
+        for directory in (web, web / ".well-known", web / ".well-known/acme-challenge"):
+            directory.chmod(0o755)  # The Nginx worker serves the ACME proof.
         for filename in ("docker-compose.yml", "docker-compose.https.yml"):
             shutil.copyfile(HERE.parent / filename, deploy / filename)
         shutil.copytree(HERE.parent / "nginx", deploy / "nginx")
@@ -367,7 +371,7 @@ def main(scenario=None):
             assert employee_rows == [(employee_id, "zlecenie", "GF3 rehearsal", "Employee", 0)]
             assert rows("PRAGMA integrity_check") == [("ok",)]
             previous = release.STATE / ("rollback-" + project)
-            previous.mkdir()
+            previous.mkdir(mode=0o700)
             with patch.object(release, "safe_path"):
                 release.snapshot(previous, volume)
             tags.extend(service["image"] for service in json.loads((previous / "compose.json").read_text())["services"].values())
@@ -606,6 +610,7 @@ if __name__ == "__main__":
     scenarios = ("success", "migration-failure", "git-failure", "guard-failure", "failure-after-open", "fence-lost")
     if len(sys.argv) == 2 and sys.argv[1] in scenarios:
         assert os.geteuid() == 0 and os.environ.get("GF3_DISPOSABLE_CI_RUNNER") == "true"
+        os.umask(0o077)
         main(sys.argv[1])
     else:
         assert len(sys.argv) == 1

@@ -1120,6 +1120,8 @@ def maintenance_cutover(tool, transaction, candidate, previous, current, target,
         verify_fence(fence)
         # Commit this boundary before starting a writable application, even behind the kernel fence.
         transaction.advance("WRITES_MAY_RESUME")
+        print("SQLite restore is now prohibited. Verifying ordinary application startup behind the ingress fence.",
+              flush=True)
         backend(staged)
         verify_backend_env(bundle)
         start_nginx(staged)
@@ -1145,9 +1147,11 @@ def maintenance_cutover(tool, transaction, candidate, previous, current, target,
             stop_maintenance_stack(previous)
         quiet()
         transaction.advance("FENCED", fence=fence)
+        print("Public ingress is fenced and SQLite writers are stopped.", flush=True)
         backup = tool.final_backup(database, transaction.bundle, before_ids, quiet,
                                    lambda metadata: transaction.advance("BACKED_UP", backup=metadata))
         tool.verify_final_backup(transaction.bundle, backup)
+        print(f"Final SQLite backup verified: {transaction.bundle / 'final.db'}", flush=True)
         quiet()
         def assert_unchanged():
             require(tool.database_stamp(database) == backup["source"], "Database changed after the final backup")

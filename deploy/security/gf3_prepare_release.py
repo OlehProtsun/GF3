@@ -348,7 +348,11 @@ def prepare(check_only):
                     maintenance_changes(tool, reviewed[0], target, reviewed[5], True)
                 except tool.MaintenanceError as error:
                     raise release.ReleaseError(str(error)) from None
-            print(f"PROD2 {target} contains a supported EF migration. Interactive rehearsal and approval are required.")
+                with candidate(target, reviewed[4]) as worktree:
+                    with release.lock(release.RUNTIME / "state/guard.lock"):
+                        release.preflight(worktree, target, reviewed[6])
+                release.command("nft", "-c", "-f", "-", data=release.fence_rules(reviewed[6]))
+            print(f"PROD2 {target} passed maintenance preflight. Interactive rehearsal and approval are required.")
             return 0
         return maintenance_rehearse(target, deploy=True)
     return prepare_ordinary(check_only, current, target)
@@ -376,7 +380,7 @@ def prepare_ordinary(check_only, initial_current, initial_target):
         release.require(engine("preflight", worktree, target) == 0, "Release engine preflight failed")
 
     subject = release.git("show", "-s", "--format=%s", target).strip()
-    print(f"Current SHA: {current}\nTarget SHA:  {target}\nCommit: {ascii(subject)}")
+    print(f"Current SHA: {current}\nTarget SHA:  {target}\nCommit: {ascii(subject)}\nUpdate type: ordinary release")
     print(f"Changed files ({len(paths)}):")
     for status, name in paths:
         print(f"  {status} {ascii(name)}")
