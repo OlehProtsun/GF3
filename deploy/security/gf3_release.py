@@ -1023,6 +1023,7 @@ def maintenance_compose(bundle, mode):
     app, nginx = (config["services"][name] for name in ("gf3-app", "nginx"))
     require(app.get("entrypoint") in (None, ["dotnet", "WebApi.dll"]) and not app.get("command"),
             "Unexpected application entrypoint in maintenance")
+    require(not app.get("depends_on"), "The maintenance backend must not start dependent services")
     path = bundle / mode
     path.mkdir(mode=0o700)
     for service in (app, nginx):
@@ -1045,7 +1046,7 @@ def maintenance_compose(bundle, mode):
 
 
 def migrate_fenced(bundle, database, baseline, assert_quiet, assert_unchanged):
-    compose(bundle, "create", "--no-deps", "--no-build", "--pull", "never", "--force-recreate", "gf3-app")
+    compose(bundle, "create", "--no-build", "--pull", "never", "--force-recreate", "gf3-app")
     item = container("gf3-app")
     data, = item["Mounts"]
     configuration = item["HostConfig"]
