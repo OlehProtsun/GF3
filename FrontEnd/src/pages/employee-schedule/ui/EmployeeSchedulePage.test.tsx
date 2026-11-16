@@ -502,20 +502,22 @@ describe("EmployeeSchedulePage", () => {
 
     const workerCards = within(screen.getByRole("tabpanel", { name: "Sunday 10" })).getAllByRole("article");
     expect(workerCards.map(card => card.textContent)).toEqual([
-      "Zoe Young08:00 - 12:00, 14:00 - 15:00",
-      expect.stringContaining("Alex All DayAll day"),
-      expect.stringContaining("Liam Late18:00 - 22:00"),
+      "Zoe Young08:00 - 12:00, 14:00 - 15:00, Late May Schedule, Second May Schedule",
+      "Alex All DayAll day",
+      "Liam Late18:00 - 22:00",
+      "Adam BlueF35",
     ]);
 
     await user.click(dayOff);
     expect(screen.getByText("No one is scheduled.")).toBeInTheDocument();
 
-    const relatedOnlyDay = screen.getByRole("tab", { name: "Thursday 14, day off" });
-    expect(relatedOnlyDay).toHaveClass(styles.dailyScheduleDayOff);
+    const relatedOnlyDay = screen.getByRole("tab", { name: "Thursday 14, working day" });
+    expect(relatedOnlyDay).toHaveClass(styles.dailyScheduleDayWorking);
     await user.click(relatedOnlyDay);
     const relatedOnlyPanel = within(screen.getByRole("tabpanel", { name: "Thursday 14" }));
-    expect(relatedOnlyPanel.getByText("No one is scheduled.")).toBeVisible();
-    expect(relatedOnlyPanel.queryByRole("article")).not.toBeInTheDocument();
+    expect(relatedOnlyPanel.getByRole("article").textContent).toBe("Zoe YoungF35");
+    expect(relatedOnlyPanel.queryByText("08:00 - 12:00")).not.toBeInTheDocument();
+    expect(relatedOnlyPanel.queryByText("No one is scheduled.")).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Show schedule matrix view" }));
     expect(screen.getByTestId("schedule-matrix")).toBeInTheDocument();
@@ -523,6 +525,53 @@ describe("EmployeeSchedulePage", () => {
     expect(matrix.mutedSuffixMap["12:14"]).toBe("F35");
     expect(matrix.urlopCellKeys).toContain("7:10");
     expect(screen.getByRole("button", { name: "Show daily schedule view" })).toHaveFocus();
+  });
+
+  test("normalizes related schedule names and marks work days only for the signed-in employee", async () => {
+    const user = userEvent.setup();
+    const dailySchedule: EmployeeSchedule = {
+      ...schedules[0],
+      relatedScheduleAssignments: [
+        ...(schedules[0].relatedScheduleAssignments ?? []),
+        { employeeId: 12, dayOfMonth: 10, scheduleId: 2, scheduleName: " Second May Schedule " },
+        { employeeId: 12, dayOfMonth: 10, scheduleId: 35, scheduleName: "   " },
+        { employeeId: 12, dayOfMonth: 14, scheduleId: 35, scheduleName: "Different Day Schedule" },
+        { employeeId: 0, dayOfMonth: 10, scheduleId: 35, scheduleName: "Invalid Employee Schedule" },
+      ],
+    };
+    mocks.scheduleQuery.mockReturnValue({ data: [dailySchedule], isLoading: false, error: null });
+    renderPage();
+
+    await user.click(screen.getByRole("button", { name: "Show daily schedule view" }));
+    await user.click(screen.getByRole("tab", { name: "Sunday 10, working day" }));
+    const workPanel = within(screen.getByRole("tabpanel", { name: "Sunday 10" }));
+    expect(workPanel.getByRole("article").textContent).toBe(
+      "Zoe Young08:00 - 12:00, Late May Schedule, Schedule #35, Second May Schedule",
+    );
+
+    const otherEmployeeDay = screen.getByRole("tab", { name: "Wednesday 13, day off" });
+    expect(otherEmployeeDay).toHaveClass(styles.dailyScheduleDayOff);
+    await user.click(otherEmployeeDay);
+    const otherEmployeePanel = within(screen.getByRole("tabpanel", { name: "Wednesday 13" }));
+    expect(otherEmployeePanel.getByRole("article").textContent).toBe("Adam BlueSecond May Schedule");
+  });
+
+  test.each(["missing", "empty"])("preserves daily shifts and empty days with %s related assignments", async state => {
+    const user = userEvent.setup();
+    const dailySchedule: EmployeeSchedule = { ...schedules[0], relatedScheduleAssignments: [] };
+    if (state === "missing") delete dailySchedule.relatedScheduleAssignments;
+    mocks.scheduleQuery.mockReturnValue({ data: [dailySchedule], isLoading: false, error: null });
+    renderPage();
+
+    await user.click(screen.getByRole("button", { name: "Show daily schedule view" }));
+    await user.click(screen.getByRole("tab", { name: "Sunday 10, working day" }));
+    const workPanel = within(screen.getByRole("tabpanel", { name: "Sunday 10" }));
+    expect(workPanel.getByRole("article").textContent).toBe("Zoe Young08:00 - 12:00");
+
+    await user.click(screen.getByRole("tab", { name: "Wednesday 13, day off" }));
+    const emptyPanel = within(screen.getByRole("tabpanel", { name: "Wednesday 13" }));
+    expect(emptyPanel.getByText("No one is scheduled.")).toBeVisible();
+    expect(emptyPanel.queryByRole("article")).not.toBeInTheDocument();
   });
 
   test("lets the employee customize and persist the schedule column order", async () => {
