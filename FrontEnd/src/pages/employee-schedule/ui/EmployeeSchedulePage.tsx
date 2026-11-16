@@ -303,6 +303,7 @@ type DailyScheduleWorker = {
   employeeId: number;
   label: string;
   shifts: EmployeeScheduleSlot[];
+  relatedScheduleNames: string[];
   isAllDay: boolean;
   firstStartMinutes: number;
 };
@@ -329,20 +330,33 @@ function buildDailyScheduleWorkers(
     slotsByEmployeeId.set(employeeId, employeeSlots);
   }
 
+  const relatedNamesByEmployeeId = new Map<number, Set<string>>();
+  for (const assignment of schedule.relatedScheduleAssignments ?? []) {
+    if (assignment.dayOfMonth !== dayOfMonth || !(assignment.employeeId > 0)) continue;
+    const names = relatedNamesByEmployeeId.get(assignment.employeeId) ?? new Set<string>();
+    names.add(assignment.scheduleName.trim() || t("Schedule #{0}", assignment.scheduleId));
+    relatedNamesByEmployeeId.set(assignment.employeeId, names);
+  }
+
+  const getWorkerLabel = (employeeId: number) => {
+    const employee = employeesById.get(employeeId);
+    return employee ? getScheduleEmployeeLabel(employee) : employeeId === fallbackEmployeeId
+      ? fallbackLabel
+      : t("Employee #{0}", employeeId);
+  };
+
   const workers = [...slotsByEmployeeId.entries()].map<DailyScheduleWorker>(([employeeId, slots]) => {
     const sortedSlots = [...slots].sort((left, right) =>
       (parseTimeMinutes(left.fromTime) ?? Number.MAX_SAFE_INTEGER) -
         (parseTimeMinutes(right.fromTime) ?? Number.MAX_SAFE_INTEGER) ||
       left.toTime.localeCompare(right.toTime),
     );
-    const employee = employeesById.get(employeeId);
-
     return {
       employeeId,
-      label: employee ? getScheduleEmployeeLabel(employee) : employeeId === fallbackEmployeeId
-        ? fallbackLabel
-        : t("Employee #{0}", employeeId),
+      label: getWorkerLabel(employeeId),
       shifts: sortedSlots,
+      relatedScheduleNames: [...(relatedNamesByEmployeeId.get(employeeId) ?? [])]
+        .sort((left, right) => left.localeCompare(right)),
       isAllDay: sortedSlots.some(isAllDayScheduleSlot),
       firstStartMinutes: parseTimeMinutes(sortedSlots[0]?.fromTime ?? "") ?? Number.MAX_SAFE_INTEGER,
     };
@@ -357,18 +371,34 @@ function buildDailyScheduleWorkers(
     .filter(worker => worker.isAllDay)
     .sort((left, right) => left.label.localeCompare(right.label));
   const middleIndex = Math.ceil(timedWorkers.length / 2);
+  const relatedOnlyWorkers = [...relatedNamesByEmployeeId]
+    .filter(([employeeId]) => !slotsByEmployeeId.has(employeeId))
+    .map<DailyScheduleWorker>(([employeeId, names]) => ({
+      employeeId,
+      label: getWorkerLabel(employeeId),
+      shifts: [],
+      relatedScheduleNames: [...names].sort((left, right) => left.localeCompare(right)),
+      isAllDay: false,
+      firstStartMinutes: Number.MAX_SAFE_INTEGER,
+    }))
+    .sort((left, right) => left.label.localeCompare(right.label) || left.employeeId - right.employeeId);
 
   return [
     ...timedWorkers.slice(0, middleIndex),
     ...allDayWorkers,
     ...timedWorkers.slice(middleIndex),
+    ...relatedOnlyWorkers,
   ];
 }
 
 function formatDailyWorkerShifts(worker: DailyScheduleWorker) {
-  return worker.isAllDay
+  const relatedNames = worker.relatedScheduleNames.join(", ");
+  if (worker.shifts.length === 0) return relatedNames;
+
+  const ownShifts = worker.isAllDay
     ? t("All day")
     : formatGraphIntervals(mergeGraphIntervalsForDisplay(worker.shifts, { mergeTouching: true }));
+  return relatedNames && ownShifts ? `${ownShifts}, ${relatedNames}` : ownShifts || relatedNames;
 }
 
 function buildScheduleMatrixColumns(
@@ -731,8 +761,11 @@ export function EmployeeSchedulePage() {
     return Array.from({ length: getDaysInMonth(selectedSchedule.year, selectedSchedule.month) }, (_, index) => {
       const dayOfMonth = index + 1;
       const date = new Date(Date.UTC(selectedSchedule.year, selectedSchedule.month - 1, dayOfMonth));
-      const isWorkingDay = currentEmployeeId !== null && currentEmployeeId > 0 && selectedSchedule.slots.some(slot =>
-        slot.dayOfMonth === dayOfMonth && slot.employeeId === currentEmployeeId,
+      const isWorkingDay = currentEmployeeId !== null && currentEmployeeId > 0 && (
+        selectedSchedule.slots.some(slot => slot.dayOfMonth === dayOfMonth && slot.employeeId === currentEmployeeId) ||
+        (selectedSchedule.relatedScheduleAssignments ?? []).some(assignment =>
+          assignment.dayOfMonth === dayOfMonth && assignment.employeeId === currentEmployeeId,
+        )
       );
 
       return {
