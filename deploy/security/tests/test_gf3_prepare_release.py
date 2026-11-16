@@ -14,6 +14,7 @@ from urllib.error import URLError
 
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import gf3_maintenance as maintenance
 import gf3_prepare_release as prepare
 
 
@@ -370,6 +371,55 @@ class ManagedDeploymentTests(unittest.TestCase):
         self.confirm.assert_not_called()
         self.engine.assert_not_called()
         self.api.assert_not_called()
+
+    def test_menu_deploy_dispatches_combined_release_to_maintenance(self):
+        self.push()
+        target = self.push("DataAccessLayer/Migrations/20261114225324_AddComment.Designer.cs")
+        with patch.object(prepare, "maintenance_rehearse", return_value=0) as rehearse:
+            self.assertEqual(prepare.prepare(False), 0)
+        rehearse.assert_called_once_with(target, deploy=True)
+        self.engine.assert_not_called()
+        self.assertEqual(self.approval.read_bytes(), self.approval_contents)
+
+    def test_maintenance_check_only_blocks_failed_ci_without_rehearsing_or_approving(self):
+        self.push("DataAccessLayer/Migrations/20261114225324_AddComment.Designer.cs")
+        self.job_overrides["Docker image"] = {"conclusion": "failure"}
+        with patch.object(prepare, "maintenance_rehearse") as rehearse:
+            with self.assertRaises(release.ReleaseError):
+                prepare.prepare(True)
+        rehearse.assert_not_called()
+        self.engine.assert_not_called()
+        self.assertEqual(self.approval.read_bytes(), self.approval_contents)
+
+    def test_live_maintenance_requires_exact_sha_and_rechecks_ci_after_approval(self):
+        target = self.push("DataAccessLayer/Migrations/20261114225324_AddComment.Designer.cs")
+        changes = (["DataAccessLayer/Migrations/20261114225324_AddComment.Designer.cs"],
+                   ("before",), ("before", "added"), ())
+
+        def reply(prompt):
+            if "Begin" in prompt:
+                return "yes"
+            if rerun:
+                self.newer_run = {"run_number": 13, "status": "queued", "conclusion": None}
+                return target
+            return "0" * 40
+
+        with (patch.object(release, "maintenance_tool") as load,
+              patch.object(prepare, "maintenance_changes", return_value=changes),
+              patch.object(release, "preflight"),
+              patch.object(release, "maintenance_database", return_value=self.root / "fixture.db"),
+              patch.object(prepare.sys.stdin, "isatty", return_value=True),
+              patch("builtins.input", side_effect=reply)):
+            load.return_value.MaintenanceError = maintenance.MaintenanceError
+            load.return_value.image_id.return_value = "sha256:" + "f" * 64
+            for rerun, failure in ((False, "SHA confirmation did not match"), (True, "pending or unsuccessful")):
+                with self.subTest(rerun=rerun), self.assertRaisesRegex(release.ReleaseError, failure):
+                    prepare.prepare(False)
+            self.assertEqual(load.return_value.rehearse.call_count, 2)
+        self.engine.assert_not_called()
+        self.assertEqual(self.approval.read_bytes(), self.approval_contents)
+        self.assertEqual(list(self.state.glob("maintenance-*/capability.json")), [])
+        self.assertNotIn("never-print-this", self.output.getvalue())
 
     def test_maintenance_rehearsal_rejects_changed_review_after_typed_sha(self):
         target = self.push()

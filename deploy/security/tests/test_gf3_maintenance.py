@@ -1,4 +1,4 @@
-from contextlib import closing
+from contextlib import closing, nullcontext
 from pathlib import Path
 import json
 import sqlite3
@@ -257,6 +257,66 @@ time.sleep(10)
         self.assertTrue(journal.read()["writes_may_resume"])
         with self.assertRaises(maintenance.MaintenanceError):
             journal.advance("RESTORING")
+
+    def test_release_engine_checks_exact_authorization_and_consumes_it_once(self):
+        target = "a" * 40
+        before = "b" * 40
+        nonce = "c" * 64
+        image = "sha256:" + "d" * 64
+        bundle = self.root / f"maintenance-{target[:12]}-fixture"
+        bundle.mkdir(mode=0o700)
+        capability = bundle / "capability.json"
+        consumed = bundle / "capability-consumed.json"
+        reviewed = (before, None, None, (), b"env", b"review", (), (), b"compose", (34, 2))
+        permit = {"nonce": nonce, "target": target, "before": before, "review": "review-digest", "image": image,
+                  "migrations": "migration-digest", "expires": 1010}
+        audit = {"stage": "passed", "target": target, "before": before, "image": image, "ci": [34, 2]}
+        release.store(bundle / "rehearsal.json", audit)
+
+        def load_helper(_, namespace):
+            namespace.update(maintenance_state=lambda *_args, **_kwargs: reviewed,
+                             review_digest=lambda _: "review-digest",
+                             maintenance_changes=lambda *_: ([], BEFORE, AFTER, COLUMNS),
+                             candidate=lambda *_: nullcontext(self.root))
+
+        with (patch.object(release, "STATE", self.root),
+              patch.object(release, "protected_json", side_effect=lambda path: json.loads(path.read_bytes())),
+              patch.object(release, "safe_path"),
+              patch.object(release.time, "time", return_value=1000),
+              patch.object(release, "git", side_effect=lambda op, *_: (
+                  "https://github.com/OlehProtsun/GF3\n" if op == "remote" else target + "\n")) as git,
+              patch.object(release, "maintenance_tool", return_value=maintenance),
+              patch.object(release, "exec", side_effect=load_helper, create=True),
+              patch.object(release, "migration_fingerprint", side_effect=lambda _, sha: (
+                  "migration-digest" if sha == target else "prior-digest")),
+              patch.object(release, "docker_json", return_value=[{
+                  "Id": image, "Config": {"Labels": {"org.opencontainers.image.revision": target}},
+              }]),
+              patch.object(release, "preflight", side_effect=release.ReleaseError("staging stopped for test"))
+              as preflight):
+            with self.assertRaises(FileNotFoundError):
+                release.maintenance_deploy(bundle, target, nonce)
+            for stale in ({"nonce": "e" * 64}, {"target": before}, {"expires": 999}):
+                with self.subTest(stale=tuple(stale)):
+                    release.store(capability, {**permit, **stale})
+                    with self.assertRaisesRegex(release.ReleaseError, "authorization does not match"):
+                        release.maintenance_deploy(bundle, target, nonce)
+            git.assert_not_called()
+            release.store(capability, permit)
+            release.store(bundle / "rehearsal.json", {**audit, "ci": [34, 1]})
+            with self.assertRaisesRegex(release.ReleaseError, "state changed after maintenance approval"):
+                release.maintenance_deploy(bundle, target, nonce)
+            self.assertFalse(consumed.exists())
+            preflight.assert_not_called()
+            release.store(bundle / "rehearsal.json", audit)
+            with self.assertRaisesRegex(release.ReleaseError, "staging stopped for test"):
+                release.maintenance_deploy(bundle, target, nonce)
+            self.assertEqual(json.loads(consumed.read_bytes()), permit)
+            self.assertFalse(capability.exists())
+            release.store(capability, permit)
+            with self.assertRaisesRegex(release.ReleaseError, "already consumed"):
+                release.maintenance_deploy(bundle, target, nonce)
+            preflight.assert_called_once()
 
 
 if __name__ == "__main__":
