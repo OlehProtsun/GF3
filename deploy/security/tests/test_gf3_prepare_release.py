@@ -518,12 +518,12 @@ class ManagedDeploymentTests(unittest.TestCase):
         old_blob, new_blob = (self.git("rev-parse", f"{sha}:{path}", root=self.writer).strip()
                               for sha in (before, target))
         installed = self.base / "installed-engine.py"
-        installed.write_bytes(b"previous engine\n")
+        shutil.copyfile(self.root / path, installed)
         self.git("fetch", "origin")
         with patch.multiple(prepare, ENGINE=installed, PREFLIGHT_HOTFIX_BLOBS=(old_blob, new_blob)):
             with self.assertRaisesRegex(release.ReleaseError, "Separate manual maintenance"):
                 prepare.changed_paths(before, target)
-            installed.write_bytes(b"fixed engine\n")
+            shutil.copyfile(self.writer / path, installed)
             self.assertEqual(prepare.changed_paths(before, target), [("M", path)])
             unrelated = self.push(path, "another engine\n")
             self.git("fetch", "origin")
