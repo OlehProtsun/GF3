@@ -20,18 +20,20 @@ namespace GF3.Tests;
 public sealed class RealtimeMiddlewareAndGenericCoverageTests
 {
     [Fact]
-    public async Task WorkflowLog_IsSentOnlyToManagers()
+    public async Task WorkflowLog_IsSentOnlyToSystemManagers()
     {
         var all = new RecordingPresenceClient();
         var managers = new RecordingPresenceClient();
-        var notifier = new RealtimeNotifier(new FakeHubContext(all, managers));
+        var systemManagers = new RecordingPresenceClient();
+        var notifier = new RealtimeNotifier(new FakeHubContext(all, managers, systemManagers));
         await notifier.NotifyWorkflowLogCreatedAsync(new WorkflowLogEntryModel
         {
             Id = 42, ActorRole = "Manager", ActorName = "Manager", Action = "Private action",
             OccurredAtUtc = DateTimeOffset.UtcNow,
         });
         Assert.Empty(all.WorkflowLogMessages);
-        Assert.Equal(42, Assert.Single(managers.WorkflowLogMessages).Id);
+        Assert.Empty(managers.WorkflowLogMessages);
+        Assert.Equal(42, Assert.Single(systemManagers.WorkflowLogMessages).Id);
     }
     [Fact]
     public async Task EmployeePresenceHub_ConnectsAndDisconnectsEmployeePresence()
@@ -290,6 +292,7 @@ public sealed class RealtimeMiddlewareAndGenericCoverageTests
             accountService ?? new RecordingEmployeeAccountService(),
             new ManagerEditLockService(),
             notifier ?? new RecordingRealtimeNotifier(),
+            new EmployeeOnlineWorkflowLogTests.ThrowingWorkflowLogService(),
             NullLogger<EmployeePresenceHub>.Instance)
         {
             Context = new FakeHubCallerContext("connection-1", user),
@@ -378,14 +381,14 @@ public sealed class RealtimeMiddlewareAndGenericCoverageTests
         }
     }
 
-    private sealed class FakeHubContext(RecordingPresenceClient client, RecordingPresenceClient? managers = null) : IHubContext<EmployeePresenceHub, IEmployeePresenceClient>
+    private sealed class FakeHubContext(RecordingPresenceClient client, RecordingPresenceClient? managers = null, RecordingPresenceClient? systemManagers = null) : IHubContext<EmployeePresenceHub, IEmployeePresenceClient>
     {
-        public IHubClients<IEmployeePresenceClient> Clients { get; } = new FakeHubClients(client, managers);
+        public IHubClients<IEmployeePresenceClient> Clients { get; } = new FakeHubClients(client, managers, systemManagers);
 
         public IGroupManager Groups { get; } = new FakeGroupManager();
     }
 
-    private sealed class FakeHubClients(RecordingPresenceClient client, RecordingPresenceClient? managers = null) : IHubClients<IEmployeePresenceClient>
+    private sealed class FakeHubClients(RecordingPresenceClient client, RecordingPresenceClient? managers, RecordingPresenceClient? systemManagers) : IHubClients<IEmployeePresenceClient>
     {
         public IEmployeePresenceClient All => client;
 
@@ -395,7 +398,12 @@ public sealed class RealtimeMiddlewareAndGenericCoverageTests
 
         public IEmployeePresenceClient Clients(IReadOnlyList<string> connectionIds) => client;
 
-        public IEmployeePresenceClient Group(string groupName) => groupName == EmployeePresenceHub.ManagersGroupName ? managers ?? client : client;
+        public IEmployeePresenceClient Group(string groupName) => groupName switch
+        {
+            EmployeePresenceHub.ManagersGroupName => managers ?? client,
+            EmployeePresenceHub.SystemManagersGroupName => systemManagers ?? client,
+            _ => client,
+        };
 
         public IEmployeePresenceClient GroupExcept(string groupName, IReadOnlyList<string> excludedConnectionIds) => client;
 
