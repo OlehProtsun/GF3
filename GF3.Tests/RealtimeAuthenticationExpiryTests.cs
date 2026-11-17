@@ -20,6 +20,7 @@ using Microsoft.Extensions.Options;
 using WebApi.Auth;
 using WebApi.Options;
 using WebApi.Realtime;
+using WebApi.Services;
 
 namespace GF3.Tests;
 
@@ -56,6 +57,7 @@ public sealed class RealtimeAuthenticationExpiryTests
         builder.Services.AddSingleton<IManagerPresenceService, ManagerPresenceService>();
         builder.Services.AddSingleton<IManagerEditLockService, ManagerEditLockService>();
         builder.Services.AddScoped<IRealtimeNotifier, RealtimeNotifier>();
+        builder.Services.AddScoped<IWorkflowLogService, WorkflowLogService>();
         builder.Services.AddSingleton(Options.Create(jwtOptions));
         builder.Services.AddAuthentication(JwtAuthenticationDefaults.SchemeName)
             .AddScheme<AuthenticationSchemeOptions, JwtAuthenticationHandler>(JwtAuthenticationDefaults.SchemeName, _ => { });

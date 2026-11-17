@@ -26,7 +26,7 @@ public sealed class ManagerWorkspaceSignalRTests
     {
         var context = Context(mode);
         var groups = new RecordingGroupManager(); var locks = new ManagerEditLockService();
-        var hub = new EmployeePresenceHub(new EmployeePresenceService(), new ManagerPresenceService(), new RecordingEmployeeAccountService(), locks, new RecordingRealtimeNotifier(), NullLogger<EmployeePresenceHub>.Instance) { Context = context, Groups = groups };
+        var hub = new EmployeePresenceHub(new EmployeePresenceService(), new ManagerPresenceService(), new RecordingEmployeeAccountService(), locks, new RecordingRealtimeNotifier(), new EmployeeOnlineWorkflowLogTests.ThrowingWorkflowLogService(), NullLogger<EmployeePresenceHub>.Instance) { Context = context, Groups = groups };
         await hub.OnConnectedAsync(); Assert.True(context.Aborted); Assert.Empty(groups.AddedGroups);
         await Assert.ThrowsAsync<HubException>(() => hub.SetManagerEditLocks([ManagerEditLockTargets.Schedule(1, 1)]));
         await Assert.ThrowsAsync<HubException>(() => hub.SetScheduleEditLocks([new ScheduleEditLockTarget(1, 1)]));
@@ -38,7 +38,7 @@ public sealed class ManagerWorkspaceSignalRTests
     public async Task PcAndLegacyManagerLocksPreserveLifecycle(string? mode)
     {
         var context = Context(mode); var groups = new RecordingGroupManager(); var locks = new ManagerEditLockService();
-        var hub = new EmployeePresenceHub(new EmployeePresenceService(), new ManagerPresenceService(), new RecordingEmployeeAccountService(), locks, new RecordingRealtimeNotifier(), NullLogger<EmployeePresenceHub>.Instance) { Context = context, Groups = groups };
+        var hub = new EmployeePresenceHub(new EmployeePresenceService(), new ManagerPresenceService(), new RecordingEmployeeAccountService(), locks, new RecordingRealtimeNotifier(), new EmployeeOnlineWorkflowLogTests.ThrowingWorkflowLogService(), NullLogger<EmployeePresenceHub>.Instance) { Context = context, Groups = groups };
         await hub.OnConnectedAsync(); Assert.False(context.Aborted); Assert.Single(groups.AddedGroups);
         var result = await hub.SetScheduleEditLocks([new ScheduleEditLockTarget(1, 1)]); Assert.Single(result); Assert.True(result[0].IsLocked);
         await hub.OnDisconnectedAsync(null); Assert.Empty(locks.ReleaseConnection(context.ConnectionId));
@@ -49,7 +49,7 @@ public sealed class ManagerWorkspaceSignalRTests
         if (mode is not null) claims.Add(new(ManagerWorkspaceModes.ClaimType, mode));
         return new FakeHubCallerContext("mode-test", new ClaimsPrincipal(new ClaimsIdentity(claims, "tests")));
     }
-    private sealed class RecordingEmployeeAccountService : IEmployeeAccountService
+    internal sealed class RecordingEmployeeAccountService : IEmployeeAccountService
     {
         public BusinessLogicLayer.Contracts.Employees.EmployeeAccountModel? Account { get; init; }
         public bool FailNextTouch { get; set; }
@@ -92,7 +92,7 @@ public sealed class ManagerWorkspaceSignalRTests
             => throw new NotSupportedException();
     }
 
-    private sealed class RecordingGroupManager : IGroupManager
+    internal sealed class RecordingGroupManager : IGroupManager
     {
         public List<(string ConnectionId, string GroupName)> AddedGroups { get; } = [];
         public List<(string ConnectionId, string GroupName)> RemovedGroups { get; } = [];
@@ -110,7 +110,7 @@ public sealed class ManagerWorkspaceSignalRTests
         }
     }
 
-    private sealed class FakeHubCallerContext(string connectionId, ClaimsPrincipal user) : HubCallerContext
+    internal sealed class FakeHubCallerContext(string connectionId, ClaimsPrincipal user) : HubCallerContext
     {
         public override string ConnectionId { get; } = connectionId;
 
@@ -128,10 +128,11 @@ public sealed class ManagerWorkspaceSignalRTests
         public override void Abort() { Aborted = true; }
     }
 
-    private sealed class RecordingRealtimeNotifier : IRealtimeNotifier
+    internal sealed class RecordingRealtimeNotifier : IRealtimeNotifier
     {
         public List<ManagerDataChangedMessage> ManagerDataChanges { get; } = [];
         public List<ManagerEditLockState> ManagerEditLockChanges { get; } = [];
+        public List<WorkflowLogEntryModel> WorkflowLogEntries { get; } = [];
 
         public Task NotifyScheduleChangedAsync(int containerId, int graphId, string reason)
             => Task.CompletedTask;
@@ -158,7 +159,10 @@ public sealed class ManagerWorkspaceSignalRTests
             => Task.CompletedTask;
 
         public Task NotifyWorkflowLogCreatedAsync(WorkflowLogEntryModel entry)
-            => Task.CompletedTask;
+        {
+            WorkflowLogEntries.Add(entry);
+            return Task.CompletedTask;
+        }
 
         public Task NotifyScheduleEditLockChangedAsync(ScheduleEditLockState state)
             => Task.CompletedTask;

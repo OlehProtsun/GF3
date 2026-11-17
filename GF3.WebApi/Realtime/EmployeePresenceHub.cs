@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using WebApi.Auth;
 using WebApi.Contracts.WorkflowLogs;
+using WebApi.Services;
 
 namespace WebApi.Realtime;
 
@@ -130,11 +131,13 @@ public sealed class EmployeePresenceHub : Hub<IEmployeePresenceClient>
     public const string RoutePattern = "/api/realtime/presence";
 
     public const string ManagersGroupName = "presence:managers";
+    public const string SystemManagersGroupName = "presence:system-managers";
     private readonly IEmployeePresenceService _employeePresenceService;
     private readonly IManagerPresenceService _managerPresenceService;
     private readonly IEmployeeAccountService _employeeAccountService;
     private readonly IManagerEditLockService _managerEditLockService;
     private readonly IRealtimeNotifier _realtimeNotifier;
+    private readonly IWorkflowLogService _workflowLogService;
     private readonly ILogger<EmployeePresenceHub> _logger;
 
     public EmployeePresenceHub(
@@ -143,6 +146,7 @@ public sealed class EmployeePresenceHub : Hub<IEmployeePresenceClient>
         IEmployeeAccountService employeeAccountService,
         IManagerEditLockService managerEditLockService,
         IRealtimeNotifier realtimeNotifier,
+        IWorkflowLogService workflowLogService,
         ILogger<EmployeePresenceHub> logger)
     {
         _employeePresenceService = employeePresenceService;
@@ -150,6 +154,7 @@ public sealed class EmployeePresenceHub : Hub<IEmployeePresenceClient>
         _employeeAccountService = employeeAccountService;
         _managerEditLockService = managerEditLockService;
         _realtimeNotifier = realtimeNotifier;
+        _workflowLogService = workflowLogService;
         _logger = logger;
     }
 
@@ -209,6 +214,10 @@ public sealed class EmployeePresenceHub : Hub<IEmployeePresenceClient>
                 return;
             }
             await Groups.AddToGroupAsync(Context.ConnectionId, ManagersGroupName).ConfigureAwait(false);
+            if (Context.User.HasClaim(AuthPolicies.SystemManagerClaim, "true"))
+            {
+                await Groups.AddToGroupAsync(Context.ConnectionId, SystemManagersGroupName).ConfigureAwait(false);
+            }
 
             var managerId = TryGetManagerId(Context.User);
             if (managerId is > 0)
@@ -243,6 +252,15 @@ public sealed class EmployeePresenceHub : Hub<IEmployeePresenceClient>
 
             if (change.StateChanged)
             {
+                try
+                {
+                    await _workflowLogService.LogAsync(Context.User!, "Online", CancellationToken.None).ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogDebug(ex, "Employee online workflow log failed for employee {EmployeeId}.", employeeId);
+                }
+
                 await BroadcastPresenceChangedAsync(change, lastLoginAtUtc).ConfigureAwait(false);
             }
         }
