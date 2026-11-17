@@ -164,6 +164,8 @@ class ManagedDeploymentTests(unittest.TestCase):
                 return self.git(*args[1:], root=kwargs.get("cwd"))
             except subprocess.CalledProcessError as error:
                 raise release.ReleaseError(f"git {args[2]} failed (exit {error.returncode})") from None
+        if args[0] in ("systemd-analyze", "nft"):
+            return ""
         self.assertEqual(args[0], "systemctl", args)
         operation, unit = args[1:3]
         if operation == "show":
@@ -255,6 +257,22 @@ class ManagedDeploymentTests(unittest.TestCase):
             self.app_health = "unhealthy"
         return 0
 
+    def run_preflight_cli(self, operation, work, revision):
+        self.assertEqual(operation, "preflight")
+        self.assertFalse(self.locked)
+        with (patch.object(sys, "argv", [str(prepare.ENGINE), operation, str(work), revision]),
+              patch.object(release, "DEPLOY_LOCK", self.deploy_lock),
+              patch.object(os, "geteuid", return_value=0, create=True),
+              patch.object(os, "umask"), patch.object(release.signal, "signal")):
+            return release.main()
+
+    def stub_preflight_host_checks(self):
+        guard_lock = self.state / "state/guard.lock"
+        guard_lock.parent.mkdir()
+        guard_lock.touch(mode=0o600)
+        self.enterContext(patch.multiple(release, verify_ipv6=lambda: None, verify_ssh_and_certbot=lambda: None,
+                                         render=lambda _: {}, validate=lambda *_: None))
+
     def set_active_for_recovery(self, bundle):
         if os.name == "nt":
             self.set_active(bundle)
@@ -289,6 +307,21 @@ class ManagedDeploymentTests(unittest.TestCase):
         self.assertEqual(list(self.state.glob("preflight-*")), [])
         self.assertNotIn("never-print-this", self.output.getvalue())
         self.assertIn("Retained rollback bundle and SQLite snapshot present", self.output.getvalue())
+
+    def test_frontend_only_release_reaches_real_preflight_cli_before_confirmation(self):
+        self.push()
+        self.stub_preflight_host_checks()
+        self.engine.side_effect = self.run_preflight_cli
+        self.do_confirm = lambda _: False
+        try:
+            status = prepare.prepare(False)
+        except release.ReleaseError as error:
+            self.fail(f"{error}\n{self.output.getvalue()}")
+        self.assertEqual(status, 0)
+        self.assertIn("Preflight OK:", self.output.getvalue())
+        self.confirm.assert_called_once_with(self.target)
+        self.assertEqual(self.engine.call_count, 1)
+        self.assertEqual(self.approval.read_bytes(), self.approval_contents)
 
     def test_already_up_to_date_and_check_only(self):
         self.assertEqual(prepare.prepare(False), 0)
@@ -381,6 +414,32 @@ class ManagedDeploymentTests(unittest.TestCase):
         self.engine.assert_not_called()
         self.assertEqual(self.approval.read_bytes(), self.approval_contents)
 
+    def test_supported_migration_passes_classification_and_preflight(self):
+        migration = f"{maintenance.MIGRATIONS}/20260101000000_Initial.Designer.cs"
+        self.current = self.commit_file(migration, '[Migration("20260101000000_Initial")]\n')
+        release.store(self.previous / "release.json", {"sha": self.current, "baseline": BASELINE})
+        self.git("push", "origin", "PROD2")
+        self.git("pull", "--ff-only", root=self.writer)
+        added = f"{maintenance.MIGRATIONS}/20260102000000_AddComment"
+        self.push(added + ".cs", """
+            protected override void Up(MigrationBuilder migrationBuilder)
+            {
+                migrationBuilder.AddColumn<string>(name: "comment", table: "employee", type: "TEXT", nullable: true);
+            }
+        """)
+        self.push(added + ".Designer.cs", '[Migration("20260102000000_AddComment")]\n')
+        self.stub_preflight_host_checks()
+        with (patch.object(prepare, "MAINTENANCE_TOOLING_REVIEW", self.base / "no-tooling-review"),
+              patch.object(release, "maintenance_tool", return_value=maintenance),
+              patch.object(release, "fence_rules", return_value="disposable rules") as fence):
+            self.assertEqual(prepare.prepare(True), 0)
+        fence.assert_called_once_with(BASELINE)
+        self.assertIn("Preflight OK:", self.output.getvalue())
+        self.assertIn("passed maintenance preflight", self.output.getvalue())
+        self.engine.assert_not_called()
+        self.confirm.assert_not_called()
+        self.assertEqual(self.approval.read_bytes(), self.approval_contents)
+
     def test_maintenance_check_only_blocks_failed_ci_without_rehearsing_or_approving(self):
         self.push("DataAccessLayer/Migrations/20261114225324_AddComment.Designer.cs")
         self.job_overrides["Docker image"] = {"conclusion": "failure"}
@@ -449,6 +508,27 @@ class ManagedDeploymentTests(unittest.TestCase):
         self.git("push", "origin", "PROD2", root=self.writer)
         self.assertEqual(prepare.prepare(True), 0)
         self.confirm.assert_not_called()
+
+    def test_preflight_engine_transition_requires_exact_blobs_and_installed_copy(self):
+        path = prepare.ENGINE_PATH
+        before = self.commit_file(path, "previous engine\n")
+        self.git("push", "origin", "PROD2")
+        self.git("pull", "--ff-only", root=self.writer)
+        target = self.push(path, "fixed engine\n")
+        old_blob, new_blob = (self.git("rev-parse", f"{sha}:{path}", root=self.writer).strip()
+                              for sha in (before, target))
+        installed = self.base / "installed-engine.py"
+        installed.write_bytes(b"previous engine\n")
+        self.git("fetch", "origin")
+        with patch.multiple(prepare, ENGINE=installed, PREFLIGHT_HOTFIX_BLOBS=(old_blob, new_blob)):
+            with self.assertRaisesRegex(release.ReleaseError, "Separate manual maintenance"):
+                prepare.changed_paths(before, target)
+            installed.write_bytes(b"fixed engine\n")
+            self.assertEqual(prepare.changed_paths(before, target), [("M", path)])
+            unrelated = self.push(path, "another engine\n")
+            self.git("fetch", "origin")
+            with self.assertRaisesRegex(release.ReleaseError, "Separate manual maintenance"):
+                prepare.changed_paths(before, unrelated)
 
     def test_remote_moves_after_confirmation(self):
         target = self.push()

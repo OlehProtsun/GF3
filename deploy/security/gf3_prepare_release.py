@@ -53,6 +53,9 @@ MAINTENANCE_FILES = {
     ".dockerignore", ".gitattributes", ".gitignore", ".gitmodules", "dockerfile", "gf3.webapi/program.cs",
 }
 HELPER_PATH = "deploy/security/gf3_prepare_release.py"
+ENGINE_PATH = "deploy/security/gf3_release.py"
+# One reviewed transition for the PROD2 preflight dispatcher hotfix.
+PREFLIGHT_HOTFIX_BLOBS = ("5d24a4a03ae6ed3ed354bfed5c27e812954483b9", "45aecfd170368512a92371f1916157147fd208c3")
 GIT_OPERATIONS = (
     "MERGE_HEAD", "CHERRY_PICK_HEAD", "REVERT_HEAD", "REBASE_HEAD", "rebase-apply", "rebase-merge", "sequencer",
     "BISECT_START", "info/grafts",
@@ -240,16 +243,21 @@ def changed_paths(before, target):
         release.git("merge-base", "--is-ancestor", before, target)
     except release.ReleaseError:
         raise release.ReleaseError("Cannot establish a fast-forward from the current release to PROD2") from None
-    changes = release.git("diff", "--raw", "--no-ext-diff", "--no-renames", "-z", before, target, "--").split("\0")
+    changes = release.git("diff", "--raw", "--no-abbrev", "--no-ext-diff", "--no-renames", "-z",
+                          before, target, "--").split("\0")
     paths = []
     maintenance = []
     for header, name in zip(changes[:-1:2], changes[1::2], strict=True):
-        old_mode, new_mode, _, _, status = header[1:].split()
+        old_mode, new_mode, old_blob, new_blob, status = header[1:].split()
         paths.append((status, name))
         if name == HELPER_PATH and new_mode == "100644" and (
                 release.git("hash-object", "--no-filters", str(Path(__file__).absolute())).strip()
                 == release.git("rev-parse", f"{target}:{HELPER_PATH}").strip()):
             # The reviewed helper can enter the live tree once it has been installed explicitly.
+            continue
+        if (name == ENGINE_PATH and (status, old_mode, new_mode) == ("M", "100644", "100644")
+                and (old_blob, new_blob) == PREFLIGHT_HOTFIX_BLOBS
+                and release.git("hash-object", "--no-filters", str(ENGINE)).strip() == new_blob):
             continue
         if critical_path(name) or {old_mode, new_mode}.intersection(("120000", "160000")):
             maintenance.append(name)
