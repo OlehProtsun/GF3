@@ -1,3 +1,72 @@
+.installCard {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: clamp(8px, 3vw, 12px);
+  min-width: 0;
+  padding: 12px clamp(12px, 4vw, 16px);
+  border: 1px solid #d7e6f6;
+  border-radius: 22px;
+  background: #f1f7ff;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.06);
+  color: #0f172a;
+  text-decoration: none;
+  transition: background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.installCard:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+@media (hover: hover) {
+  .installCard:hover {
+    border-color: #bfd8f8;
+    background: #eaf3ff;
+    box-shadow: 0 6px 16px rgba(37, 99, 235, 0.09);
+  }
+}
+
+.installCard:active {
+  background: #e3efff;
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.06);
+}
+
+.installIcon,
+.installChevron {
+  display: grid;
+  place-items: center;
+  color: #2563eb;
+}
+
+.installIcon {
+  width: 40px;
+  height: 40px;
+  border-radius: 14px;
+  background: #deecff;
+}
+
+.installChevron {
+  width: 28px;
+  height: 28px;
+  border-radius: 10px;
+  background: #e7f1ff;
+}
+
+.installCopy {
+  display: grid;
+  gap: 3px;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
+}
+
+.installCopy strong { font-size: .94rem; font-weight: 800; }
+.installCopy > span { color: #475569; font-size: .8rem; }
+
+@media (prefers-reduced-motion: reduce) {
+  .installCard { transition: none; }
+}
+
 .profilePanel {
   display: grid;
   gap: 14px;

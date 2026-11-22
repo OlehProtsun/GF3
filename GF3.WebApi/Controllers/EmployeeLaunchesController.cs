@@ -18,7 +18,7 @@ public sealed class EmployeeLaunchesController(EmployeeLaunchService service) : 
         if (!int.TryParse(User.FindFirstValue("employee_id"), out var employeeId) || employeeId <= 0)
             throw new BadHttpRequestException("The current employee session is invalid.");
 
-        await service.RecordAsync(employeeId, request.Mode, User, ct);
+        await service.RecordAsync(employeeId, request.Mode, ct);
         return NoContent();
     }
 

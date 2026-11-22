@@ -103,6 +103,7 @@ public static class WebApiServiceCollectionExtensions
         services.AddSingleton<IManagerEditLockService>(services => services.GetRequiredService<ManagerEditLockService>());
         services.AddSingleton<IScheduleEditLockService>(services => services.GetRequiredService<ManagerEditLockService>());
         services.AddScoped<IRealtimeNotifier, RealtimeNotifier>();
+        services.AddHttpContextAccessor();
         services.AddScoped<IWorkflowLogService, WorkflowLogService>();
         services.AddScoped<EmployeeLaunchService>();
         services.AddScoped<ScheduleVersionCommitService>();

@@ -89,6 +89,7 @@ export function getHomeActivityPresentation(item: ManagerHomeActivityItem, emplo
   const statuses: Record<string, string> = { open: t("Open"), accepted: t("Accepted"), cancelled: t("Cancelled"), pending: t("Requires approval"), approved: t("Approved"), rejected: t("Rejected"), updated: t("Updated"), expired: t("Expired") };
   const interval = (date?: string | null, from?: string | null, to?: string | null) => [date ? formatHomeDate(date) : "", from && to ? `${from} – ${to}` : ""].filter(Boolean).join(", ");
   let description = interval(item.shiftDate, item.fromTime, item.toTime);
+  if (item.removesShift) description = [description, "–"].filter(Boolean).join(" → ");
   if (item.returnFromTime && item.returnToTime) description = [description, interval(item.returnShiftDate, item.returnFromTime, item.returnToTime)].filter(Boolean).join(" → ");
   if (item.vacationDays?.length) description = vacationRanges(item.vacationDays);
   if (item.kind === "swap_created" && counterparty) description = [counterparty, description].filter(Boolean).join(" · ");

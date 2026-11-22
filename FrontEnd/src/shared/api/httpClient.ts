@@ -1,4 +1,5 @@
 import { t, translateServerMessage } from "@shared/i18n";
+import { getPwaLaunchMode } from "@shared/lib/pwaDisplayMode";
 export type ValidationErrors = Record<string, string[]>;
 type ValidationErrorPayload = ValidationErrors | string[];
 
@@ -317,6 +318,7 @@ async function executeRequest(path: string, options: RequestOptions = {}) {
 
   const headers = new Headers(options.headers);
   headers.set("Accept", responseType === "blob" ? "*/*" : "application/json");
+  headers.set("X-GF-Launch-Mode", getPwaLaunchMode());
 
   if (!options.anonymous && authAccessToken && !headers.has("Authorization")) {
     headers.set("Authorization", `Bearer ${authAccessToken}`);

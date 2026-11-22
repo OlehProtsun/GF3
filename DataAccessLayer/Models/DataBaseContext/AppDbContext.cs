@@ -1022,8 +1022,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, TimeProvider? 
 
             entity.Property(request => request.OriginalFromTime).IsRequired(false).HasMaxLength(5);
             entity.Property(request => request.OriginalToTime).IsRequired(false).HasMaxLength(5);
-            entity.Property(request => request.RequestedFromTime).IsRequired().HasMaxLength(5);
-            entity.Property(request => request.RequestedToTime).IsRequired().HasMaxLength(5);
+            entity.Property(request => request.RequestedFromTime).HasMaxLength(5);
+            entity.Property(request => request.RequestedToTime).HasMaxLength(5);
+            entity.Property(request => request.Operation).HasConversion<string>().HasDefaultValue(ShiftCorrectionOperation.ChangeTimes);
             entity.Property(request => request.Comment).IsRequired(false).HasMaxLength(1000);
             entity.Property(request => request.Status)
                 .HasConversion<string>()
@@ -1044,7 +1045,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, TimeProvider? 
             entity.ToTable(table =>
             {
                 table.HasCheckConstraint("ck_shift_correction_dom", "day_of_month BETWEEN 1 AND 31");
-                table.HasCheckConstraint("ck_shift_correction_time_format", "((original_from_time IS NULL AND original_to_time IS NULL) OR (original_from_time IS NOT NULL AND original_to_time IS NOT NULL AND schedule_slot_id > 0 AND schedule_slot_id IS NOT NULL AND original_from_time GLOB '[0-2][0-9]:[0-5][0-9]' AND original_from_time < '24:00' AND original_to_time GLOB '[0-2][0-9]:[0-5][0-9]' AND original_to_time < '24:00')) AND requested_from_time GLOB '[0-2][0-9]:[0-5][0-9]' AND requested_from_time < '24:00' AND requested_to_time GLOB '[0-2][0-9]:[0-5][0-9]' AND requested_to_time < '24:00'");
+                table.HasCheckConstraint("ck_shift_correction_time_format", "(operation = 'RemoveShift' AND removal_snapshot_json IS NOT NULL AND schedule_slot_id IS NULL AND original_from_time IS NULL AND original_to_time IS NULL AND requested_from_time IS NULL AND requested_to_time IS NULL) OR (operation = 'ChangeTimes' AND removal_snapshot_json IS NULL AND ((original_from_time IS NULL AND original_to_time IS NULL) OR (original_from_time IS NOT NULL AND original_to_time IS NOT NULL AND schedule_slot_id > 0 AND schedule_slot_id IS NOT NULL AND original_from_time GLOB '[0-2][0-9]:[0-5][0-9]' AND original_from_time < '24:00' AND original_to_time GLOB '[0-2][0-9]:[0-5][0-9]' AND original_to_time < '24:00')) AND requested_from_time IS NOT NULL AND requested_to_time IS NOT NULL AND requested_from_time GLOB '[0-2][0-9]:[0-5][0-9]' AND requested_from_time < '24:00' AND requested_to_time GLOB '[0-2][0-9]:[0-5][0-9]' AND requested_to_time < '24:00')");
                 table.HasCheckConstraint("ck_shift_correction_requested_order", "requested_from_time < requested_to_time");
             });
         });

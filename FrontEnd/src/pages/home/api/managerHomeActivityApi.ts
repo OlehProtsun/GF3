@@ -8,6 +8,7 @@ export type ManagerHomeActivityItem = {
   targetType: "graph" | "availability" | "urlop";
   counterpartyName?: string | null; scheduleName?: string | null; shopName?: string | null;
   isManagerCreatedOffer?: boolean;
+  removesShift?: boolean;
   shiftDate?: string | null; fromTime?: string | null; toTime?: string | null;
   returnShiftDate?: string | null; returnFromTime?: string | null; returnToTime?: string | null;
   vacationDays?: string[] | null;

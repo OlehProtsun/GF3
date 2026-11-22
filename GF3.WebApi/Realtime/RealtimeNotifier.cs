@@ -126,5 +126,6 @@ public sealed class RealtimeNotifier(IHubContext<EmployeePresenceHub, IEmployeeP
         ActorEmployeeId = entry.ActorEmployeeId,
         ActorName = entry.ActorName,
         Action = entry.Action,
+        LaunchMode = entry.LaunchMode,
     };
 }

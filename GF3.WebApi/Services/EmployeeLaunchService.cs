@@ -1,5 +1,4 @@
 using System.Globalization;
-using System.Security.Claims;
 using BusinessLogicLayer.Common;
 using BusinessLogicLayer.Services.Abstractions;
 using DataAccessLayer.Models.DataBaseContext;
@@ -10,10 +9,10 @@ using WebApi.Realtime;
 namespace WebApi.Services;
 
 public sealed class EmployeeLaunchService(AppDbContext db, IEmployeePresenceService presence,
-    IWorkflowLogService workflowLog, IRealtimeNotifier realtime, TimeProvider timeProvider,
+    IRealtimeNotifier realtime, TimeProvider timeProvider,
     ILogger<EmployeeLaunchService> logger)
 {
-    public async Task RecordAsync(int employeeId, string mode, ClaimsPrincipal user, CancellationToken ct)
+    public async Task RecordAsync(int employeeId, string mode, CancellationToken ct)
     {
         if (mode is not ("browser" or "pwa"))
             throw ValidationException.ForField(nameof(RecordEmployeeLaunchRequest.Mode), "Mode must be browser or pwa.");
@@ -24,15 +23,6 @@ public sealed class EmployeeLaunchService(AppDbContext db, IEmployeePresenceServ
             ? await account.ExecuteUpdateAsync(update => update.SetProperty(x => x.LastPwaLaunchAtUtc, now), ct)
             : await account.ExecuteUpdateAsync(update => update.SetProperty(x => x.LastBrowserLaunchAtUtc, now), ct);
         if (rows == 0) throw new KeyNotFoundException("The employee account was not found.");
-
-        try
-        {
-            await workflowLog.LogAsync(user, mode == "pwa" ? "Opened platform via PWA" : "Opened platform via browser", ct);
-        }
-        catch (Exception exception)
-        {
-            logger.LogDebug(exception, "Failed to log employee launch for {EmployeeId}.", employeeId);
-        }
 
         try
         {

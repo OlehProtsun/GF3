@@ -53,6 +53,7 @@ export const queryKeys = {
   employeeSchedules: {
     all: ["employeeSchedules"] as const,
     list: () => ["employeeSchedules", "list"] as const,
+    publicList: () => ["employeeSchedules", "publicList"] as const,
   },
   shiftSwaps: {
     employeeApprovals: () => ["shiftSwaps", "employeeApprovals"] as const,

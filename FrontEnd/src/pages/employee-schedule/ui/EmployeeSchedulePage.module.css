@@ -224,6 +224,20 @@
 .dailyScheduleWorker { min-width: 0; display: grid; gap: 5px; padding: 12px 14px; border: 1px solid rgba(148, 163, 184, 0.16); border-radius: 17px; background: rgba(255, 255, 255, 0.94); box-shadow: 0 8px 20px rgba(15, 23, 42, 0.045); }
 .dailyScheduleWorker span { min-width: 0; overflow-wrap: anywhere; color: #0f172a; font-size: 0.9rem; font-weight: 950; }
 .dailyScheduleWorker strong { color: #64748b; font-size: 0.82rem; font-weight: 900; }
+.openScheduleMatrix td[data-cell-adornment-tone="correction"],
+.dailyScheduleWorker[data-schedule-status="correction"] { --schedule-status-fill: #fff4e6; --schedule-status-border: #f6d1a4; }
+.openScheduleMatrix td[data-cell-adornment-tone="open"],
+.dailyScheduleWorker[data-schedule-status="open"] { --schedule-status-fill: #eff6ff; --schedule-status-border: #bfdbfe; }
+.openScheduleMatrix td[data-cell-adornment-tone="accepted"],
+.dailyScheduleWorker[data-schedule-status="accepted"] { --schedule-status-fill: #ecfdf3; --schedule-status-border: #b7e4c7; }
+.dailyScheduleWorker[data-schedule-status] {
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 8px;
+  border-color: var(--schedule-status-border);
+  background: var(--schedule-status-fill);
+}
+.dailyScheduleWorker[data-schedule-status] > strong { grid-area: 2 / 1 / auto / -1; }
+.dailyScheduleStatusBadges { grid-area: 1 / 2; display: flex; align-items: center; gap: 4px; }
 .dailyScheduleEmpty { min-height: 120px; display: grid; place-items: center; align-content: center; gap: 5px; padding: 20px; border: 1px dashed rgba(244, 63, 94, 0.22); border-radius: 18px; background: rgba(255, 241, 242, 0.72); color: #64748b; text-align: center; }
 .dailyScheduleEmpty strong { color: #9f1239; font-size: 0.88rem; }
 .dailyScheduleEmpty span { font-size: 0.76rem; font-weight: 750; }

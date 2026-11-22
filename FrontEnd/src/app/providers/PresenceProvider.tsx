@@ -33,6 +33,7 @@ import {
   getEmployeeSwapNotificationId,
 } from "@shared/lib/employeeNotificationReadState";
 import { isDev } from "@shared/lib/isDev";
+import { getPwaLaunchMode } from "@shared/lib/pwaDisplayMode";
 
 const presenceHubMethodName = "PresenceChanged";
 const scheduleChangedMethodName = "ScheduleChanged";
@@ -700,7 +701,7 @@ export function PresenceProvider({ children }: PropsWithChildren) {
     const sessionRole = session.role;
 
     const connection = new HubConnectionBuilder()
-      .withUrl(buildApiUrl("realtime/presence"), {
+      .withUrl(buildApiUrl("realtime/presence", { launchMode: getPwaLaunchMode() }), {
         accessTokenFactory: () => getAuthAccessToken() ?? "",
       })
       .withAutomaticReconnect([0, 2000, 5000, 10000])

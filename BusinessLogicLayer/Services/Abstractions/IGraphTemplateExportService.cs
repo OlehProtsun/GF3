@@ -26,4 +26,8 @@ public interface IGraphTemplateExportService
 
     Task<(byte[] content, string fileName)> ExportPublishedGraphToXlsxAsync(
         int employeeId, int graphId, CancellationToken ct = default);
+
+    Task<(byte[] content, string fileName)> ExportPublishedPreviewToXlsxAsync(
+        int containerId, int graphId, CancellationToken ct = default)
+        => throw new NotSupportedException("Published preview export is not supported by this exporter.");
 }

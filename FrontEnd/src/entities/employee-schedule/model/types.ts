@@ -43,3 +43,7 @@ export type EmployeeSchedule = {
   slots: EmployeeScheduleSlot[];
   relatedScheduleAssignments?: EmployeeScheduleRelatedAssignment[];
 };
+
+export type PublicScheduleSummary = Pick<EmployeeSchedule, "id" | "name" | "year" | "month" | "lastUpdatedAtUtc"> & {
+  publicationStatus: "public";
+};

@@ -39,6 +39,8 @@ export type GraphMatrixSelectionMode = "replace" | "toggle" | "range";
 export type ContainerGraphMatrixEditMode = "deferred" | "inline";
 export type ContainerGraphMatrixEmptyCellVariant = "neutral" | "danger";
 
+type ReadOnlyCellAdornment = { content: ReactNode; tone: string; count: number };
+
 type ContainerGraphMatrixProps = {
   urlopCellKeys?: ReadonlySet<string>;
   urlopInfoLabels?: ReadonlyMap<string, string>;
@@ -47,6 +49,7 @@ type ContainerGraphMatrixProps = {
   cellMap: GraphMatrixCellMap;
   visualHintMap?: GraphMatrixCellMap;
   mutedSuffixMap?: GraphMatrixCellMap;
+  readOnlyCellAdornments?: ReadonlyMap<string, ReadOnlyCellAdornment>;
   visualHintDetailMap?: GraphRelatedScheduleHintDetailMap;
   lockVisualHintCells?: boolean;
   styleMap?: GraphMatrixStyleMap;
@@ -146,6 +149,7 @@ type MatrixValueCellProps = {
   visualHint?: string;
   urlopLabel?: string;
   mutedSuffix?: string;
+  readOnlyAdornment?: ReadOnlyCellAdornment;
   lockVisualHint?: boolean;
   error?: string;
   isEmpty: boolean;
@@ -436,6 +440,7 @@ const MatrixValueCell = memo(function MatrixValueCell({
   visualHint,
   urlopLabel,
   mutedSuffix,
+  readOnlyAdornment,
   lockVisualHint,
   error,
   isEmpty,
@@ -652,6 +657,8 @@ const MatrixValueCell = memo(function MatrixValueCell({
         isEditing && styles.editingCell,
       )}
       style={inlineStyle}
+      data-cell-adornment-tone={readOnlyAdornment?.tone}
+      data-cell-adornment-count={readOnlyAdornment?.count}
       data-matrix-target={interactionEnabled ? "cell" : undefined}
       data-employee-id={interactionEnabled ? employeeId : undefined}
       data-day-of-month={interactionEnabled ? dayOfMonth : undefined}
@@ -805,6 +812,7 @@ const MatrixValueCell = memo(function MatrixValueCell({
             {renderedContent}
           </button>
         )}
+        {readOnlyAdornment && <span className={styles.readOnlyAdornment}>{readOnlyAdornment.content}</span>}
       </div>
     </td>
   );
@@ -816,6 +824,7 @@ export function ContainerGraphMatrix({
   cellMap,
   visualHintMap = {},
   mutedSuffixMap = {},
+  readOnlyCellAdornments,
   visualHintDetailMap = {},
   lockVisualHintCells = false,
   styleMap = {},
@@ -1962,6 +1971,7 @@ export function ContainerGraphMatrix({
                             urlopLabel={urlopInfoLabels?.get(cellKey) ?? (vacation && isEmpty ? t("Urlop") : undefined)}
                             visualHint={visualHint}
                             mutedSuffix={mutedSuffixMap[cellKey]}
+                            readOnlyAdornment={readOnly ? readOnlyCellAdornments?.get(cellKey) : undefined}
                             lockVisualHint={lockVisualHintCells}
                             error={error}
                             isEmpty={isEmpty}

@@ -6,6 +6,8 @@ export type ShiftCorrectionRequest = {
   scheduleId: number;
   scheduleSlotId: number | null;
   isDayOffRequest: boolean;
+  requestType?: "adjustShift" | "addShift" | "removeShift";
+  originalShifts?: Array<{ slotId: number; fromTime: string; toTime: string }>;
   scheduleName: string;
   shopName: string;
   year: number;
@@ -15,8 +17,8 @@ export type ShiftCorrectionRequest = {
   employeeName: string;
   originalFromTime: string | null;
   originalToTime: string | null;
-  requestedFromTime: string;
-  requestedToTime: string;
+  requestedFromTime: string | null;
+  requestedToTime: string | null;
   comment: string | null;
   status: ShiftCorrectionStatus;
   createdAtUtc: string;
@@ -26,10 +28,12 @@ export type ShiftCorrectionRequest = {
 
 export type CreateShiftCorrectionInput = {
   scheduleId: number;
-  requestedFromTime: string;
-  requestedToTime: string;
   comment?: string | null;
-} & ({ scheduleSlotId: number; dayOfMonth?: never } | { dayOfMonth: number; scheduleSlotId?: never });
+} & (
+  | ({ requestType?: never; requestedFromTime: string; requestedToTime: string } &
+    ({ scheduleSlotId: number; dayOfMonth?: never } | { dayOfMonth: number; scheduleSlotId?: never }))
+  | { requestType: "removeShift"; dayOfMonth: number; scheduleSlotId?: never; requestedFromTime?: never; requestedToTime?: never }
+);
 
 export type ShiftCorrectionSetting = {
   highlightColor: string;

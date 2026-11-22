@@ -7,6 +7,8 @@ public sealed class ShiftCorrectionRequestDto
     public int ScheduleId { get; init; }
     public int? ScheduleSlotId { get; init; }
     public bool IsDayOffRequest { get; init; }
+    public string RequestType { get; init; } = string.Empty;
+    public IReadOnlyList<ShiftCorrectionOriginalShiftDto> OriginalShifts { get; init; } = [];
     public string ScheduleName { get; init; } = string.Empty;
     public string ShopName { get; init; } = string.Empty;
     public int Year { get; init; }
@@ -16,11 +18,13 @@ public sealed class ShiftCorrectionRequestDto
     public string EmployeeName { get; init; } = string.Empty;
     public string? OriginalFromTime { get; init; }
     public string? OriginalToTime { get; init; }
-    public string RequestedFromTime { get; init; } = string.Empty;
-    public string RequestedToTime { get; init; } = string.Empty;
+    public string? RequestedFromTime { get; init; }
+    public string? RequestedToTime { get; init; }
     public string? Comment { get; init; }
     public string Status { get; init; } = string.Empty;
     public DateTimeOffset CreatedAtUtc { get; init; }
     public DateTimeOffset? ReviewedAtUtc { get; init; }
     public string? ReviewedByManagerName { get; init; }
 }
+
+public sealed record ShiftCorrectionOriginalShiftDto(int SlotId, string FromTime, string ToTime);

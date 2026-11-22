@@ -15,6 +15,13 @@ public interface IWorkflowLogService
         CancellationToken cancellationToken = default);
 
     Task<WorkflowLogEntryModel> LogAsync(
+        ClaimsPrincipal user,
+        string action,
+        string? launchMode,
+        CancellationToken cancellationToken)
+        => LogAsync(user, action, cancellationToken);
+
+    Task<WorkflowLogEntryModel> LogAsync(
         string actorRole,
         string actorName,
         int? actorEmployeeId,
@@ -40,26 +47,48 @@ public interface IWorkflowLogService
     Task<int> DeleteAllAsync(CancellationToken cancellationToken = default);
 }
 
-public sealed class WorkflowLogService(AppDbContext db, IRealtimeNotifier realtimeNotifier) : IWorkflowLogService
+public sealed class WorkflowLogService(
+    AppDbContext db,
+    IRealtimeNotifier realtimeNotifier,
+    IHttpContextAccessor? httpContextAccessor = null) : IWorkflowLogService
 {
     public Task<WorkflowLogEntryModel> LogAsync(
         ClaimsPrincipal user,
         string action,
         CancellationToken cancellationToken = default)
+        => LogAsync(user, action, GetRequestLaunchMode(), cancellationToken);
+
+    public Task<WorkflowLogEntryModel> LogAsync(
+        ClaimsPrincipal user,
+        string action,
+        string? launchMode,
+        CancellationToken cancellationToken)
     {
         var role = user.FindFirstValue(ClaimTypes.Role) ?? string.Empty;
         var actorName = user.FindFirstValue("display_name") ?? user.Identity?.Name ?? GetFallbackActorName(role);
         var actorEmployeeId = int.TryParse(user.FindFirstValue("employee_id"), out var employeeId) ? employeeId : (int?)null;
 
-        return LogAsync(role, actorName, actorEmployeeId, action, cancellationToken);
+        return PersistAsync(role, actorName, actorEmployeeId, action, launchMode, cancellationToken);
     }
 
-    public async Task<WorkflowLogEntryModel> LogAsync(
+    public Task<WorkflowLogEntryModel> LogAsync(
         string actorRole,
         string actorName,
         int? actorEmployeeId,
         string action,
         CancellationToken cancellationToken = default)
+        => PersistAsync(actorRole, actorName, actorEmployeeId, action, GetRequestLaunchMode(), cancellationToken);
+
+    private string? GetRequestLaunchMode()
+        => httpContextAccessor?.HttpContext?.Request.Headers["X-GF-Launch-Mode"].ToString();
+
+    private async Task<WorkflowLogEntryModel> PersistAsync(
+        string actorRole,
+        string actorName,
+        int? actorEmployeeId,
+        string action,
+        string? launchMode,
+        CancellationToken cancellationToken)
     {
         var normalizedRole = NormalizeActorRole(actorRole);
         var entry = new WorkflowLogEntryModel
@@ -69,6 +98,7 @@ public sealed class WorkflowLogService(AppDbContext db, IRealtimeNotifier realti
             ActorEmployeeId = actorEmployeeId,
             ActorName = string.IsNullOrWhiteSpace(actorName) ? GetFallbackActorName(actorRole) : actorName.Trim(),
             Action = action.Trim(),
+            LaunchMode = launchMode is "pwa" or "browser" ? launchMode : null,
         };
 
         var settings = await GetSettingsAsync(cancellationToken).ConfigureAwait(false);

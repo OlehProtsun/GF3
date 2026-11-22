@@ -1,0 +1,206 @@
+:global(html):has(.dialog[open]) {
+  overflow: hidden;
+}
+
+.dialog {
+  --gutter-top: max(16px, env(safe-area-inset-top));
+  --gutter-right: max(16px, env(safe-area-inset-right));
+  --gutter-bottom: max(16px, env(safe-area-inset-bottom));
+  --gutter-left: max(16px, env(safe-area-inset-left));
+  inset: var(--gutter-top) var(--gutter-right) var(--gutter-bottom) var(--gutter-left);
+  width: min(440px, calc(100% - var(--gutter-left) - var(--gutter-right)));
+  max-width: none;
+  max-height: calc(100% - var(--gutter-top) - var(--gutter-bottom));
+  max-height: calc(100dvh - var(--gutter-top) - var(--gutter-bottom));
+  margin: auto;
+  padding: clamp(18px, 5vw, 28px);
+  box-sizing: border-box;
+  overflow: auto;
+  overscroll-behavior: contain;
+  border: 1px solid rgb(255 255 255 / 90%);
+  border-radius: 34px;
+  background: radial-gradient(ellipse at 82% 8%, #e7efff, transparent 53%),
+    linear-gradient(155deg, #edf3ff, #fafcff 48%, #f5f8ff);
+  box-shadow: 0 24px 64px rgb(21 43 91 / 30%), 0 8px 24px rgb(21 43 91 / 12%);
+  color: #101a30;
+  text-align: center;
+  color-scheme: light;
+}
+
+.dialog[open] {
+  animation: enter 220ms ease-out both;
+}
+
+.dialog::backdrop {
+  background: rgb(24 33 58 / 49%);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+
+.close {
+  position: absolute;
+  z-index: 1;
+  top: 14px;
+  right: 14px;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: #dfe8fa;
+  color: #465b7d;
+  cursor: pointer;
+}
+
+.illustration {
+  position: relative;
+  width: min(100%, 260px);
+  height: clamp(120px, 29vw, 158px);
+  margin: 8px auto 17px;
+  overflow: hidden;
+}
+
+.illustration::before {
+  position: absolute;
+  inset: 31% 0 -20%;
+  border-radius: 58% 54% 33% 32%;
+  background: linear-gradient(155deg, #dce7fc, #e9f0ff);
+  transform: rotate(-9deg);
+  content: "";
+}
+
+.phone {
+  position: absolute;
+  top: 8%;
+  left: 50%;
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  width: 85px;
+  height: 155px;
+  padding-top: 39px;
+  box-sizing: border-box;
+  border: 3px solid #abcaff;
+  border-right: 6px solid #2263ff;
+  border-radius: 23px;
+  background: linear-gradient(140deg, #bad4ff, #86b1ff 65%, #d8e7ff);
+  box-shadow: 0 8px 20px rgb(51 110 228 / 20%);
+  transform: translateX(-50%) rotate(12deg);
+}
+
+.phone::before {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 33px;
+  height: 10px;
+  border-radius: 0 0 7px 7px;
+  background: #d5e5ff;
+  transform: translateX(-50%);
+  content: "";
+}
+
+.phone img {
+  width: 49px;
+  height: 49px;
+  border-radius: 13px;
+  box-shadow: 0 7px 14px rgb(38 86 181 / 20%);
+}
+
+.accents {
+  position: absolute;
+  top: 13%;
+  right: calc(50% + 48px);
+  display: grid;
+  gap: 6px;
+}
+
+.accents span {
+  width: 15px;
+  height: 3px;
+  border-radius: 3px;
+  background: #4485ff;
+  transform: translateX(12px) rotate(57deg);
+}
+
+.accents span:nth-child(2) {
+  transform: rotate(27deg);
+}
+
+.accents span:nth-child(3) {
+  transform: translateX(-3px) rotate(-11deg);
+}
+
+.title {
+  max-width: 15em;
+  margin: 0 auto;
+  font-size: clamp(23px, 6.4vw, 31px);
+  font-weight: 800;
+  line-height: 1.08;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+}
+
+.description {
+  margin: 12px 0 0;
+  color: #546584;
+  font-size: clamp(14px, 3.7vw, 17px);
+  line-height: 1.4;
+  text-wrap: pretty;
+}
+
+.actions {
+  display: grid;
+  gap: 10px;
+  margin-top: clamp(20px, 6vw, 34px);
+}
+
+.primary,
+.secondary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 11px;
+  width: 100%;
+  min-height: 46px;
+  padding: 8px 14px;
+  box-sizing: border-box;
+  border: 0;
+  border-radius: 999px;
+  font: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.primary {
+  min-height: 50px;
+  background: linear-gradient(160deg, #367bff, #094ce7 72%, #034cff);
+  box-shadow: 0 6px 16px rgb(17 81 229 / 22%);
+  color: #fff;
+  font-size: 18px;
+  font-weight: 750;
+}
+
+.secondary {
+  background: #e8edf6;
+  color: #465b7d;
+  font-weight: 500;
+}
+
+.close:focus-visible,
+.primary:focus-visible,
+.secondary:focus-visible {
+  outline: 2px solid #245cca;
+  outline-offset: 3px;
+}
+
+@keyframes enter {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dialog[open] { animation: none; }
+}

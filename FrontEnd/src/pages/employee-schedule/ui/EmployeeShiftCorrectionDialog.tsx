@@ -1,332 +1,397 @@
 import { dateTimeFormat, t } from "@shared/i18n";
-import { useEffect, useId, useMemo, useRef, useState, type MouseEvent } from "react";
+import { useEffect, useId, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import { useSwapModalEnvironment } from "@pages/employee-swap/ui/useSwapModalEnvironment";
 import type { EmployeeSchedule, EmployeeScheduleSlot } from "@entities/employee-schedule";
 import type { CreateShiftCorrectionInput, ShiftCorrectionRequest } from "@entities/shift-corrections";
+import { formatShiftCorrectionDelta, shiftCorrectionOriginalMinutes } from "@entities/shift-corrections/model/presentation";
+import { formatScheduleLastUpdate } from "@shared/lib/scheduleLastUpdate";
+import { parseFlexibleTimeSegment } from "@shared/lib/timeRange";
 import { IosButton } from "@shared/ui/components/IosButton";
-import { CheckIcon, CloseIcon, ScheduleIcon } from "@shared/ui/icons";
+import { ArrowRightIcon, CheckIcon, ChevronLeftIcon, ChevronRightIcon, ClockIcon, CloseIcon, NoteIcon, ScheduleDetailsIcon, ScheduleIcon } from "@shared/ui/icons";
+import scheduleStyles from "./EmployeeScheduleSelectDialog.module.css";
 import styles from "./EmployeeShiftCorrectionDialog.module.css";
-
-type Boundary = { slotId: number; edge: "start" | "end" };
-const commentMaxLength = 1000;
 
 type EmployeeShiftCorrectionDialogProps = {
   open: boolean;
-  schedule: EmployeeSchedule | null;
+  schedules: EmployeeSchedule[];
   employeeId: number | null;
   existingRequests: ShiftCorrectionRequest[];
-  unavailableDays?: ReadonlySet<number>;
   isSending: boolean;
+  submitted?: boolean;
   errorMessage?: string | null;
   onCancel: () => void;
   onSubmit: (input: CreateShiftCorrectionInput) => void;
 };
 
-const weekdayFormatter = dateTimeFormat("en-GB", { weekday: "short", timeZone: "UTC" });
+const steps = [
+  { label: "Schedule", title: "Choose a schedule" },
+  { label: "Day", title: "Choose a day" },
+  { label: "Shift", title: "Adjust shift time" },
+  { label: "Comment", title: "Add a comment" },
+  { label: "Review", title: "Review your request" },
+] as const;
 
-function toMinutes(value: string) {
-  const [hours, minutes] = value.split(":").map(Number);
-  return hours * 60 + minutes;
+const commentMaxLength = 1000;
+const timePattern = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
+const periodFormatter = dateTimeFormat("en-GB", { month: "long", year: "numeric", timeZone: "UTC" });
+const dateFormatter = dateTimeFormat("en-GB", { dateStyle: "full", timeZone: "UTC" });
+
+function formatShift(from: string, to: string) {
+  return from && to ? from + " – " + to : "—";
 }
 
-function toTime(minutes: number) {
-  const safe = Math.max(0, Math.min(1439, minutes));
-  return `${String(Math.floor(safe / 60)).padStart(2, "0")}:${String(safe % 60).padStart(2, "0")}`;
+function moveTime(value: string, delta: number) {
+  const time = parseFlexibleTimeSegment(value);
+  if (!time) return value;
+  const minutes = time.totalMinutes + delta;
+  if (minutes < 0 || minutes > 1439) return value;
+  return String(Math.floor(minutes / 60)).padStart(2, "0") + ":" + String(minutes % 60).padStart(2, "0");
 }
 
-function ownsSlot(slot: EmployeeScheduleSlot, employeeId: number | null) {
-  return employeeId === null
-    ? slot.employeeId === undefined || slot.employeeId === null
-    : slot.employeeId === undefined || slot.employeeId === null || slot.employeeId === employeeId;
+export function EmployeeShiftCorrectionDialog({ open, ...props }: EmployeeShiftCorrectionDialogProps) {
+  return open ? <ShiftCorrectionWizard {...props} /> : null;
 }
 
-function formatAdjustment(minutes: number) {
-  if (minutes === 0) return t("No change yet");
-  const direction = minutes > 0 ? "later" : "earlier";
-  const absolute = Math.abs(minutes);
-  const hours = Math.floor(absolute / 60);
-  const remainder = absolute % 60;
-  const amount = [
-    hours ? `${hours} ${hours === 1 ? "hour" : "hours"}` : "",
-    remainder ? t("{0} min", remainder) : "",
-  ].filter(Boolean).join(" ");
-  return `${amount} ${direction}`;
-}
-
-export function EmployeeShiftCorrectionDialog({
-  open,
-  schedule,
-  employeeId,
-  existingRequests,
-  unavailableDays,
-  isSending,
-  errorMessage,
-  onCancel,
-  onSubmit,
-}: EmployeeShiftCorrectionDialogProps) {
-  const titleId = useId();
+function ShiftCorrectionWizard({
+  schedules, employeeId, existingRequests, isSending, submitted, errorMessage, onCancel, onSubmit,
+}: Omit<EmployeeShiftCorrectionDialogProps, "open">) {
+  const stepTitleId = useId();
   const commentId = useId();
   const commentHelpId = useId();
   const dialogRef = useRef<HTMLDialogElement>(null);
-  useSwapModalEnvironment(dialogRef, undefined, open && Boolean(schedule));
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const selectedDayRef = useRef<HTMLButtonElement>(null);
+  const stepTitleRef = useRef<HTMLHeadingElement>(null);
+  const [step, setStep] = useState(0);
+  const [scheduleId, setScheduleId] = useState<number | null>(null);
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
-  const [boundary, setBoundary] = useState<Boundary | null>(null);
-  const [adjustmentMinutes, setAdjustmentMinutes] = useState(0);
-  const [dayOffFrom, setDayOffFrom] = useState("");
-  const [dayOffTo, setDayOffTo] = useState("");
+  const [slotId, setSlotId] = useState<number | null>(null);
+  const [requestedFrom, setRequestedFrom] = useState("");
+  const [requestedTo, setRequestedTo] = useState("");
   const [comment, setComment] = useState("");
+  const [requestDayOff, setRequestDayOff] = useState(false);
+  useSwapModalEnvironment(dialogRef);
 
-  const slotsByDay = useMemo(() => {
-    const map = new Map<number, EmployeeScheduleSlot[]>();
-    schedule?.slots.filter(slot => ownsSlot(slot, employeeId)).forEach(slot => {
-      const daySlots = map.get(slot.dayOfMonth) ?? [];
-      daySlots.push(slot);
-      map.set(slot.dayOfMonth, daySlots);
+  useEffect(() => {
+    if (bodyRef.current) bodyRef.current.scrollTop = 0;
+    stepTitleRef.current?.focus({ preventScroll: true });
+  }, [step, submitted]);
+
+  useEffect(() => {
+    if (step === 1) selectedDayRef.current?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
+  }, [step, selectedDay, slotId]);
+
+  const publishedSchedules = schedules.filter(item => item.publicationStatus === "public");
+  const schedule = publishedSchedules.find(item => item.id === scheduleId);
+  const monthSchedules = schedule ? publishedSchedules.filter(item =>
+    item.year === schedule.year && item.month === schedule.month) : [];
+  const daysInMonth = schedule ? new Date(Date.UTC(schedule.year, schedule.month, 0)).getUTCDate() : 0;
+  const pendingRequests = existingRequests.filter(request => request.status === "pending" && request.employeeId === employeeId);
+  const pendingForMonth = pendingRequests.filter(request => request.year === schedule?.year && request.month === schedule?.month);
+
+  function getDayDetails(day: number | null) {
+    const ownSlotsOnDay = (item: EmployeeSchedule) => item.slots.filter(slot =>
+      employeeId !== null && slot.employeeId === employeeId && slot.dayOfMonth === day);
+    const slots = schedule ? ownSlotsOnDay(schedule).sort((a, b) =>
+      a.fromTime.localeCompare(b.fromTime) || a.toTime.localeCompare(b.toTime) || a.id - b.id) : [];
+    const otherSlots: EmployeeScheduleSlot[] = [];
+    const conflictsBySchedule = new Map<number, string>();
+    for (const other of monthSchedules) {
+      if (other.id !== scheduleId) {
+        const assigned = ownSlotsOnDay(other);
+        if (assigned.length) conflictsBySchedule.set(other.id, other.name);
+        otherSlots.push(...assigned);
+      }
+      for (const assignment of other.relatedScheduleAssignments ?? []) {
+        if (assignment.employeeId === employeeId && assignment.dayOfMonth === day && assignment.scheduleId !== scheduleId)
+          conflictsBySchedule.set(assignment.scheduleId, assignment.scheduleName);
+      }
+    }
+    const conflictNames = [...new Set([...conflictsBySchedule].map(([id, name]) => name.trim() || t("Schedule #{0}", id)))]
+      .sort((a, b) => a.localeCompare(b));
+    return { slots, otherSlots, conflictNames, pending: pendingForMonth.filter(request => request.dayOfMonth === day) };
+  }
+
+  const { slots: selectedSlots, otherSlots, conflictNames, pending: pendingOnDay } = getDayDetails(selectedDay);
+  const selectedSlot = selectedSlots.find(slot => slot.id === slotId);
+  const isPendingSlot = (slot: EmployeeScheduleSlot) => pendingRequests.some(request => request.scheduleSlotId === slot.id) ||
+    pendingForMonth.some(request => request.dayOfMonth === slot.dayOfMonth && request.scheduleId === scheduleId &&
+      (request.requestType === "removeShift" ||
+        (request.originalFromTime === slot.fromTime && request.originalToTime === slot.toTime)));
+  const dayOptions = step === 1 && schedule ? Array.from({ length: daysInMonth }, (_, index) => {
+    const day = index + 1;
+    const date = dateFormatter.format(new Date(Date.UTC(schedule.year, schedule.month - 1, day)));
+    const details = getDayDetails(day);
+    return (details.slots.length > 0 ? details.slots : [null]).map(slot => {
+      const conflicts = slot === null ? details.conflictNames : [];
+      const pending = slot ? isPendingSlot(slot) : details.pending.length > 0;
+      return {
+        day, date, slot,
+        selected: selectedDay === day && slotId === (slot?.id ?? null),
+        pending,
+        disabled: pending || conflicts.length > 0,
+        label: slot ? formatShift(slot.fromTime, slot.toTime) : conflicts.length > 0
+          ? t(conflicts.length === 1 ? "Already working on another schedule ({0})" : "Already working on other schedules ({0})", conflicts.join(", "))
+          : t("Day off"),
+        detail: conflicts.length > 0 ? t("Choose another day or go back to select the schedule with the assigned shift.")
+          : pending ? t("Pending approval") : slot ? null : t("Request a shift on this day"),
+      };
     });
-    map.forEach(daySlots => daySlots.sort((left, right) => left.fromTime.localeCompare(right.fromTime)));
-    return map;
-  }, [employeeId, schedule]);
+  }).flat() : [];
+  const tabStop = dayOptions.find(option => option.selected && !option.disabled) ?? dayOptions.find(option => !option.disabled);
 
-  const days = useMemo(() => schedule ? Array.from(
-    { length: new Date(Date.UTC(schedule.year, schedule.month, 0)).getUTCDate() }, (_, index) => index + 1,
-  ) : [], [schedule]);
-  const selectedSlots = selectedDay === null ? [] : slotsByDay.get(selectedDay) ?? [];
-  const selectedSlot = boundary ? selectedSlots.find(slot => slot.id === boundary.slotId) ?? null : null;
-  const pendingSlotIds = useMemo(
-    () => new Set(existingRequests.filter(request => request.status === "pending").map(request => request.scheduleSlotId)),
-    [existingRequests],
-  );
+  const hasDay = Boolean(schedule && selectedDay !== null && selectedDay >= 1 && selectedDay <= daysInMonth);
+  const isDayOff = hasDay && selectedSlots.length === 0;
+  const canChooseDay = hasDay && employeeId !== null && (isDayOff
+    ? slotId === null && conflictNames.length === 0 && pendingOnDay.length === 0
+    : Boolean(selectedSlot && !isPendingSlot(selectedSlot)));
+  const validPeriod = timePattern.test(requestedFrom) && timePattern.test(requestedTo) && requestedFrom < requestedTo;
+  const unchanged = Boolean(selectedSlot && requestedFrom === (parseFlexibleTimeSegment(selectedSlot.fromTime)?.label ?? selectedSlot.fromTime)
+    && requestedTo === (parseFlexibleTimeSegment(selectedSlot.toTime)?.label ?? selectedSlot.toTime));
+  const overlaps = validPeriod && [...selectedSlots.filter(slot => slot.id !== selectedSlot?.id), ...otherSlots]
+    .some(slot => {
+      const from = parseFlexibleTimeSegment(slot.fromTime)?.label ?? slot.fromTime;
+      const to = parseFlexibleTimeSegment(slot.toTime)?.label ?? slot.toTime;
+      return from < requestedTo && requestedFrom < to;
+    });
+  const canRemoveShifts = Boolean(selectedSlot) && !selectedSlots.some(isPendingSlot) &&
+    !pendingOnDay.some(request => request.scheduleId === scheduleId);
+  const canSubmit = canChooseDay && (requestDayOff ? canRemoveShifts : validPeriod && !unchanged && !overlaps);
+  const canContinue = step === 0 ? Boolean(schedule && employeeId !== null) : step === 1 ? canChooseDay : canSubmit;
+  const monthLabel = schedule ? periodFormatter.format(new Date(Date.UTC(schedule.year, schedule.month - 1, 1))) : "";
+  const dateLabel = schedule && selectedDay !== null
+    ? dateFormatter.format(new Date(Date.UTC(schedule.year, schedule.month - 1, selectedDay))) : "";
+  const originalShift = requestDayOff ? selectedSlots.map(slot => formatShift(slot.fromTime, slot.toTime)).join(", ")
+    : selectedSlot ? formatShift(selectedSlot.fromTime, selectedSlot.toTime) : t("Day off");
+  const requestedShift = requestDayOff ? "–" : formatShift(requestedFrom, requestedTo);
 
-  useEffect(() => {
-    if (!open) return;
-    setSelectedDay([...slotsByDay.keys()].sort((a, b) => a - b)[0] ?? days[0] ?? null);
-    setBoundary(null);
-    setAdjustmentMinutes(0);
-    setDayOffFrom("");
-    setDayOffTo("");
-  }, [days, open, schedule?.id, slotsByDay]);
+  function resetShift() {
+    setSlotId(null);
+    setRequestedFrom("");
+    setRequestedTo("");
+    setRequestDayOff(false);
+  }
 
-  useEffect(() => {
-    if (open) setComment("");
-  }, [open, schedule?.id]);
+  function chooseSchedule(id: number) {
+    if (id === scheduleId) return;
+    setScheduleId(id);
+    setSelectedDay(null);
+    resetShift();
+  }
 
-  useEffect(() => {
-    if (open) dialogRef.current?.querySelector('[role="tab"][aria-selected="true"]')
-      ?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
-  }, [open, selectedDay]);
+  function chooseDay(day: number) {
+    if (day === selectedDay) return;
+    setSelectedDay(day);
+    resetShift();
+  }
 
-  useEffect(() => {
-    if (!open) return;
-    const handleKeyDown = (event: KeyboardEvent) => event.key === "Escape" && onCancel();
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onCancel, open]);
+  function chooseSlot(slot: EmployeeScheduleSlot) {
+    if (slot.id === slotId) return;
+    if (slot.dayOfMonth !== selectedDay) setRequestDayOff(false);
+    setSelectedDay(slot.dayOfMonth);
+    setSlotId(slot.id);
+    setRequestedFrom(parseFlexibleTimeSegment(slot.fromTime)?.label ?? "");
+    setRequestedTo(parseFlexibleTimeSegment(slot.toTime)?.label ?? "");
+  }
 
-  if (!open || !schedule) return null;
+  function cancel() {
+    if (!isSending) onCancel();
+  }
 
-  const originalFrom = selectedSlot?.fromTime ?? "";
-  const originalTo = selectedSlot?.toTime ?? "";
-  const requestedFrom = selectedSlot && boundary
-    ? toTime(toMinutes(originalFrom) + (boundary.edge === "start" ? adjustmentMinutes : 0))
-    : "";
-  const requestedTo = selectedSlot && boundary
-    ? toTime(toMinutes(originalTo) + (boundary.edge === "end" ? adjustmentMinutes : 0))
-    : "";
-  const requestedFromMinutes = requestedFrom ? toMinutes(requestedFrom) : 0;
-  const requestedToMinutes = requestedTo ? toMinutes(requestedTo) : 0;
-  const overlaps = selectedSlot
-    ? selectedSlots.some(slot => slot.id !== selectedSlot.id
-      && requestedFromMinutes < toMinutes(slot.toTime)
-      && requestedToMinutes > toMinutes(slot.fromTime))
-    : false;
-  const isDayOff = selectedSlots.length === 0;
-  const dayOffPending = existingRequests.some(request => request.status === "pending" &&
-    request.employeeId === employeeId && request.year === schedule.year && request.month === schedule.month &&
-    request.dayOfMonth === selectedDay);
-  const dayUnavailable = selectedDay === null || unavailableDays?.has(selectedDay);
-  const dayOffValid = /^([01]\d|2[0-3]):[0-5]\d$/.test(dayOffFrom) &&
-    /^([01]\d|2[0-3]):[0-5]\d$/.test(dayOffTo) && dayOffFrom < dayOffTo;
-  const isValid = isDayOff ? dayOffValid && !dayOffPending && !dayUnavailable : Boolean(selectedSlot && boundary && adjustmentMinutes !== 0
-    && requestedFromMinutes < requestedToMinutes && !overlaps && !pendingSlotIds.has(selectedSlot.id));
+  function back() {
+    if (!isSending && step > 0) setStep(step - 1);
+  }
 
-  const selectBoundary = (slotId: number, edge: Boundary["edge"]) => {
-    if (pendingSlotIds.has(slotId)) return;
-    setBoundary({ slotId, edge });
-    setAdjustmentMinutes(0);
-  };
-
-  const setRequestedBoundaryTime = (value: string) => {
-    if (!selectedSlot || !boundary) return;
-    const originalTime = boundary.edge === "start" ? selectedSlot.fromTime : selectedSlot.toTime;
-    setAdjustmentMinutes(toMinutes(value) - toMinutes(originalTime));
-  };
-
-  const moveRequestedBoundary = (deltaMinutes: number) => {
-    if (!selectedSlot || !boundary) return;
-    const originalTime = boundary.edge === "start" ? selectedSlot.fromTime : selectedSlot.toTime;
-    const nextMinutes = Math.max(0, Math.min(1439, toMinutes(originalTime) + adjustmentMinutes + deltaMinutes));
-    setAdjustmentMinutes(nextMinutes - toMinutes(originalTime));
-  };
-
-  const handleOverlayMouseDown = (event: MouseEvent<HTMLDialogElement>) => {
-    if (event.target === event.currentTarget) onCancel();
-  };
+  function advance() {
+    if (submitted || isSending || !canContinue) return;
+    if (step < steps.length - 1) {
+      setStep(step + 1);
+      return;
+    }
+    if (!schedule || selectedDay === null) return;
+    const request = {
+      scheduleId: schedule.id,
+      ...(comment.trim() ? { comment: comment.trim() } : {}),
+    };
+    if (requestDayOff) {
+      onSubmit({ ...request, requestType: "removeShift", dayOfMonth: selectedDay });
+      return;
+    }
+    const payload = {
+      ...request,
+      requestedFromTime: requestedFrom,
+      requestedToTime: requestedTo,
+    };
+    if (selectedSlot) onSubmit({ ...payload, scheduleSlotId: selectedSlot.id });
+    else if (isDayOff) onSubmit({ ...payload, dayOfMonth: selectedDay });
+  }
 
   return createPortal(
-    <dialog ref={dialogRef} className={styles.overlay} aria-modal="true" aria-labelledby={titleId} onCancel={event => { event.preventDefault(); onCancel(); }} onMouseDown={handleOverlayMouseDown}>
+    <dialog ref={dialogRef} className={styles.overlay} aria-label={t("Request a shift change")}
+      onCancel={event => { event.preventDefault(); cancel(); }}
+      onMouseDown={event => { if (event.target === event.currentTarget) cancel(); }}>
       <div className={styles.dialog}>
         <header className={styles.header}>
-          <div className={styles.titleBlock}>
-            <span className={styles.eyebrow}><ScheduleIcon size={16} />  {t("Correction request")}</span>
-            <h2 id={titleId}>{t("Request a shift change")}</h2>
-            <p>{schedule.name}  {t("· Adjust a shift or request one on a day off.")}</p>
-          </div>
-          <button type="button" className={styles.closeButton} aria-label={t("Close shift correction dialog")} onClick={onCancel}>
+          {!submitted && step > 0 && <button type="button" className={styles.backButton} aria-label={t("Back")} disabled={isSending} onClick={back}>
+            <ChevronLeftIcon size={18} />
+          </button>}
+          <ol className={styles.progress} aria-label={t("Request progress")}
+            style={{ "--progress-complete": `${step * 100 / (steps.length - 1)}%` } as CSSProperties}>
+            {steps.map((item, index) => <li key={item.label} aria-current={index === step ? "step" : undefined} data-complete={index < step}>
+              <span className={styles.stepMarker} aria-hidden="true">{index < step ? <CheckIcon size={13} /> : index + 1}</span>
+              <span className={styles.stepLabel}>{t(item.label)}</span>
+            </li>)}
+          </ol>
+          {!submitted && <button type="button" className={styles.closeButton} aria-label={t("Close shift correction dialog")} disabled={isSending} onClick={cancel}>
             <CloseIcon size={18} />
-          </button>
+          </button>}
         </header>
 
-        <div className={styles.body}>
-        <section className={styles.stepSection}>
-          <div className={styles.stepHeader}>
-            <span className={styles.stepNumber}>1</span>
-            <div><strong>{t("Choose a day")}</strong><small>{t("Select a shift or a day off.")}</small></div>
-          </div>
-          <div className={styles.dayList} role="tablist" aria-label={t("Schedule days")}>
-            {days.map(day => {
-              const weekday = weekdayFormatter.format(new Date(Date.UTC(schedule.year, schedule.month - 1, day))).replace(".", "");
-              return (
-                <button key={day} type="button" role="tab" aria-selected={day === selectedDay}
-                  className={day === selectedDay ? styles.dayActive : ""}
-                  onClick={() => { setSelectedDay(day); setBoundary(null); setAdjustmentMinutes(0); setDayOffFrom(""); setDayOffTo(""); }}>
-                  <span>{weekday}</span><strong>{day}</strong>
-                </button>
-              );
+        <div className={styles.body} ref={bodyRef}>
+          {submitted ? <div className={styles.success}>
+            <span className={styles.successIcon} aria-hidden="true"><CheckIcon size={28} /></span>
+            <h3 tabIndex={-1} ref={stepTitleRef}>{t("Request sent successfully!")}</h3>
+            <p>{t("Your shift correction request has been sent to your manager for approval.")}</p>
+            <span className={styles.successStatus}><ClockIcon size={14} />{t("Pending approval")}</span>
+          </div> : <>
+          <h3 id={stepTitleId} tabIndex={-1} ref={stepTitleRef}>{t(steps[step].title)}</h3>
+
+          {step === 0 && <div className={styles.choices} role="group" aria-labelledby={stepTitleId}>
+            {publishedSchedules.length === 0 && <p className={styles.hint}>{t("No published schedules")}</p>}
+            {publishedSchedules.map(item => {
+              const selected = item.id === scheduleId;
+              const updated = formatScheduleLastUpdate(item.lastUpdatedAtUtc);
+              return <button key={item.id} type="button" className={scheduleStyles.row + (selected ? " " + scheduleStyles.selected : "")}
+                aria-pressed={selected} onClick={() => chooseSchedule(item.id)}>
+                <span className={scheduleStyles.icon} aria-hidden="true"><ScheduleIcon size={20} /></span>
+                <span className={scheduleStyles.iconDivider} aria-hidden="true" />
+                <span className={scheduleStyles.copy}>
+                  <strong>{item.name}</strong>
+                  <span>{periodFormatter.format(new Date(Date.UTC(item.year, item.month - 1, 1)))}</span>
+                  <span className={scheduleStyles.updated}>{item.lastUpdatedAtUtc ? t("Updated {0}", updated) : updated}</span>
+                </span>
+                <span className={scheduleStyles.indicator} aria-hidden="true">{selected && <CheckIcon size={15} />}</span>
+              </button>;
             })}
-          </div>
-        </section>
+          </div>}
 
-        {isDayOff ? (
-          <section className={styles.stepSection}>
-            <div className={styles.stepHeader}>
-              <span className={styles.stepNumber}>2</span>
-              <div><strong>{t("Day off")}</strong><small>{t("Request a shift on this day")}</small></div>
+          {step === 1 && schedule && <>
+            <p className={styles.hint}>{schedule.name} — {monthLabel}</p>
+            <div className={styles.shiftChoices} role="radiogroup" aria-labelledby={stepTitleId} onKeyDown={event => {
+              if (!["ArrowDown", "ArrowUp", "ArrowLeft", "ArrowRight"].includes(event.key)) return;
+              const rows = [...event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="radio"]:not(:disabled)')];
+              if (rows.length === 0) return;
+              event.preventDefault();
+              const index = rows.indexOf(event.target as HTMLButtonElement);
+              const direction = event.key === "ArrowDown" || event.key === "ArrowRight" ? 1 : -1;
+              const next = rows[(index + direction + rows.length) % rows.length];
+              next.focus();
+              next.click();
+            }}>
+              {dayOptions.map(option => (
+                <button key={option.slot ? `shift-${option.slot.id}` : `day-${option.day}`} type="button" role="radio"
+                  className={styles.shiftChoice} aria-checked={option.selected && !option.disabled}
+                  data-pending={option.pending || undefined}
+                  tabIndex={option === tabStop ? 0 : -1} disabled={option.disabled}
+                  ref={option.selected ? selectedDayRef : undefined}
+                  onClick={() => { if (option.slot) chooseSlot(option.slot); else chooseDay(option.day); }}>
+                  <span className={styles.shiftDetails}>
+                    <span>{option.date}</span>
+                    <strong>{option.label}</strong>
+                    {option.detail && <small>{option.detail}</small>}
+                    {option.pending && option.detail !== t("Pending approval") && <small>{t("Pending approval")}</small>}
+                  </span>
+                  <span className={styles.shiftIndicator} aria-hidden="true" />
+                </button>
+              ))}
             </div>
-            <div className={`${styles.timeEditor} ${styles.dayOffEditor}`}>
-              <label><span>{t("New start time")}</span><input type="time" step="60" value={dayOffFrom}
-                disabled={dayOffPending || dayUnavailable || isSending} onChange={event => setDayOffFrom(event.target.value)} /></label>
-              <label><span>{t("New end time")}</span><input type="time" step="60" value={dayOffTo}
-                disabled={dayOffPending || dayUnavailable || isSending} onChange={event => setDayOffTo(event.target.value)} /></label>
-            </div>
-            {dayOffPending ? <p className={styles.hint}>{t("Pending approval")}</p> : dayUnavailable ? (
-              <p className={styles.validation}>{t("You already work on this date in another schedule.")}</p>
-            ) : null}
-            {dayOffValid ? <p className={styles.movement}>{t("Day off")} → {dayOffFrom}–{dayOffTo}</p> : null}
-            {dayOffFrom && dayOffTo && !dayOffValid ? <p className={styles.validation}>{t("The shift end must be after its start.")}</p> : null}
-          </section>
-        ) : <>
-        <section className={styles.stepSection} aria-label={t("Choose shift and time")}>
-          <div className={styles.stepHeader}>
-            <span className={styles.stepNumber}>2</span>
-            <div><strong>{t("Choose what to change")}</strong><small>{t("Select the start or end time of a shift.")}</small></div>
-          </div>
-          {selectedSlots.length > 0 ? (
-            <div className={styles.shiftList}>
-              {selectedSlots.map((slot, index) => {
-                const pending = pendingSlotIds.has(slot.id);
-                const selectedEdge = boundary?.slotId === slot.id ? boundary.edge : null;
-                return (
-                  <article key={slot.id} className={`${styles.shiftCard} ${pending ? styles.shiftPending : ""}`}>
-                    <div className={styles.shiftCardHeader}>
-                      <span>{t("Shift")} {index + 1}</span>
-                      <strong>{slot.fromTime} – {slot.toTime}</strong>
-                      {pending ? <em>{t("Pending approval")}</em> : null}
-                    </div>
-                    <div className={styles.boundaryChoices} role="group" aria-label={t("Change {0} to {1}", slot.fromTime, slot.toTime)}>
-                      <button type="button" className={selectedEdge === "start" ? styles.boundarySelected : ""}
-                        aria-label={t("Change start time from {0}", slot.fromTime)} aria-pressed={selectedEdge === "start"}
-                        disabled={pending} onClick={() => selectBoundary(slot.id, "start")}>
-                        <span>{t("Start")}</span><strong>{slot.fromTime}</strong>
-                      </button>
-                      <i aria-hidden="true">→</i>
-                      <button type="button" className={selectedEdge === "end" ? styles.boundarySelected : ""}
-                        aria-label={t("Change end time from {0}", slot.toTime)} aria-pressed={selectedEdge === "end"}
-                        disabled={pending} onClick={() => selectBoundary(slot.id, "end")}>
-                        <span>{t("End")}</span><strong>{slot.toTime}</strong>
-                      </button>
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-          ) : <p className={styles.empty}>{t("No shifts are available for correction.")}</p>}
-        </section>
+          </>}
 
-        <section className={`${styles.stepSection} ${styles.adjustmentPanel}`}>
-          <div className={styles.stepHeader}>
-            <span className={styles.stepNumber}>3</span>
-            <div><strong>{t("Set the new time")}</strong><small>{t("You can type the exact time or use a quick adjustment.")}</small></div>
-          </div>
-          {boundary && selectedSlot ? (
-            <>
-              <div className={styles.timeEditor}>
-                <button type="button" aria-label={t("Move selected time 30 minutes earlier")} onClick={() => moveRequestedBoundary(-30)}>−30 min</button>
-                <label>
-                  <span>{boundary.edge === "start" ? t("New start time") : t("New end time")}</span>
-                  <input type="time" step="900" value={boundary.edge === "start" ? requestedFrom : requestedTo}
-                    onChange={event => setRequestedBoundaryTime(event.target.value)} />
-                </label>
-                <button type="button" aria-label={t("Move selected time 30 minutes later")} onClick={() => moveRequestedBoundary(30)}>+30 min</button>
-              </div>
-              <p className={styles.movement}>{boundary.edge === "start" ? t("Start time") : t("End time")}: {formatAdjustment(adjustmentMinutes)}</p>
-              <div className={styles.comparison}>
-                <div><span>{t("Current shift")}</span><strong>{originalFrom} – {originalTo}</strong></div>
-                <i>→</i>
-                <div><span>{t("Requested shift")}</span><strong>{requestedFrom} – {requestedTo}</strong></div>
-              </div>
-              {overlaps ? <p className={styles.validation}>{t("This time overlaps another shift on the same day.")}</p> : null}
-              {requestedFromMinutes >= requestedToMinutes ? <p className={styles.validation}>{t("The shift end must be after its start.")}</p> : null}
-            </>
-          ) : <p className={styles.hint}>{t("Select a Start or End time above to continue.")}</p>}
-        </section>
-        </>}
-        <section className={styles.stepSection}>
-          <div className={styles.stepHeader}>
-            <span className={styles.stepNumber}>{isDayOff ? 3 : 4}</span>
-            <div>
-              <label htmlFor={commentId}>{t("Comment (optional)")}</label>
-              <small id={commentHelpId}>{t("Add any details your manager should know.")}</small>
+          {step === 2 && <div className={styles.stepSection}>
+            <div className={styles.comparison}>
+              <div><span>{t("Original shift")}</span><strong>{originalShift}</strong></div>
+              <span aria-hidden="true">→</span>
+              <div><span>{t("Requested shift")}</span><strong>{requestedShift}</strong></div>
             </div>
-          </div>
-          <textarea
-            id={commentId}
-            className={styles.commentInput}
-            aria-describedby={commentHelpId}
-            maxLength={commentMaxLength}
-            rows={3}
-            value={comment}
-            disabled={isSending}
-            onChange={event => setComment(event.target.value)}
-          />
-          <small className={styles.commentCount}>{t("{0} / {1} characters", comment.length, commentMaxLength)}</small>
-        </section>
-        {errorMessage ? <p className={styles.validation}>{errorMessage}</p> : null}
+            {!requestDayOff && <div className={styles.timeEditor}>
+              {([
+                { label: "Start time", value: requestedFrom, setValue: setRequestedFrom },
+                { label: "End time", value: requestedTo, setValue: setRequestedTo },
+              ] as const).map(({ label, value, setValue }) => <div key={label}>
+                <label>{t(label)}<input type="time" step="60" value={value} onChange={event => setValue(event.target.value)} /></label>
+                <div className={styles.quickTimes}>
+                  <button type="button" disabled={moveTime(value, -15) === value} aria-label={t(label) + " · " + t("Move selected time 15 minutes earlier")} onClick={() => setValue(moveTime(value, -15))}>−15</button>
+                  <button type="button" disabled={moveTime(value, 15) === value} aria-label={t(label) + " · " + t("Move selected time 15 minutes later")} onClick={() => setValue(moveTime(value, 15))}>+15</button>
+                </div>
+              </div>)}
+            </div>}
+            {selectedSlot && <button type="button" className={styles.dayOffOption} aria-pressed={requestDayOff}
+              disabled={!requestDayOff && !canRemoveShifts} onClick={() => setRequestDayOff(value => !value)}>
+              <ScheduleIcon size={19} />
+              <span className={styles.shiftDetails}>
+                <strong>{t("Request day off")}</strong>
+                <span>{t(selectedSlots.length === 1 ? "Remove your scheduled shift for this day." : "Remove all your shifts in this schedule for this day.")}</span>
+              </span>
+              <span className={styles.shiftIndicator} aria-hidden="true">{requestDayOff && <CheckIcon size={14} />}</span>
+            </button>}
+            {selectedSlot && !canRemoveShifts && <p className={styles.hint}>{t("This day already has a pending correction request.")}</p>}
+            {requestDayOff && <p className={styles.hint}>{t("This request requires manager approval.")}</p>}
+            {requestDayOff && conflictNames.length > 0 &&
+              <p className={styles.hint}>{t("Your shifts in other schedules will remain unchanged ({0}).", conflictNames.join(", "))}</p>}
+            {!requestDayOff && requestedFrom && requestedTo && !validPeriod && <p className={styles.validation}>{t("The shift end must be after its start.")}</p>}
+            {!requestDayOff && unchanged && <p className={styles.hint}>{t("Change at least one boundary before sending the request.")}</p>}
+            {!requestDayOff && overlaps && <p className={styles.validation}>{t("This time overlaps another shift on the same day.")}</p>}
+          </div>}
 
+          {step === 3 && <div className={styles.stepSection}>
+            <label htmlFor={commentId}>{t("Comment (optional)")}</label>
+            <p className={styles.hint} id={commentHelpId}>{t("Add any details your manager should know.")}</p>
+            <textarea id={commentId} className={styles.commentInput} aria-describedby={commentHelpId}
+              maxLength={commentMaxLength} rows={4} value={comment} onChange={event => setComment(event.target.value)} />
+            <small className={styles.commentCount}>{t("{0} / {1} characters", comment.length, commentMaxLength)}</small>
+          </div>}
+
+          {step === 4 && schedule && <div className={styles.reviewCard}>
+            <span className={styles.reviewBadge} data-kind={requestDayOff ? "remove" : isDayOff ? "add" : "adjust"}>
+              {requestDayOff ? <ScheduleDetailsIcon size={15} /> : isDayOff ? <ScheduleIcon size={15} /> : <ClockIcon size={15} />}
+              {t(requestDayOff ? "Request day off" : isDayOff ? "Request shift on a day off" : "Shift correction")}
+            </span>
+            <div className={styles.reviewRow}><ScheduleIcon size={17} /><div><small>{t("Schedule")}</small><strong>{schedule.name}</strong><span>{monthLabel}</span></div></div>
+            <div className={styles.reviewRow}><ScheduleDetailsIcon size={17} /><div><small>{t("Date")}</small><strong>{dateLabel}</strong></div></div>
+            <div className={styles.reviewTimes}>
+              <div><small>{t("Original shift")}</small><strong>{originalShift}</strong></div>
+              <ArrowRightIcon size={16} />
+              <div><small>{t("Requested shift")}</small><strong>{requestedShift}</strong></div>
+            </div>
+            {requestDayOff && <p className={styles.hint}>{t("Duration change")} · {formatShiftCorrectionDelta(-shiftCorrectionOriginalMinutes(selectedSlots))}</p>}
+            {comment.trim() && <div className={styles.reviewRow}><NoteIcon size={17} /><div><small>{t("Comment")}</small><span className={styles.reviewComment}>{comment.trim()}</span></div></div>}
+            {requestDayOff && conflictNames.length > 0 &&
+              <p className={styles.hint}>{t("Your shifts in other schedules will remain unchanged ({0}).", conflictNames.join(", "))}</p>}
+          </div>}
+
+          {step > 0 && (!schedule || (step > 1 && !canChooseDay)) &&
+            <p className={styles.validation} role="status">{t("The selected schedule or shift is no longer available for correction. Go back to make another selection.")}</p>}
+          {step === 4 && requestDayOff && canChooseDay && !canRemoveShifts &&
+            <p className={styles.validation}>{t("This day already has a pending correction request.")}</p>}
+          {step === 4 && !requestDayOff && overlaps && <p className={styles.validation}>{t("This time overlaps another shift on the same day.")}</p>}
+          {step === 4 && !requestDayOff && unchanged && <p className={styles.validation}>{t("Change at least one boundary before sending the request.")}</p>}
+          {step === 4 && errorMessage && <p className={styles.validation} role="alert">{errorMessage}</p>}
+          </>}
         </div>
-        <footer className={styles.footer}>
-          <IosButton label={t("Cancel")} variant="secondary" size="compact" onClick={onCancel} />
-          <IosButton label={isSending ? t("Sending...") : t("Send request")} size="compact" icon={<CheckIcon size={15} />}
-            disabled={!isValid || isSending}
-            onClick={() => {
-              if (!isValid || isSending) return;
-              const trimmedComment = comment.trim();
-              const request = { scheduleId: schedule.id, ...(trimmedComment ? { comment: trimmedComment } : {}) };
-              if (isDayOff && selectedDay !== null) onSubmit({ ...request, dayOfMonth: selectedDay, requestedFromTime: dayOffFrom, requestedToTime: dayOffTo });
-              else if (selectedSlot) onSubmit({ ...request, scheduleSlotId: selectedSlot.id, requestedFromTime: requestedFrom, requestedToTime: requestedTo });
-            }} />
+
+        <footer className={styles.footer} data-submitted={submitted || undefined}>
+          {submitted ? <IosButton label={t("Done")} size="compact" onClick={onCancel} /> : <>
+          <IosButton label={t(step === 0 ? "Cancel" : "Back")} variant="secondary" size="compact" disabled={isSending}
+            className={styles.footerSecondary} customColor="#f1f5f9" customBorderColor="#dfe6ef"
+            icon={step === 0 ? <CloseIcon size={16} /> : <ChevronLeftIcon size={16} />}
+            onClick={step === 0 ? cancel : back} />
+          <IosButton label={isSending ? t("Sending...") : t(step === 4 ? "Send request" : "Continue")} size="compact"
+            className={styles.footerPrimary} icon={step === 4 ? <CheckIcon size={15} /> : <ChevronRightIcon size={16} />}
+            disabled={!canContinue || isSending} onClick={advance} />
+          </>}
         </footer>
       </div>
-    </dialog>, document.body
+    </dialog>, document.body,
   );
 }

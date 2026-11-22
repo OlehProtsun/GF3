@@ -2,11 +2,15 @@ using System.Security.Claims;
 using BusinessLogicLayer.Contracts.Enums;
 using BusinessLogicLayer.Contracts.Models;
 using BusinessLogicLayer.Services.Abstractions;
+using DataAccessLayer.Models.DataBaseContext;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using WebApi.Auth;
 using WebApi.Contracts.EmployeeSchedules;
 using WebApi.Services;
+using StoredSchedule = DataAccessLayer.Models.ScheduleModel;
+using StoredPublicationStatus = DataAccessLayer.Models.Enums.SchedulePublicationStatus;
 
 namespace WebApi.Controllers;
 
@@ -20,6 +24,109 @@ public sealed class EmployeeSchedulesController(
     IContainerService containerService,
     IScheduleLastUpdateService? scheduleLastUpdateService = null) : ControllerBase
 {
+    [HttpGet("public")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    public async Task<ActionResult<IReadOnlyList<PublicScheduleSummaryDto>>> GetPublicSchedules(
+        [FromServices] AppDbContext db, CancellationToken cancellationToken)
+    {
+        var schedules = await GetBrowsableSchedules(db, GetRequiredEmployeeId())
+            .OrderByDescending(schedule => schedule.Year)
+            .ThenByDescending(schedule => schedule.Month)
+            .ThenBy(schedule => schedule.Name)
+            .ThenBy(schedule => schedule.Id)
+            .Select(schedule => new { schedule.Id, schedule.Name, schedule.Year, schedule.Month, schedule.PublishedAtUtc })
+            .ToListAsync(cancellationToken);
+        var updates = scheduleLastUpdateService is null
+            ? new Dictionary<int, DateTimeOffset>()
+            : await scheduleLastUpdateService.GetLastUpdatesAsync(schedules.Select(schedule => schedule.Id), cancellationToken);
+
+        return Ok(schedules.Select(schedule => new PublicScheduleSummaryDto(
+            schedule.Id, schedule.Name, schedule.Year, schedule.Month, "public",
+            updates.TryGetValue(schedule.Id, out var updated) ? updated : schedule.PublishedAtUtc)).ToList());
+    }
+
+    [HttpGet("public/{scheduleId:int}")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    public async Task<ActionResult<EmployeeScheduleDto>> GetPublicSchedule(
+        int scheduleId, [FromServices] AppDbContext db, CancellationToken cancellationToken)
+    {
+        var schedule = await GetBrowsableSchedules(db, GetRequiredEmployeeId())
+            .Where(item => item.Id == scheduleId)
+            .AsSingleQuery()
+            .Select(item => new EmployeeScheduleDto
+            {
+                Id = item.Id,
+                Name = item.Name,
+                ContainerId = item.ContainerId,
+                ShopId = item.ShopId,
+                Year = item.Year,
+                Month = item.Month,
+                PublicationStatus = "public",
+                PublishedAtUtc = item.PublishedAtUtc,
+                Note = item.Note ?? string.Empty,
+                AllowSwap = false,
+                Employees = item.Employees.OrderBy(employee => employee.DisplayOrder).ThenBy(employee => employee.EmployeeId)
+                    .Select(employee => new EmployeeScheduleEmployeeDto
+                    {
+                        Id = employee.Id,
+                        EmployeeId = employee.EmployeeId,
+                        FirstName = employee.Employee.FirstName,
+                        LastName = employee.Employee.LastName,
+                        DisplayOrder = employee.DisplayOrder,
+                    }).ToList(),
+                Slots = item.Slots.Where(slot => slot.EmployeeId > 0)
+                    .OrderBy(slot => slot.DayOfMonth).ThenBy(slot => slot.SlotNo)
+                    .Select(slot => new EmployeeScheduleSlotDto
+                    {
+                        Id = slot.Id,
+                        EmployeeId = slot.EmployeeId,
+                        DayOfMonth = slot.DayOfMonth,
+                        SlotNo = slot.SlotNo,
+                        FromTime = slot.FromTime,
+                        ToTime = slot.ToTime,
+                        Status = slot.Status.ToString(),
+                    }).ToList(),
+            })
+            .SingleOrDefaultAsync(cancellationToken);
+        if (schedule is null) return NotFound();
+
+        var previewSchedule = new ScheduleModel
+        {
+            Id = schedule.Id,
+            ContainerId = schedule.ContainerId,
+            Year = schedule.Year,
+            Month = schedule.Month,
+            Employees = schedule.Employees.Select(employee => new ScheduleEmployeeModel
+            {
+                EmployeeId = employee.EmployeeId,
+            }).ToList(),
+        };
+        var relatedPublishedSchedules = await GetRelatedPublishedSchedulesAsync([previewSchedule], cancellationToken);
+        schedule.RelatedScheduleAssignments = BuildRelatedScheduleAssignments(previewSchedule, relatedPublishedSchedules);
+
+        schedule.LastUpdatedAtUtc = schedule.PublishedAtUtc;
+        if (scheduleLastUpdateService is not null)
+        {
+            var updates = await scheduleLastUpdateService.GetLastUpdatesAsync([schedule.Id], cancellationToken);
+            if (updates.TryGetValue(schedule.Id, out var updated)) schedule.LastUpdatedAtUtc = updated;
+        }
+
+        return Ok(schedule);
+    }
+
+    // A published assignment grants related schedule visibility for its container and period.
+    // Shops represented by the other published schedules in that scope need no separate assignment.
+    internal static IQueryable<StoredSchedule> GetBrowsableSchedules(AppDbContext db, int employeeId)
+        => db.Schedules.AsNoTracking().Where(schedule =>
+            schedule.PublicationStatus == StoredPublicationStatus.Public &&
+            !schedule.Employees.Any(employee => employee.EmployeeId == employeeId) &&
+            db.Schedules.Any(assigned =>
+                assigned.PublicationStatus == StoredPublicationStatus.Public &&
+                assigned.ContainerId == schedule.ContainerId &&
+                assigned.Year == schedule.Year &&
+                assigned.Month == schedule.Month &&
+                assigned.Employees.Any(employee => employee.EmployeeId == employeeId && !employee.Employee.IsDeleted)));
+
     [HttpGet]
     [ProducesResponseType(typeof(IEnumerable<EmployeeScheduleDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<IEnumerable<EmployeeScheduleDto>>> GetVisible(CancellationToken cancellationToken)

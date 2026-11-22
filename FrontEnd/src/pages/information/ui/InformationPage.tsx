@@ -1,7 +1,5 @@
-import { getLocale, t, translateServerMessage } from "@shared/i18n";
+import { t, translateServerMessage } from "@shared/i18n";
 import { useMemo, useState } from "react";
-import { useAuth } from "@app/providers/AuthProvider";
-import { useEmployeeLaunchUsageQuery } from "@entities/employee-launches/api/queries";
 import {
   useBulkDeleteWorkflowLogsMutation,
   useDeleteWorkflowLogMutation,
@@ -16,7 +14,7 @@ import { AvailabilityDateTimeField } from "@entities/availability-groups";
 import { getErrorMessage } from "@shared/api/httpClient";
 import { ConfirmDialog } from "@shared/ui/ConfirmDialog";
 import { PageHeader } from "@shared/ui/PageHeader";
-import { CloseIcon, InformationIcon, SearchIcon } from "@shared/ui/icons";
+import { CloseIcon, InformationIcon, MonitorIcon, SearchIcon, SmartphoneIcon } from "@shared/ui/icons";
 import {
   formatWorkflowLogTime,
   getRoleLabel,
@@ -38,8 +36,6 @@ type DeleteIntent =
   | { kind: "bulk"; payload: WorkflowLogBulkDeleteRequest; title: string; message: string; confirmText: string };
 
 export function InformationPage() {
-  const { session } = useAuth();
-  const canViewUsage = session?.role === "manager" && session.isSystemManager === true && session.workspaceMode === "pc";
   const logsQuery = useWorkflowLogsQuery();
   const settingsQuery = useWorkflowLogSettingsQuery();
   const updateSettingsMutation = useUpdateWorkflowLogSettingsMutation();
@@ -140,8 +136,6 @@ export function InformationPage() {
   return (
     <div className={styles.page}>
       <PageHeader title={t("Information")} subtitle={t("Employee and manager workflow activity")} backTo={-1} />
-
-      {canViewUsage && <EmployeeUsage />}
 
       <section className={styles.panel}>
         <div className={styles.panelHeader}>
@@ -306,46 +300,59 @@ export function InformationPage() {
               </label>
 
               <div className={styles.timelineList}>
-                {filteredSelectedDayLogs.map(log => (
-                  <article key={log.id} className={styles.timelineItem}>
-                    <time className={styles.timelineTime} dateTime={log.occurredAtUtc}>
-                      {formatWorkflowLogTime(log.occurredAtUtc)}
-                    </time>
-                    <span className={styles.timelineDot} aria-hidden="true" />
-                    <div className={styles.timelineContent}>
-                      <div className={styles.actorLine}>
-                        <strong>{log.actorName}</strong>
-                        <span
-                          className={[
-                            styles.roleBadge,
-                            log.actorRole.toLowerCase() === "employee" ? styles.roleBadgeEmployee : styles.roleBadgeManager,
-                          ].filter(Boolean).join(" ")}
-                        >
-                          {getRoleLabel(log.actorRole)}
-                        </span>
+                {filteredSelectedDayLogs.map(log => {
+                  const legacyPwaLaunch = log.action === "Opened platform via PWA";
+                  const legacyBrowserLaunch = log.action === "Opened platform via browser";
+                  const launchMode = log.launchMode ?? (legacyPwaLaunch ? "pwa" : legacyBrowserLaunch ? "browser" : null);
+                  const LaunchIcon = launchMode === "pwa" ? SmartphoneIcon : MonitorIcon;
+
+                  return (
+                    <article key={log.id} className={styles.timelineItem}>
+                      <time className={styles.timelineTime} dateTime={log.occurredAtUtc}>
+                        {formatWorkflowLogTime(log.occurredAtUtc)}
+                      </time>
+                      <span className={styles.timelineDot} aria-hidden="true" />
+                      <div className={styles.timelineContent}>
+                        <div className={styles.actorLine}>
+                          <strong>{log.actorName}</strong>
+                          <span
+                            className={[
+                              styles.badge,
+                              log.actorRole.toLowerCase() === "employee" ? styles.roleBadgeEmployee : styles.roleBadgeManager,
+                            ].filter(Boolean).join(" ")}
+                          >
+                            {getRoleLabel(log.actorRole)}
+                          </span>
+                          {launchMode && (
+                            <span className={[styles.badge, launchMode === "pwa" ? styles.launchBadgePwa : styles.launchBadgeBrowser].join(" ")}>
+                              <LaunchIcon size={13} />
+                              {launchMode === "pwa" ? t("PWA") : t("Browser")}
+                            </span>
+                          )}
+                        </div>
+                        <p>{legacyPwaLaunch || legacyBrowserLaunch ? t("Opened platform") : translateServerMessage(log.action)}</p>
                       </div>
-                      <p>{translateServerMessage(log.action)}</p>
-                    </div>
-                    <button
-                      type="button"
-                      className={styles.logDeleteButton}
-                      disabled={deletePending}
-                      aria-label={t("Delete log from {0} at {1}", log.actorName, formatWorkflowLogTime(log.occurredAtUtc))}
-                      onClick={() => {
-                        setActionError(null);
-                        setDeleteIntent({
-                          kind: "entry",
-                          id: log.id,
-                          title: t("Delete log entry"),
-                          message: t("Delete this {0} log from {1}?", getRoleLabel(log.actorRole).toLowerCase(), log.actorName),
-                          confirmText: t("Delete entry"),
-                        });
-                      }}
-                    >
-                      <CloseIcon size={15} />
-                    </button>
-                  </article>
-                ))}
+                      <button
+                        type="button"
+                        className={styles.logDeleteButton}
+                        disabled={deletePending}
+                        aria-label={t("Delete log from {0} at {1}", log.actorName, formatWorkflowLogTime(log.occurredAtUtc))}
+                        onClick={() => {
+                          setActionError(null);
+                          setDeleteIntent({
+                            kind: "entry",
+                            id: log.id,
+                            title: t("Delete log entry"),
+                            message: t("Delete this {0} log from {1}?", getRoleLabel(log.actorRole).toLowerCase(), log.actorName),
+                            confirmText: t("Delete entry"),
+                          });
+                        }}
+                      >
+                        <CloseIcon size={15} />
+                      </button>
+                    </article>
+                  );
+                })}
                 {selectedDay && filteredSelectedDayLogs.length === 0 ? (
                   <div className={styles.emptySearch}>{t("No logs match this search.")}</div>
                 ) : null}
@@ -369,40 +376,3 @@ export function InformationPage() {
   );
 }
 
-function EmployeeUsage() {
-  const usageQuery = useEmployeeLaunchUsageQuery(true);
-  const [search, setSearch] = useState("");
-  const locale = getLocale();
-  const format = new Intl.DateTimeFormat(locale, { dateStyle: "short", timeStyle: "short" });
-  const time = (value: string | null) => value ? format.format(new Date(value)) : "—";
-  const employees = usageQuery.data ?? [];
-  const term = search.trim().toLocaleLowerCase(locale);
-  const visible = employees.filter(employee => [employee.employeeName, employee.username].some(value => value?.toLocaleLowerCase(locale).includes(term)));
-
-  return <details className={`${styles.panel} ${styles.usage}`} open>
-    <summary><strong>{t("Employee usage")}</strong> <span className={styles.countPill}>{employees.length}</span></summary>
-    <label className={styles.logSearch}>
-      <SearchIcon size={18} />
-      <input type="search" aria-label={t("Search employees")} placeholder={t("Search employees")} value={search} onChange={event => setSearch(event.target.value)} />
-    </label>
-    {usageQuery.isLoading && <p role="status">{t("Loading...")}</p>}
-    {usageQuery.isError && <p role="alert">{t("Could not load employee usage.")}</p>}
-    {!usageQuery.isError && usageQuery.data && visible.length === 0 && <p>{t("No employees found.")}</p>}
-    {visible.length > 0 && <ul className={styles.usageList}>
-      {visible.map(employee => <li key={employee.employeeId} className={styles.usageRow}>
-        <div className={styles.usageName}>
-          <strong>{employee.employeeName}</strong>
-          <span className={employee.isOnline ? styles.livePill : styles.pausedPill}>{employee.isOnline ? t("Online") : t("Offline")}</span>
-          <small>{employee.hasLoginAccount ? employee.username : t("No account")}</small>
-        </div>
-        <dl>
-          <div><dt>{t("Last login")}</dt><dd>{time(employee.lastLoginAtUtc)}</dd></div>
-          <div><dt>{t("Last activity")}</dt><dd>{time(employee.lastSeenAtUtc)}</dd></div>
-          <div><dt>{t("Last launch")}</dt><dd>{employee.lastLaunchMode === "pwa" ? t("PWA") : employee.lastLaunchMode === "browser" ? t("Browser") : t("No data")}</dd></div>
-          <div><dt>{t("Last browser launch")}</dt><dd>{time(employee.lastBrowserLaunchAtUtc)}</dd></div>
-          <div><dt>{t("Last PWA launch")}</dt><dd>{time(employee.lastPwaLaunchAtUtc)}</dd></div>
-        </dl>
-      </li>)}
-    </ul>}
-  </details>;
-}

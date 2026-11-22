@@ -240,6 +240,7 @@ export function EmployeeSwapPage() {
   const targetEmployees = targetEmployeesQuery.data ?? [];
   const [actionError, setActionError] = useState<string | null>(null);
   const [isGiveAwayExpanded, setIsGiveAwayExpanded] = useState(false);
+  const [swapConfirmation, setSwapConfirmation] = useState<"acceptance" | "manager">();
   const [isHistoryExpanded, setIsHistoryExpanded] = useState(false);
   const [historySuspended, setHistorySuspended] = useState(false);
   useSwapModalEnvironment(historyDialogRef, historyTriggerRef, isHistoryExpanded && !historySuspended);
@@ -611,14 +612,19 @@ export function EmployeeSwapPage() {
         requirePickupApproval={contractSettingsQuery.data?.requirePickupApproval}
         restrictToEightHours={restrictToEightHours}
         busy={createSwapMutation.isPending || exceptionMutation.isPending} error={actionError || (loadError ? getErrorMessage(loadError, t("Could not load swap data.")) : null)}
-        onClose={() => { setIsGiveAwayExpanded(false); createOfferTriggerRef.current?.focus({ preventScroll: true }); }}
+        confirmation={swapConfirmation}
+        onClose={() => {
+          setIsGiveAwayExpanded(false);
+          setSwapConfirmation(undefined);
+          createOfferTriggerRef.current?.focus({ preventScroll: true });
+        }}
         onRequestException={payload => { setActionError(null); exceptionMutation.mutate(payload, {
-          onSuccess: () => { setIsGiveAwayExpanded(false); createOfferTriggerRef.current?.focus({ preventScroll: true }); },
+          onSuccess: () => setSwapConfirmation("manager"),
           onError: error => { setActionError(getErrorMessage(error, t("Could not request a manager exception.")));
             void queryClient.invalidateQueries({ queryKey: queryKeys.shiftSwaps.all }); },
         }); }}
         onSubmit={payload => { setActionError(null); createSwapMutation.mutate(payload, {
-          onSuccess: () => { setIsGiveAwayExpanded(false); createOfferTriggerRef.current?.focus({ preventScroll: true }); },
+          onSuccess: swap => setSwapConfirmation(swap.isAwaitingManagerApproval ? "manager" : "acceptance"),
           onError: error => {
             setActionError(getErrorMessage(error, t("Could not create this swap offer.")));
             void queryClient.invalidateQueries({ queryKey: ["shiftSwaps", "preview"] });

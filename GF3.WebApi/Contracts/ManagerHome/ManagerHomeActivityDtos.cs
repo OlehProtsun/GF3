@@ -13,6 +13,7 @@ public sealed record ManagerHomeActivityItemDto
     public required string TargetType { get; init; }
     public string? CounterpartyName { get; init; }
     public bool IsManagerCreatedOffer { get; init; }
+    public bool RemovesShift { get; init; }
     public string? ScheduleName { get; init; }
     public string? ShopName { get; init; }
     public DateOnly? ShiftDate { get; init; }

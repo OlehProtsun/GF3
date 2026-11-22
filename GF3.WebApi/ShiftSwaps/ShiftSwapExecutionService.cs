@@ -728,15 +728,18 @@ public sealed class ShiftSwapExecutionService(
     private async Task<ExchangeReadContext> LoadExchangeReadContextAsync(IReadOnlyList<ShiftSwapRequestModel> swaps, CancellationToken ct)
     {
         var exchanges = swaps.Where(s => s.RequestKind == ShiftSwapRequestKind.Exchange && !ShiftSwapArchive.IsArchived(s)).ToList();
-        if (exchanges.Count == 0) return new([], [], [], []);
+        var historyIds = swaps.Where(s => s.Status == ShiftSwapStatus.Accepted &&
+                (s.RequestKind != ShiftSwapRequestKind.Exchange || !ShiftSwapArchive.IsArchived(s)))
+            .Select(s => s.Id).ToArray();
+        var histories = historyIds.Length == 0 ? new List<ShiftSwapHistoryModel>() :
+            await db.ShiftSwapHistories.AsNoTracking().Where(h => historyIds.Contains(h.SourceShiftSwapRequestId)).ToListAsync(ct);
+        if (exchanges.Count == 0) return new([], [], [], histories);
         var returnIds = exchanges.Where(s => s.ReturnScheduleId.HasValue).Select(s => s.ReturnScheduleId!.Value).Distinct().ToArray();
         var schedules = await db.Schedules.AsNoTracking().Include(s => s.Shop).Include(s => s.Slots).Where(s => returnIds.Contains(s.Id)).ToListAsync(ct);
         var employeeIds = exchanges.SelectMany(s => new[] { s.FromEmployeeId, s.TargetEmployeeId }).Where(id => id.HasValue).Select(id => id!.Value).Distinct().ToArray();
         var assignments = await LoadAssignmentsAsync(employeeIds, schedules.Concat(exchanges.Select(s => s.Schedule)).ToList(), ct);
         var slotIds = exchanges.SelectMany(s => new[] { s.ScheduleSlotId, s.ReturnScheduleSlotId }).Where(id => id.HasValue).Select(id => id!.Value).ToArray();
         var offers = await LoadOpenOffersAsync(slotIds, ct);
-        var ids = exchanges.Select(s => s.Id).ToArray();
-        var histories = await db.ShiftSwapHistories.AsNoTracking().Where(h => ids.Contains(h.SourceShiftSwapRequestId)).ToListAsync(ct);
         return new(schedules, assignments, offers, histories);
     }
 
@@ -745,10 +748,23 @@ public sealed class ShiftSwapExecutionService(
 
     private ShiftSwapDto PopulateExchangeDto(ShiftSwapRequestModel swap, int employeeId, ShiftSwapDto dto, ExchangeReadContext context)
     {
-        if (swap.RequestKind != ShiftSwapRequestKind.Exchange || ShiftSwapArchive.IsArchived(swap)) return dto;
+        var history = context.Histories.FirstOrDefault(h => h.SourceShiftSwapRequestId == swap.Id);
+        if (swap.RequestKind != ShiftSwapRequestKind.Exchange)
+        {
+            if (history is null) return dto;
+            ShiftSwapRules.PopulateReturnSummary(dto, swap, null, history);
+            foreach (var snapshot in new[] { dto.BeforeSnapshot, dto.AfterSnapshot })
+            {
+                if (snapshot is null) continue;
+                foreach (var row in snapshot.Rows)
+                    row.DayValues = row.DayValues.Where(day => day.Key == history.DayOfMonth)
+                        .ToDictionary(day => day.Key, day => day.Value);
+            }
+            return dto;
+        }
+        if (ShiftSwapArchive.IsArchived(swap)) return dto;
         var back = context.Schedules.FirstOrDefault(s => s.Id == swap.ReturnScheduleId)?.Slots.FirstOrDefault(s => s.Id == swap.ReturnScheduleSlotId);
         dto.IsScheduleLocked |= back is not null && IsScheduleLocked(back.Schedule);
-        var history = context.Histories.FirstOrDefault(h => h.SourceShiftSwapRequestId == swap.Id);
         ShiftSwapRules.PopulateReturnSummary(dto, swap, back, history);
         dto.CanAccept = false;
         dto.CanAcceptFull = false;

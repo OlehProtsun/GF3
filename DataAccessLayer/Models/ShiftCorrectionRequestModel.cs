@@ -37,10 +37,16 @@ public sealed class ShiftCorrectionRequestModel
     public string? OriginalToTime { get; set; }
 
     [Column("requested_from_time")]
-    public string RequestedFromTime { get; set; } = string.Empty;
+    public string? RequestedFromTime { get; set; }
 
     [Column("requested_to_time")]
-    public string RequestedToTime { get; set; } = string.Empty;
+    public string? RequestedToTime { get; set; }
+
+    [Column("operation")]
+    public ShiftCorrectionOperation Operation { get; set; }
+
+    [Column("removal_snapshot_json")]
+    public string? RemovalSnapshotJson { get; set; }
 
     [Column("comment")]
     public string? Comment { get; set; }

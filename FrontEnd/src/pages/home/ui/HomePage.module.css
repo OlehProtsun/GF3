@@ -33,20 +33,63 @@
 .pending { background:#fcecef; color:#a7263e; }
 .open { background:#eaf0ff; color:#2459c5; }
 .todayControls.todayControls { flex:0 1 auto; }
-.worksToolbar { display:flex; align-items:center; gap:12px; margin-bottom:10px; flex-shrink:0; }
-.dateControls { display:flex; align-items:center; gap:6px; flex:none; max-width:100%; }
-.monthSelect { width:208px; max-width:100%; flex:none; }
-.monthSelect > button { min-height:36px; padding:4px 10px; gap:8px; }
-.dayControls { display:flex; gap:6px; }
 .iconButton,.todayButton { display:inline-flex; align-items:center; justify-content:center; gap:8px; height:36px; padding:0 14px; background:#fbfcff; border:1px solid #dfe6f1; color:#18243a; border-radius:22px; font:inherit; font-size:12px; cursor:pointer; }
 .iconButton { width:36px; padding:0; }
 .iconButton:hover,.todayButton:hover { background:#f0f4fe; }
 .iconButton:disabled:disabled { opacity:.55; cursor:default; }
-.shopFilters { display:flex; align-items:center; gap:6px; flex:1; min-width:0; color:#4b5b75; font-size:12px; font-weight:750; }
+.shopFilters { display:flex; align-items:center; gap:10px; min-width:0; padding:6px 12px; color:#344966; font-size:12px; }
+.shopFilters .periodLabel { flex-shrink:0; }
+.filterPanel {
+  min-width: 0;
+  flex-shrink: 0;
+  border: 1px solid #dfe8f6;
+  border-radius: 22px;
+  background: #f3f7ff;
+  box-shadow: 0 3px 10px #294c8a0a;
+}
+.scheduleFilters { margin-bottom:10px; }
+.periodRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  padding: 8px 12px;
+  border-bottom: 1px solid #e1e9f6;
+  color: #344966;
+  font-size: 12px;
+}
+.periodLabel, .periodControls { display: flex; align-items: center; gap: 5px; }
+.periodLabel { font-weight: 750; }
+.periodLabel svg { color: #275bd6; }
+.periodControls { max-width: 100%; }
+.periodControls .iconButton { flex: 0 0 30px; width: 30px; height: 30px; }
+.periodControls .activityPeriodSelect { width: 160px; }
+.periodControls .scheduleDateSelect { width: 178px; }
+.periodControls .todayButton { flex-shrink: 0; height: 30px; padding-inline: 8px; }
+.periodControls :is(.activityPeriodSelect, .scheduleDateSelect) > button {
+  min-height: 30px;
+  padding: 4px 8px;
+  gap: 4px;
+  box-shadow: none;
+}
+.periodRange { padding-inline-start: 9px; border-inline-start: 1px solid #dce5f4; }
+.periodRange span {
+  display: block;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #e8effb;
+  font-size: 11px;
+  font-weight: 700;
+}
 .tabs,.shopPills { display:flex; align-items:center; gap:5px; overflow-x:auto; min-width:0; padding-block:2px 4px; flex-shrink:0; scrollbar-width:thin; scrollbar-color:#c5cfdf transparent; }
+.tabs {
+  overflow-y: hidden;
+  padding: 10px 16px;
+  scroll-padding-inline: 16px;
+}
 .shopPills { flex-shrink:1; }
 .tabs button,.shopPills button { display:inline-flex; align-items:center; gap:5px; flex:none; min-height:31px; padding:4px 8px; border:1px solid #e1e8f2; border-radius:999px; background:#f2f5f9; color:#465774; font:inherit; font-size:11px; font-weight:700; white-space:nowrap; cursor:pointer; transition:background-color 140ms ease,color 140ms ease,border-color 140ms ease; }
-.shopPills button { min-height:36px; padding-inline:10px; }
+.shopPills button { padding-inline:10px; }
 .tabs button { gap:5px; padding-inline:9px; }
 .tabs button:hover,.shopPills button:hover { background:#e7eefb; }
 .tabs button[aria-selected="true"],.shopPills button[aria-pressed="true"] { color:white; border-color:#2458cf; background:#275bd6; }
@@ -59,14 +102,39 @@
 .tabs button.approvalTab:focus-visible { outline-color:#ac1936; }
 .tabs button .approvalCount,
 .tabs button[aria-selected="true"] .approvalCount { background:#ffedf0; color:#ac1936; border:1px solid #efb8c3; }
-@media(prefers-reduced-motion:no-preference) {
-  .tabs button.approvalTab { animation:approval-glow 6s ease-in-out infinite; }
+.tabs button.approvalTab.approvalTabPending {
+  position: relative;
+  isolation: isolate;
+  border-color: #dc2626;
 }
-@keyframes approval-glow {
-  0%, 100% { box-shadow:inset 0 0 0 1px transparent; }
-  50% { box-shadow:inset 0 0 0 1px #ba34572e; }
+
+.tabs button.approvalTabPending::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  animation: approvalAura 1.15s ease-out infinite !important;
+}
+
+@keyframes approvalAura {
+  0% {
+    inset: -1px;
+    box-shadow: 0 0 3px 3px rgba(239, 68, 68, 0.78);
+    opacity: 0;
+  }
+  20% { opacity: 1; }
+  100% {
+    inset: -7px;
+    box-shadow: 0 0 5px 4px rgba(239, 68, 68, 0.78);
+    opacity: 0;
+  }
 }
 .scope { margin:8px 2px 5px; min-height:15px; font-size:11px; color:#66748b; flex-shrink:0; }
+.tabs:has(.approvalTabPending) {
+  /* Keep the full approval aura within the horizontal scrollport. */
+  padding-block: 16px;
+}
 .feed { flex:1; min-height:0; overflow:auto; scroll-padding-block:14px; scrollbar-width:thin; scrollbar-color:#c5cfdf transparent; }
 .feed[data-overflow-top],.feed[data-overflow-bottom] { mask-image:linear-gradient(to bottom, var(--fade-top, #000), #000 var(--fade-top-size, 0px), #000 calc(100% - var(--fade-bottom-size, 0px)), var(--fade-bottom, #000)); }
 .feed[data-overflow-top] { --fade-top:transparent; --fade-top-size:14px; }
@@ -88,10 +156,6 @@
 .dashboard :is(a,button,[tabindex]):focus-visible { outline:2px solid #2563eb; outline-offset:-2px; border-radius:6px; }
 .dashboard :is(.tabs,.shopPills) button:focus-visible { border-radius:999px; }
 @media(max-width:1100px) { .dashboard { grid-template-columns:minmax(0,1fr); } .card.card { height:clamp(560px,calc(100dvh - 134px),740px); } }
-@media(max-width:550px) {
-  .worksToolbar { align-items:stretch; flex-direction:column; gap:6px; }
-  .dateControls { flex-wrap:wrap; }
-}
 @media(max-width:550px) { .page { padding-inline:12px; } .dashboard { padding-top:10px; gap:16px; } .card.card { padding:14px 11px 11px; border-radius:22px; } .cardTitle h2 { font-size:17px; } .employeeCount { font-size:11px; } .event { grid-template-columns:32px minmax(0,1fr) 33px; gap:5px 7px; } .eventIcon { width:32px; height:32px; } .event > .status { grid-column:2; justify-self:start; } .event time { grid-column:3; grid-row:1 / span 2; } }
 @media(prefers-reduced-motion:reduce) { .dashboard *, .dashboard *::after { scroll-behavior:auto; transition:none; animation:none; } }
 .placeholder { display:grid; place-items:center; width:100%; min-width:0; min-height:calc(100dvh - 60px); padding:24px; box-sizing:border-box; text-align:center; }

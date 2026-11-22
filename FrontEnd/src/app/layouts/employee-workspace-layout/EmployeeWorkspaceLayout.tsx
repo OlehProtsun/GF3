@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState, type PropsWithChildren } from "re
 import { NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "@app/providers/AuthProvider";
 import { useRealtime } from "@app/providers/PresenceProvider";
-import { EmployeePwaInstallBanner } from "./EmployeePwaInstallBanner";
+import { EmployeePwaInstallDialog } from "./EmployeePwaInstallDialog";
 import { EmployeeCommunicationDialog } from "@entities/communications/ui";
 import { EmployeePushInvitation } from "@entities/employee-push/ui/EmployeePushInvitation";
 import { useEmployeeShiftSwapsQuery, type ShiftSwap } from "@entities/shift-swaps";
@@ -282,7 +282,6 @@ export function EmployeeWorkspaceLayout({ children }: PropsWithChildren) {
           </nav>
         </header>
 
-        {pathname !== "/install" && <EmployeePwaInstallBanner />}
         <main data-employee-content className={styles.content}>{children}</main>
         {isProfileRoute && <nav className={styles.legalLinks} aria-label={t("Legal documents")}>
             <a href="/legal/index.html">{t("Legal documents")}</a>
@@ -327,6 +326,7 @@ export function EmployeeWorkspaceLayout({ children }: PropsWithChildren) {
       </nav>
 
       <EmployeeCommunicationDialog employeeId={session?.employeeId ?? null} />
+      {pathname !== "/install" && <EmployeePwaInstallDialog />}
       <EmployeePushInvitation />
     </div>
   );

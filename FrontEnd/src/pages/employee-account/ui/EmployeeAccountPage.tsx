@@ -2,6 +2,7 @@ import { t } from "@shared/i18n";
 import { useLanguageRevision } from "@shared/i18n/useLanguageRevision";
 import { LanguageSelector } from "@shared/i18n/LanguageSelector";
 import { useEffect, useState } from "react";
+import { NavLink } from "react-router-dom";
 import { useAuth } from "@app/providers/AuthProvider";
 import {
   useConfirmEmployeePasswordResetMutation,
@@ -13,7 +14,7 @@ import { getErrorMessage } from "@shared/api/httpClient";
 import { ErrorBanner } from "@shared/ui/components/ErrorBanner";
 import { IosButton } from "@shared/ui/components/IosButton";
 import { pushErrorAlertFromError } from "@shared/ui/feedback/error-alerts/errorAlerts";
-import { AccountSettingsIcon, CheckIcon, ChevronRightIcon, EmployeeIcon, LogoutIcon, SaveIcon } from "@shared/ui/icons";
+import { AccountSettingsIcon, BookOpenIcon, CheckIcon, ChevronRightIcon, EmployeeIcon, LogoutIcon, SaveIcon } from "@shared/ui/icons";
 import sharedStyles from "@pages/shared/EmployeeWorkspacePage.module.css";
 import styles from "./EmployeeAccountPage.module.css";
 import { RegulationHistoryCard } from "@entities/regulations/ui/RegulationHistoryCard";
@@ -186,6 +187,14 @@ export function EmployeeAccountPage() {
 
   return (
     <div className={sharedStyles.page}>
+      <NavLink to="/install" className={styles.installCard}>
+        <span className={styles.installIcon} aria-hidden="true"><BookOpenIcon size={20} /></span>
+        <span className={styles.installCopy}>
+          <strong>{t("App Guide")}</strong>
+          <span>{t("Learn how to use GF and explore its features.")}</span>
+        </span>
+        <span className={styles.installChevron} aria-hidden="true"><ChevronRightIcon size={16} /></span>
+      </NavLink>
       <section className={styles.profilePanel}>
         <div className={styles.panelHeader} data-employee-motion>
           <div className={styles.profileSummaryBlock}>

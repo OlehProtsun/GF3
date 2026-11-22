@@ -79,6 +79,7 @@ public static class ManagerHomeActivityReader
             OccurredAtUtc = new DateTimeOffset(DateTime.ParseExact(row.OccurredAt, "yyyy-MM-dd HH:mm:ss.fffffff", CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal)),
             EmployeeName = string.IsNullOrWhiteSpace(name) ? employeeId?.ToString(CultureInfo.InvariantCulture) ?? "—" : name,
             CounterpartyName = Text("CounterpartyName"), IsManagerCreatedOffer = Number("IsManagerCreatedOffer") == 1,
+            RemovesShift = Number("RemovesShift") == 1,
             Status = row.Status, RequiresApproval = row.RequiresApproval,
             TargetType = row.TargetType, ContainerId = Number("ContainerId"), GraphId = Number("GraphId"),
             AvailabilityGroupId = Number("AvailabilityGroupId"), ShopId = Number("ShopId"), EmployeeId = employeeId,
@@ -144,7 +145,9 @@ public static class ManagerHomeActivityReader
             SELECT r.id, r.created_at_utc, r.reviewed_at_utc, lower(r.status) AS status, r.schedule_slot_id,
                 json_object('EmployeeId', r.employee_id, 'EmployeeName', e.first_name || ' ' || e.last_name,
                     'ContainerId', s.container_id, 'GraphId', s.id, 'ScheduleName', s.name, 'ShopName', p.name,
-                    'Year', s.year, 'Month', s.month, 'Day', r.day_of_month, 'FromTime', r.original_from_time,
+                    'Year', COALESCE(json_extract(r.removal_snapshot_json, '$.Year'), s.year),
+                    'Month', COALESCE(json_extract(r.removal_snapshot_json, '$.Month'), s.month),
+                    'RemovesShift', r.operation = 'RemoveShift', 'Day', r.day_of_month, 'FromTime', r.original_from_time,
                     'ToTime', r.original_to_time, 'ReturnYear', s.year, 'ReturnMonth', s.month, 'ReturnDay', r.day_of_month,
                     'ReturnFromTime', r.requested_from_time, 'ReturnToTime', r.requested_to_time) AS payload
             FROM shift_correction_request r JOIN schedule s ON s.id = r.schedule_id
