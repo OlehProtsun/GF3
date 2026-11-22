@@ -52,9 +52,8 @@ internal static class ShiftSwapExchangeRules
         catch (ArgumentOutOfRangeException) { return "The selected shift has an invalid date."; }
         if (source.ScheduleId == back.ScheduleId && Date(source) == Date(back) && give == receive)
             return "Choose a different shift period for the exchange.";
-        if (offers.Any(offer => offer.Id != requestId && offer.Status == ShiftSwapStatus.Open &&
-            (offer.ScheduleSlotId == source.Id || offer.ScheduleSlotId == back.Id ||
-             offer.ReturnScheduleSlotId == source.Id || offer.ReturnScheduleSlotId == back.Id)))
+        if (ShiftSwapReservationRules.HasConflict(offers, source, give, requestId) ||
+            ShiftSwapReservationRules.HasConflict(offers, back, receive, requestId))
             return "This shift already has an open swap offer. Refresh and choose another shift.";
         var remainingOwner = Project(assignments, owner, source, give, null, null);
         var remainingTarget = Project(assignments, target, back, receive, null, null);
@@ -65,26 +64,29 @@ internal static class ShiftSwapExchangeRules
 
     internal static IReadOnlyList<ShiftSwapPeriod> FindEligibleReturnWindows(ExchangeInput input, ScheduleSlotModel candidate)
     {
-        var start = ParseTimeMinutes(candidate.FromTime);
-        var end = ParseTimeMinutes(candidate.ToTime);
-        if (start is null || end is null || end <= start) return [];
         DateOnly candidateDate;
         try { candidateDate = Date(candidate); }
         catch (ArgumentOutOfRangeException) { return []; }
         var remainingOwner = Project(input.Assignments, input.OwnerId, input.Source, input.SourcePeriod, null, null);
         var windows = new List<ShiftSwapPeriod>();
-        int? runStart = null;
+        var reservations = ShiftSwapReservationRules.ForSlot(input.OpenOffers, candidate, input.RequestId);
         // Maximal free intervals allow each side to choose its own duration, including legacy minute boundaries.
-        for (var minute = start.Value; minute <= end.Value; minute++)
+        foreach (var freeWindow in ShiftSwapReservationRules.GetFreeWindows(candidate, reservations))
         {
-            var free = minute < end.Value && !remainingOwner.Any(item => item.Date == candidateDate && item.Start <= minute && minute < item.End);
-            if (free) runStart ??= minute;
-            else if (runStart is { } from)
+            var start = ParseTimeMinutes(freeWindow.FromTime)!.Value;
+            var end = ParseTimeMinutes(freeWindow.ToTime)!.Value;
+            int? runStart = null;
+            for (var minute = start; minute <= end; minute++)
             {
-                var period = new ShiftSwapPeriod(Time(from), Time(minute));
-                if (GetExchangeConflictReason(input with { Return = candidate, ReturnPeriod = period }) is null)
-                    windows.Add(period);
-                runStart = null;
+                var free = minute < end && !remainingOwner.Any(item => item.Date == candidateDate && item.Start <= minute && minute < item.End);
+                if (free) runStart ??= minute;
+                else if (runStart is { } from)
+                {
+                    var period = new ShiftSwapPeriod(Time(from), Time(minute));
+                    if (GetExchangeConflictReason(input with { Return = candidate, ReturnPeriod = period }) is null)
+                        windows.Add(period);
+                    runStart = null;
+                }
             }
         }
         return windows;
@@ -147,7 +149,7 @@ internal static class ShiftSwapExchangeRules
     }
 
     private sealed record Interval(DateOnly Date, int Start, int End);
-    private static bool Matches(ShiftSwapReturnCandidateDto expected, ScheduleSlotModel slot)
+    internal static bool Matches(ShiftSwapReturnCandidateDto expected, ScheduleSlotModel slot)
         => expected.SlotId == slot.Id && expected.ScheduleId == slot.ScheduleId && expected.Year == slot.Schedule.Year &&
             expected.Month == slot.Schedule.Month && expected.DayOfMonth == slot.DayOfMonth &&
             expected.FromTime == slot.FromTime && expected.ToTime == slot.ToTime;

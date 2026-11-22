@@ -104,6 +104,7 @@ public static class WebApiServiceCollectionExtensions
         services.AddSingleton<IScheduleEditLockService>(services => services.GetRequiredService<ManagerEditLockService>());
         services.AddScoped<IRealtimeNotifier, RealtimeNotifier>();
         services.AddScoped<IWorkflowLogService, WorkflowLogService>();
+        services.AddScoped<EmployeeLaunchService>();
         services.AddScoped<ScheduleVersionCommitService>();
         services.AddScoped<WebApi.ShiftSwaps.ShiftSwapExecutionService>();
         services.AddScoped<WebApi.ShiftSwaps.ContractShiftApprovalService>();

@@ -79,23 +79,24 @@ public sealed class ShiftSwapSafetyTests
     }
 
     [Fact]
-    public async Task Create_DuplicateOpenSlot_ExistingIndexEnforced()
+    public async Task Create_SameIntervalRejected_AdjacentIntervalAllowedWithNonUniqueIndexes()
     {
         await using var database = await SqliteTestDatabase.CreateAsync();
         var fixture = await SeedAsync(database, offer: false);
-        var gate = new WriteGate("INSERT INTO \"shift_swap_request\"");
-        await using var first = Context(database, gate);
-        await using var second = Context(database, gate);
-        var firstNotifier = new RecordingNotifier();
-        var secondNotifier = new RecordingNotifier();
-        var results = await RaceAsync(
-            () => Employee(first, fixture.Owner, firstNotifier).Create(Request(fixture), default),
-            () => Employee(second, fixture.Owner, secondNotifier).Create(Request(fixture), default));
-        AssertWinner(results);
-        Assert.Equal("This shift already has an open swap offer.", results.Single(error => error != null)!.Message);
-        await using var persisted = database.CreateContext();
-        Assert.Equal(1, await persisted.ShiftSwapRequests.CountAsync(swap => swap.Status == ShiftSwapStatus.Open));
-        Assert.Equal(1, firstNotifier.Events.Count + secondNotifier.Events.Count);
+        await using var db = database.CreateContext();
+        var owner = Employee(db, fixture.Owner);
+        await owner.Create(Request(fixture, "09:00", "13:00"), default);
+        var conflict = await Assert.ThrowsAsync<ValidationException>(() => owner.Create(Request(fixture, "09:00", "13:00"), default));
+        Assert.Equal("This shift already has an open swap offer.", conflict.Message);
+        await owner.Create(Request(fixture, "13:00", "15:00"), default);
+        Assert.Equal(2, await db.ShiftSwapRequests.CountAsync(swap => swap.Status == ShiftSwapStatus.Open));
+        await db.Database.OpenConnectionAsync();
+        await using var indexes = db.Database.GetDbConnection().CreateCommand();
+        indexes.CommandText = """
+            SELECT COUNT(*) FROM pragma_index_list('shift_swap_request')
+            WHERE name IN ('ix_shift_swap_open_slot', 'ix_shift_swap_open_return_slot') AND "unique" = 0
+            """;
+        Assert.Equal(2L, await indexes.ExecuteScalarAsync());
     }
 
     [Fact]
@@ -317,6 +318,7 @@ public sealed class ShiftSwapSafetyTests
     [InlineData("accept")]
     [InlineData("cancel")]
     [InlineData("manager")]
+    [InlineData("create")]
     public async Task WriterBusy_ReturnsControlledConflictWithoutMutation(string action)
     {
         await using var database = await SqliteTestDatabase.CreateAsync();
@@ -330,6 +332,7 @@ public sealed class ShiftSwapSafetyTests
         {
             if (action == "accept") await Employee(actor, fixture.Target, notifier).Accept(fixture.Swap, default);
             else if (action == "cancel") await Employee(actor, fixture.Owner, notifier).Cancel(fixture.Swap, default);
+            else if (action == "create") await Employee(actor, fixture.Owner, notifier).Create(Request(fixture), default);
             else await Manager(actor, notifier).CancelContainerSwap(fixture.Container, fixture.Swap, default);
         });
         Assert.Equal("This swap changed during another request. Refresh and try again.", exception.Message);

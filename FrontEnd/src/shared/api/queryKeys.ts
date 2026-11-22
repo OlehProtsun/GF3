@@ -70,6 +70,7 @@ export const queryKeys = {
     graphManualHighlightSetting: (containerId: number, graphId: number) => ["shiftSwaps", "graphManualHighlightSetting", containerId, graphId] as const,
     container: (containerId: number) => ["shiftSwaps", "container", containerId] as const,
   },
+  employeeLaunches: { list: () => ["employeeLaunches", "list"] as const },
   workflowLogs: {
     all: ["workflowLogs"] as const,
     list: () => ["workflowLogs", "list"] as const,

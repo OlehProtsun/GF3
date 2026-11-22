@@ -30,6 +30,18 @@
   flex-wrap: wrap;
 }
 
+.usage > summary { cursor: pointer; padding: 6px 4px; }
+.usage > summary .countPill { margin-inline-start: 6px; }
+.usage > label { margin-block: 12px; max-width: 360px; }
+.usageList { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.usageRow { display: grid; grid-template-columns: minmax(150px, 1fr) 3fr; gap: 10px; padding: 12px; border: 1px solid #e4e8ef; border-radius: 14px; background: #f9fafb; }
+.usageName { display: flex; flex-wrap: wrap; align-items: center; align-content: start; gap: 6px; overflow-wrap: anywhere; }
+.usageName small { width: 100%; color: #526075; }
+.usageRow dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 8px; margin: 0; font-size: 13px; }
+.usageRow dt { color: #526075; }
+.usageRow dd { margin: 3px 0 0; }
+@media (max-width: 720px) { .usageRow { grid-template-columns: 1fr; } }
+
 .panelTitle {
   display: inline-flex;
   align-items: center;

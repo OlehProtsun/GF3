@@ -5,7 +5,7 @@ import { beforeEach, expect, test, vi } from "vitest";
 import { setLanguage, t } from "@shared/i18n";
 import { useRef, useState } from "react";
 import type { EmployeeSchedule } from "@entities/employee-schedule";
-import type { ShiftSwapOfferPreview, ShiftSwapReturnCandidate, SwapWizardRequest } from "@entities/shift-swaps";
+import type { ShiftSwap, ShiftSwapOfferPreview, ShiftSwapReturnCandidate, SwapWizardRequest } from "@entities/shift-swaps";
 import { SwapScrollRegion } from "./SwapScrollRegion";
 import { SwapCreateWizard } from "./SwapCreateWizard";
 import { SwapShiftPickerDialog } from "./SwapShiftPickerDialog";
@@ -120,7 +120,7 @@ test("custom source and private Give survive edits with long names in the same m
   expect(result.onSubmit).toHaveBeenCalledWith({ allowPartialAcceptance: false, requestKind: "give", scheduleId: 10, scheduleSlotId: 100, fromTime: "09:15", toTime: "16:30", targetEmployeeId: 2 });
 });
 
-const mocks = vi.hoisted(() => ({ candidates: vi.fn(), preview: vi.fn() }));
+const mocks = vi.hoisted(() => ({ candidates: vi.fn(), preview: vi.fn(), revalidate: vi.fn() }));
 vi.mock("@entities/shift-swaps", async original => ({
   ...await original<typeof import("@entities/shift-swaps")>(),
   useShiftSwapReturnCandidatesQuery: (params: unknown) => mocks.candidates(params),
@@ -143,11 +143,65 @@ beforeEach(() => {
     close: { configurable: true, value(this: HTMLDialogElement) { this.open = false; } },
   });
   mocks.candidates.mockImplementation(() => ({ data: { items: [candidate, { ...candidate, slotId: 201, canSelect: false, unavailableReason: "Not enough hours." }], hasMore: false }, isFetching: false }));
-  mocks.preview.mockImplementation((payload: SwapWizardRequest | null) => ({ data: payload ? {
+  mocks.revalidate.mockReset();
+  mocks.revalidate.mockImplementation(async (data: ShiftSwapOfferPreview) => data);
+  mocks.preview.mockImplementation((payload: SwapWizardRequest | null) => {
+    const data = payload ? {
     requestKind: payload.requestKind, allowPartialAcceptance: payload.allowPartialAcceptance ?? false, targetEmployeeId: payload.targetEmployeeId, targetEmployeeName: payload.targetEmployeeId ? "Target Worker" : "Everyone",
     source: { ...source, fromTime: payload.fromTime, toTime: payload.toTime }, return: payload.requestKind === "exchange" ? { ...candidate, fromTime: payload.returnFromTime, toTime: payload.returnToTime } : null,
     isValid: true, projectedMonths: [{ year: 2026, month: 10, hoursBefore: 7.5, hoursAfter: payload.requestKind === "exchange" ? 7.5 : 0, workDaysBefore: 1, workDaysAfter: 1, freeDaysBefore: 30, freeDaysAfter: 30 }],
-  } satisfies ShiftSwapOfferPreview : undefined, isFetching: false }));
+    } satisfies ShiftSwapOfferPreview : undefined;
+    return { data, isFetching: false, refetchWithSignal: () => mocks.revalidate(data) };
+  });
+});
+
+test("the pending source half stays visible and updates the selection when reservations change", async () => {
+  const user = userEvent.setup();
+  const result = setup();
+  const pending = { id: 1, status: "open", scheduleSlotId: 100, fromTime: "09:00", toTime: "13:00" } as ShiftSwap;
+  const rerender = (swaps: ShiftSwap[]) => result.rerender(<QueryClientProvider client={result.client}>
+    <SwapCreateWizard {...result.props} swaps={swaps} />
+  </QueryClientProvider>);
+  rerender([pending]);
+  await user.click(screen.getByRole("button", { name: /F27/ }));
+  const row = screen.getByRole("radio");
+  expect(row).toBeEnabled();
+  expect(row).toHaveTextContent("Awaiting confirmation · 09:00–13:00");
+  await user.click(row);
+  expect(screen.getByRole("button", { name: "Full shift" })).toBeDisabled();
+  fireEvent.change(screen.getByDisplayValue("13:00"), { target: { value: "12:59" } });
+  expect(screen.getByDisplayValue("13:00")).toBeInTheDocument();
+  rerender([{ ...pending, toTime: "15:00" }]);
+  expect(screen.getByDisplayValue("15:00")).toBeInTheDocument();
+  rerender([{ ...pending, toTime: "16:30" }]);
+  expect(screen.getByText("Entire shift is pending")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Confirm shift" })).toBeDisabled();
+});
+
+test("a failed revalidation prevents submission after a valid review", async () => {
+  const user = userEvent.setup();
+  const result = setup();
+  await chooseSource(user);
+  await user.click(screen.getByRole("button", { name: "Continue" }));
+  mocks.revalidate.mockImplementation(async (data: ShiftSwapOfferPreview) => ({ ...data, isValid: false, unavailableReason: "That time is already reserved." }));
+  await user.click(screen.getByRole("button", { name: "Send request" }));
+  expect(mocks.revalidate).toHaveBeenCalledOnce();
+  expect(result.onSubmit).not.toHaveBeenCalled();
+  expect(screen.getByText("That time is already reserved.")).toBeVisible();
+});
+
+test("a preview request error is visible and the employee can retry", async () => {
+  const user = userEvent.setup();
+  const result = setup();
+  await chooseSource(user);
+  await user.click(screen.getByRole("button", { name: "Continue" }));
+  mocks.revalidate.mockRejectedValueOnce(new Error("Preview temporarily unavailable."));
+  const send = screen.getByRole("button", { name: "Send request" });
+  await user.click(send);
+  expect(screen.getByText("Preview temporarily unavailable.")).toBeVisible();
+  expect(result.onSubmit).not.toHaveBeenCalled();
+  await user.click(send);
+  expect(result.onSubmit).toHaveBeenCalledOnce();
 });
 test("locks independent app scrollers and restores inline styles and positions on close", () => {
   const app = document.createElement("div"); app.id = "root";

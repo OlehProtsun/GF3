@@ -27,7 +27,7 @@ function offer(payload: Record<string, unknown>) {
     fromEmployeeHoursBefore: 7.5, fromEmployeeHoursAfter: 7.5, allowPartialAcceptance: false, canAcceptFull: true, eligibleClaimWindows: [] as {fromTime:string;toTime:string}[], canAccept: false, canCancel: true, isCreatedByCurrentEmployee: true, isManagerCreated: false, isScheduleLocked: false, acceptanceUnavailableReason: "",
     ...(payload.requestKind === "exchange" ? { returnScheduleName: "F35", returnShopName: "Central", returnYear: 2026, returnMonth: 10, returnDayOfMonth: 3, returnShiftHours: 7.5 } : {}), ...payload };
 }
-async function mockApi(page: Page, actor: number, state: { offers: Offer[]; stale?: boolean; scheduleCount?: number; shiftCount?: number; employeeCount?: number; multipleReturnSchedules?: boolean; previewState?: "loading" | "error" | "invalid" | "stale"; ownerName?: string; targetName?: string; language?: "en" | "pl" | "uk" }) {
+async function mockApi(page: Page, actor: number, state: { offers: Offer[]; stale?: boolean; holdReturn?: boolean; scheduleCount?: number; shiftCount?: number; employeeCount?: number; multipleReturnSchedules?: boolean; previewState?: "loading" | "error" | "invalid" | "stale"; ownerName?: string; targetName?: string; language?: "en" | "pl" | "uk" }) {
   await page.addInitScript(() => localStorage.setItem("gf3.auth.access-token", "swap-test"));
   await page.route("**/*", async route => {
     const path = new URL(route.request().url()).pathname;
@@ -40,7 +40,8 @@ async function mockApi(page: Page, actor: number, state: { offers: Offer[]; stal
     else if (path === "/api/employee-ui-state") body = { scheduleColumnOrders: {}, readNotificationIds: [], pinnedSwapIds: [] };
     else if (path === "/api/employee-shift-swaps/return-candidates") {
       const pageNo = Number(new URL(route.request().url()).searchParams.get("page") ?? 1);
-      body = { items: pageNo === 1 ? [returned, { ...returned, slotId: 205, dayOfMonth: 4, fromTime: "09:00", toTime: "16:30", durationMinutes: 450 }, ...Array.from({ length: 29 }, (_, i) => ({ ...returned, slotId: i + 300, canSelect: false, unavailableReason: "Not enough hours." }))]
+      const firstReturn = state.holdReturn ? { ...returned, canSelect: false, eligibleWindows: [], unavailableReason: "This shift already has an open swap offer. Refresh and choose another shift." } : returned;
+      body = { items: pageNo === 1 ? [firstReturn, { ...returned, slotId: 205, dayOfMonth: 4, fromTime: "09:00", toTime: "16:30", durationMinutes: 450 }, ...Array.from({ length: 29 }, (_, i) => ({ ...returned, slotId: i + 300, canSelect: false, unavailableReason: "Not enough hours." }))]
         : [{ ...returned, slotId: 999, dayOfMonth: state.multipleReturnSchedules ? 5 : 31, ...(state.multipleReturnSchedules ? { scheduleId: 30, scheduleName: "F99 — Aleksandra Maria Kowalska-Wiśniewska", month: 11, fromTime: "10:00", toTime: "16:00", durationMinutes: 360, suggestedFromTime: "10:00", suggestedToTime: "16:00", eligibleWindows: [{ fromTime: "10:00", toTime: "16:00" }] } : {}) }], page: pageNo, pageSize: 30, hasMore: pageNo === 1 };
     } else if (path === "/api/employee-shift-swaps/preview") {
       if (state.previewState === "loading") return;
@@ -65,6 +66,32 @@ async function mockApi(page: Page, actor: number, state: { offers: Offer[]; stal
     await route.fulfill({ contentType: "application/json", body: JSON.stringify(body) });
   });
 }
+
+test("swap wizard keeps free windows beside two pending offers and disables a reserved return", async ({ page }) => {
+  await mockApi(page, 1, { holdReturn: true, offers: [
+    offer({ id: 1, requestKind: "give", fromTime: "09:00", toTime: "11:00" }),
+    offer({ id: 2, requestKind: "give", fromTime: "13:00", toTime: "14:00" }),
+  ] });
+  await page.goto("/swap");
+  await page.getByRole("button", { name: "Create offer", exact: true }).click();
+  const modal = page.getByRole("dialog", { name: "Create a swap offer" });
+  await modal.getByRole("button", { name: /F27/ }).click();
+  const shift = modal.getByRole("radio");
+  await expect(shift).toContainText("Awaiting confirmation · 09:00–11:00");
+  await expect(shift).toContainText("Awaiting confirmation · 13:00–14:00");
+  await shift.click();
+  await expect(modal.getByRole("button", { name: "Full shift" })).toBeDisabled();
+  await expect(modal.locator('input[type="time"]').first()).toHaveValue("11:00");
+  await modal.getByRole("button", { name: "Confirm shift" }).click();
+  await modal.getByRole("button", { name: "Continue", exact: true }).click();
+  await modal.getByRole("button", { name: "Specific employee", exact: true }).click();
+  await modal.getByRole("button", { name: "Target Worker", exact: true }).click();
+  await modal.getByRole("radio", { name: "Swap shifts", exact: true }).click();
+  await modal.getByRole("button", { name: "Choose their shift", exact: true }).click();
+  await modal.getByRole("button", { name: /F35/ }).click();
+  await expect(modal.getByRole("radio", { name: /03.10.2026.*open swap offer/ })).toBeDisabled();
+  await expect(modal.getByRole("button", { name: "Confirm selection" })).toBeDisabled();
+});
 
 for (const [language, label] of [["en", "Partial"], ["pl", "Częściowo"], ["uk", "Частково"]] as const) {
   for (const width of [320, 375]) {
@@ -263,7 +290,11 @@ for (const width of [320, 375, 430]) {
   });
 }
 
-test("custom private Give sends exact payload and cancellation appears in History", async ({ page }) => {
+test("custom private Give submits without newer abort APIs and cancellation appears in History", async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(AbortSignal, "any", { value: undefined, configurable: true });
+    Object.defineProperty(AbortSignal.prototype, "throwIfAborted", { value: undefined, configurable: true });
+  });
   const state: { offers: Offer[] } = { offers: [] };
   await mockApi(page, 1, state); await page.goto("/swap");
   await page.getByRole("button", { name: "Create offer", exact: true }).click();
@@ -279,7 +310,7 @@ test("custom private Give sends exact payload and cancellation appears in Histor
   await page.getByRole("button", { name: "Target Worker", exact: true }).click();
   await page.getByRole("button", { name: "Save selection" }).click();
   await page.getByRole("button", { name: "Continue", exact: true }).click();
-  const sent = page.waitForRequest(r => new URL(r.url()).pathname === "/api/employee-shift-swaps" && r.method() === "POST");
+  const sent = page.waitForRequest(r => new URL(r.url()).pathname === "/api/employee-shift-swaps" && r.method() === "POST", { timeout: 5_000 });
   await page.getByRole("button", { name: "Send request" }).click();
   expect((await sent).postDataJSON()).toEqual({ allowPartialAcceptance: false, requestKind: "give", scheduleId: 10, scheduleSlotId: 100, fromTime: "09:15", toTime: "16:15", targetEmployeeId: 2 });
   await page.getByRole("button", { name: "View offer details for F27" }).click();

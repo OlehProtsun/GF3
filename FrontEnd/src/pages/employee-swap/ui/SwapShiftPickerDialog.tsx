@@ -23,11 +23,13 @@ export function SwapShiftPickerDialog({ shifts, selection, outgoing, returnMode 
   const [custom, setCustom] = useState(Boolean(selection && (selection.period.fromTime !== selection.shift.fromTime || selection.period.toTime !== selection.shift.toTime)));
   const shift = shifts.find(item => item.slotId === slotId);
   const allowed = (item: ShiftSwapReturnCandidate, value: SwapPeriod) => {
+    if (!item.canSelect) return false;
     const from = swapMinutes(value.fromTime), to = swapMinutes(value.toTime);
     if (from < swapMinutes(item.fromTime) || to > swapMinutes(item.toTime) || from >= to) return false;
     if ((wholeShiftOnly || item.requiresWholeShift) && (item.durationMinutes !== 480 || value.fromTime !== item.fromTime || value.toTime !== item.toTime)) return false;
+    const windows = item.eligibleWindows ?? (returnMode ? [] : [item]);
+    if (!windows.some(window => from >= swapMinutes(window.fromTime) && to <= swapMinutes(window.toTime))) return false;
     if (!returnMode) return true;
-    if (!item.eligibleWindows?.some(window => from >= swapMinutes(window.fromTime) && to <= swapMinutes(window.toTime))) return false;
     // The target must give away any part of this shift that overlaps the incoming source period.
     const give = outgoing?.shift;
     if (give && give.year === item.year && give.month === item.month && give.dayOfMonth === item.dayOfMonth) {
@@ -44,6 +46,18 @@ export function SwapShiftPickerDialog({ shifts, selection, outgoing, returnMode 
       ? { fromTime: item.suggestedFromTime, toTime: item.suggestedToTime } : null;
     return suggested && allowed(item, suggested) ? suggested : item.eligibleWindows?.find(window => allowed(item, window)) ?? null;
   };
+  const availability = JSON.stringify([shift?.slotId, shift?.fromTime, shift?.toTime, shift?.canSelect, shift?.eligibleWindows, wholeShiftOnly]);
+  const [previousAvailability, setPreviousAvailability] = useState<string | null>(null);
+  if (availability !== previousAvailability) {
+    setPreviousAvailability(availability);
+    if (!period || !shift || !allowed(shift, period)) {
+      const replacement = fullAllowed && shift ? { fromTime: shift.fromTime, toTime: shift.toTime } : shift ? suggestedPeriod(shift) : null;
+      setPeriod(replacement);
+      setCustom(Boolean(replacement && !fullAllowed));
+    }
+  }
+  const activeWindow = period && shift?.eligibleWindows?.find(window =>
+    window.fromTime <= period.fromTime && window.toTime >= period.toTime);
   const choose = (item: ShiftSwapReturnCandidate) => {
     if (!item.canSelect) return;
     setSlotId(item.slotId);
@@ -52,8 +66,11 @@ export function SwapShiftPickerDialog({ shifts, selection, outgoing, returnMode 
     setPeriod(full ? { fromTime: item.fromTime, toTime: item.toTime } : suggestedPeriod(item));
   };
   const changeTime = (edge: "fromTime" | "toTime", time: string) => {
-    if (!period || !/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) return;
-    setPeriod({ ...period, [edge]: time });
+    if (!period || !shift || !/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) return;
+    const updated = { ...period, [edge]: time };
+    const withinWindow = !shift.eligibleWindows || shift.eligibleWindows.some(window =>
+      window.fromTime <= updated.fromTime && window.toTime >= updated.toTime && updated.fromTime < updated.toTime);
+    if (withinWindow) setPeriod(updated);
   };
   const canAdjust = (edge: "fromTime" | "toTime", delta: number) => {
     if (!shift || !period) return false;
@@ -74,13 +91,18 @@ export function SwapShiftPickerDialog({ shifts, selection, outgoing, returnMode 
       const next = rows[(index + direction + rows.length) % rows.length];
       next?.focus(); next?.click();
     }}>
-      {shifts.map(item => <button key={item.slotId} type="button" role="radio" aria-checked={item.slotId === slotId}
+      {shifts.map(item => <button key={item.slotId} type="button" role="radio" aria-checked={item.canSelect && item.slotId === slotId}
         tabIndex={item.slotId === slotId || (!shift?.canSelect && shifts.find(candidate => candidate.canSelect)?.slotId === item.slotId) ? 0 : -1}
         className={styles.row} disabled={!item.canSelect} onClick={() => choose(item)}>
         <span>{swapShiftDate(item)}</span>
         <strong>{item.fromTime} – {item.toTime}</strong>
         <span className={styles.radio} aria-hidden="true" />
-        {!item.canSelect && <small>{translateServerMessage(item.unavailableReason ?? t("Shift unavailable."))}</small>}
+        {Boolean(item.reservedWindows?.length) && <span className={styles.windows}>
+          {item.reservedWindows?.map(window => <span key={window.fromTime}>{t("Awaiting confirmation")} · {window.fromTime}–{window.toTime}</span>)}
+          {item.canSelect && item.eligibleWindows?.map(window => <span className={styles.available} key={window.fromTime}>{t("Available")} · {window.fromTime}–{window.toTime}</span>)}
+        </span>}
+        {!item.canSelect && <small>{item.reservedWindows?.length && !item.eligibleWindows?.length
+          ? t("Entire shift is pending") : translateServerMessage(item.unavailableReason ?? t("Shift unavailable."))}</small>}
       </button>)}
       {!loading && shifts.length === 0 && <p>{t("No shifts available.")}</p>}
       {loading && <p role="status">{t("Loading...")}</p>}
@@ -90,14 +112,18 @@ export function SwapShiftPickerDialog({ shifts, selection, outgoing, returnMode 
       <h3 id={periodHeadingId} data-period-heading>{returnMode ? t("Time to receive") : t("Time to give away")}</h3>
       <div className={styles.modes}>
         <button type="button" aria-pressed={!custom} disabled={!fullAllowed} onClick={() => { if (!shift) return; setCustom(false); setPeriod({ fromTime: shift.fromTime, toTime: shift.toTime }); }}>{t("Full shift")}</button>
-        <button type="button" aria-pressed={custom} disabled={!shift || wholeShiftOnly || shift.requiresWholeShift} onClick={() => { setCustom(true); if (returnMode && shift && !valid) setPeriod(suggestedPeriod(shift)); }}>{t("Custom period")}</button>
+        <button type="button" aria-pressed={custom} disabled={!shift?.canSelect || wholeShiftOnly || shift.requiresWholeShift} onClick={() => { setCustom(true); if (shift && !valid) setPeriod(suggestedPeriod(shift)); }}>{t("Custom period")}</button>
       </div>
+      {custom && shift && (shift.eligibleWindows?.length ?? 0) > 1 && <div className={styles.windowActions} role="group" aria-label={t("Available")}>
+        {shift.eligibleWindows?.filter(window => allowed(shift, window)).map(window => <button type="button" key={window.fromTime}
+          aria-pressed={window === activeWindow} onClick={() => setPeriod(window)}>{window.fromTime}–{window.toTime}</button>)}
+      </div>}
       {custom && shift && period && <div className={styles.controls}><strong className={styles.date}>{swapShiftDate(shift)}</strong>
         {(["fromTime", "toTime"] as const).map(edge => <label key={edge}>
           <span>{edge === "fromTime" ? t("From") : t("To")}</span>
           <div className={styles.time}>
             <button type="button" aria-label={t("Decrease {0}", edge === "fromTime" ? t("From") : t("To"))} disabled={!canAdjust(edge, -15)} onClick={() => changeTime(edge, swapTime(swapMinutes(period[edge]) - 15))}>−</button>
-            <input type="time" step={900} value={period[edge]} min={shift.fromTime} max={shift.toTime}
+            <input type="time" value={period[edge]} min={activeWindow?.fromTime ?? shift.fromTime} max={activeWindow?.toTime ?? shift.toTime}
               onChange={event => changeTime(edge, event.target.value)} />
             <button type="button" aria-label={t("Increase {0}", edge === "fromTime" ? t("From") : t("To"))} disabled={!canAdjust(edge, 15)} onClick={() => changeTime(edge, swapTime(swapMinutes(period[edge]) + 15))}>+</button>
           </div>

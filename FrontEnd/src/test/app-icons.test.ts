@@ -20,6 +20,7 @@ describe("application icons", () => {
       icons: [
         { src: "/icons/gf-icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
         { src: "/icons/gf-icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
+        { src: "/icons/gf-icon-maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
       ],
     });
   });
@@ -63,5 +64,21 @@ describe("application icons", () => {
       expect(resolved.startsWith(publicRoot + path.sep)).toBe(true);
       expect(pngDimensions(relative).join("x")).toBe(icon.sizes);
     }
+  });
+
+  it("declares each iOS startup screen once with matching media and pixel dimensions", () => {
+    const html = new DOMParser().parseFromString(readFileSync("index.html", "utf8"), "text/html");
+    const links = [...html.head.querySelectorAll<HTMLLinkElement>('link[rel="apple-touch-startup-image"]')];
+    const viewports = [[320, 568, 2], [375, 667, 2], [375, 812, 3], [390, 844, 3], [393, 852, 3],
+      [402, 874, 3], [414, 896, 2], [414, 896, 3], [428, 926, 3], [430, 932, 3], [440, 956, 3]];
+    expect(links).toHaveLength(viewports.length);
+    for (const [width, height, dpr] of viewports) {
+      const image = `splash/ios-${width * dpr}x${height * dpr}.png`;
+      const matching = links.filter(link => link.getAttribute("href") === `/${image}`);
+      expect(matching).toHaveLength(1);
+      expect(matching[0].media).toBe(`(device-width: ${width}px) and (device-height: ${height}px) and (-webkit-device-pixel-ratio: ${dpr}) and (orientation: portrait)`);
+      expect(pngDimensions(image)).toEqual([width * dpr, height * dpr]);
+    }
+    expect(readFileSync("promo.html", "utf8")).not.toMatch(/gf3-startup-splash|apple-touch-startup-image/);
   });
 });

@@ -279,6 +279,7 @@ function invalidateRealtimeBaselineQueries(queryClient: QueryClient) {
   invalidateRealtimeQuery(queryClient, queryKeys.employeeSchedules.all);
   invalidateRealtimeQuery(queryClient, queryKeys.shiftSwaps.all);
   invalidateRealtimeQuery(queryClient, queryKeys.workflowLogs.all);
+  invalidateRealtimeQuery(queryClient, queryKeys.employeeLaunches.list());
   invalidateRealtimeQuery(queryClient, queryKeys.employeeAvailability.all);
   invalidateRealtimeQuery(queryClient, queryKeys.employeeUiState.current());
 }
@@ -369,6 +370,8 @@ export function PresenceProvider({ children }: PropsWithChildren) {
     }
 
     invalidateRealtimeQuery(queryClient, queryKeys.employees.all);
+    if (session?.isSystemManager === true && managerPcMode)
+      invalidateRealtimeQuery(queryClient, queryKeys.employeeLaunches.list());
   });
 
   const queuedGraphRefreshes = useRef(new Map<number, Set<number>>());
@@ -409,6 +412,10 @@ export function PresenceProvider({ children }: PropsWithChildren) {
   });
 
   const applyManagerDataChanged = useEffectEvent((update: ManagerDataChangedUpdate) => {
+    if (update.resourceType === "employee-launches") {
+      invalidateRealtimeQuery(queryClient, queryKeys.employeeLaunches.list());
+      return;
+    }
     // The update response installs the replacement token before refreshing the profile/list.
     if (update.resourceType === managerEditResourceTypes.managerProfile &&
         update.reason === "manager-profile-updated" &&

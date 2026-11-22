@@ -45,7 +45,8 @@ public sealed class RealtimeNotifier(IHubContext<EmployeePresenceHub, IEmployeeP
         string reason,
         int? containerId = null,
         int? graphId = null)
-        => hubContext.Clients.All.ManagerDataChanged(new ManagerDataChangedMessage
+        => (resourceType == "employee-launches" ? hubContext.Clients.Group(EmployeePresenceHub.SystemManagersGroupName) : hubContext.Clients.All)
+            .ManagerDataChanged(new ManagerDataChangedMessage
         {
             ResourceType = resourceType,
             ResourceId = resourceId,

@@ -13,8 +13,10 @@ namespace GF3.Tests;
 
 public sealed class ShiftSwapLifecycleMatrixTests
 {
-    [Fact]
-    public async Task Competing_exchange_creations_claim_return_slot_exactly_once()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Concurrent_exchange_creations_claim_only_disjoint_return_intervals(bool adjacent)
     {
         await using var database = await SqliteTestDatabase.CreateAsync();
         await using var setup = database.CreateContext();
@@ -24,14 +26,31 @@ public sealed class ShiftSwapLifecycleMatrixTests
         setup.Add(thirdSource); await setup.SaveChangesAsync();
         var original = Request(f, scenario);
         var competing = Request(f, scenario); competing.ScheduleId = f.ReturnSchedule; competing.ScheduleSlotId = thirdSource.Id;
-        var gate = new ShiftSwapSafetyTests.WriteGate("INSERT INTO \"shift_swap_request\"");
-        await using var first = new AppDbContext(new DbContextOptionsBuilder<AppDbContext>().UseSqlite(database.ConnectionString).AddInterceptors(gate).Options);
-        await using var second = new AppDbContext(new DbContextOptionsBuilder<AppDbContext>().UseSqlite(database.ConnectionString).AddInterceptors(gate).Options);
-        var results = await Task.WhenAll(Task.Run(() => Record.ExceptionAsync(() => EmployeeController(first, f.Owner).Create(original, default))),
-            Task.Run(() => Record.ExceptionAsync(() => EmployeeController(second, f.Third).Create(competing, default))));
-        Assert.Single(results, e => e is null); Assert.IsType<ValidationException>(Assert.Single(results, e => e is not null));
+        if (adjacent)
+        {
+            original.ReturnToTime = "13:00";
+            competing.ReturnFromTime = "13:00";
+        }
+        await using var first = database.CreateContext();
+        await using var second = database.CreateContext();
+        var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        async Task<Exception?> Create(AppDbContext context, int employeeId, CreateEmployeeShiftSwapRequest request)
+        {
+            await start.Task;
+            return await Record.ExceptionAsync(() => EmployeeController(context, employeeId).Create(request, default));
+        }
+        var firstCreate = Create(first, f.Owner, original);
+        var secondCreate = Create(second, f.Third, competing);
+        start.SetResult();
+        var results = await Task.WhenAll(firstCreate, secondCreate);
+        if (adjacent) Assert.All(results, Assert.Null);
+        else
+        {
+            Assert.Single(results, error => error is null);
+            Assert.IsType<ValidationException>(Assert.Single(results, error => error is not null));
+        }
         await using var fresh = database.CreateContext();
-        Assert.Single(await fresh.ShiftSwapRequests.ToListAsync());
+        Assert.Equal(adjacent ? 2 : 1, await fresh.ShiftSwapRequests.CountAsync());
         Assert.Empty(await fresh.ShiftSwapHistories.ToListAsync()); Assert.Empty(await fresh.ScheduleVersions.ToListAsync());
         AssertIntervalsEqual([(1, 1, 540, 1020), (2, 2, 540, 1020), (3, 4, 540, 1020)], await ReadAssignmentIntervalsAsync(fresh));
     }

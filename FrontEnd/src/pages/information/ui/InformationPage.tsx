@@ -1,5 +1,7 @@
-import { t, translateServerMessage } from "@shared/i18n";
+import { getLocale, t, translateServerMessage } from "@shared/i18n";
 import { useMemo, useState } from "react";
+import { useAuth } from "@app/providers/AuthProvider";
+import { useEmployeeLaunchUsageQuery } from "@entities/employee-launches/api/queries";
 import {
   useBulkDeleteWorkflowLogsMutation,
   useDeleteWorkflowLogMutation,
@@ -36,6 +38,8 @@ type DeleteIntent =
   | { kind: "bulk"; payload: WorkflowLogBulkDeleteRequest; title: string; message: string; confirmText: string };
 
 export function InformationPage() {
+  const { session } = useAuth();
+  const canViewUsage = session?.role === "manager" && session.isSystemManager === true && session.workspaceMode === "pc";
   const logsQuery = useWorkflowLogsQuery();
   const settingsQuery = useWorkflowLogSettingsQuery();
   const updateSettingsMutation = useUpdateWorkflowLogSettingsMutation();
@@ -136,6 +140,8 @@ export function InformationPage() {
   return (
     <div className={styles.page}>
       <PageHeader title={t("Information")} subtitle={t("Employee and manager workflow activity")} backTo={-1} />
+
+      {canViewUsage && <EmployeeUsage />}
 
       <section className={styles.panel}>
         <div className={styles.panelHeader}>
@@ -361,4 +367,42 @@ export function InformationPage() {
       />
     </div>
   );
+}
+
+function EmployeeUsage() {
+  const usageQuery = useEmployeeLaunchUsageQuery(true);
+  const [search, setSearch] = useState("");
+  const locale = getLocale();
+  const format = new Intl.DateTimeFormat(locale, { dateStyle: "short", timeStyle: "short" });
+  const time = (value: string | null) => value ? format.format(new Date(value)) : "—";
+  const employees = usageQuery.data ?? [];
+  const term = search.trim().toLocaleLowerCase(locale);
+  const visible = employees.filter(employee => [employee.employeeName, employee.username].some(value => value?.toLocaleLowerCase(locale).includes(term)));
+
+  return <details className={`${styles.panel} ${styles.usage}`} open>
+    <summary><strong>{t("Employee usage")}</strong> <span className={styles.countPill}>{employees.length}</span></summary>
+    <label className={styles.logSearch}>
+      <SearchIcon size={18} />
+      <input type="search" aria-label={t("Search employees")} placeholder={t("Search employees")} value={search} onChange={event => setSearch(event.target.value)} />
+    </label>
+    {usageQuery.isLoading && <p role="status">{t("Loading...")}</p>}
+    {usageQuery.isError && <p role="alert">{t("Could not load employee usage.")}</p>}
+    {!usageQuery.isError && usageQuery.data && visible.length === 0 && <p>{t("No employees found.")}</p>}
+    {visible.length > 0 && <ul className={styles.usageList}>
+      {visible.map(employee => <li key={employee.employeeId} className={styles.usageRow}>
+        <div className={styles.usageName}>
+          <strong>{employee.employeeName}</strong>
+          <span className={employee.isOnline ? styles.livePill : styles.pausedPill}>{employee.isOnline ? t("Online") : t("Offline")}</span>
+          <small>{employee.hasLoginAccount ? employee.username : t("No account")}</small>
+        </div>
+        <dl>
+          <div><dt>{t("Last login")}</dt><dd>{time(employee.lastLoginAtUtc)}</dd></div>
+          <div><dt>{t("Last activity")}</dt><dd>{time(employee.lastSeenAtUtc)}</dd></div>
+          <div><dt>{t("Last launch")}</dt><dd>{employee.lastLaunchMode === "pwa" ? t("PWA") : employee.lastLaunchMode === "browser" ? t("Browser") : t("No data")}</dd></div>
+          <div><dt>{t("Last browser launch")}</dt><dd>{time(employee.lastBrowserLaunchAtUtc)}</dd></div>
+          <div><dt>{t("Last PWA launch")}</dt><dd>{time(employee.lastPwaLaunchAtUtc)}</dd></div>
+        </dl>
+      </li>)}
+    </ul>}
+  </details>;
 }

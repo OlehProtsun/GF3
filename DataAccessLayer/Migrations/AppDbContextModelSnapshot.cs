@@ -551,9 +551,17 @@ namespace DataAccessLayer.Migrations
                         .HasDefaultValue("pl")
                         .HasColumnName("language");
 
+                    b.Property<DateTimeOffset?>("LastBrowserLaunchAtUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("last_browser_launch_at_utc");
+
                     b.Property<DateTimeOffset?>("LastLoginAtUtc")
                         .HasColumnType("TEXT")
                         .HasColumnName("last_login_at_utc");
+
+                    b.Property<DateTimeOffset?>("LastPwaLaunchAtUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("last_pwa_launch_at_utc");
 
                     b.Property<DateTimeOffset?>("LastSeenAtUtc")
                         .HasColumnType("TEXT")
@@ -2320,13 +2328,11 @@ namespace DataAccessLayer.Migrations
                         .HasDatabaseName("ix_shift_swap_return_schedule_status");
 
                     b.HasIndex("ReturnScheduleSlotId", "Status")
-                        .IsUnique()
-                        .HasDatabaseName("ux_shift_swap_open_return_slot")
+                        .HasDatabaseName("ix_shift_swap_open_return_slot")
                         .HasFilter("status = 'Open' AND request_kind = 'Exchange' AND return_schedule_slot_id IS NOT NULL");
 
                     b.HasIndex("ScheduleSlotId", "Status")
-                        .IsUnique()
-                        .HasDatabaseName("ux_shift_swap_open_slot")
+                        .HasDatabaseName("ix_shift_swap_open_slot")
                         .HasFilter("status = 'Open'");
 
                     b.HasIndex(new[] { "FromEmployeeId", "Status" }, "ix_shift_swap_from_status");

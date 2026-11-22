@@ -1,6 +1,7 @@
 import { beforeEach as beforeEnglishTest } from "vitest";
 import { setLanguage as setTestLanguage } from "@shared/i18n";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
+import { use } from "react";
 import type { PropsWithChildren } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AuthSession } from "@entities/auth/model/types";
@@ -12,6 +13,7 @@ const auth = vi.hoisted(() => ({
   status: "authenticated" as "authenticated" | "unauthenticated" | "loading",
   session: null as AuthSession | null,
   protectedMount: vi.fn(),
+  installReady: null as Promise<void> | null,
 }));
 vi.mock("@app/providers/AuthProvider", () => ({ useAuth: () => auth }));
 vi.mock("@app/layouts/overlay-sidebar-layout", () => ({ OverlaySidebarLayout: ({ children }: PropsWithChildren) => <>{children}</> }));
@@ -27,6 +29,10 @@ vi.mock("@pages/employee-availability", () => ({ EmployeeAvailabilityPage: () =>
 vi.mock("@pages/employee-schedule", () => ({ EmployeeSchedulePage: () => { return <div>EmployeeSchedulePage</div>; } }));
 vi.mock("@pages/employee-swap", () => ({ EmployeeSwapPage: () => { return <div>EmployeeSwapPage</div>; } }));
 vi.mock("@pages/employee-account", () => ({ EmployeeAccountPage: () => { return <div>EmployeeAccountPage</div>; } }));
+vi.mock("@pages/employee-install", () => ({ EmployeeInstallPage: function EmployeeInstallPage() {
+  if (auth.installReady) use(auth.installReady);
+  return <section data-testid="install-page" />;
+} }));
 vi.mock("@pages/login", () => ({ LoginPage: () => { return <div>LoginPage</div>; } }));
 vi.mock("@pages/password-recovery", () => ({ PasswordRecoveryPage: () => { return <div>PasswordRecoveryPage</div>; } }));
 vi.mock("@pages/shop-list", () => ({ ShopListPage: () => { return <div>ShopListPage</div>; } }));
@@ -54,6 +60,43 @@ function mount(path: string) {
   window.history.replaceState({}, "", path);
   return render(<AppRouter />);
 }
+
+function appendSplash() {
+  const splash = document.createElement("div");
+  splash.id = "gf3-startup-splash";
+  document.body.append(splash);
+  return splash;
+}
+
+it("keeps the splash through auth and the first suspended route, then shows the blank install page", async () => {
+  let release!: () => void;
+  auth.installReady = new Promise<void>(resolve => { release = resolve; });
+  auth.status = "loading";
+  auth.session = null;
+  const splash = appendSplash();
+  const view = mount("/install");
+  expect(splash).toBeInTheDocument();
+  auth.status = "authenticated";
+  auth.session = employee;
+  view.rerender(<AppRouter />);
+  expect(splash).toBeInTheDocument();
+  expect(screen.queryByTestId("install-page")).toBeNull();
+  await act(async () => release());
+  expect(await screen.findByTestId("install-page")).toBeEmptyDOMElement();
+  expect(splash).not.toBeInTheDocument();
+  auth.installReady = null;
+});
+
+it("finishes the splash after the login redirect for anonymous visitors", async () => {
+  auth.status = "unauthenticated";
+  auth.session = null;
+  const splash = appendSplash();
+  mount("/install");
+  expect(await screen.findByText("LoginPage")).toBeVisible();
+  expect(splash).not.toBeInTheDocument();
+  expect(window.location.pathname).toBe("/login");
+  auth.status = "authenticated";
+});
 
 describe("AppRouter system access", () => {
   it.each([["/urlop", "ManagerUrlopListPage"], ["/urlop/1", "ManagerUrlopPage"]])("Urlop route %s is available in manager PC mode", async (path, page) => {

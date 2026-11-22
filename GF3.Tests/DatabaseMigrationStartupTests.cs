@@ -20,6 +20,8 @@ public sealed class DatabaseMigrationStartupTests
         const string prior = "20261101190152_AddDayOffShiftCorrectionRequests";
         const string correction = "20261114225324_AddShiftCorrectionComment";
         const string refresh = "20261115135735_RefreshManualShiftOffer";
+        const string disjointSwaps = "20261122150944_AllowDisjointOpenSwapIntervals";
+        const string launchModes = "20261122151455_TrackEmployeeLaunchModes";
         var root = CreateTempRoot();
         var sourcePath = Path.Combine(root, "SQLite.db");
         var clonePath = Path.Combine(root, "clone.db");
@@ -39,10 +41,11 @@ public sealed class DatabaseMigrationStartupTests
             {
                 var result = await DatabaseMigrationStartup.ApplyAsync(clone, cloneWorkspace, true, true,
                     NullLogger.Instance);
-                Assert.Equal(new[] { correction, refresh }, result.AppliedMigrations);
+                Assert.Equal(new[] { correction, refresh, disjointSwaps, launchModes }, result.AppliedMigrations);
                 Assert.Equal("Fixture", (await clone.Employees.SingleAsync()).FirstName);
                 Assert.Empty(await clone.ShiftCorrectionRequests.Select(request => request.Comment).ToListAsync());
                 Assert.Empty(await clone.ShiftSwapRequests.Select(request => request.RefreshedAtUtc).ToListAsync());
+                Assert.Empty(await clone.EmployeeAccounts.Select(account => new { account.LastBrowserLaunchAtUtc, account.LastPwaLaunchAtUtc }).ToListAsync());
                 Assert.Equal("ok", await IntegrityAsync(cloneWorkspace.ConnectionString));
             }
             SqliteConnection.ClearAllPools();

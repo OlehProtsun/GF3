@@ -45,6 +45,12 @@ public class EmployeeAccountModel
     [Column("last_seen_at_utc")]
     public DateTimeOffset? LastSeenAtUtc { get; set; }
 
+    [Column("last_browser_launch_at_utc")]
+    public DateTimeOffset? LastBrowserLaunchAtUtc { get; set; }
+
+    [Column("last_pwa_launch_at_utc")]
+    public DateTimeOffset? LastPwaLaunchAtUtc { get; set; }
+
     [Column("session_version")]
     public int SessionVersion { get; set; }
 

@@ -2,7 +2,7 @@ import { useEffect, useId, useMemo, useRef, useState, type RefObject } from "rea
 import { createPortal } from "react-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import type { EmployeeSchedule } from "@entities/employee-schedule";
-import { useShiftSwapPreviewQuery, useShiftSwapReturnCandidatesQuery, type ShiftSwap, type ShiftSwapEmployee, type SwapWizardRequest } from "@entities/shift-swaps";
+import { useShiftSwapPreviewQuery, useShiftSwapReturnCandidatesQuery, type ShiftSwap, type ShiftSwapEmployee, type ShiftSwapOfferPreview, type SwapWizardRequest } from "@entities/shift-swaps";
 import { queryKeys } from "@shared/api/queryKeys";
 import { getErrorMessage } from "@shared/api/httpClient";
 import { getLocale, translateServerMessage, t } from "@shared/i18n";
@@ -13,6 +13,7 @@ import { SwapShiftPickerDialog, swapMinutes, swapShiftDate, type SwapShiftSelect
 import { SwapRequestTypeDialog } from "./SwapRequestTypeDialog";
 import { SwapScrollRegion } from "./SwapScrollRegion";
 import { useSwapModalEnvironment } from "./useSwapModalEnvironment";
+import { getSwapSlotWindows } from "../model/swapReservedWindows";
 import styles from "./SwapCreateWizard.module.css";
 type Recipient = { mode: "everyone" } | { mode: "specific"; employee: ShiftSwapEmployee; kind: "give" }
   | { mode: "specific"; employee: ShiftSwapEmployee; kind: "exchange"; selection: SwapShiftSelection };
@@ -40,7 +41,8 @@ export function SwapCreateWizard({ schedules, employees, employeeId, employeeNam
   const [returnSelection, setReturnSelection] = useState<SwapShiftSelection | null>(null);
   const [search, setSearch] = useState("");
   const [returnScheduleId, setReturnScheduleId] = useState<number | null>(null);
-  const submitGuard = useRef(false);
+  const [submitPreviewError, setSubmitPreviewError] = useState<string | null>(null);
+  const submitGuard = useRef<AbortController | null>(null);
   const client = useQueryClient();
   const back = () => {
     if (busy) return;
@@ -55,7 +57,7 @@ export function SwapCreateWizard({ schedules, employees, employeeId, employeeNam
     if (bodyRef.current) bodyRef.current.scrollTop = 0;
     dialogRef.current?.querySelector<HTMLElement>("[data-subview-heading]")?.focus({ preventScroll: true });
   }, [view, step]);
-  useEffect(() => { if (!busy) submitGuard.current = false; }, [busy, error]);
+  useEffect(() => { if (!busy) submitGuard.current = null; }, [busy, error]);
   useEffect(() => {
     if (view === "wizard" && step === 1 && source) {
       const list = schedulesRef.current;
@@ -82,6 +84,10 @@ export function SwapCreateWizard({ schedules, employees, employeeId, employeeNam
     return { ...base, requestKind: "give", targetEmployeeId: null };
   }, [source, recipient, recipientMode, allowPartialAcceptance, wholeShiftOnly]);
   const previewQuery = useShiftSwapPreviewQuery(step === 3 && view === "wizard" ? payload : null);
+  useEffect(() => () => {
+    submitGuard.current?.abort();
+    submitGuard.current = null;
+  }, [payload, step, view]);
   const candidatesQuery = useShiftSwapReturnCandidatesQuery((view === "return" || view === "returnSchedule") && source && typeEmployee ? {
     sourceScheduleId: source.shift.scheduleId, sourceSlotId: source.shift.slotId,
     fromTime: source.period.fromTime, toTime: source.period.toTime, targetEmployeeId: typeEmployee.id,
@@ -91,13 +97,14 @@ export function SwapCreateWizard({ schedules, employees, employeeId, employeeNam
   const schedule = schedules.find(item => item.id === sourceScheduleId);
   const ownShifts = schedule?.slots.filter(slot => slot.employeeId === employeeId && slot.status === "ASSIGNED")
     .sort((a, b) => a.dayOfMonth - b.dayOfMonth || a.fromTime.localeCompare(b.fromTime) || a.id - b.id).map(slot => {
-      const reserved = swaps.some(swap => swap.status === "open" && (swap.scheduleSlotId === slot.id || swap.returnScheduleSlotId === slot.id));
+      const { reserved, available } = getSwapSlotWindows(slot, swaps);
+      const durationMinutes = swapMinutes(slot.toTime) - swapMinutes(slot.fromTime);
       return { scheduleId: schedule.id, scheduleName: schedule.name, shopName: schedule.shopName,
         year: schedule.year, month: schedule.month, dayOfMonth: slot.dayOfMonth, slotId: slot.id,
-        fromTime: slot.fromTime, toTime: slot.toTime, durationMinutes: swapMinutes(slot.toTime) - swapMinutes(slot.fromTime),
-        requiresWholeShift: wholeShiftOnly,
-        canSelect: !reserved && (!wholeShiftOnly || swapMinutes(slot.toTime) - swapMinutes(slot.fromTime) === 480),
-        unavailableReason: reserved ? "This shift already has an open swap offer." : wholeShiftOnly && swapMinutes(slot.toTime) - swapMinutes(slot.fromTime) !== 480 ? "Employment contract requires a whole shift of exactly eight hours." : null };
+        fromTime: slot.fromTime, toTime: slot.toTime, durationMinutes,
+        requiresWholeShift: wholeShiftOnly, reservedWindows: reserved, eligibleWindows: available,
+        canSelect: available.length > 0 && (!wholeShiftOnly || (reserved.length === 0 && durationMinutes === 480)),
+        unavailableReason: wholeShiftOnly ? "Employment contract requires a whole shift of exactly eight hours." : null };
     }) ?? [];
   const selectEmployee = (employee: ShiftSwapEmployee) => {
     setTypeEmployee(employee);
@@ -108,16 +115,42 @@ export function SwapCreateWizard({ schedules, employees, employeeId, employeeNam
     setView("type");
   };
   const preview = previewQuery.data;
-  const previewMatches = Boolean(preview && payload && preview.source.scheduleId === payload.scheduleId &&
-    preview.source.slotId === payload.scheduleSlotId && preview.source.fromTime === payload.fromTime && preview.source.toTime === payload.toTime &&
-    (preview.allowPartialAcceptance ?? false) === Boolean(payload.allowPartialAcceptance) &&
-    preview.targetEmployeeId === payload.targetEmployeeId && preview.requestKind === payload.requestKind &&
-    (payload.requestKind === "give" || (preview.return?.slotId === payload.returnScheduleSlotId &&
-      preview.return?.scheduleId === payload.returnScheduleId && preview.return?.fromTime === payload.returnFromTime && preview.return?.toTime === payload.returnToTime)));
+  const matchesPayload = (value: ShiftSwapOfferPreview | undefined) => Boolean(value && payload && value.source.scheduleId === payload.scheduleId &&
+    value.source.slotId === payload.scheduleSlotId && value.source.fromTime === payload.fromTime && value.source.toTime === payload.toTime &&
+    (value.allowPartialAcceptance ?? false) === Boolean(payload.allowPartialAcceptance) &&
+    value.targetEmployeeId === payload.targetEmployeeId && value.requestKind === payload.requestKind &&
+    (payload.requestKind === "give" || (value.return?.slotId === payload.returnScheduleSlotId &&
+      value.return?.scheduleId === payload.returnScheduleId && value.return?.fromTime === payload.returnFromTime && value.return?.toTime === payload.returnToTime)));
+  const previewMatches = matchesPayload(preview);
+  const submit = async (exception: boolean) => {
+    if (!payload || submitGuard.current) return;
+    const controller = new AbortController();
+    submitGuard.current = controller;
+    setSubmitPreviewError(null);
+    try {
+      const refreshed = await previewQuery.refetchWithSignal(controller.signal);
+      if (controller.signal.aborted) return;
+      const matches = matchesPayload(refreshed);
+      const invalidPreview = !refreshed.isValid || !matches;
+      if (invalidPreview || Boolean(refreshed.requiresManagerException) !== exception) {
+        if (submitGuard.current === controller) submitGuard.current = null;
+        if (invalidPreview)
+          setSubmitPreviewError(matches && refreshed.unavailableReason
+            ? translateServerMessage(refreshed.unavailableReason) : t("Could not preview this request."));
+        return;
+      }
+      if (exception) onRequestException?.(payload);
+      else onSubmit(payload);
+    } catch (reason) {
+      if (submitGuard.current === controller) submitGuard.current = null;
+      if (!controller.signal.aborted) setSubmitPreviewError(getErrorMessage(reason, t("Could not preview this request.")));
+    }
+  };
   const displayError = error || ((view === "return" || view === "returnSchedule") && candidatesQuery.error ? getErrorMessage(candidatesQuery.error, t("Could not load return shifts.")) : null)
-    || (step === 3 && previewQuery.error ? getErrorMessage(previewQuery.error, t("Could not preview this request.")) : null);
+    || (step === 3 && (submitPreviewError || (previewQuery.error ? getErrorMessage(previewQuery.error, t("Could not preview this request.")) : null)));
   const enterReview = () => {
     if (!payload) return;
+    setSubmitPreviewError(null);
     void client.invalidateQueries({ queryKey: queryKeys.shiftSwaps.preview(payload) });
     setStep(3);
   };
@@ -261,12 +294,10 @@ export function SwapCreateWizard({ schedules, employees, employeeId, employeeNam
           <footer className={styles.footer}>
             {step < 3 ? <button type="button" className={styles.primary} disabled={step === 1 ? !source : !payload}
               onClick={() => step === 1 ? setStep(2) : enterReview()}>{t("Continue")}{step < 3 && <span aria-hidden="true" className={styles.arrow}>→</span>}</button>
-              : <button type="button" className={styles.primary} disabled={busy || Boolean(preview?.requiresManagerException) || !payload || !previewMatches || !preview?.isValid || previewQuery.isFetching || Boolean(previewQuery.error)} onClick={() => {
-                if (!payload || submitGuard.current) return; submitGuard.current = true; onSubmit(payload);
-              }}>{busy ? t("Sending...") : t("Send request")}<span className={styles.arrow} aria-hidden="true">→</span></button>}
+              : <button type="button" className={styles.primary} disabled={busy || Boolean(preview?.requiresManagerException) || !payload || !previewMatches || !preview?.isValid || previewQuery.isFetching || Boolean(previewQuery.error)} onClick={() => void submit(false)}>{busy ? t("Sending...") : t("Send request")}<span className={styles.arrow} aria-hidden="true">→</span></button>}
             {step === 3 && preview?.requiresManagerException ? <button type="button" className={styles.primary}
               disabled={busy || !payload || !previewMatches || !preview.isValid || previewQuery.isFetching || !onRequestException}
-              onClick={() => { if (!payload || submitGuard.current) return; submitGuard.current = true; onRequestException?.(payload); }}>{t("Request exception")}</button> : null}
+              onClick={() => void submit(true)}>{t("Request exception")}</button> : null}
           </footer>
         </>}
       </div>
