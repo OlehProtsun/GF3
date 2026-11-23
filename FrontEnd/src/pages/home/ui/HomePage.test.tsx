@@ -127,25 +127,30 @@ function observeFeed() {
  return observers;
 }
 
-test("the work header owns the shared date controls across day and month boundaries", async () => {
+test("the work date and activity period are independent across month boundaries", async () => {
  vi.setSystemTime(new Date("2026-11-01T10:00:00Z"));
  const user = userEvent.setup();
  mount();
  const works = screen.getByRole("heading", { name: "Who Works Today?" }).closest("section")!;
  const activity = screen.getByRole("heading", { name: "Application Activity" }).closest("section")!;
- for (const name of ["Select month", "Previous day", "Today", "Next day"]) {
+ for (const name of ["Select date", "Previous day", "Today", "Next day"]) {
   expect(within(works).getByRole("button", { name, exact: true })).toBeVisible();
   expect(within(activity).queryByRole("button", { name, exact: true })).toBeNull();
  }
  await user.click(within(works).getByRole("button", { name: "Previous day" }));
  await waitFor(() => expect(loadHomeDashboard).toHaveBeenLastCalledWith("2026-10-31", expect.anything()));
  await waitFor(() => expect(managerHomeActivityApi.list).toHaveBeenLastCalledWith(
-  expect.objectContaining({ year: 2026, month: 10, tab: "all", offset: 0 }), expect.anything()));
- await user.click(within(works).getByRole("button", { name: "Select month" }));
+  expect.objectContaining({ year: 2026, month: 11, tab: "all", offset: 0 }), expect.anything()));
+ await user.click(within(activity).getByRole("button", { name: "Period", exact: true }));
  await user.click(screen.getByRole("option", { name: "February 2027", exact: true }));
- await waitFor(() => expect(loadHomeDashboard).toHaveBeenLastCalledWith("2027-02-28", expect.anything()));
+ await waitFor(() => expect(managerHomeActivityApi.list).toHaveBeenLastCalledWith(
+  expect.objectContaining({ year: 2027, month: 2, tab: "all", offset: 0 }), expect.anything()));
+ expect(loadHomeDashboard).toHaveBeenLastCalledWith("2026-10-31", expect.anything());
  await user.click(within(works).getByRole("button", { name: "Next day" }));
- await waitFor(() => expect(loadHomeDashboard).toHaveBeenLastCalledWith("2027-03-01", expect.anything()));
+ expect(within(works).getByText("Employees scheduled for 1 November 2026")).toBeVisible();
+ expect(loadHomeDashboard).toHaveBeenCalledWith("2026-11-01", expect.anything());
+ expect(managerHomeActivityApi.list).toHaveBeenLastCalledWith(
+  expect.objectContaining({ year: 2027, month: 2, tab: "all", offset: 0 }), expect.anything());
  await user.click(within(works).getByRole("button", { name: "Today", exact: true }));
  expect(screen.getByRole("heading", { name: "Who Works Today?" })).toBeVisible();
 });
@@ -211,7 +216,7 @@ test("changing tab or month resets the feed and never displays an old in-flight 
  await user.click(screen.getByRole("tab", { name: /Requires Approval/ }));
  expect(feed.scrollTop).toBe(0);
  expect(await within(feed).findByText("approvals 11 1 gave up a shift")).toBeVisible();
- await user.click(screen.getByRole("button", { name: "Select month", exact: true }));
+ await user.click(within(screen.getByRole("group", { name: "Period" })).getByRole("button", { name: "Period", exact: true }));
  await user.click(screen.getByRole("option", { name: "December 2026", exact: true }));
  expect(await within(feed).findByText("approvals 12 1 gave up a shift")).toBeVisible();
  await act(async () => finishOldPage(activityPage(7, 8, "Old")));

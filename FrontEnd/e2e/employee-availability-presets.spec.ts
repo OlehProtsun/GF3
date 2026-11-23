@@ -15,7 +15,10 @@ for (const language of ["en", "pl", "uk"] as const) {
     let availabilityWrites = 0;
     async function install(target: Page) {
       target.on("pageerror", error => errors.push(error.message));
-      await target.addInitScript(() => localStorage.setItem("gf3.auth.access-token", "preset-fixture"));
+      await target.addInitScript(() => {
+        localStorage.setItem("gf3.auth.access-token", "preset-fixture");
+        sessionStorage.setItem("gf3.pwa.install.dismissed", "1");
+      });
       await target.route("**/*", async route => {
         const path = new URL(route.request().url()).pathname;
         if (!path.startsWith("/api/")) return route.continue();

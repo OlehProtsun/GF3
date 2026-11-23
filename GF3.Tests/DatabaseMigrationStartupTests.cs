@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using System.Text.Json;
 using DataAccessLayer.Administration;
 using DataAccessLayer.Models;
@@ -22,6 +23,11 @@ public sealed class DatabaseMigrationStartupTests
         const string refresh = "20261115135735_RefreshManualShiftOffer";
         const string disjointSwaps = "20261122150944_AllowDisjointOpenSwapIntervals";
         const string launchModes = "20261122151455_TrackEmployeeLaunchModes";
+        const string launchLog = "20261122160000_AddWorkflowLogLaunchMode";
+        const string removal = "20261122173000_AddShiftRemovalCorrections";
+        const string gif = "20261123120000_AddCommunicationGifAttachment";
+        const string photo = "20261123130000_AddCommunicationPhotoAttachment";
+        const string contentBlocks = "20261123140000_AddCommunicationContentBlocks";
         var root = CreateTempRoot();
         var sourcePath = Path.Combine(root, "SQLite.db");
         var clonePath = Path.Combine(root, "clone.db");
@@ -31,22 +37,49 @@ public sealed class DatabaseMigrationStartupTests
             await using (var source = CreateContext(workspace.ConnectionString))
             {
                 await source.GetService<IMigrator>().MigrateAsync(prior);
-                source.Employees.Add(new EmployeeModel { FirstName = "Fixture", LastName = "Employee" });
-                await source.SaveChangesAsync();
+                var (owner, _, schedule, slot) = await EmployeePushNotificationSourceTests.Seed(source);
+                var now = DateTimeOffset.UtcNow;
+                await source.Database.ExecuteSqlInterpolatedAsync($"""
+                    INSERT INTO shift_correction_request
+                        (schedule_id, employee_id, schedule_slot_id, day_of_month, original_from_time, original_to_time,
+                         requested_from_time, requested_to_time, status, created_at_utc)
+                    VALUES ({schedule.Id}, {owner}, {slot.Id}, 1, '08:00', '16:00', '08:00', '16:30', 'Approved', {now});
+                    INSERT INTO communication_message (title, body, deadline_at_utc, created_at_utc, created_by_manager_name)
+                    VALUES ('Fixture message', 'Legacy text', {now.AddDays(1)}, {now}, 'Fixture manager');
+                    """);
             }
             var snapshot = await workspace.CreateAutomaticBackupAsync(default);
+            Assert.Equal("0", await ReadPragmaAsync(workspace.ConnectionString, "PRAGMA wal_checkpoint(TRUNCATE)"));
+            await using var sourceConnection = new SqliteConnection(workspace.ConnectionString);
+            SqliteConnection.ClearPool(sourceConnection);
+            var sourceHash = await HashAsync(sourcePath);
+            var backupHash = await HashAsync(snapshot.Path);
             File.Copy(snapshot.Path, clonePath);
             var cloneWorkspace = new SqliteDatabaseWorkspace(clonePath);
             await using (var clone = CreateContext(cloneWorkspace.ConnectionString))
             {
                 var result = await DatabaseMigrationStartup.ApplyAsync(clone, cloneWorkspace, true, true,
                     NullLogger.Instance);
-                Assert.Equal(new[] { correction, refresh, disjointSwaps, launchModes }, result.AppliedMigrations);
-                Assert.Equal("Fixture", (await clone.Employees.SingleAsync()).FirstName);
-                Assert.Empty(await clone.ShiftCorrectionRequests.Select(request => request.Comment).ToListAsync());
+                Assert.Equal(new[] { correction, refresh, disjointSwaps, launchModes, launchLog, removal, gif, photo, contentBlocks },
+                    result.AppliedMigrations);
+                Assert.Equal(new[] { "Owner", "Recipient" }, await clone.Employees.OrderBy(employee => employee.Id).Select(employee => employee.FirstName).ToArrayAsync());
+                var legacy = await clone.ShiftCorrectionRequests.SingleAsync();
+                Assert.Equal(ShiftCorrectionOperation.ChangeTimes, legacy.Operation);
+                Assert.Equal(("08:00", "16:00", "08:00", "16:30"),
+                    (legacy.OriginalFromTime, legacy.OriginalToTime, legacy.RequestedFromTime, legacy.RequestedToTime));
+                Assert.Null(legacy.Comment);
+                Assert.Null(legacy.RemovalSnapshotJson);
                 Assert.Empty(await clone.ShiftSwapRequests.Select(request => request.RefreshedAtUtc).ToListAsync());
                 Assert.Empty(await clone.EmployeeAccounts.Select(account => new { account.LastBrowserLaunchAtUtc, account.LastPwaLaunchAtUtc }).ToListAsync());
-                Assert.Equal("ok", await IntegrityAsync(cloneWorkspace.ConnectionString));
+                Assert.Empty(await clone.Set<WorkflowLogEntryModel>().Select(entry => entry.LaunchMode).ToListAsync());
+                var message = await clone.Set<CommunicationMessageModel>().SingleAsync();
+                Assert.Equal("Legacy text", message.Body);
+                Assert.Null(message.GifAttachmentJson);
+                Assert.Null(message.PhotoAttachmentJson);
+                Assert.Null(message.ContentBlocksJson);
+                Assert.False(clone.Database.HasPendingModelChanges());
+                Assert.Equal("ok", await ReadPragmaAsync(cloneWorkspace.ConnectionString, "PRAGMA integrity_check"));
+                Assert.Null(await ReadPragmaAsync(cloneWorkspace.ConnectionString, "PRAGMA foreign_key_check"));
             }
             SqliteConnection.ClearAllPools();
             var verificationConnection = new SqliteConnectionStringBuilder
@@ -58,15 +91,23 @@ public sealed class DatabaseMigrationStartupTests
             await using (var verification = CreateContext(verificationConnection))
             {
                 Assert.Empty(await verification.Database.GetPendingMigrationsAsync());
-                Assert.Equal("Fixture", (await verification.Employees.SingleAsync()).FirstName);
+                Assert.Equal(2, await verification.Employees.CountAsync());
                 verification.Employees.Add(new EmployeeModel { FirstName = "Unexpected", LastName = "Write" });
                 var error = await Assert.ThrowsAsync<DbUpdateException>(() => verification.SaveChangesAsync());
                 Assert.Equal(8, Assert.IsType<SqliteException>(error.InnerException).SqliteErrorCode);
             }
-            await using var unchanged = CreateContext(workspace.ConnectionString);
+            var immutableSource = new SqliteConnectionStringBuilder
+            {
+                DataSource = new Uri(sourcePath).AbsoluteUri + "?immutable=1",
+                Mode = SqliteOpenMode.ReadOnly,
+                Pooling = false,
+            }.ToString();
+            await using var unchanged = CreateContext(immutableSource);
             Assert.Equal(prior, (await unchanged.Database.GetAppliedMigrationsAsync()).Last());
-            Assert.Equal("Fixture", (await unchanged.Employees.SingleAsync()).FirstName);
-            Assert.Equal("ok", await IntegrityAsync(workspace.ConnectionString));
+            Assert.Equal(2, await unchanged.Employees.CountAsync());
+            Assert.Equal("ok", await ReadPragmaAsync(immutableSource, "PRAGMA integrity_check"));
+            Assert.Equal(sourceHash, await HashAsync(sourcePath));
+            Assert.Equal(backupHash, await HashAsync(snapshot.Path));
         }
         finally
         {
@@ -74,13 +115,66 @@ public sealed class DatabaseMigrationStartupTests
             Directory.Delete(root, recursive: true);
         }
 
-        static async Task<string?> IntegrityAsync(string connectionString)
+        static async Task<string?> ReadPragmaAsync(string connectionString, string pragma)
         {
             await using var connection = new SqliteConnection(connectionString);
             await connection.OpenAsync();
             await using var command = connection.CreateCommand();
-            command.CommandText = "PRAGMA integrity_check";
-            return (string?)await command.ExecuteScalarAsync();
+            command.CommandText = pragma;
+            return (await command.ExecuteScalarAsync())?.ToString();
+        }
+
+        static async Task<byte[]> HashAsync(string path)
+        {
+            await using var file = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            return await SHA256.HashDataAsync(file);
+        }
+    }
+
+    [Fact]
+    public async Task RemovalMigration_EnforcesSnapshotAndTimesOnAnUpgradedDatabase()
+    {
+        await using var database = await GF3.Tests.Infrastructure.SqliteTestDatabase.CreateAsync();
+        await using var db = database.CreateContext();
+        var migrator = db.GetService<IMigrator>();
+        await migrator.MigrateAsync("20261122160000_AddWorkflowLogLaunchMode");
+        var (owner, _, schedule, slot) = await EmployeePushNotificationSourceTests.Seed(db);
+        await migrator.MigrateAsync();
+
+        var removal = Draft("[]", null);
+        removal.RemovalSnapshotJson = JsonSerializer.Serialize(new[] { new { slot.Id, slot.FromTime, slot.ToTime } });
+        db.Add(removal);
+        await db.SaveChangesAsync();
+
+        await Reject(Draft(null, null));
+        await Reject(Draft(removal.RemovalSnapshotJson, "09:00"));
+        var attached = Draft(removal.RemovalSnapshotJson, null);
+        attached.ScheduleSlotId = slot.Id;
+        await Reject(attached);
+        var changedTimes = Draft(removal.RemovalSnapshotJson, "09:00");
+        changedTimes.Operation = ShiftCorrectionOperation.ChangeTimes;
+        changedTimes.RequestedToTime = "14:00";
+        await Reject(changedTimes);
+
+        var persisted = await db.ShiftCorrectionRequests.SingleAsync();
+        Assert.Equal(ShiftCorrectionOperation.RemoveShift, persisted.Operation);
+        Assert.Equal(removal.RemovalSnapshotJson, persisted.RemovalSnapshotJson);
+        Assert.Null(persisted.RequestedFromTime);
+        Assert.Null(persisted.RequestedToTime);
+
+        ShiftCorrectionRequestModel Draft(string? snapshot, string? start) => new()
+        {
+            ScheduleId = schedule.Id, EmployeeId = owner, DayOfMonth = 1,
+            Operation = ShiftCorrectionOperation.RemoveShift, Status = ShiftCorrectionStatus.Approved,
+            RequestedFromTime = start, RemovalSnapshotJson = snapshot, CreatedAtUtc = DateTimeOffset.UtcNow,
+        };
+
+        async Task Reject(ShiftCorrectionRequestModel request)
+        {
+            db.Add(request);
+            var error = await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync());
+            Assert.Equal(275, Assert.IsType<SqliteException>(error.InnerException).SqliteExtendedErrorCode);
+            db.ChangeTracker.Clear();
         }
     }
 

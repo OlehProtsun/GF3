@@ -16,7 +16,10 @@ async function fixture(page: Page, groups = [structuredClone(group)], expandFirs
   const urlopWrites: unknown[] = [];
   const errors: string[] = [];
   page.on("pageerror", error => errors.push(error.message));
-  await page.addInitScript(() => localStorage.setItem("gf3.auth.access-token", "matrix-fixture"));
+  await page.addInitScript(() => {
+    localStorage.setItem("gf3.auth.access-token", "matrix-fixture");
+    sessionStorage.setItem("gf3.pwa.install.dismissed", "1");
+  });
   await page.route("**/*", async route => {
     const path = new URL(route.request().url()).pathname;
     if (!path.startsWith("/api/")) return route.continue();

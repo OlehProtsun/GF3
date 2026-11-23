@@ -1,9 +1,6 @@
 using BusinessLogicLayer.Contracts.Communications;
 using DataAccessLayer.Administration;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Formats;
-using SixLabors.ImageSharp.Formats.Webp;
-using SixLabors.ImageSharp.Processing;
+using SkiaSharp;
 
 namespace WebApi.Services;
 
@@ -14,6 +11,7 @@ public sealed class CommunicationGifStorage(ISqliteDatabaseWorkspace workspace)
     public const int MaxRequestBytes = MaxBlockUploadBytes + 64 * 1024;
     private const int MaxFrames = 120;
     private const long MaxCanvasPixelsAcrossFrames = 60_000_000;
+    private const int MaxPhotoPixels = 16_000_000;
     private static readonly byte[] LoopExtension = [0x21, 0xff, 11, .. "NETSCAPE2.0"u8, 3, 1, 0, 0, 0];
 
     private string DirectoryPath => Path.Combine(Path.GetDirectoryName(workspace.DatabasePath)!, "communication-gifs");
@@ -35,27 +33,56 @@ public sealed class CommunicationGifStorage(ISqliteDatabaseWorkspace workspace)
     public async Task<CommunicationGifAttachment> SavePhotoAsync(IFormFile file, CancellationToken ct)
     {
         if (file.Length is <= 0 or > MaxGifBytes) throw new BadHttpRequestException("File too large");
-        try
-        {
-            using var input = file.OpenReadStream();
-            var format = Image.DetectFormat(input);
-            if (format.DefaultMimeType is not ("image/jpeg" or "image/png" or "image/webp"))
-                throw new BadHttpRequestException("Unsupported file format");
-            input.Position = 0;
-            var info = Image.Identify(input);
-            if ((long)info.Width * info.Height > 16_000_000) throw new BadHttpRequestException("File too large");
-            input.Position = 0;
-            using var photo = Image.Load(new DecoderOptions { MaxFrames = 1 }, input);
-            photo.Mutate(image => image.AutoOrient());
-            using var output = new MemoryStream();
-            await photo.SaveAsync(output, new WebpEncoder { SkipMetadata = true }, ct);
-            if (output.Length > MaxGifBytes) throw new BadHttpRequestException("File too large");
-            return await StoreAsync(file.FileName, output.ToArray(), "image/webp", ct);
-        }
-        catch (Exception error) when (error is UnknownImageFormatException or InvalidImageContentException)
-        {
+        var bytes = new byte[(int)file.Length];
+        await using (var input = file.OpenReadStream())
+            await input.ReadExactlyAsync(bytes, ct);
+
+        using var data = SKData.CreateCopy(bytes);
+        using var codec = SKCodec.Create(data);
+        if (codec is null || codec.EncodedFormat is not (SKEncodedImageFormat.Jpeg or SKEncodedImageFormat.Png or SKEncodedImageFormat.Webp))
             throw new BadHttpRequestException("Unsupported file format");
-        }
+
+        var (width, height) = (codec.Info.Width, codec.Info.Height);
+        if (width <= 0 || height <= 0 || (long)width * height > MaxPhotoPixels)
+            throw new BadHttpRequestException("File too large");
+
+        ct.ThrowIfCancellationRequested();
+        using var colorSpace = SKColorSpace.CreateSrgb();
+        var info = new SKImageInfo(width, height, SKColorType.Rgba8888, SKAlphaType.Premul, colorSpace);
+        using var bitmap = new SKBitmap(info);
+        if (codec.GetPixels(info, bitmap.GetPixels()) != SKCodecResult.Success)
+            throw new BadHttpRequestException("Unsupported file format");
+
+        using var oriented = OrientPhoto(bitmap, codec.EncodedOrigin);
+        // Encode only the decoded pixels. The input metadata never reaches the encoder.
+        using var output = (oriented ?? bitmap).Encode(SKEncodedImageFormat.Webp, 75)
+            ?? throw new BadHttpRequestException("Unsupported file format");
+        if (output.Size > MaxGifBytes) throw new BadHttpRequestException("File too large");
+        return await StoreAsync(file.FileName, output.ToArray(), "image/webp", ct);
+    }
+
+    private static SKBitmap? OrientPhoto(SKBitmap bitmap, SKEncodedOrigin origin)
+    {
+        if (origin == SKEncodedOrigin.TopLeft) return null;
+        var (width, height) = (bitmap.Width, bitmap.Height);
+        var transform = origin switch
+        {
+            SKEncodedOrigin.TopRight => new SKMatrix(-1, 0, width, 0, 1, 0, 0, 0, 1),
+            SKEncodedOrigin.BottomRight => new SKMatrix(-1, 0, width, 0, -1, height, 0, 0, 1),
+            SKEncodedOrigin.BottomLeft => new SKMatrix(1, 0, 0, 0, -1, height, 0, 0, 1),
+            SKEncodedOrigin.LeftTop => new SKMatrix(0, 1, 0, 1, 0, 0, 0, 0, 1),
+            SKEncodedOrigin.RightTop => new SKMatrix(0, -1, height, 1, 0, 0, 0, 0, 1),
+            SKEncodedOrigin.RightBottom => new SKMatrix(0, -1, height, -1, 0, width, 0, 0, 1),
+            SKEncodedOrigin.LeftBottom => new SKMatrix(0, 1, 0, -1, 0, width, 0, 0, 1),
+            _ => SKMatrix.Identity,
+        };
+        var rotated = origin is >= SKEncodedOrigin.LeftTop and <= SKEncodedOrigin.LeftBottom;
+        var oriented = new SKBitmap(rotated ? bitmap.Info.WithSize(height, width) : bitmap.Info);
+        using var canvas = new SKCanvas(oriented);
+        canvas.Clear(SKColors.Transparent);
+        canvas.SetMatrix(transform);
+        canvas.DrawBitmap(bitmap, 0, 0, new SKSamplingOptions(SKFilterMode.Nearest));
+        return oriented;
     }
 
     private async Task<CommunicationGifAttachment> StoreAsync(string originalName, byte[] bytes, string contentType, CancellationToken ct)

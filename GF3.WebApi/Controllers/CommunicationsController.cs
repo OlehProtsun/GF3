@@ -4,6 +4,7 @@ using BusinessLogicLayer.Common;
 using BusinessLogicLayer.Services.Abstractions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using WebApi.Auth;
 using WebApi.Contracts.Communications;
 using WebApi.Realtime;
@@ -295,7 +296,7 @@ public sealed class CommunicationsController(
         IReadOnlyList<CommunicationGifAttachment>? uploaded)
     {
         try { return await save().ConfigureAwait(false); }
-        catch (Exception error) when (error is ValidationException or KeyNotFoundException)
+        catch (Exception error) when (error is ValidationException or KeyNotFoundException or DbUpdateException)
         {
             RemoveUnattached(gif);
             RemoveUnattached(photo);

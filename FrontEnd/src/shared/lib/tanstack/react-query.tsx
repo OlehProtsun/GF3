@@ -38,6 +38,7 @@ type MutationOptions<TData, TVariables> = {
   onSuccess?: (data: TData, variables: TVariables) => void;
   onError?: (error: unknown, variables: TVariables) => void;
   mutationKey?: QueryKey;
+  meta?: Record<string, unknown>;
 };
 
 type QueryClientOptions = {
@@ -73,7 +74,10 @@ export class MutationCache {
 
   constructor(
     config: {
-      onError?: (error: unknown, variables: unknown, context: unknown, mutation: { options: { mutationKey?: QueryKey } }) => void;
+      onError?: (error: unknown, variables: unknown, context: unknown, mutation: {
+        options: { mutationKey?: QueryKey };
+        meta?: Record<string, unknown>;
+      }) => void;
     } = {},
   ) {
     this.config = config;
@@ -518,7 +522,7 @@ export function useMutation<TData, TVariables>(options: MutationOptions<TData, T
           setError(reason);
           options.onError?.(reason, variables);
           callbacks?.onError?.(reason);
-          client.mutationCache?.config.onError?.(reason, variables, null, { options: { mutationKey: options.mutationKey } });
+          client.mutationCache?.config.onError?.(reason, variables, null, { options: { mutationKey: options.mutationKey }, meta: options.meta });
         })
         .finally(() => { client.changeMutationCount(-1); setIsPending(false); });
     },

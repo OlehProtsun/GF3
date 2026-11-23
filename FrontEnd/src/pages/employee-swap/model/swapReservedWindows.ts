@@ -18,7 +18,7 @@ export function getSwapSlotWindows(slot: { id: number; fromTime: string; toTime:
   for (const swap of openSwaps) {
     if (swap.status !== "open") continue;
     if (swap.scheduleSlotId === slot.id) addPeriod(swap.isManagerCreated ? null : swap.fromTime, swap.toTime);
-    if (swap.returnScheduleSlotId === slot.id) addPeriod(swap.returnFromTime, swap.returnToTime);
+    if (swap.returnScheduleSlotId === slot.id) addPeriod(swap.isManagerCreated ? null : swap.returnFromTime, swap.returnToTime);
   }
 
   for (const period of periods.sort((left, right) => left.fromTime.localeCompare(right.fromTime))) {

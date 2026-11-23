@@ -188,6 +188,13 @@ describe("AppRouter system access", () => {
       expect(window.location.pathname).toBe("/");
       expect(auth.protectedMount).not.toHaveBeenCalled();
     });
+    it(`redirects system managers in phone mode at ${path}`, async () => {
+      auth.session = { ...manager(true), workspaceMode: "phone" };
+      mount(path);
+      expect(await screen.findByText("ManagerPhoneHomePage")).toBeInTheDocument();
+      expect(window.location.pathname).toBe("/");
+      expect(auth.protectedMount).not.toHaveBeenCalled();
+    });
     it(`redirects anonymous users at ${path}`, async () => {
       auth.session = null;
       auth.status = "unauthenticated";

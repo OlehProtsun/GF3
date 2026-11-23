@@ -4,10 +4,10 @@ The ready-to-copy drafts are in [announcements](./announcements/). Each language
 
 ## Prepare a communication
 
-1. Open **Communications** as a manager. Copy the heading and body into **Title** and **Message**. Leave the Markdown heading marks and attachment note out of the message.
-2. Choose **Upload GIF** under **Attachment (optional)**. Select one file from the table and check its preview, filename and size. One communication supports one GIF.
-3. Set **Visible From** and **Visible To**, then save when it is time to publish. Use the version suitable for your audience. Communications displays the same saved text to all recipients, regardless of their app language.
-4. Employees see the text as soon as the communication opens. The GIF loads separately and plays on repeat. Employees can hide it, and reduced-motion users can choose to show it. **Close** and **Don't show this again** still work as before.
+1. Open **Communications** as a manager. Copy the heading into **Title** and paste the announcement into a **Text** block. Leave out the Markdown heading marks and attachment note. A message requires text.
+2. Add **Text**, **Photo**, and **GIF** blocks in **Message Content**. A message supports up to 20 ordered blocks. New files are limited to 3 MiB each and 8 MiB combined per save. Use **Replace** or **Remove** on individual blocks as needed.
+3. Move blocks with the up/down controls or the drag handle. Open **Preview** to check the current draft order and media. Set **Visible From** and **Visible To**, then choose **Create** or **Save changes**. Communications displays the same saved text to all recipients.
+4. Employees see the blocks in the saved order. Photos can be enlarged. GIFs loop and can be hidden. Reduced-motion users can choose when to play an animation. Select **Don't show this again** before closing to dismiss the message permanently for that employee.
 
 The main announcement can be sent without a GIF or paired with **08**. The feature drafts list the recommended attachment. Use **07** as a reminder about an existing feature.
 
@@ -30,7 +30,7 @@ In **05**, the demo creates the offer through the normal interface with an inter
 
 ## Release inventory
 
-Compared the checked-out release commit `7482e29` with the local `origin/PROD2` reference `1175c394` and inspected the owning code.
+The [release QA report](../../docs/release-2026-11-23-qa.md) records the pinned source/target comparison and validation evidence.
 
 | Area | What changed |
 | --- | --- |
@@ -44,12 +44,12 @@ Compared the checked-out release commit `7482e29` with the local `origin/PROD2` 
 
 ## Communications implementation and validation
 
-Before this change, the manager editor, Communications DTOs and message table were text-only. The separate News system was outside this change. The manager saves an uploaded GIF with the message. A nullable SQLite reference stores the generated key, filename and size. The binary is kept in `communication-gifs/` beside the active SQLite file, on the existing persistent volume.
+The editor persists an ordered list of blocks with opaque media keys. SQLite stores the references, and the binaries live in `communication-gifs/` beside the SQLite file on the existing persistent volume. Older text-only messages and legacy single attachments remain readable.
 
-The API accepts animated GIFs up to 3 MiB and 900 × 1600 pixels, with frame-count and decoded-canvas limits. It checks the file bytes and GIF block structure and writes the animation with an infinite loop. The authenticated media endpoint checks the active attachment key and the employee's publication window and dismissal status. A missing image shows a fallback while the text and dismissal controls stay available. Older text-only communications remain compatible.
+The API accepts animated GIFs up to 3 MiB and 900 × 1600 pixels, with frame-count and decoded-canvas limits. It validates GIF structure and normalizes the loop. Photos accept JPEG, PNG and WebP, enforce a 16 MP limit, apply the source orientation and produce WebP from decoded pixels. The media endpoints check the attachment key, publication window and dismissal status. If an attachment is unavailable, the other blocks and dismissal controls stay accessible.
 
-Apply the Communications migration before serving the new code. Include the media directory with database backups and restores. Replacing or removing an attachment clears its current reference. Older files may remain on disk for backups, and old attachment links are no longer served. Avoid pruning files that retained database backups still reference.
+Coordinated SQLite and media backup and restore are release prerequisites. Replacing or removing an attachment clears its current reference. Older files may remain on disk for backups. Preserve media referenced by retained database backups.
 
-The Communications migration is a nullable column addition. The full comparison with PROD2 also includes pre-existing index and constraint changes for swaps and corrections. The protected nullable-column deployment path cannot apply those migrations. This comparison is a release inventory, and no production rollout was attempted.
+The comparison with PROD2 includes three nullable columns for communications and non-additive index and constraint changes for swaps and corrections. The protected nullable-column maintenance path blocks the full chain. The production release gate remains **BLOCKED**.
 
-The eight GIFs were inspected and measured locally. Eleven focused Communications tests passed against temporary SQLite databases. A loopback Chromium demo verified manager preview, multipart submission and removal, and employee text-before-image rendering, autoplay, loading failure, reduced-motion behavior and dismissal. Its browser API responses were intercepted. Physical iPhone Safari, Android Chrome, and installed PWA playback still need a device check. The release package contains no production data and has not been published.
+See the [release QA report](../../docs/release-2026-11-23-qa.md) for the test results for this candidate. Physical iPhone Safari, Android Chrome, and installed PWA playback still require device verification.

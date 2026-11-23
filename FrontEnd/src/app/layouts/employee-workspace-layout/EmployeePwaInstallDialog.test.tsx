@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { BrowserRouter } from "react-router-dom";
 import { afterEach, expect, test, vi } from "vitest";
 import { setLanguage } from "@shared/i18n";
@@ -38,4 +38,16 @@ test("iOS Home Screen launch hides the dialog", () => {
   vi.stubGlobal("navigator", { standalone: true });
   render(<BrowserRouter><EmployeePwaInstallDialog /></BrowserRouter>);
   expect(screen.queryByRole("dialog")).toBeNull();
+});
+
+test("an open employee announcement takes priority and the install invite resumes after it closes", async () => {
+  setLanguage("en");
+  const { rerender } = render(<BrowserRouter>
+    <div role="dialog" aria-modal="true" aria-label="Employee announcement" />
+    <EmployeePwaInstallDialog />
+  </BrowserRouter>);
+  expect(screen.getByRole("dialog", { name: "Employee announcement" })).toBeVisible();
+  expect(screen.queryByRole("dialog", { name: "Add GF to your home screen" })).toBeNull();
+  rerender(<BrowserRouter><EmployeePwaInstallDialog /></BrowserRouter>);
+  await waitFor(() => expect(screen.getByRole("dialog", { name: "Add GF to your home screen" })).toBeVisible());
 });

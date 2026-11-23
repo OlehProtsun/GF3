@@ -5,6 +5,7 @@ import { useSwapModalEnvironment } from "@pages/employee-swap/ui/useSwapModalEnv
 import type { EmployeeSchedule, EmployeeScheduleSlot } from "@entities/employee-schedule";
 import type { CreateShiftCorrectionInput, ShiftCorrectionRequest } from "@entities/shift-corrections";
 import { formatShiftCorrectionDelta, shiftCorrectionOriginalMinutes } from "@entities/shift-corrections/model/presentation";
+import type { ShiftSwap } from "@entities/shift-swaps/model/types";
 import { formatScheduleLastUpdate } from "@shared/lib/scheduleLastUpdate";
 import { parseFlexibleTimeSegment } from "@shared/lib/timeRange";
 import { IosButton } from "@shared/ui/components/IosButton";
@@ -17,6 +18,7 @@ type EmployeeShiftCorrectionDialogProps = {
   schedules: EmployeeSchedule[];
   employeeId: number | null;
   existingRequests: ShiftCorrectionRequest[];
+  activeSwaps: readonly Pick<ShiftSwap, "status" | "scheduleSlotId" | "returnScheduleSlotId">[];
   isSending: boolean;
   submitted?: boolean;
   errorMessage?: string | null;
@@ -54,7 +56,7 @@ export function EmployeeShiftCorrectionDialog({ open, ...props }: EmployeeShiftC
 }
 
 function ShiftCorrectionWizard({
-  schedules, employeeId, existingRequests, isSending, submitted, errorMessage, onCancel, onSubmit,
+  schedules, employeeId, existingRequests, activeSwaps, isSending, submitted, errorMessage, onCancel, onSubmit,
 }: Omit<EmployeeShiftCorrectionDialogProps, "open">) {
   const stepTitleId = useId();
   const commentId = useId();
@@ -155,8 +157,13 @@ function ShiftCorrectionWizard({
       const to = parseFlexibleTimeSegment(slot.toTime)?.label ?? slot.toTime;
       return from < requestedTo && requestedFrom < to;
     });
-  const canRemoveShifts = Boolean(selectedSlot) && !selectedSlots.some(isPendingSlot) &&
+  const hasOpenSwap = activeSwaps.some(swap => swap.status === "open" && selectedSlots.some(slot =>
+    slot.id === swap.scheduleSlotId || slot.id === swap.returnScheduleSlotId));
+  const canRemoveShifts = Boolean(selectedSlot) && !hasOpenSwap && !selectedSlots.some(isPendingSlot) &&
     !pendingOnDay.some(request => request.scheduleId === scheduleId);
+  const removalBlockedReason = hasOpenSwap
+    ? t("Resolve the open swap or pending shift approval before requesting or approving this day off.")
+    : t("This day already has a pending correction request.");
   const canSubmit = canChooseDay && (requestDayOff ? canRemoveShifts : validPeriod && !unchanged && !overlaps);
   const canContinue = step === 0 ? Boolean(schedule && employeeId !== null) : step === 1 ? canChooseDay : canSubmit;
   const monthLabel = schedule ? periodFormatter.format(new Date(Date.UTC(schedule.year, schedule.month - 1, 1))) : "";
@@ -335,7 +342,7 @@ function ShiftCorrectionWizard({
               </span>
               <span className={styles.shiftIndicator} aria-hidden="true">{requestDayOff && <CheckIcon size={14} />}</span>
             </button>}
-            {selectedSlot && !canRemoveShifts && <p className={styles.hint}>{t("This day already has a pending correction request.")}</p>}
+            {selectedSlot && !canRemoveShifts && <p className={styles.hint}>{removalBlockedReason}</p>}
             {requestDayOff && <p className={styles.hint}>{t("This request requires manager approval.")}</p>}
             {requestDayOff && conflictNames.length > 0 &&
               <p className={styles.hint}>{t("Your shifts in other schedules will remain unchanged ({0}).", conflictNames.join(", "))}</p>}
@@ -373,7 +380,7 @@ function ShiftCorrectionWizard({
           {step > 0 && (!schedule || (step > 1 && !canChooseDay)) &&
             <p className={styles.validation} role="status">{t("The selected schedule or shift is no longer available for correction. Go back to make another selection.")}</p>}
           {step === 4 && requestDayOff && canChooseDay && !canRemoveShifts &&
-            <p className={styles.validation}>{t("This day already has a pending correction request.")}</p>}
+            <p className={styles.validation}>{removalBlockedReason}</p>}
           {step === 4 && !requestDayOff && overlaps && <p className={styles.validation}>{t("This time overlaps another shift on the same day.")}</p>}
           {step === 4 && !requestDayOff && unchanged && <p className={styles.validation}>{t("Change at least one boundary before sending the request.")}</p>}
           {step === 4 && errorMessage && <p className={styles.validation} role="alert">{errorMessage}</p>}

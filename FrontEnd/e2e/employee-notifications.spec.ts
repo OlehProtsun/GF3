@@ -9,7 +9,10 @@ const labels = {
 for (const language of ['en', 'pl', 'uk'] as const) {
   test('employee notification lifecycle in ' + language, async ({ page }) => {
     await page.clock.install({ time: new Date(now) });
-    await page.addInitScript(() => localStorage.setItem('gf3.auth.access-token', 'notification-test'));
+    await page.addInitScript(() => {
+      localStorage.setItem('gf3.auth.access-token', 'notification-test');
+      sessionStorage.setItem('gf3.pwa.install.dismissed', '1');
+    });
     const readIds = new Set<string>();
     let newsItems = [1, 2].map(id => ({ id, title: `Announcement ${id}`, body: 'News content', audience: 'all', imageUrl: null, videoUrl: null, createdAtUtc: new Date(now).toISOString(), isRead: false }));
     const errors: string[] = [];

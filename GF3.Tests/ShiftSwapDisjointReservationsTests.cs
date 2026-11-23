@@ -26,6 +26,8 @@ public sealed class ShiftSwapDisjointReservationsTests
         await using var db = database.CreateContext();
         var left = await Create(db, fixture.Owner, Give(fixture, "09:00", "13:00", fixture.Target));
         var right = await Create(db, fixture.Owner, Give(fixture, "13:00", "15:00", fixture.Third));
+        await Assert.ThrowsAsync<ValidationException>(() => EmployeeController(db, fixture.Owner)
+            .Create(Give(fixture, "13:00", "15:00", fixture.Target), default));
         Assert.All(await db.ShiftSwapRequests.ToListAsync(), request => Assert.Equal(fixture.SourceSlot, request.ScheduleSlotId));
         Assert.Single(await db.ScheduleSlots.Where(slot => slot.ScheduleId == fixture.SourceSchedule).ToListAsync());
         var first = acceptRightFirst ? right : left;
@@ -45,6 +47,45 @@ public sealed class ShiftSwapDisjointReservationsTests
             assignments.Select(slot => (slot.EmployeeId!.Value, slot.FromTime, slot.ToTime)));
         Assert.Equal(2, await db.ShiftSwapHistories.CountAsync());
         Assert.True(await db.ScheduleVersions.CountAsync() >= 2);
+    }
+
+    [Fact]
+    public async Task ConcurrentAcceptsTransferAnOfferOnlyOnce()
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        var fixture = await SeedSixHourShift(database);
+        int id;
+        await using (var setup = database.CreateContext())
+            id = (await Create(setup, fixture.Owner, Give(fixture, "09:00", "13:00"))).Id;
+
+        var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var left = Accept(fixture.Target);
+        var right = Accept(fixture.Third);
+        start.SetResult();
+        var winner = Assert.Single((await Task.WhenAll(left, right)).OfType<int>());
+        await using var db = database.CreateContext();
+        Assert.Equal(ShiftSwapStatus.Accepted, (await db.ShiftSwapRequests.FindAsync(id))!.Status);
+        var history = Assert.Single(await db.ShiftSwapHistories.ToListAsync());
+        Assert.Equal(id, history.SourceShiftSwapRequestId);
+        var assignments = await db.ScheduleSlots.Where(slot => slot.ScheduleId == fixture.SourceSchedule)
+            .OrderBy(slot => slot.FromTime).Select(slot => new { slot.EmployeeId, slot.FromTime, slot.ToTime }).ToListAsync();
+        Assert.Equal([(winner, "09:00", "13:00"), (fixture.Owner, "13:00", "15:00")],
+            assignments.Select(slot => (slot.EmployeeId!.Value, slot.FromTime, slot.ToTime)));
+
+        async Task<int?> Accept(int employeeId)
+        {
+            await start.Task;
+            await using var context = database.CreateContext();
+            try
+            {
+                await EmployeeController(context, employeeId).Accept(id, default);
+                return employeeId;
+            }
+            catch (ValidationException)
+            {
+                return null;
+            }
+        }
     }
 
     [Fact]
@@ -296,12 +337,18 @@ public sealed class ShiftSwapDisjointReservationsTests
         await Create(db, f.Owner, Give(f, "09:00", "13:00"));
         await Create(db, f.Owner, Give(f, "13:00", "15:00"));
         var migrator = db.GetService<IMigrator>();
+        await migrator.MigrateAsync("20261122150944_AllowDisjointOpenSwapIntervals");
+        var before = await db.Database.GetAppliedMigrationsAsync();
         await Assert.ThrowsAsync<SqliteException>(() => migrator.MigrateAsync("20261115135735_RefreshManualShiftOffer"));
         Assert.Equal(2, await db.ShiftSwapRequests.CountAsync());
+        Assert.Equal(before, await db.Database.GetAppliedMigrationsAsync());
         await db.Database.OpenConnectionAsync();
         await using var indexes = db.Database.GetDbConnection().CreateCommand();
-        indexes.CommandText = "SELECT COUNT(*) FROM pragma_index_list('shift_swap_request') WHERE name = 'ix_shift_swap_open_slot'";
-        Assert.Equal(1L, await indexes.ExecuteScalarAsync());
+        indexes.CommandText = """
+            SELECT COUNT(*) FROM pragma_index_list('shift_swap_request')
+            WHERE name IN ('ix_shift_swap_open_slot', 'ix_shift_swap_open_return_slot') AND "unique" = 0
+            """;
+        Assert.Equal(2L, await indexes.ExecuteScalarAsync());
     }
 
     private static async Task<SwapFixture> SeedSixHourShift(SqliteTestDatabase database, bool sameSchedule = false)

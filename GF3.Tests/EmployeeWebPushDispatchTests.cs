@@ -9,7 +9,7 @@ using Microsoft.Extensions.Options;
 using WebApi.Infrastructure;
 using WebApi.Options;
 using WebApi.Services;
-using WebPush;
+using Lib.Net.Http.WebPush;
 
 namespace GF3.Tests;
 
@@ -23,13 +23,15 @@ public sealed class EmployeeWebPushDispatchTests
             Ttls.Add(int.Parse(request.Headers.GetValues("TTL").Single()));
             Assert.Equal(HttpMethod.Post, request.Method);
             Assert.Equal("https://fcm.googleapis.com/send/test", request.RequestUri!.AbsoluteUri);
+            Assert.Equal("vapid", request.Headers.Authorization?.Scheme);
+            Assert.Equal("aes128gcm", Assert.Single(request.Content!.Headers.ContentEncoding));
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.Created));
         }
     }
     [Fact]
     public async Task StandardsSender_EncryptsMultipleSendsAndBoundsTtl()
     {
-        var vapid = VapidHelper.GenerateVapidKeys(); var encryption = VapidHelper.GenerateVapidKeys(); var gateway = new Gateway();
+        var vapid = EmployeePushControllerTests.GenerateVapidKeys(); var encryption = EmployeePushControllerTests.GenerateVapidKeys(); var gateway = new Gateway();
         using var http = new HttpClient(gateway);
         using var sender = new EmployeeWebPushSender(http, Options.Create(new PushOptions { Enabled = true, VapidSubject = "mailto:operator@example.com", VapidPublicKey = vapid.PublicKey, VapidPrivateKey = vapid.PrivateKey }), new Clock());
         var subscription = new EmployeePushSubscriptionModel { Endpoint = "https://fcm.googleapis.com/send/test", P256dh = encryption.PublicKey, Auth = EmployeePushControllerTests.Encode(new byte[16]) };
@@ -251,7 +253,7 @@ public sealed class EmployeeWebPushDispatchTests
     public async Task GatewayFailures_RetryOrFinalize(int code, bool retries)
     {
         await using var database = await SqliteTestDatabase.CreateAsync(); await Seed(database);
-        var source = new Source(); var sender = new Sender { Send = _ => throw new WebPushException("Fake", new PushSubscription("https://fcm.googleapis.com/test", "test", "test"), new HttpResponseMessage((HttpStatusCode)code)) }; var clock = new Clock();
+        var source = new Source(); var sender = new Sender { Send = _ => throw new PushServiceClientException("Fake", (HttpStatusCode)code) }; var clock = new Clock();
         await using var provider = Provider(database, source, sender); using var worker = Worker(provider, clock);
         await worker.ScanAsync(default);
         await using var db = database.CreateContext(); var job = await db.EmployeePushDeliveries.AsNoTracking().SingleAsync();
@@ -270,7 +272,7 @@ public sealed class EmployeeWebPushDispatchTests
     public async Task Gone_DeletesOnlyThatDeviceAndContinues(int code)
     {
         await using var database = await SqliteTestDatabase.CreateAsync(); await Seed(database, 2);
-        var sender = new Sender(); sender.Send = _ => sender.Calls == 1 ? throw new WebPushException("Fake", new PushSubscription("https://fcm.googleapis.com/test", "test", "test"), new HttpResponseMessage((HttpStatusCode)code)) : Task.CompletedTask;
+        var sender = new Sender(); sender.Send = _ => sender.Calls == 1 ? throw new PushServiceClientException("Fake", (HttpStatusCode)code) : Task.CompletedTask;
         await using var provider = Provider(database, new Source(), sender); using var worker = Worker(provider, new Clock());
         await worker.ScanAsync(default);
         await using var db = database.CreateContext(); Assert.Single(await db.EmployeePushSubscriptions.ToListAsync());

@@ -3,21 +3,19 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { BrowserRouter } from "react-router-dom";
 import { beforeEach, expect, test, vi } from "vitest";
-import type { AuthSession } from "@entities/auth/model/types";
-import type { EmployeeLaunchUsage } from "@entities/employee-launches/model/types";
+import type { WorkflowLog } from "@entities/workflow-logs";
 import { setLanguage } from "@shared/i18n";
 import { InformationPage } from "./InformationPage";
 
-const mocks = vi.hoisted(() => ({ auth: vi.fn(), usage: vi.fn() }));
-vi.mock("@app/providers/AuthProvider", () => ({ useAuth: mocks.auth }));
-vi.mock("@entities/employee-launches/api/employeeLaunchesApi", () => ({ employeeLaunchesApi: { list: mocks.usage } }));
+const mocks = vi.hoisted(() => ({ list: vi.fn(), settings: vi.fn() }));
 vi.mock("@entities/workflow-logs/api/workflowLogsApi", () => ({ workflowLogsApi: {
-  list: async () => [], settings: async () => ({ isEnabled: true, audience: "all" }),
+  list: mocks.list, settings: mocks.settings,
 } }));
 
-const manager: AuthSession = { role: "manager", userName: "system", displayName: "System", isSystemManager: true, workspaceMode: "pc" };
-const noAccount: EmployeeLaunchUsage = { employeeId: 1, employeeName: "Ada Worker", username: null, hasLoginAccount: false, isOnline: false,
-  lastLoginAtUtc: null, lastSeenAtUtc: null, lastBrowserLaunchAtUtc: null, lastPwaLaunchAtUtc: null, lastLaunchMode: null, lastLaunchAtUtc: null };
+const event: WorkflowLog = {
+  id: 1, actorRole: "employee", actorName: "Ada Worker", actorEmployeeId: 1,
+  action: "Opened platform", occurredAtUtc: "2026-11-22T10:00:00Z", launchMode: "pwa",
+};
 
 function mount() {
   render(<QueryClientProvider client={new QueryClient()}><BrowserRouter><InformationPage /></BrowserRouter></QueryClientProvider>);
@@ -25,38 +23,43 @@ function mount() {
 
 beforeEach(() => {
   setLanguage("en");
-  mocks.auth.mockReturnValue({ status: "authenticated", session: manager });
-  mocks.usage.mockReset();
+  mocks.list.mockReset().mockResolvedValue([event]);
+  mocks.settings.mockReset().mockResolvedValue({ isEnabled: true, audience: "all" });
 });
 
-test("system PC shows presence, launch history and a searchable account list", async () => {
-  const timestamp = "2026-11-22T10:00:00Z";
-  mocks.usage.mockResolvedValue([noAccount, { ...noAccount, employeeId: 2, employeeName: "Ben Worker", username: "ben-login",
-    isOnline: true, hasLoginAccount: true, lastBrowserLaunchAtUtc: timestamp, lastPwaLaunchAtUtc: timestamp, lastLaunchAtUtc: timestamp, lastLaunchMode: "pwa" }]);
+test("shows browser and PWA launch history in the searchable workflow log", async () => {
+  mocks.list.mockResolvedValue([event, { ...event, id: 2, actorName: "Ben Worker", launchMode: "browser" }]);
   mount();
-  const section = screen.getByText("Employee usage").closest("details")!;
-  expect(await within(section).findByText("No account")).toBeVisible();
-  expect(within(section).getByText("No data")).toBeVisible();
-  expect(within(section).getByText("Online")).toBeVisible();
-  expect(within(section).getByText("PWA", { exact: true })).toBeVisible();
-  expect(within(section).getAllByText(new Intl.DateTimeFormat("en-GB", { dateStyle: "short", timeStyle: "short" }).format(new Date(timestamp)))).toHaveLength(2);
-  await userEvent.type(within(section).getByRole("searchbox"), "ben-login");
-  expect(within(section).queryByText("Ada Worker")).toBeNull();
-  expect(within(section).getByText("Ben Worker")).toBeVisible();
+  expect(await screen.findByText("Ada Worker")).toBeVisible();
+  const rows = screen.getAllByRole("article");
+  expect(rows).toHaveLength(2);
+  expect(within(rows.find(row => row.textContent?.includes("Ada Worker"))!).getByText("PWA", { exact: true })).toBeVisible();
+  expect(within(rows.find(row => row.textContent?.includes("Ben Worker"))!).getByText("Browser", { exact: true })).toBeVisible();
+  await userEvent.type(screen.getByRole("searchbox"), "Ben");
+  expect(screen.queryByText("Ada Worker")).toBeNull();
+  expect(screen.getByText("Ben Worker")).toBeVisible();
 });
 
-test.each([{ ...manager, isSystemManager: false }, { ...manager, workspaceMode: "phone" }, { ...manager, role: "employee" }])(
-  "usage stays hidden for an ineligible session", session => {
-    mocks.auth.mockReturnValue({ status: "authenticated", session });
-    mount();
-    expect(screen.queryByText("Employee usage")).toBeNull();
-    expect(mocks.usage).not.toHaveBeenCalled();
-  },
-);
-
-test("a usage failure leaves the workflow logs visible", async () => {
-  mocks.usage.mockRejectedValue(new Error("offline"));
+test.each([
+  { action: "Opened platform via PWA", badge: "PWA" },
+  { action: "Opened platform via browser", badge: "Browser" },
+  { action: "Online", badge: null },
+])("uses the matching label for historical event $action", async ({ action, badge }) => {
+  mocks.list.mockResolvedValue([{ ...event, action, launchMode: null }]);
   mount();
-  expect(await screen.findByText("Could not load employee usage.")).toBeVisible();
+  const row = await screen.findByRole("article");
+  expect(within(row).getByText(badge ? "Opened platform" : "Online", { exact: true })).toBeVisible();
+  if (badge) expect(within(row).getByText(badge, { exact: true })).toBeVisible();
+  else {
+    expect(within(row).queryByText("Browser", { exact: true })).toBeNull();
+    expect(within(row).queryByText("PWA", { exact: true })).toBeNull();
+  }
+});
+
+test("a logging settings failure leaves launch history visible", async () => {
+  mocks.settings.mockRejectedValue(new Error());
+  mount();
+  expect(await screen.findByText("Could not load logging settings.")).toBeVisible();
   expect(screen.getByText("Workflow logs", { exact: true })).toBeVisible();
+  expect(screen.getByText("PWA", { exact: true })).toBeVisible();
 });

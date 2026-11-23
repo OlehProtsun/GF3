@@ -22,3 +22,23 @@ test.each([null, "08:59", "9:00"])("conservatively holds inconsistent or legacy 
   expect(getSwapSlotWindows(slot, [swap({ returnScheduleSlotId: 1, returnFromTime: from, returnToTime: "13:00" })]))
     .toEqual({ reserved: [period("09:00", "15:00")], available: [] });
 });
+
+test.each([
+  { scheduleSlotId: 1, fromTime: "09:00" },
+  { scheduleSlotId: 1, ...period("09:00", "10:00"), isManagerCreated: true },
+  { returnScheduleSlotId: 1, returnFromTime: "13:00", returnToTime: "14:00", isManagerCreated: true },
+])("reserves the whole slot when a manager owns the offer or an endpoint is missing", (details) => {
+  const offers = [Object.freeze(swap(details))];
+  Object.freeze(offers);
+  expect(getSwapSlotWindows(Object.freeze(slot), offers)).toEqual({ reserved: [period("09:00", "15:00")], available: [] });
+});
+
+test("does not mutate the inputs when merging touching source and return holds", () => {
+  const source = Object.freeze(swap({ scheduleSlotId: 1, ...period("09:00", "13:00") }));
+  const returned = Object.freeze(swap({ returnScheduleSlotId: 1, returnFromTime: "13:00", returnToTime: "14:00" }));
+  const offers = [returned, source];
+  Object.freeze(offers);
+  expect(getSwapSlotWindows(slot, offers)).toEqual({ reserved: [period("09:00", "14:00")], available: [period("14:00", "15:00")] });
+  expect(offers).toEqual([returned, source]);
+  expect(source.toTime).toBe("13:00");
+});

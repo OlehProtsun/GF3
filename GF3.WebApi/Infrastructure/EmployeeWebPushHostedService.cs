@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using WebApi.Options;
 using WebApi.Services;
-using WebPush;
+using Lib.Net.Http.WebPush;
 
 namespace WebApi.Infrastructure;
 
@@ -91,7 +91,7 @@ public sealed class EmployeeWebPushHostedService(
                             await FinishAsync(db, job.Id, token, "sent", ct);
                         }
                         catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
-                        catch (WebPushException exception) when (exception.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.Gone)
+                        catch (PushServiceClientException exception) when (exception.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.Gone)
                         {
                             await db.EmployeePushSubscriptions.Where(x => x.Id == subscription.Id && x.EmployeeId == subscription.EmployeeId &&
                                 db.EmployeePushDeliveries.Any(d => d.Id == job.Id && d.LeaseToken == token)).ExecuteDeleteAsync(ct);
@@ -100,7 +100,7 @@ public sealed class EmployeeWebPushHostedService(
                         catch (Exception exception)
                         {
                             var retry = exception is HttpRequestException or TaskCanceledException ||
-                                exception is WebPushException push && (push.StatusCode == HttpStatusCode.TooManyRequests || (int)push.StatusCode >= 500);
+                                exception is PushServiceClientException push && (push.StatusCode == HttpStatusCode.TooManyRequests || (int)push.StatusCode >= 500);
                             var attempts = job.AttemptCount + 1;
                             if (!retry || attempts >= 8)
                             {

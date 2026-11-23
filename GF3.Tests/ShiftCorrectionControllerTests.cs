@@ -325,21 +325,27 @@ public sealed class ShiftCorrectionControllerTests
         await using var seed = database.CreateContext();
         var fixture = await SeedAsync(seed);
         var ready = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var count = 0;
-        var interceptor = new PendingInsertBarrier(async () => {
-            if (Interlocked.Increment(ref count) == 2) ready.SetResult();
-            await ready.Task.WaitAsync(TimeSpan.FromSeconds(10));
-        });
-        var options = new DbContextOptionsBuilder<DataAccessLayer.Models.DataBaseContext.AppDbContext>()
-            .UseSqlite(database.ConnectionString).AddInterceptors(interceptor).Options;
         async Task<bool> Submit()
         {
-            await using var db = new DataAccessLayer.Models.DataBaseContext.AppDbContext(options);
-            var result = await EmployeeController(db, fixture).Create(new() { ScheduleId = fixture.ScheduleId, DayOfMonth = 13,
-                RequestedFromTime = "08:00", RequestedToTime = "16:00" }, default);
-            return result.Result is CreatedAtActionResult;
+            await ready.Task;
+            await using var db = database.CreateContext();
+            try
+            {
+                var result = await EmployeeController(db, fixture).Create(new() { ScheduleId = fixture.ScheduleId, DayOfMonth = 13,
+                    RequestedFromTime = "08:00", RequestedToTime = "16:00" }, default);
+                Assert.IsType<CreatedAtActionResult>(result.Result);
+                return true;
+            }
+            catch (ValidationException error)
+            {
+                Assert.Contains("pending", error.Message, StringComparison.OrdinalIgnoreCase);
+                return false;
+            }
         }
-        var submissions = await Task.WhenAll(Submit(), Submit());
+        var attemptOne = Submit();
+        var attemptTwo = Submit();
+        ready.SetResult();
+        var submissions = await Task.WhenAll(attemptOne, attemptTwo);
         Assert.Single(submissions, success => success);
         seed.ChangeTracker.Clear();
         var request = await seed.ShiftCorrectionRequests.SingleAsync();
@@ -387,23 +393,13 @@ public sealed class ShiftCorrectionControllerTests
         Assert.Equal(2, await db.ScheduleSlots.CountAsync());
     }
 
-    private sealed class PendingInsertBarrier(Func<Task> wait) : Microsoft.EntityFrameworkCore.Diagnostics.SaveChangesInterceptor
-    {
-        public override async ValueTask<Microsoft.EntityFrameworkCore.Diagnostics.InterceptionResult<int>> SavingChangesAsync(
-            Microsoft.EntityFrameworkCore.Diagnostics.DbContextEventData eventData, Microsoft.EntityFrameworkCore.Diagnostics.InterceptionResult<int> result, CancellationToken cancellationToken = default)
-        {
-            if (eventData.Context!.ChangeTracker.Entries<ShiftCorrectionRequestModel>().Any(entry => entry.State == EntityState.Added)) await wait();
-            return result;
-        }
-    }
-
-    private static EmployeeShiftCorrectionsController EmployeeController(DataAccessLayer.Models.DataBaseContext.AppDbContext db, Fixture fixture,
+    internal static EmployeeShiftCorrectionsController EmployeeController(DataAccessLayer.Models.DataBaseContext.AppDbContext db, Fixture fixture,
         ManagerEditLockService? locks = null)
     {
         var controller = new EmployeeShiftCorrectionsController(db, locks ?? new(), new NoopWorkflowLogService(), new NoopRealtimeNotifier());
         SetEmployeeUser(controller, fixture.EmployeeId); return controller;
     }
-    private static ManagerShiftCorrectionsController ManagerController(DataAccessLayer.Models.DataBaseContext.AppDbContext db, Fixture fixture)
+    internal static ManagerShiftCorrectionsController ManagerController(DataAccessLayer.Models.DataBaseContext.AppDbContext db, Fixture fixture)
     {
         var controller = new ManagerShiftCorrectionsController(db, new NoopWorkflowLogService(), new NoopRealtimeNotifier());
         SetManagerUser(controller, fixture.ManagerId); return controller;
@@ -741,7 +737,7 @@ public sealed class ShiftCorrectionControllerTests
         Assert.False(await db.ShiftCorrectionRequests.AnyAsync());
     }
 
-    private static async Task<Fixture> SeedAsync(DataAccessLayer.Models.DataBaseContext.AppDbContext db)
+    internal static async Task<Fixture> SeedAsync(DataAccessLayer.Models.DataBaseContext.AppDbContext db)
     {
         var container = TestDataFactory.CreateDalContainer();
         var shop = TestDataFactory.CreateDalShop();
@@ -805,5 +801,5 @@ public sealed class ShiftCorrectionControllerTests
         };
     }
 
-    private sealed record Fixture(int ContainerId, int ScheduleId, int EmployeeId, int ManagerId, int MorningSlotId, int AfternoonSlotId);
+    internal sealed record Fixture(int ContainerId, int ScheduleId, int EmployeeId, int ManagerId, int MorningSlotId, int AfternoonSlotId);
 }

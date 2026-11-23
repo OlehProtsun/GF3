@@ -744,6 +744,7 @@ export function EmployeeSchedulePage() {
         schedules={rankedSchedules}
         employeeId={currentEmployeeId}
         existingRequests={shiftCorrectionsQuery.data ?? []}
+        activeSwaps={shiftSwapsQuery.data ?? []}
         isSending={createShiftCorrectionMutation.isPending}
         errorMessage={shiftCorrectionError}
         submitted={shiftCorrectionSubmitted}

@@ -11,7 +11,10 @@ test("account language defaults to Polish, persists English and Ukrainian and st
   const manager = () => ({ id: identity.managerId, userName: identity.userName, displayName: identity.displayName, recoveryEmail: "chief@example.com", isOnline: true, isSystem: false, createdAtUtc: "2026-09-01T12:00:00Z" });
   const errors: string[] = [];
   page.on("pageerror", error => errors.push(error.message));
-  await page.addInitScript(() => localStorage.setItem("gf3.auth.access-token", "language-test-token"));
+  await page.addInitScript(() => {
+    localStorage.setItem("gf3.auth.access-token", "language-test-token");
+    sessionStorage.setItem("gf3.pwa.install.dismissed", "1");
+  });
   await page.route("**/*", async route => {
     const path = new URL(route.request().url()).pathname;
     if (!path.startsWith("/api/")) return route.continue();
@@ -94,10 +97,13 @@ test("account language defaults to Polish, persists English and Ukrainian and st
   await expect(page.locator("html")).toHaveAttribute("lang", "uk");
   await choose("uk", "English");
   await page.goto("/manager-profile");
-  await page.getByRole("button", { name: "Collapse sidebar", exact: true }).click();
+  await expect(page.locator("html")).toHaveAttribute("lang", "en");
+  const sidebar = page.getByRole("button", { name: "Collapse sidebar", exact: true });
+  if (await sidebar.isVisible()) await sidebar.click();
   await page.locator('section[aria-labelledby="manager-account-actions-heading"]').getByRole("button", { name: "Log out", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Zaloguj się", exact: true })).toBeVisible();
   await page.getByRole("textbox", { name: "Nazwa użytkownika", exact: true }).fill("chief");
+  await page.getByRole("button", { name: "PC", exact: true }).click();
   await page.getByRole("textbox", { name: "Hasło", exact: true }).fill("123456");
   await page.getByRole("button", { name: "Zaloguj się", exact: true }).click();
   await page.getByRole("button", { name: /^PC/ }).click();

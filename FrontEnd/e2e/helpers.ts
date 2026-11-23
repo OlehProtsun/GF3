@@ -41,6 +41,8 @@ export async function loginWithCredentials(page: Page, username: string, passwor
   await page.reload();
   await expect(page.locator("html")).toHaveAttribute("lang", "en");
   await expect(appShell).toBeVisible();
+  const installPrompt = page.getByRole("dialog", { name: "Add GF to your home screen" });
+  if (await installPrompt.isVisible()) await installPrompt.getByRole("button", { name: "Not now" }).click();
 }
 
 export async function loginAsManager(page: Page) {

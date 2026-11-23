@@ -2,16 +2,17 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using DataAccessLayer.Models;
+using Lib.Net.Http.WebPush;
+using Lib.Net.Http.WebPush.Authentication;
 using Microsoft.Extensions.Options;
 using WebApi.Options;
-using WebPush;
 
 namespace WebApi.Services;
 
 public sealed class EmployeeWebPushSender(HttpClient httpClient, IOptions<PushOptions> options, TimeProvider timeProvider) : IEmployeeWebPushSender, IDisposable
 {
-    private readonly WebPushClient client = new(httpClient);
-    public void Dispose() => client.Dispose();
+    private readonly PushServiceClient client = new(httpClient) { AutoRetryAfter = false };
+    public void Dispose() => httpClient.Dispose();
     public async Task SendAsync(EmployeePushSubscriptionModel subscription, EmployeePushCandidate candidate, CancellationToken ct)
     {
         var settings = options.Value;
@@ -25,11 +26,15 @@ public sealed class EmployeeWebPushSender(HttpClient httpClient, IOptions<PushOp
         if (Encoding.UTF8.GetByteCount(payload) > 3072) throw new InvalidOperationException("Push payload exceeds the limit.");
         var remaining = candidate.OccurredAtUtc + EmployeeNotificationRetention.Duration - timeProvider.GetUtcNow();
         var ttl = Math.Clamp((int)remaining.TotalSeconds, 0, candidate.NotificationId.StartsWith("swap-public:", StringComparison.Ordinal) || candidate.NotificationId.StartsWith("open-shift:", StringComparison.Ordinal) ? 3600 : 432000);
-        await client.SendNotificationAsync(new PushSubscription(subscription.Endpoint, subscription.P256dh, subscription.Auth), payload,
-            new Dictionary<string, object>
-            {
-                ["vapidDetails"] = new VapidDetails(settings.VapidSubject, settings.VapidPublicKey, settings.VapidPrivateKey),
-                ["TTL"] = ttl
-            }, ct);
+        var target = new PushSubscription
+        {
+            Endpoint = subscription.Endpoint,
+            Keys = new Dictionary<string, string> { ["p256dh"] = subscription.P256dh, ["auth"] = subscription.Auth },
+        };
+        using var authentication = new VapidAuthentication(settings.VapidPublicKey, settings.VapidPrivateKey)
+        {
+            Subject = settings.VapidSubject,
+        };
+        await client.RequestPushMessageDeliveryAsync(target, new PushMessage(payload) { TimeToLive = ttl }, authentication, ct);
     }
 }

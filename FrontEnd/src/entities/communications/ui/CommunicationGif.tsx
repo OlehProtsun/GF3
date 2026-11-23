@@ -59,7 +59,7 @@ function MediaImage({ id, attachmentKey, file, photo = false, thumbnail = false 
 type MediaSource = { id?: number; attachmentKey?: string; file?: File };
 
 export function CommunicationPhoto(props: MediaSource & { thumbnail?: boolean }) {
-  return <div className={styles.frame} data-employee={!props.thumbnail || undefined}><MediaImage key={props.attachmentKey} {...props} photo /></div>;
+  return <div className={styles.frame} data-employee={!props.thumbnail || undefined}><MediaImage key={`${props.id}:${props.attachmentKey}`} {...props} photo /></div>;
 }
 
 export function CommunicationGif({ employee = false, ...source }: MediaSource & { employee?: boolean; thumbnail?: boolean }) {
@@ -72,6 +72,6 @@ export function CommunicationGif({ employee = false, ...source }: MediaSource & 
         {t(playing ? "Hide animation" : "Show animation")}
       </button>
     )}
-    {playing && <MediaImage key={source.attachmentKey} {...source} />}
+    {playing && <MediaImage key={`${source.id}:${source.attachmentKey}`} {...source} />}
   </div>;
 }

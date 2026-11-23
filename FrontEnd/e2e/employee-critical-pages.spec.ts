@@ -38,10 +38,13 @@ function createSyntheticPdf() {
 }
 
 test.describe("employee critical pages", () => {
-  test("daily schedule uses only selected-schedule assignments and keeps the rounded PDF controls", async ({ page }, info) => {
+  test("daily schedule distinguishes selected shifts and related assignments and keeps the rounded PDF controls", async ({ page }, info) => {
     await page.clock.setFixedTime(new Date("2026-08-12T10:00:00Z"));
     await page.emulateMedia({ reducedMotion: "reduce" });
-    await page.addInitScript(() => localStorage.setItem("gf3.auth.access-token", "daily-schedule-fixture"));
+    await page.addInitScript(() => {
+      localStorage.setItem("gf3.auth.access-token", "daily-schedule-fixture");
+      sessionStorage.setItem("gf3.pwa.install.dismissed", "1");
+    });
     await page.route("**/api/**", route => {
       const path = new URL(route.request().url()).pathname;
       if (!path.startsWith("/api/")) return route.continue();
@@ -71,11 +74,22 @@ test.describe("employee critical pages", () => {
     await expect(page.getByRole("button", { name: "Export schedule to PDF" })).toHaveCSS("border-top-left-radius", "999px");
     await eye.click();
     const workers = page.getByRole("tabpanel", { name: "Wednesday 12" });
-    await expect(workers.getByRole("article")).toHaveCount(1);
-    await expect(workers.getByRole("article")).toHaveText("Zoe Young08:00 - 12:00");
-    await expect(workers.getByText(/Vera Away|Casey Outside|Alternate graph|^UR$/)).toHaveCount(0);
+    const cards = workers.getByRole("article");
+    await expect(cards).toHaveCount(2);
+    await expect(cards.filter({ hasText: "Zoe Young" })).toContainText("08:00 - 12:00");
+    await expect(cards.filter({ hasText: "Zoe Young" })).toContainText("Alternate graph");
+    const relatedOnly = cards.filter({ hasText: "Casey Outside" });
+    await expect(relatedOnly).toContainText("Alternate graph");
+    await expect(relatedOnly).not.toContainText("08:00 - 12:00");
+    await expect(workers.getByText(/Vera Away|^UR$/)).toHaveCount(0);
     await workers.screenshot({ path: info.outputPath("daily-selected-workers.png") });
-    await page.getByRole("tab", { name: "Thursday 13, day off" }).click();
+    await page.getByRole("tab", { name: "Thursday 13, working day" }).click();
+    const followingDay = page.getByRole("tabpanel", { name: "Thursday 13" }).getByRole("article");
+    await expect(followingDay).toHaveCount(1);
+    await expect(followingDay).toContainText("Zoe Young");
+    await expect(followingDay).toContainText("Alternate graph");
+    await expect(followingDay).not.toContainText("08:00 - 12:00");
+    await page.getByRole("tab", { name: "Friday 14, day off" }).click();
     await expect(page.getByText("No one is scheduled.")).toBeVisible();
     const showMatrix = page.getByRole("button", { name: "Show schedule matrix view" });
     await expect(showMatrix).toHaveAttribute("aria-pressed", "true");

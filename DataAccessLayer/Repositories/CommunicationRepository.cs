@@ -1,6 +1,7 @@
 using DataAccessLayer.Models;
 using DataAccessLayer.Models.DataBaseContext;
 using DataAccessLayer.Repositories.Abstractions;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
 namespace DataAccessLayer.Repositories;
@@ -57,16 +58,31 @@ public sealed class CommunicationRepository : GenericRepository<CommunicationMes
             .AnyAsync(message => message.Id == communicationId, ct);
 
     public async Task<bool> UpdateMessageAsync(CommunicationMessageModel message, bool changeGif, bool changePhoto, CancellationToken ct = default)
-        => await _set.Where(row => row.Id == message.Id)
-            .ExecuteUpdateAsync(setters => setters
-                .SetProperty(row => row.Title, message.Title)
-                .SetProperty(row => row.Body, message.Body)
-                .SetProperty(row => row.ContentBlocksJson, row => message.ContentBlocksJson ?? row.ContentBlocksJson)
-                .SetProperty(row => row.VisibleFromUtc, message.VisibleFromUtc)
-                .SetProperty(row => row.DeadlineAtUtc, message.DeadlineAtUtc)
-                .SetProperty(row => row.PhotoAttachmentJson, row => changePhoto ? message.PhotoAttachmentJson : row.PhotoAttachmentJson)
-                .SetProperty(row => row.GifAttachmentJson, row => changeGif ? message.GifAttachmentJson : row.GifAttachmentJson), ct)
-            .ConfigureAwait(false) > 0;
+    {
+        await using var transaction = await _db.Database.BeginTransactionAsync(ct).ConfigureAwait(false);
+        int affectedRows;
+        try
+        {
+            affectedRows = await _set.Where(row => row.Id == message.Id)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(row => row.Title, message.Title)
+                    .SetProperty(row => row.Body, message.Body)
+                    .SetProperty(row => row.ContentBlocksJson, row => message.ContentBlocksJson ?? row.ContentBlocksJson)
+                    .SetProperty(row => row.VisibleFromUtc, message.VisibleFromUtc)
+                    .SetProperty(row => row.DeadlineAtUtc, message.DeadlineAtUtc)
+                    .SetProperty(row => row.PhotoAttachmentJson, row => changePhoto ? message.PhotoAttachmentJson : row.PhotoAttachmentJson)
+                    .SetProperty(row => row.GifAttachmentJson, row => changeGif ? message.GifAttachmentJson : row.GifAttachmentJson), ct)
+                .ConfigureAwait(false);
+        }
+        catch (SqliteException error) when (error.SqliteErrorCode == 19)
+        {
+            // ExecuteUpdateAsync surfaces the SQLite error directly. Report a rejected write only after rollback.
+            await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
+            throw new DbUpdateException("SQLite rejected the communication message update.", error);
+        }
+        await transaction.CommitAsync(ct).ConfigureAwait(false);
+        return affectedRows > 0;
+    }
 
     public Task<bool> DismissalExistsAsync(int communicationId, int employeeId, CancellationToken ct = default)
         => _db.EmployeeCommunicationDismissals

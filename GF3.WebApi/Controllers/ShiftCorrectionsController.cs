@@ -112,7 +112,8 @@ public sealed class EmployeeShiftCorrectionsController(
                     item.EmployeeId == employeeId && item.DayOfMonth == day));
                 if (removal.Shifts.Count == 0)
                     throw ValidationException.ForField(nameof(request.DayOfMonth), "Choose a day with assigned shifts to request the day off.");
-                await ShiftCorrectionRules.EnsureNoActiveSwapsAsync(db, removal.Shifts, cancellationToken).ConfigureAwait(false);
+                if (await ShiftCorrectionRules.HasActiveSwapsAsync(db, removal.Shifts, cancellationToken).ConfigureAwait(false))
+                    throw new ValidationException(ShiftCorrectionRules.ActiveSwapsMessage);
             }
             else
             {
@@ -326,7 +327,8 @@ public sealed class ManagerShiftCorrectionsController(
                     item.EmployeeId == correction.EmployeeId && !item.Employee.IsDeleted, cancellationToken).ConfigureAwait(false))
                 return Conflict(new ProblemDetails { Status = 409, Title = "The schedule or request changed. Refresh and try again." });
 
-            await ShiftCorrectionRules.EnsureNoActiveSwapsAsync(db, removal.Shifts, cancellationToken).ConfigureAwait(false);
+            if (await ShiftCorrectionRules.HasActiveSwapsAsync(db, removal.Shifts, cancellationToken).ConfigureAwait(false))
+                return Conflict(new ProblemDetails { Status = 409, Title = ShiftCorrectionRules.ActiveSwapsMessage });
             foreach (var assigned in affectedSlots)
             {
                 assigned.EmployeeId = null;
@@ -582,17 +584,18 @@ internal static class ShiftCorrectionRules
                 ?? throw new InvalidOperationException("Missing shift removal snapshot.")
             : null;
 
-    internal static async Task EnsureNoActiveSwapsAsync(AppDbContext db,
+    internal const string ActiveSwapsMessage = "Resolve the open swap or pending shift approval before requesting or approving this day off.";
+
+    internal static async Task<bool> HasActiveSwapsAsync(AppDbContext db,
         IReadOnlyList<ShiftCorrectionOriginalShiftDto> shifts, CancellationToken cancellationToken)
     {
         var ids = shifts.Select(shift => shift.SlotId).ToArray();
-        if (await db.ShiftSwapRequests.AnyAsync(item => item.Status == ShiftSwapStatus.Open &&
+        return await db.ShiftSwapRequests.AnyAsync(item => item.Status == ShiftSwapStatus.Open &&
                 ((item.ScheduleSlotId.HasValue && ids.Contains(item.ScheduleSlotId.Value)) ||
                  (item.ReturnScheduleSlotId.HasValue && ids.Contains(item.ReturnScheduleSlotId.Value))), cancellationToken)
             || await db.ContractShiftApprovalRequests.AnyAsync(item => item.Status == "pending" &&
                 (ids.Contains(item.ScheduleSlotId) ||
-                 (item.ReturnScheduleSlotId.HasValue && ids.Contains(item.ReturnScheduleSlotId.Value))), cancellationToken))
-            throw new ValidationException("Resolve the open swap or pending shift approval before requesting or approving this day off.");
+                 (item.ReturnScheduleSlotId.HasValue && ids.Contains(item.ReturnScheduleSlotId.Value))), cancellationToken);
     }
 
     internal static ShiftCorrectionRequestDto ToDto(ShiftCorrectionRequestModel model)

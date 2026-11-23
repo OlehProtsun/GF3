@@ -79,6 +79,72 @@ async function showScheduleActivity(page: Page) {
   return { trigger, activity: page.getByRole("dialog", { name: "Schedule Activity", exact: true }) };
 }
 
+test("employee requests removal of a workday and manager approves the same request", async ({ page, isMobile }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await correctionFixture(page, "en");
+  await page.addInitScript(() => sessionStorage.setItem("gf3.pwa.install.dismissed", "1"));
+  let manager = false;
+  let posted = false;
+  const originalShifts = [{ slotId: 51, fromTime: "08:00", toTime: "12:00" }, { slotId: 52, fromTime: "15:00", toTime: "19:00" }];
+  const request = { id: 85, containerId: 1, scheduleId: 3, scheduleSlotId: null, requestType: "removeShift", isDayOffRequest: false,
+    originalShifts, employeeId: 2, employeeName: "Fixture Worker", scheduleName: "Schedule", shopName: "Central",
+    year: 2026, month: 10, dayOfMonth: 21, originalFromTime: null, originalToTime: null, requestedFromTime: null, requestedToTime: null,
+    createdAtUtc: "2026-10-20T14:00:00Z", status: "pending", comment: "Fixture reason", reviewedAtUtc: null as string | null };
+  await page.route("**/api/auth/session", route => manager ? route.fallback() : route.fulfill({ json: {
+    role: "employee", employeeId: 2, userName: "fixture-worker", displayName: "Fixture Worker",
+  } }));
+  await page.route("**/api/employee-schedules", route => route.fulfill({ json: [{
+    id: 3, containerId: 1, shopId: 4, name: "Schedule", shopName: "Central", year: 2026, month: 10, publicationStatus: "public",
+    employees: [{ id: 1, employeeId: 2, displayName: "Fixture Worker", displayOrder: 0 }],
+    slots: originalShifts.map((shift, index) => ({ id: shift.slotId, employeeId: 2, slotNo: index + 1, dayOfMonth: 21,
+      fromTime: shift.fromTime, toTime: shift.toTime, status: "ASSIGNED" })),
+  }] }));
+  await page.route("**/api/employee-shift-corrections", route => {
+    if (route.request().method() !== "POST") return route.fulfill({ json: posted ? [request] : [] });
+    expect(route.request().postDataJSON()).toEqual({ scheduleId: 3, requestType: "removeShift", dayOfMonth: 21, comment: "Fixture reason" });
+    posted = true;
+    return route.fulfill({ status: 201, json: request });
+  });
+  await page.route("**/api/containers/1/graphs/3/shift-corrections", route => route.fulfill({ json: posted ? [request] : [] }));
+  await page.route("**/api/containers/1/graphs/3/shift-corrections/85/approve", route => {
+    expect(route.request().method()).toBe("POST");
+    request.status = "approved";
+    request.reviewedAtUtc = new Date().toISOString();
+    return route.fulfill({ json: request });
+  });
+
+  await page.goto("/schedule");
+  await page.getByRole("button", { name: "Request a shift correction" }).click();
+  const wizard = page.getByRole("dialog", { name: "Request a shift change" });
+  const next = wizard.getByRole("button", { name: "Continue", exact: true });
+  await wizard.getByRole("button", { name: /^Schedule/ }).click();
+  await next.click();
+  await wizard.getByRole("radio", { name: /08:00 – 12:00/ }).click();
+  await next.click();
+  await wizard.getByRole("button", { name: /Request day off/ }).click();
+  await next.click();
+  await wizard.getByRole("textbox", { name: "Comment (optional)" }).fill("Fixture reason");
+  await next.click();
+  await expect(wizard.getByText("Duration change · −8h")).toBeVisible();
+  const sendRequest = wizard.getByRole("button", { name: "Send request" });
+  if (isMobile) await sendRequest.tap();
+  else await sendRequest.click();
+  await expect(wizard.getByText("Pending approval")).toBeVisible();
+
+  manager = true;
+  await page.goto("/container/1/graphs/3/edit");
+  const { activity } = await showScheduleActivity(page);
+  await activity.getByRole("tab", { name: /Shift Corrections/ }).click();
+  const requests = activity.getByRole("list", { name: "Shift correction requests" });
+  await requests.getByRole("listitem").filter({ hasText: "Fixture Worker" }).click();
+  const detail = requests.getByRole("listitem").filter({ hasText: "Fixture reason" });
+  await expect(detail.getByText("Day off requested", { exact: true })).toBeVisible();
+  await detail.getByRole("button", { name: "Approve", exact: true }).click();
+  await expect.poll(() => request.status).toBe("approved");
+  await expect(activity.getByText("Approved", { exact: true }).first()).toBeVisible();
+});
+
 test("Schedule Activity preserves graph panels, live counts and overlay layering", async ({ page }) => {
   test.setTimeout(60_000);
   await page.setViewportSize({ width: 1694, height: 864 });

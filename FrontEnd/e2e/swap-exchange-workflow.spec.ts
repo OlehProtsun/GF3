@@ -28,7 +28,10 @@ function offer(payload: Record<string, unknown>) {
     ...(payload.requestKind === "exchange" ? { returnScheduleName: "F35", returnShopName: "Central", returnYear: 2026, returnMonth: 10, returnDayOfMonth: 3, returnShiftHours: 7.5 } : {}), ...payload };
 }
 async function mockApi(page: Page, actor: number, state: { offers: Offer[]; stale?: boolean; holdReturn?: boolean; scheduleCount?: number; shiftCount?: number; employeeCount?: number; multipleReturnSchedules?: boolean; previewState?: "loading" | "error" | "invalid" | "stale"; ownerName?: string; targetName?: string; language?: "en" | "pl" | "uk" }) {
-  await page.addInitScript(() => localStorage.setItem("gf3.auth.access-token", "swap-test"));
+  await page.addInitScript(() => {
+    localStorage.setItem("gf3.auth.access-token", "swap-test");
+    sessionStorage.setItem("gf3.pwa.install.dismissed", "1");
+  });
   await page.route("**/*", async route => {
     const path = new URL(route.request().url()).pathname;
     if (!path.startsWith("/api/")) return route.continue();
@@ -68,10 +71,11 @@ async function mockApi(page: Page, actor: number, state: { offers: Offer[]; stal
 }
 
 test("swap wizard keeps free windows beside two pending offers and disables a reserved return", async ({ page }) => {
-  await mockApi(page, 1, { holdReturn: true, offers: [
+  const state = { holdReturn: true, offers: [
     offer({ id: 1, requestKind: "give", fromTime: "09:00", toTime: "11:00" }),
     offer({ id: 2, requestKind: "give", fromTime: "13:00", toTime: "14:00" }),
-  ] });
+  ] };
+  await mockApi(page, 1, state);
   await page.goto("/swap");
   await page.getByRole("button", { name: "Create offer", exact: true }).click();
   const modal = page.getByRole("dialog", { name: "Create a swap offer" });
@@ -91,6 +95,18 @@ test("swap wizard keeps free windows beside two pending offers and disables a re
   await modal.getByRole("button", { name: /F35/ }).click();
   await expect(modal.getByRole("radio", { name: /03.10.2026.*open swap offer/ })).toBeDisabled();
   await expect(modal.getByRole("button", { name: "Confirm selection" })).toBeDisabled();
+
+  state.offers = [{ ...state.offers[0], status: "accepted", acceptedByEmployeeId: 2 }, { ...state.offers[1], scheduleSlotId: 101 }];
+  const remaining = schedule(1);
+  remaining.slots = [{ ...remaining.slots[0], id: 101, fromTime: "11:00" }];
+  await page.route("**/api/employee-schedules", route => route.fulfill({ json: [remaining] }));
+  await page.reload();
+  await page.getByRole("button", { name: "Create offer", exact: true }).click();
+  await modal.getByRole("button", { name: /F27/ }).click();
+  await expect(modal.getByRole("radio")).toContainText("Awaiting confirmation · 13:00–14:00");
+  await expect(modal.getByRole("radio")).not.toContainText("Awaiting confirmation · 09:00–11:00");
+  await modal.getByRole("radio").click();
+  await expect(modal.locator('input[type="time"]').first()).toHaveValue("11:00");
 });
 
 for (const [language, label] of [["en", "Partial"], ["pl", "Częściowo"], ["uk", "Частково"]] as const) {

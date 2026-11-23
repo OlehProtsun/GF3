@@ -58,6 +58,7 @@ function MutationHarness({
 }) {
   const mutation = useMutation({
     mutationKey: ["save"],
+    meta: { handlesErrorInline: true },
     mutationFn,
     onSuccess,
     onError,
@@ -304,6 +305,6 @@ describe("react-query shim", () => {
     });
     expect(onError).toHaveBeenCalledTimes(1);
     expect(cacheError).toHaveBeenCalledTimes(1);
-    expect(cacheError.mock.calls[0][3]).toEqual({ options: { mutationKey: ["save"] } });
+    expect(cacheError.mock.calls[0][3]).toEqual({ options: { mutationKey: ["save"] }, meta: { handlesErrorInline: true } });
   });
 });

@@ -1,6 +1,12 @@
 import { expect, test, type Page } from "@playwright/test";
 
-const apiUrl = /^https?:\/\/[^/]+\/api\//;
+const apiUrl = /^https?:\/\/(?:localhost|127\.0\.0\.1|\[::1\])(?::\d+)?\/api\//;
+const installTitle = "Add GF to your home screen";
+
+test.beforeEach(async ({ page }) => {
+  await page.route("**/*", route => ["localhost", "127.0.0.1", "[::1]"].includes(new URL(route.request().url()).hostname)
+    ? route.fallback() : route.abort("blockedbyclient"));
+});
 
 async function mockEmployee(page: Page, mode: "browser" | "media" | "ios" = "browser") {
   const launches: string[] = [];
@@ -28,20 +34,44 @@ async function mockEmployee(page: Page, mode: "browser" | "media" | "ios" = "bro
   return launches;
 }
 
-test("pwa install banner links to a blank employee page and records only document launches", async ({ page }) => {
+test("browser install opens the employee guide and records only document launches", async ({ page }) => {
   const launches = await mockEmployee(page);
   await page.goto("/swap");
-  const banner = page.getByRole("link", { name: "Download" });
-  await expect(banner).toBeVisible();
+  const install = page.getByRole("dialog", { name: installTitle });
+  await expect(install).toBeVisible();
   await expect.poll(() => launches).toEqual(["browser"]);
-  await banner.click();
-  await expect(page).toHaveURL(/\/install$/);
-  await expect(page.locator("[data-employee-content] section")).toBeEmpty();
-  await expect(banner).toHaveCount(0);
+  await install.getByRole("button", { name: "Install", exact: true }).click();
+  await expect(page).toHaveURL(/\/install\?topic=getting-started$/);
+  const language = page.getByRole("dialog", { name: "Choose your language" });
+  await expect(language).toBeVisible();
+  await language.getByRole("radio", { name: /English/ }).check();
+  await language.getByRole("button", { name: "Continue" }).click();
+  await expect(page.getByRole("heading", { name: "Install on your phone" })).toBeVisible();
+  await expect(install).toHaveCount(0);
   expect(launches).toEqual(["browser"]);
   await page.reload();
-  await expect(page.locator("[data-employee-content] section")).toBeEmpty();
+  await expect(language).toBeVisible();
   await expect.poll(() => launches).toEqual(["browser", "browser"]);
+});
+
+test("Not now survives reload in the same tab and leaves a fresh tab eligible", async ({ page, context }) => {
+  const launches = await mockEmployee(page);
+  await page.goto("/swap");
+  const install = page.getByRole("dialog", { name: installTitle });
+  await install.getByRole("button", { name: "Not now" }).click();
+  await expect(install).toHaveCount(0);
+  await page.reload();
+  await expect(page.locator("[data-employee-content]")).toBeVisible();
+  await expect(install).toHaveCount(0);
+  await expect.poll(() => launches).toEqual(["browser", "browser"]);
+
+  const fresh = await context.newPage();
+  try {
+    await fresh.route("**/*", route => new URL(route.request().url()).hostname === "localhost" ? route.fallback() : route.abort());
+    await mockEmployee(fresh);
+    await fresh.goto("/swap");
+    await expect(fresh.getByRole("dialog", { name: installTitle })).toBeVisible();
+  } finally { await fresh.close(); }
 });
 
 test("pwa cold launch draws before React and exits after the employee route is ready", async ({ page, browserName }) => {
@@ -61,11 +91,11 @@ test("pwa cold launch draws before React and exits after the employee route is r
     await expect(splash).toHaveCSS("pointer-events", "none");
     await expect(page.locator("#root")).toBeEmpty();
     release();
-    await expect(page.locator("[data-employee-content] section")).toBeEmpty();
+    await expect(page.getByRole("dialog", { name: "Choose your language" })).toBeVisible();
     await expect(splash).toHaveCount(0);
     await page.goto("/swap");
     await expect(page.locator("[data-employee-content]")).toBeVisible();
-    await expect(page.getByRole("link", { name: "Download" })).toHaveCount(0);
+    await expect(page.getByRole("dialog", { name: installTitle })).toHaveCount(0);
     await expect(splash).toHaveCount(0);
     await expect.poll(() => launches).toEqual(["pwa", "pwa"]);
   } finally { release(); }
@@ -77,5 +107,5 @@ test("standalone pwa login redirect still finishes the startup splash", async ({
   await page.goto("/install");
   await expect(page).toHaveURL(/\/login$/);
   await expect(page.locator("#gf3-startup-splash")).toHaveCount(0);
-  await expect(page.getByRole("link", { name: /Download|Pobierz/ })).toHaveCount(0);
+  await expect(page.getByRole("dialog", { name: installTitle })).toHaveCount(0);
 });
