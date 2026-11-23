@@ -35,6 +35,8 @@ The SkiaSharp 4.157.0 NuGet repository manifest pins SkiaSharp commit `2a53a3c86
 
 The framework-dependent candidate publish includes SkiaSharp's MIT license and complete supplier notice. On the cached Ubuntu 24.04 test image, `ldd` on the published Linux x64 binary resolved glibc 2.39-0ubuntu8.9 and GCC runtime libraries 14.2.0-4ubuntu2~24.04.1. This check is limited to the test image and this architecture. The final image comparison below identifies the actual production-image package versions. Statically compiled components for each distributed RID remain open.
 
+The published SkiaSharp 4.157.0 files contain `SkWuffsCodec` in all 13 Linux binaries, the macOS universal binary and all three Windows binaries. All Linux files and Windows PDBs also contain `wuffs_gif`. The inspected files did not contain a `SkGifCodec` marker. This corroborates upstream's Wuffs configuration and identifies the origin of the active GIF codec. Symbol and string checks alone do not establish the full set of statically linked objects. Retain the supplier's complete native notice. [Pinned codec source and flags](https://github.com/mono/skia/blob/51cb594d773b5383a45065ea3c8cbec398ad2c36/gn/skia.gni)
+
 ## Production Linux amd64 image
 
 Local production Dockerfile build `sha256:fcdb3615fc8de5bfe540dd42c1bc1aa8791c0524639ba0f819e8362a2484f193` uses Ubuntu 24.04.5 LTS, Microsoft.NETCore.App 10.0.15 and Microsoft.AspNetCore.App 10.0.15. The Linux amd64 ASP.NET base manifest is `sha256:f7b58ba6e8f2cbe11c3cb58e8a5f5f2a077834095e24f21e6eb969ab4f9eb4bf`. Preserve the .NET distribution's original terms and third-party notices. [Runtime source](https://github.com/dotnet/runtime/tree/v10.0.15) · [ASP.NET source](https://github.com/dotnet/aspnetcore/tree/v10.0.15)

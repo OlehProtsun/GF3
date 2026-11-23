@@ -8,6 +8,7 @@ async function openSchedule(page: Page, longList = false, additionalNames: strin
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.addInitScript(() => {
     if (!localStorage.getItem("gf3.auth.access-token")) localStorage.setItem("gf3.auth.access-token", "column-order-a");
+    sessionStorage.setItem("gf3.pwa.install.dismissed", "1");
   });
 
   const employeeNames = longList ? [...names, ...Array.from({ length: 18 }, (_, index) =>

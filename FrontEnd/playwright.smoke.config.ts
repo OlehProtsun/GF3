@@ -6,15 +6,14 @@ export default defineConfig({
   outputDir: "../GF3.Tests/TestResults/playwright",
   workers: 2,
   use: {
-    baseURL: "http://localhost:5173",
+    baseURL: "http://127.0.0.1:5199",
     serviceWorkers: "block",
     trace: "on-first-retry",
     screenshot: "only-on-failure",
   },
   webServer: {
-    command: "npm run dev -- --host localhost",
-    url: "http://localhost:5173/login",
-    env: { GF3_E2E_NO_PROXY: "1" },
+    command: "node scripts/playwright-preview.mjs 5199",
+    url: "http://127.0.0.1:5199/version.json",
     reuseExistingServer: false,
     timeout: 120_000,
   },

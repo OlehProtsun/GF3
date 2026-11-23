@@ -3,6 +3,7 @@ import { expect, test, type Page } from "@playwright/test";
 async function fixture(page: Page, { authenticated = true, history = false, count = 25, longName = false } = {}) {
   if (authenticated) await page.addInitScript(() => localStorage.setItem("gf3.auth.access-token", "deep-link-test"));
   await page.addInitScript(() => {
+    sessionStorage.setItem("gf3.pwa.install.dismissed", "1");
     Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: (text: string) => {
       (window as unknown as { copiedSwapLink: string }).copiedSwapLink = text; return Promise.resolve();
     } } });
