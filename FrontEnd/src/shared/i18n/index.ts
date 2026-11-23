@@ -23,7 +23,11 @@ export function setLanguage(value: Language) {
 
 /** Only application-owned messages belong here; never translate user content. */
 export function t(message: string, ...values: unknown[]): string {
-  const translated = language === "en" ? englishLabels[message] ?? message : dictionaries[language][message] ?? message;
+  return translate(language, message, ...values);
+}
+
+export function translate(targetLanguage: Language, message: string, ...values: unknown[]): string {
+  const translated = targetLanguage === "en" ? englishLabels[message] ?? message : dictionaries[targetLanguage][message] ?? message;
   return translated.replace(/\{(\d+)\}/g, (match, index: string) => Number(index) < values.length ? String(values[Number(index)]) : match);
 }
 

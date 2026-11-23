@@ -89,7 +89,7 @@ function InstallDialog({ onDismiss }: { onDismiss: () => void }) {
       <div className={styles.actions}>
         <button type="button" className={styles.primary} onClick={() => {
           onDismiss();
-          navigate("/install");
+          navigate("/install?topic=getting-started");
         }}>
           <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M12 2v13m-5-5 5 5 5-5M3 17v4h18v-4" />
