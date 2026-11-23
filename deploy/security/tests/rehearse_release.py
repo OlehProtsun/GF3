@@ -43,6 +43,9 @@ def diagnostic_command(*args, cwd=None, timeout=120, capture=True, check=True, d
 
 
 production_command = release.command
+HISTORICAL_PRIOR = "353f8e23dbd3f6c9989e7df2198346b72c700487"
+HISTORICAL_TARGET = "1175c39461e149a7bb35f428babed28279727899"
+HISTORICAL_TARGET_IMAGE = "gf3-web:maintenance-target"
 
 
 def free_port():
@@ -53,22 +56,31 @@ def free_port():
 
 def rehearse_migrations(root, snapshot_path):
     """Use a fresh copy of the synthetic CI database to exercise EF startup in Docker."""
-    added = ("20261114225324_AddShiftCorrectionComment", "20261115135735_RefreshManualShiftOffer")
-    columns = (("shift_correction_request", "comment", "TEXT"),
-               ("shift_swap_request", "refreshed_at_utc", "INTEGER"))
+    repo = HERE.parents[1]
+
+    def git(*args):
+        return release.git(*args, root=repo)
+
+    revision = git("rev-parse", "HEAD").strip()
+    target = maintenance.migration_ids(git, revision)
+    cutoff = target.index("20261122173000_AddShiftRemovalCorrections") + 1
+    before, added = target[:cutoff], target[cutoff:]
+    columns = maintenance.migration_plan(git, revision, revision, added)
     image, = release.docker_json("image", "inspect", "gf3-web:ci")
     with closing(sqlite3.connect(snapshot_path)) as db:
-        target = tuple(row[0] for row in db.execute(
-            'SELECT MigrationId FROM "__EFMigrationsHistory" ORDER BY MigrationId'))
-    assert target[-2:] == added
-    before = target[:-2]
+        maintenance.verify(db, target)
+        assert db.execute("PRAGMA foreign_key_check").fetchall() == []
     fixture = root / "maintenance-fixture.db"
     frozen = root / "maintenance-backup.db"
     maintenance.snapshot(snapshot_path, fixture, target)
     with closing(sqlite3.connect(fixture)) as db, db:
-        for (table, name, _), migration in zip(columns, added, strict=True):
+        for table, name, _ in reversed(columns):
             db.execute(f'ALTER TABLE "{table}" DROP COLUMN "{name}"')
-            db.execute('DELETE FROM "__EFMigrationsHistory" WHERE MigrationId=?', (migration,))
+        db.executemany('DELETE FROM "__EFMigrationsHistory" WHERE MigrationId=?', ((migration,) for migration in added))
+        db.execute("""INSERT INTO communication_message
+                   (title, body, deadline_at_utc, created_at_utc, created_by_manager_name)
+                   VALUES ('Legacy rehearsal', 'Keep this message', '2099-01-02', '2099-01-01', 'Fixture')""")
+        assert db.execute("PRAGMA foreign_key_check").fetchall() == []
     maintenance.snapshot(fixture, frozen, before, quiesced=True)
     maintenance.rehearse(release.command, release.docker_json, image["Id"], root, frozen, before, target, columns)
     maintenance.rehearse(release.command, release.docker_json, image["Id"], root, frozen, before, target, columns,
@@ -76,8 +88,9 @@ def rehearse_migrations(root, snapshot_path):
     print("Maintenance rehearsal passed: isolated EF startup, expected schema, integrity and logical row preservation")
 
     # The migration is still pending, but the duplicate DDL causes the candidate to fail.
+    table, name, affinity = columns[0]
     with closing(sqlite3.connect(fixture)) as db, db:
-        db.execute('ALTER TABLE shift_correction_request ADD COLUMN "comment" TEXT NULL')
+        db.execute(f'ALTER TABLE "{table}" ADD COLUMN "{name}" {affinity} NULL')
     try:
         maintenance.rehearse(release.command, release.docker_json, image["Id"], root, fixture, before, target, columns)
     except maintenance.MaintenanceError as error:
@@ -384,7 +397,7 @@ def main(scenario=None):
                 config = release.render(root)
                 release.freeze(config, volume)
                 app_service = config["services"]["gf3-app"]
-                app_service["image"] = "gf3-web:ci"
+                app_service["image"] = HISTORICAL_TARGET_IMAGE
                 app_service["environment"]["DatabaseStartup__RequireExistingDatabase"] = "true"
                 release.save_compose(candidate, config)
                 (candidate / "guard-enabled").touch()
@@ -604,6 +617,16 @@ def main(scenario=None):
                 release.command("docker", "image", "rm", tag, check=False)
 
 
+def build_rehearsal_image(repo, revision, image):
+    subprocess.run(["git", "fetch", "--no-tags", "--depth=1", "origin", revision], cwd=repo, check=True)
+    with tempfile.TemporaryDirectory(prefix="gf3-rehearsal-source-") as worktree:
+        subprocess.run(["git", "worktree", "add", "--detach", worktree, revision], cwd=repo, check=True)
+        try:
+            subprocess.run(["docker", "build", "-t", image, worktree], check=True)
+        finally:
+            subprocess.run(["git", "worktree", "remove", "--force", worktree], cwd=repo, check=True)
+
+
 if __name__ == "__main__":
     import sys
 
@@ -616,20 +639,14 @@ if __name__ == "__main__":
         assert len(sys.argv) == 1
         main()
         if os.environ.get("GITHUB_ACTIONS") == "true":
-            # Exercise production primitives with real Docker, kernel fence, Git and SQLite on a
-            # fresh runner. Use a pinned previous application that predates the pending migrations.
+            # Keep the established two-addition kernel-fence scenarios on their original
+            # revision pair. The current image exercises the current additive suffix above.
             if not shutil.which("nft"):
                 subprocess.run(["sudo", "-n", "apt-get", "update"], check=True)
                 subprocess.run(["sudo", "-n", "apt-get", "install", "-y", "nftables"], check=True)
-            prior = "353f8e23dbd3f6c9989e7df2198346b72c700487"
             repo = HERE.parents[1]
-            subprocess.run(["git", "fetch", "--no-tags", "--depth=1", "origin", prior], cwd=repo, check=True)
-            with tempfile.TemporaryDirectory(prefix="gf3-prior-source-") as worktree:
-                subprocess.run(["git", "worktree", "add", "--detach", worktree, prior], cwd=repo, check=True)
-                try:
-                    subprocess.run(["docker", "build", "-t", "gf3-web:maintenance-prior", worktree], check=True)
-                finally:
-                    subprocess.run(["git", "worktree", "remove", "--force", worktree], cwd=repo, check=True)
+            build_rehearsal_image(repo, HISTORICAL_PRIOR, "gf3-web:maintenance-prior")
+            build_rehearsal_image(repo, HISTORICAL_TARGET, HISTORICAL_TARGET_IMAGE)
             for case in scenarios:
                 subprocess.run(["sudo", "-n", "env", "GF3_DISPOSABLE_CI_RUNNER=true",
                                 "/usr/bin/python3", "-u", str(Path(__file__).resolve()), case], check=True)
