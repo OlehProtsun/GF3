@@ -69,7 +69,7 @@ The candidate uses SkiaSharp 4.157.0. No license input is needed. Once the build
 | Lint and Playwright CI wiring | Lint passed with **0 errors and 21 existing warnings**. The exact two-browser smoke configuration passed **12 tests, 0 failed, 0 skipped**. CI YAML parses and the smoke job precedes the existing Docker job. |
 | Host guard | Windows **53 passed, 0 failed, 4 skipped** (Linux-only advisory locking). A disposable Linux run with a read-only repository mount passed **57 tests, 0 failed, 0 skipped**. |
 | Dependency advisory checks | Patched the production lock entry for MIT `ws` from 7.5.10 to 7.5.14 within SignalR's version range. `npm audit --omit=dev` and `dotnet list GF3.WebApi/WebApi.csproj package --vulnerable --include-transitive` found zero current advisories in the queried scopes. The unfiltered npm install reported **24 advisories** in the development dependency scope. |
-| Production Docker | Local Release publish passed and contains the font, licenses, native binaries and frontend. `docker build --pull=false --progress=plain -t gf3-plan78:local .` and direct SDK image pull failed resolving MCR manifests with EOF. The first failure was on `dotnet/sdk:10.0`; the retry failed on `dotnet/aspnet:10.0`. The production image and local HTTP(S) ingress rehearsal remain unverified. |
+| Production Docker | Local Release publish passed. Docker registry access initially returned EOF. Loaded the official amd64 base manifests and layers after verifying SHA-256 digests over IPv4, then built the unchanged production Dockerfile successfully with `docker build --pull=false --platform linux/amd64 --progress=plain -t gf3-plan78:local .`. The image is `sha256:fcdb3615fc8de5bfe540dd42c1bc1aa8791c0524639ba0f819e8362a2484f193`. Verified the native linkages, .NET 10.0.15, the font and bundled notices in that image. |
 
 ## Browser matrix and release gates
 
@@ -77,6 +77,8 @@ The candidate uses SkiaSharp 4.157.0. No license input is needed. Once the build
 | --- | ---: | ---: | ---: | ---: | --- |
 | PWA, Guide and ordered communication media on the production frontend preview | 6 passed | 6 passed | 6 passed | 6 passed | **24 passed, 0 failed, 0 skipped** |
 | Exact Vite-backed hermetic CI configuration | 6 passed | Outside scope | Outside scope | 6 passed | **12 passed, 0 failed, 0 skipped** |
+| Employee PDF share, download and activation on disposable SQLite | 3 passed | Outside scope | Outside scope | 3 passed | **6 passed, 0 failed, 0 skipped** after modeling the same synthetic shop for the approved-leave request. The pre-fix Chromium trace recorded a 404 against the synthetic shop. |
+| Holiday and day-off states | 2 passed | 2 passed | 2 passed | 2 passed | **8 passed, 0 failed, 0 skipped** after modeling prior install-invite dismissal in this fixture. The pre-fix Chromium reproduction showed the invite intercepting the click. |
 | Complete 44-file Playwright suite | Pending | Pending | Pending | Incomplete | **60 of 1,968 cases started, 22 failures logged** before stopping. No reliable final pass/skip totals from the interrupted runner. |
 
 The first complete-suite attempt used Vite dev as required by the plan. Production-update tests require `/version.json` and a production frontend bundle. The second attempt used the compiled frontend at loopback port 4173 and the same isolated Development API. It also exposed stale browser fixtures that left the employee installation invite open and expected outdated Daily/related assignment labels. Dedicated PWA tests retain the prompt behavior. Following fixture corrections, Daily schedule and notification cases passed for Chromium and iPhone WebKit. The employee-to-manager correction case passed in Chromium and in an isolated iPhone touch rerun.
@@ -85,7 +87,9 @@ The real-account fixture repeatedly signs in with the same manager username. The
 
 One separate PDF rerun was stopped after discovering that the restated connection override was ignored and the local development SQLite database received test traffic. Its results were discarded. The following run used the verified `ConnectionStrings:Default` override with a confirmed temporary SQLite file. Production data was outside these runs.
 
-**Open release gates** are GSAP and `@gsap/react`, final native and asset attribution, a completed full browser run, production image and ingress validation, protected SQLite maintenance, coordinated media restore and device verification. The physical device checklist covers iOS Safari and Android Chrome installation, cold start, Guide, rotation, Back/Close, photo and GIF playback, and reduced motion. The draft PR is held under the user's updated instructions. Merge and deploy are blocked.
+The [first hosted CI run](https://github.com/OlehProtsun/GF3/actions/runs/45271812769) on `10833d7d1f70d483177a16c17d235371af379f0f` passed Build and test. Playwright browser installation failed because the moving `ubuntu-latest` runner resolved to Ubuntu 26.04, which the locked Playwright build rejects. The smoke job now uses Ubuntu 24.04. Its browser versions, project coverage and assertions are unchanged. The first CI Docker job was skipped because it depends on the smoke job.
+
+**Open release gates** are GSAP and `@gsap/react`, non-permissive OS packages, final native and asset attribution, a completed full browser run, hosted CI and ingress validation, protected SQLite maintenance, coordinated media restore and device verification. The physical device checklist covers iOS Safari and Android Chrome installation, cold start, Guide, rotation, Back/Close, photo and GIF playback, and reduced motion. The draft PR is held under the user's updated instructions. Merge and deploy are blocked.
 
 ## BLOCKER — PRODUCTION MAINTENANCE
 

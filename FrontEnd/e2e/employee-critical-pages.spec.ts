@@ -126,6 +126,11 @@ test.describe("employee critical pages", () => {
           expect(route.request().headers().authorization).toMatch(/^Bearer /);
           return route.fulfill({ contentType: "application/pdf", headers: { "Content-Disposition": "attachment; filename=synthetic.pdf" }, body: createSyntheticPdf() });
         });
+        await page.route(/\/api\/employee-urlop\/approved\?/, route => {
+          const parameters = new URL(route.request().url()).searchParams;
+          expect(Object.fromEntries(parameters)).toEqual({ shopId: "1", year: "2026", month: "10" });
+          return route.fulfill({ json: [] });
+        });
         await loginWithCredentials(page, employee.username, employee.password);
         await page.goto("/schedule");
         const trigger = page.getByRole("button", { name: "Export schedule to PDF" });
