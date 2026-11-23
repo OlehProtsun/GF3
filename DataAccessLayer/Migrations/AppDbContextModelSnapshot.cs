@@ -277,6 +277,18 @@ namespace DataAccessLayer.Migrations
                         .HasColumnType("TEXT")
                         .HasColumnName("deadline_at_utc");
 
+                    b.Property<string>("ContentBlocksJson")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("content_blocks_json");
+
+                    b.Property<string>("PhotoAttachmentJson")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("photo_attachment_json");
+
+                    b.Property<string>("GifAttachmentJson")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("gif_attachment_json");
+
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(160)

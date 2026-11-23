@@ -23,6 +23,15 @@ public class CommunicationMessageModel
     [Column("body")]
     public string Body { get; set; } = null!;
 
+    [Column("content_blocks_json")]
+    public string? ContentBlocksJson { get; set; }
+
+    [Column("photo_attachment_json")]
+    public string? PhotoAttachmentJson { get; set; }
+
+    [Column("gif_attachment_json")]
+    public string? GifAttachmentJson { get; set; }
+
     [Column("visible_from_utc")]
     public DateTimeOffset? VisibleFromUtc { get; set; }
 

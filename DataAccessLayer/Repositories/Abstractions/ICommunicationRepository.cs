@@ -13,6 +13,8 @@ public interface ICommunicationRepository : IBaseRepository<CommunicationMessage
 
     Task<bool> ExistsAsync(int communicationId, CancellationToken ct = default);
 
+    Task<bool> UpdateMessageAsync(CommunicationMessageModel message, bool changeGif, bool changePhoto, CancellationToken ct = default);
+
     Task<bool> DismissalExistsAsync(int communicationId, int employeeId, CancellationToken ct = default);
 
     Task AddDismissalAsync(EmployeeCommunicationDismissalModel dismissal, CancellationToken ct = default);

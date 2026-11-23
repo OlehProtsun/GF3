@@ -1,4 +1,5 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 import { chromium } from "@playwright/test";
 import { createServer } from "vite";
 
@@ -11,6 +12,7 @@ const manifest = await readFile(manifestFile, "utf8").then(JSON.parse, error => 
   return {};
 });
 const selected = new Set(process.argv.slice(2));
+let capturesChanged = false;
 const captureFolders = [
   [/^login/, "getting-started"],
   [/^(alerts|nav-alerts)/, "notifications"],
@@ -97,6 +99,10 @@ try {
   let vacationRequest = null;
   let availabilityDemo;
   let swapDemo;
+  const communicationDemo = selected.has("communication-gif") ? {
+    gif: { key: "9f1271a8-5ef9-496f-aa32-0e0f8a2bab11", fileName: "01-schedule-selection.gif", size: 178808 },
+    dismissed: false, mediaRequests: 0, fail: false, release: undefined, manager: false, saved: undefined,
+  } : null;
   page.setDefaultTimeout(4000);
   page.on("pageerror", error => console.log("Demo page error:", error.message));
   await page.clock.setFixedTime(new Date(current));
@@ -108,8 +114,46 @@ try {
     const api = url.pathname.slice(5);
     if (api.includes("negotiate")) return route.fulfill({ status: 503 });
     let data = [];
-    if (api === "auth/session") data = { ...profile, role: "employee", employeeId: 1 };
+    if (api === "auth/session") data = communicationDemo?.manager
+      ? { ...profile, role: "manager", managerId: 1, workspaceMode: "pc", displayName: "Demo manager" }
+      : { ...profile, role: "employee", employeeId: 1 };
     else if (api === "account-language") data = { language: "en" };
+    else if (api === "communications/pending" && communicationDemo) data = communicationDemo.dismissed ? [] : [{
+      id: 900, title: "New schedules", body: "Find your schedules grouped by month.", createdByManagerName: "Demo manager",
+      visibleFromUtc: timestamp, deadlineAtUtc: "2026-11-30T18:00:00Z", createdAtUtc: timestamp, isActive: true, gif: communicationDemo.gif,
+    }];
+    else if (api === `communications/900/gif/${communicationDemo?.gif.key}` && communicationDemo) {
+      if (request.headers().authorization !== "Bearer guide-demo") return route.fulfill({ status: 401 });
+      communicationDemo.mediaRequests++;
+      if (communicationDemo.fail) return route.fulfill({ status: 404, json: { title: "Unavailable" } });
+      if (!communicationDemo.manager) await new Promise(resolve => { communicationDemo.release = resolve; });
+      return route.fulfill({
+        contentType: "image/gif",
+        body: await readFile(new URL("../../release-assets/2026-11-23/gifs/01-schedule-selection.gif", import.meta.url)),
+      });
+    }
+    else if (api === "communications/900/dismiss" && communicationDemo) {
+      communicationDemo.dismissed = true;
+      return route.fulfill({ status: 204 });
+    }
+    else if (api === "communications" && communicationDemo?.manager) data = communicationDemo.saved ? [communicationDemo.saved] : [];
+    else if (api === "communications/with-gif" && communicationDemo?.manager) {
+      if (!request.headers()["content-type"]?.startsWith("multipart/form-data;"))
+        return route.fulfill({ status: 400, json: { title: "Demo multipart request was incomplete" } });
+      data = communicationDemo.saved = {
+        id: 900, title: "Demo release announcement", body: "Find your schedules grouped by month.",
+        createdByManagerName: "Demo manager", visibleFromUtc: timestamp, deadlineAtUtc: "2026-11-30T18:00:00Z",
+        createdAtUtc: timestamp, isActive: true, gif: communicationDemo.gif,
+      };
+    }
+    else if (api === "communications/900" && request.method() === "PUT" && communicationDemo?.manager) {
+      if (!request.postDataJSON().removeGif)
+        return route.fulfill({ status: 400, json: { title: "Demo update did not request removal" } });
+      data = communicationDemo.saved = { ...communicationDemo.saved, gif: null };
+    }
+    else if (api === "manager-notepad" && communicationDemo?.manager) data = {
+      notes: [], state: { isExpanded: false, isPinned: false, height: 520 },
+    };
     else if (api === "employment-contract-settings" && swapDemo) data = { restrictSwapsToEightHours: Boolean(swapDemo.wholeShiftOnly) };
     else if (api === "employee-shift-swap-approvals" && swapDemo) data = swapDemo.approvals ?? [];
     else if (api === "employee-ui-state") data = { readNotificationIds: [], pinnedSwapIds: [], scheduleColumnOrders: {} };
@@ -214,6 +258,7 @@ try {
         rounded((Math.min(focus.x + focus.width, x + width) - x - left) / width),
         rounded((Math.min(focus.y + focus.height, y + height) - y - top) / height),
       ] };
+      capturesChanged = true;
       console.log("Captured", name);
     } catch (error) { console.log("Skipped", name, error.message.split("\n")[0]); }
   }
@@ -853,6 +898,244 @@ try {
     } finally { swapDemo = undefined; }
   });
 
+  if (communicationDemo) {
+    await page.emulateMedia({ reducedMotion: "no-preference" });
+    await go("/profile");
+    const dialog = page.getByRole("dialog", { name: "New schedules" });
+    await dialog.getByText("Find your schedules grouped by month.").waitFor();
+    await dialog.getByText("Loading animation…").waitFor();
+    for (let attempt = 0; !communicationDemo.release && attempt < 80; attempt++) await page.waitForTimeout(25);
+    if (!communicationDemo.release) throw new Error("The authenticated demo GIF request did not arrive");
+    communicationDemo.release();
+    const gif = dialog.getByRole("img", { name: "Animated demonstration" });
+    await gif.waitFor();
+    if (!(await gif.evaluate(image => image.complete && image.naturalWidth === 390)))
+      throw new Error("The attached demo GIF did not decode");
+    const initialFrame = await gif.screenshot();
+    let changed = false;
+    for (let attempt = 0; attempt < 4 && !changed; attempt++) {
+      await page.waitForTimeout(700);
+      changed = !initialFrame.equals(await gif.screenshot());
+    }
+    if (!changed) throw new Error("The decoded GIF did not start animating");
+    await dialog.getByRole("button", { name: "Hide animation" }).click();
+    await gif.waitFor({ state: "hidden" });
+    communicationDemo.fail = true;
+    await dialog.getByRole("button", { name: "Show animation" }).click();
+    await dialog.getByText("The animation could not be loaded.").waitFor();
+    await dialog.getByRole("checkbox", { name: "Don't show this again" }).check();
+    await dialog.getByRole("button", { name: "Close", exact: true }).click();
+    await dialog.waitFor({ state: "hidden" });
+    if (!communicationDemo.dismissed) throw new Error("The demo dismissal was not saved");
+    communicationDemo.dismissed = false;
+    communicationDemo.fail = false;
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    const requests = communicationDemo.mediaRequests;
+    await go("/profile");
+    await dialog.getByRole("button", { name: "Show animation" }).waitFor();
+    if (communicationDemo.mediaRequests !== requests) throw new Error("Reduced motion loaded the animation automatically");
+    console.log("Checked text-before-media, authenticated image loading, autoplay, hide, fallback, dismissal and reduced motion.");
+
+    communicationDemo.manager = true;
+    await go("/communications");
+    await page.evaluate(() => {
+      const fetchWithDemo = window.fetch.bind(window);
+      window.fetch = (resource, init) => {
+        if (String(resource).endsWith("/communications/with-gif") && init?.body instanceof FormData) {
+          const file = init.body.get("file");
+          window.gfDemoUpload = file instanceof File && file.name === "01-schedule-selection.gif" &&
+            file.size > 0 && file.slice(0, 6).text().then(signature => signature === "GIF89a");
+        }
+        return fetchWithDemo(resource, init);
+      };
+    });
+    await page.getByRole("textbox", { name: "Title" }).fill("Demo release announcement");
+    await page.getByRole("textbox", { name: "Message" }).fill("Find your schedules grouped by month.");
+    await page.getByLabel("Upload GIF").setInputFiles(fileURLToPath(
+      new URL("../../release-assets/2026-11-23/gifs/01-schedule-selection.gif", import.meta.url),
+    ));
+    await page.getByRole("img", { name: "Animated demonstration" }).waitFor();
+    await label(/01-schedule-selection\.gif/).waitFor();
+    await page.locator("form").getByRole("button", { name: "Create", exact: true }).click();
+    await page.locator("article").filter({ hasText: "Demo release announcement" }).getByRole("button", { name: "Edit" }).click();
+    if (!(await page.evaluate(() => window.gfDemoUpload))) throw new Error("The form did not send the selected GIF");
+    await page.getByRole("img", { name: "Animated demonstration" }).waitFor();
+    await button("Remove attachment").click();
+    await button("Save changes").click();
+    await button("Cancel edit").waitFor({ state: "hidden" });
+    if (communicationDemo.saved?.gif !== null) throw new Error("The demo attachment was not removed");
+    console.log("Checked the manager's local GIF preview, multipart upload, saved preview and removal.");
+  }
+
+  if (selected.has("release")) {
+    const releaseFrames = new URL("../../release-assets/2026-11-23/.frames/", import.meta.url);
+    const failures = [];
+    let output;
+    let index;
+    async function demo(name, action) {
+      output = new URL(name + "/", releaseFrames);
+      index = 0;
+      await mkdir(output, { recursive: true });
+      try {
+        await action();
+        console.log("Recorded", name, index);
+      } catch (error) {
+        console.log("Incomplete recording", name, error.message);
+        failures.push(name);
+      }
+    }
+    async function frame(focus) {
+      let marker;
+      if (focus) {
+        await focus.waitFor();
+        await focus.scrollIntoViewIfNeeded();
+        marker = await focus.evaluateHandle(element => {
+          const box = element.getBoundingClientRect();
+          const outline = document.createElement("div");
+          outline.style.cssText = `box-sizing:border-box;position:fixed;pointer-events:none;z-index:999999;
+            border:2px solid #3679ee;border-radius:12px;left:${box.left}px;top:${box.top}px;width:${box.width}px;height:${box.height}px;
+            box-shadow:0 0 0 2px #ffffff80`;
+          (element.closest("dialog[open]") ?? document.body).append(outline);
+          return outline;
+        });
+      }
+      try {
+        await page.evaluate(() => document.fonts.ready);
+        await page.screenshot({ path: fileURLToPath(new URL(String(++index).padStart(2, "0") + ".png", output)),
+          animations: "disabled", caret: "hide" });
+      } finally {
+        await marker?.evaluate(element => element.remove());
+        await marker?.dispose();
+      }
+    }
+    const scheduleSelector = () => button(/Select schedule\. Current schedule/);
+    const matrix = () => page.locator("table").first().locator("thead");
+    async function schedulePage() {
+      await go("/schedule");
+      await scheduleSelector().waitFor();
+    }
+    await demo("01-schedule-selection", async () => {
+      await schedulePage();
+      await frame(nav("/schedule"));
+      await frame(scheduleSelector());
+      await scheduleSelector().click();
+      const next = openDialog().getByRole("button", { name: /ShopDemo2/ }).first();
+      await frame();
+      await frame(next);
+      await next.click();
+      await frame(scheduleSelector().filter({ hasText: "ShopDemo2" }));
+    });
+    await demo("02-schedule-views", async () => {
+      await schedulePage();
+      const eye = button("Show daily schedule view");
+      await frame(matrix());
+      await frame(eye);
+      await eye.click();
+      const daily = page.getByRole("tablist", { name: "Schedule days" });
+      await frame(daily);
+      const nextDay = daily.getByRole("tab", { name: /\b10\b/ }).first();
+      await nextDay.click();
+      await frame(nextDay);
+      await button("Show schedule matrix view").click();
+      await frame(matrix());
+    });
+    async function correctionSteps(remove) {
+      await schedulePage();
+      const adjust = button("Request a shift correction");
+      await frame(adjust);
+      await adjust.click();
+      const dialog = openDialog();
+      const scheduleChoice = dialog.getByRole("button", { name: /ShopDemo1.*November/ }).first();
+      await frame(scheduleChoice);
+      await scheduleChoice.click();
+      await button("Continue").click();
+      const shift = dialog.getByRole("radio", { name: /12 November.*09:00|November 12.*09:00/ }).first();
+      await frame(shift);
+      await shift.click();
+      await button("Continue").click();
+      const control = remove ? label("Request day off") : button(/Start time.*15 minutes earlier/);
+      await frame(control);
+      await control.click();
+      await frame();
+      await button("Continue").click();
+      await button("Continue").click();
+      await frame(dialog.getByRole("heading", { name: "Review your request" }));
+    }
+    await demo("03-shift-correction", () => correctionSteps(false));
+    await demo("04-request-day-off", () => correctionSteps(true));
+    await demo("05-partial-shift-swap", async () => {
+      swapDemo = { schedules: [{ ...schedule, slots: slots.map(slot => slot.id === 91 ? { ...slot, toTime: "21:00" } : slot) }], offers: [] };
+      try {
+        await go("/swap");
+        const launcher = button("Create offer");
+        await launcher.click();
+        const wizard = page.locator("#create-swap-panel");
+        await wizard.getByRole("button", { name: /ShopDemo1/ }).first().click();
+        const shift = wizard.getByRole("radio", { name: /09\.11\.2026/ }).first();
+        await frame(shift);
+        await shift.click();
+        await frame(button("Custom period"));
+        await button("Custom period").click();
+        const end = wizard.locator('input[type="time"]').last();
+        await end.fill("15:00");
+        await frame(end);
+        await button("Confirm shift").click();
+        await button("Continue").click();
+        await button("Continue").click();
+        await frame(label("Your shift (you give)"));
+        await button("Send request").click();
+        await label("Swap request sent successfully!").waitFor();
+        await go("/swap");
+        await frame(page.locator("[data-swap-id]").first());
+        await launcher.click();
+        await wizard.getByRole("button", { name: /ShopDemo1/ }).first().click();
+        await shift.click();
+        await frame(shift);
+      } finally { swapDemo = undefined; }
+    });
+    await demo("06-swap-status", async () => {
+      await schedulePage();
+      await frame(matrix());
+      for (const name of ["Swap pending", "Swap completed"]) {
+        const badge = button(name);
+        await frame(badge);
+        await badge.click();
+        await frame(page.getByRole("status").filter({ hasText: name }).last());
+        await page.keyboard.press("Escape");
+      }
+    });
+    await demo("07-work-hours", async () => {
+      await schedulePage();
+      await frame(nav("/schedule"));
+      const month = button("Summary month");
+      await month.evaluate(element => element.scrollIntoView({ block: "center", behavior: "instant" }));
+      await frame(month);
+      await month.click();
+      const october = page.getByRole("option", { name: "October", exact: true });
+      await frame(october);
+      await october.click();
+      await frame(byClass("hoursSummaryGridHeader"));
+      await frame(byClass("hoursSummaryTotalPill"));
+    });
+    await demo("08-app-guide", async () => {
+      await go("/profile");
+      const guide = page.getByRole("link", { name: /App Guide/ });
+      await frame(guide);
+      await guide.click();
+      const locale = page.getByRole("radio", { name: /^English/ });
+      await frame(locale.locator("xpath=.."));
+      await locale.check();
+      await frame(button("Continue"));
+      await button("Continue").click();
+      await frame(page.getByRole("heading", { name: "Welcome to GF" }));
+      await frame(page.getByRole("link", { name: /^Your Profile/ }));
+      await page.getByRole("link", { name: /^Getting Started/ }).click();
+      await frame(page.getByRole("heading", { name: "Install on your phone" }));
+      await frame(page.getByRole("img", { name: /GF screenshot showing Safari address bar/ }));
+    });
+    if (failures.length) throw new Error("Incomplete release recordings: " + failures.join(", "));
+  }
+
   if (selected.has("guide-refine")) {
     await page.setViewportSize({ width: 375, height: 812 });
     const pages = [
@@ -916,7 +1199,7 @@ try {
     console.log("Checked guide navigation, platform switch, image preview, Escape, Back, and the password deep link.");
   }
 } finally {
-  await writeFile(manifestFile, JSON.stringify(manifest, null, 2) + "\n");
+  if (capturesChanged) await writeFile(manifestFile, JSON.stringify(manifest, null, 2) + "\n");
   await browser?.close();
   await server.close();
 }

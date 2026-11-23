@@ -18,6 +18,7 @@
 	</PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="SixLabors.ImageSharp" Version="3.2.0" />
     <PackageReference Include="PDFsharp" Version="6.2.4" />
     <PackageReference Include="System.Security.Cryptography.Pkcs" Version="8.0.2" />
     <PackageReference Include="WebPush" Version="1.0.13" />

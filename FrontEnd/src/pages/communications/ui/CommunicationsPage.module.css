@@ -1,13 +1,13 @@
 .page {
   min-height: 100%;
-  padding: 0 18px 40px;
+  padding: 0 18px max(40px, env(safe-area-inset-bottom));
 }
 
 .layout {
   width: min(1180px, 100%);
   margin: 18px auto 0;
   display: grid;
-  grid-template-columns: minmax(280px, 430px) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 9fr) minmax(0, 11fr);
   gap: 18px;
   align-items: start;
 }
@@ -345,4 +345,127 @@
   .headerPills {
     width: 100%;
   }
+}
+.uploadOptions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.uploadOption {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid #c8dcfa;
+  border-radius: 999px;
+  background: #fff;
+  color: #1d4ed8;
+  font-size: .9rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.uploadOption:hover { background: #eaf3ff; }
+.uploadOption:focus-within { outline: 2px solid #2563eb; outline-offset: 2px; }
+.uploadOption:has(input:disabled) { opacity: .55; cursor: default; }
+.uploadOption input { position: absolute; inline-size: 1px; block-size: 1px; opacity: 0; }
+
+.formActions .previewButton { background: #eaf3ff; border-color: #c8dcfa; color: #1d4ed8; }
+
+.generalInfo,
+.contentEditor {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.generalInfo {
+  padding: 12px;
+  border: 1px solid #e1e9f4;
+  border-radius: 18px;
+  background: #f8faff;
+}
+
+.generalInfo h2,
+.contentHeading h2 { margin: 0; color: #152746; font-size: 1rem; }
+.contentHeading { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.contentHeading > span { color: #526786; font-size: .8rem; }
+.blockList { margin: 0; padding: 0; display: grid; gap: 10px; list-style: none; }
+
+.block {
+  position: relative;
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  align-items: start;
+  gap: 6px;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid #e1e9f4;
+  border-radius: 18px;
+  background: #fff;
+}
+
+.block[data-dragging] {
+  z-index: 2;
+  border-color: #93bbff;
+  box-shadow: 0 8px 24px #1e3a8a29;
+}
+
+.block[data-over] { box-shadow: 0 -3px 0 #4c87f0; }
+.blockContent { display: grid; min-width: 0; gap: 8px; }
+.blockHeader, .blockHeader label, .blockActions { display: flex; align-items: center; gap: 5px; }
+.blockHeader { justify-content: space-between; flex-wrap: wrap; }
+.blockHeader label { color: #244573; font-weight: 700; font-size: .88rem; }
+.blockContent textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 76px;
+  resize: vertical;
+  padding: 9px 10px;
+  border: 1px solid #e1e9f4;
+  border-radius: 12px;
+  background: #f8faff;
+  color: #152746;
+  font: inherit;
+}
+
+.grip, .blockActions button {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  min-height: 40px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: #315b92;
+  font-size: .95rem;
+  cursor: pointer;
+}
+
+.grip { touch-action: none; cursor: grab; }
+.block[data-dragging] .grip { cursor: grabbing; }
+.grip:hover, .blockActions button:hover:not(:disabled) { background: #eaf3ff; }
+.blockActions button:disabled, .uploadOption:disabled { opacity: .45; cursor: default; }
+.grip:focus-visible, .blockActions button:focus-visible, .blockContent textarea:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+.blockMedia { display: grid; grid-template-columns: minmax(0, 76px) minmax(0, 1fr); gap: 10px; align-items: start; }
+.attachmentThumb { min-width: 0; overflow-wrap: anywhere; }
+.attachmentThumb img { max-height: 70px; }
+.blockFile { display: grid; justify-items: start; gap: 4px; min-width: 0; color: #526786; font-size: .8rem; overflow-wrap: anywhere; }
+.blockFile strong { color: #152746; }
+.blockFile .uploadOption { min-height: 36px; padding-inline: 9px; font-size: .8rem; }
+.messageItem .messageSummary {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.messageActions button { display: inline-flex; align-items: center; gap: 6px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .block { transition: none !important; }
 }

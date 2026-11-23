@@ -1,4 +1,6 @@
 using System.Security.Claims;
+using System.Text.Json;
+using BusinessLogicLayer.Common;
 using BusinessLogicLayer.Services.Abstractions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -9,6 +11,8 @@ using WebApi.Services;
 using BusinessCreateCommunicationMessageRequest = BusinessLogicLayer.Contracts.Communications.CreateCommunicationMessageRequest;
 using BusinessCommunicationMessageDto = BusinessLogicLayer.Contracts.Communications.CommunicationMessageDto;
 using BusinessUpdateCommunicationMessageRequest = BusinessLogicLayer.Contracts.Communications.UpdateCommunicationMessageRequest;
+using CommunicationContentBlock = BusinessLogicLayer.Contracts.Communications.CommunicationContentBlock;
+using CommunicationGifAttachment = BusinessLogicLayer.Contracts.Communications.CommunicationGifAttachment;
 
 namespace WebApi.Controllers;
 
@@ -17,8 +21,13 @@ namespace WebApi.Controllers;
 public sealed class CommunicationsController(
     ICommunicationService communicationService,
     IWorkflowLogService workflowLogService,
+    CommunicationGifStorage gifStorage,
+    ILogger<CommunicationsController> logger,
     IRealtimeNotifier? realtimeNotifier = null) : ControllerBase
 {
+    private const int MaxBlocks = 20;
+    private static readonly JsonSerializerOptions BlockJson = new(JsonSerializerDefaults.Web);
+
     [HttpGet]
     [Authorize(Roles = AuthRoles.Manager)]
     [ProducesResponseType(typeof(IReadOnlyList<CommunicationMessageDto>), StatusCodes.Status200OK)]
@@ -32,22 +41,46 @@ public sealed class CommunicationsController(
     [Authorize(Roles = AuthRoles.Manager)]
     [ProducesResponseType(typeof(CommunicationMessageDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
-    public async Task<ActionResult<CommunicationMessageDto>> Create(
+    public Task<ActionResult<CommunicationMessageDto>> Create(
         [FromBody] CreateCommunicationMessageRequest request,
         CancellationToken cancellationToken)
+        => CreateCoreAsync(new BusinessCreateCommunicationMessageRequest
+        {
+            Title = request.Title, Body = request.Body,
+            VisibleFromUtc = request.VisibleFromUtc, DeadlineAtUtc = request.DeadlineAtUtc,
+        }, cancellationToken);
+
+    [HttpPost("with-gif")]
+    [Authorize(Roles = AuthRoles.Manager)]
+    [Consumes("multipart/form-data")]
+    [RequestSizeLimit(CommunicationGifStorage.MaxRequestBytes)]
+    [RequestFormLimits(MultipartBodyLengthLimit = CommunicationGifStorage.MaxGifBytes)]
+    public async Task<ActionResult<CommunicationMessageDto>> CreateWithGif(
+        [FromForm] CommunicationGifForm form, CancellationToken cancellationToken)
     {
-        var created = await communicationService
-            .CreateAsync(
-                new BusinessCreateCommunicationMessageRequest
-                {
-                    Title = request.Title,
-                    Body = request.Body,
-                    VisibleFromUtc = request.VisibleFromUtc,
-                    DeadlineAtUtc = request.DeadlineAtUtc,
-                },
-                GetCurrentManagerId(),
-                GetCurrentDisplayName(),
-                cancellationToken)
+        if (form.Blocks is not null)
+        {
+            var (blocks, uploaded) = await ReadBlocksAsync(form.Blocks, null, cancellationToken).ConfigureAwait(false);
+            return await CreateCoreAsync(new BusinessCreateCommunicationMessageRequest
+            {
+                Title = form.Title, Body = GetBlockBody(blocks), VisibleFromUtc = form.VisibleFromUtc,
+                DeadlineAtUtc = form.DeadlineAtUtc, Blocks = blocks,
+            }, cancellationToken, uploaded).ConfigureAwait(false);
+        }
+        var (gif, photo) = await SaveAttachmentsAsync(cancellationToken).ConfigureAwait(false);
+        return await CreateCoreAsync(new BusinessCreateCommunicationMessageRequest
+        {
+            Title = form.Title, Body = form.Body, VisibleFromUtc = form.VisibleFromUtc,
+            DeadlineAtUtc = form.DeadlineAtUtc, Gif = gif, Photo = photo,
+        }, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<ActionResult<CommunicationMessageDto>> CreateCoreAsync(
+        BusinessCreateCommunicationMessageRequest request, CancellationToken cancellationToken,
+        IReadOnlyList<CommunicationGifAttachment>? uploaded = null)
+    {
+        var created = await SaveMessageAsync(request.Gif, request.Photo, () =>
+                communicationService.CreateAsync(request, GetCurrentManagerId(), GetCurrentDisplayName(), cancellationToken), uploaded)
             .ConfigureAwait(false);
 
         await workflowLogService
@@ -63,22 +96,51 @@ public sealed class CommunicationsController(
     [ProducesResponseType(typeof(CommunicationMessageDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<CommunicationMessageDto>> Update(
+    public Task<ActionResult<CommunicationMessageDto>> Update(
         int communicationId,
         [FromBody] UpdateCommunicationMessageRequest request,
         CancellationToken cancellationToken)
+        => UpdateCoreAsync(communicationId, new BusinessUpdateCommunicationMessageRequest
+        {
+            Title = request.Title, Body = request.Body, VisibleFromUtc = request.VisibleFromUtc,
+            DeadlineAtUtc = request.DeadlineAtUtc, RemoveGif = request.RemoveGif, RemovePhoto = request.RemovePhoto,
+        }, cancellationToken);
+
+    [HttpPut("{communicationId:int}/with-gif")]
+    [Authorize(Roles = AuthRoles.Manager)]
+    [Consumes("multipart/form-data")]
+    [RequestSizeLimit(CommunicationGifStorage.MaxRequestBytes)]
+    [RequestFormLimits(MultipartBodyLengthLimit = CommunicationGifStorage.MaxGifBytes)]
+    public async Task<ActionResult<CommunicationMessageDto>> UpdateWithGif(
+        int communicationId, [FromForm] CommunicationGifForm form, CancellationToken cancellationToken)
     {
-        var updated = await communicationService
-            .UpdateAsync(
-                communicationId,
-                new BusinessUpdateCommunicationMessageRequest
-                {
-                    Title = request.Title,
-                    Body = request.Body,
-                    VisibleFromUtc = request.VisibleFromUtc,
-                    DeadlineAtUtc = request.DeadlineAtUtc,
-                },
-                cancellationToken)
+        if (form.Blocks is not null)
+        {
+            var current = (await communicationService.ListForManagerAsync(cancellationToken).ConfigureAwait(false))
+                .FirstOrDefault(message => message.Id == communicationId)
+                ?? throw new KeyNotFoundException($"Communication message with id {communicationId} was not found.");
+            var (blocks, uploaded) = await ReadBlocksAsync(form.Blocks, current, cancellationToken).ConfigureAwait(false);
+            return await UpdateCoreAsync(communicationId, new BusinessUpdateCommunicationMessageRequest
+            {
+                Title = form.Title, Body = GetBlockBody(blocks), VisibleFromUtc = form.VisibleFromUtc,
+                DeadlineAtUtc = form.DeadlineAtUtc, Blocks = blocks, RemovePhoto = true, RemoveGif = true,
+            }, cancellationToken, uploaded).ConfigureAwait(false);
+        }
+        var (gif, photo) = await SaveAttachmentsAsync(cancellationToken).ConfigureAwait(false);
+        return await UpdateCoreAsync(communicationId, new BusinessUpdateCommunicationMessageRequest
+        {
+            Title = form.Title, Body = form.Body, VisibleFromUtc = form.VisibleFromUtc,
+            DeadlineAtUtc = form.DeadlineAtUtc, Gif = gif, Photo = photo,
+            RemovePhoto = form.RemovePhoto, RemoveGif = form.RemoveGif,
+        }, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<ActionResult<CommunicationMessageDto>> UpdateCoreAsync(
+        int communicationId, BusinessUpdateCommunicationMessageRequest request, CancellationToken cancellationToken,
+        IReadOnlyList<CommunicationGifAttachment>? uploaded = null)
+    {
+        var updated = await SaveMessageAsync(request.Gif, request.Photo, () =>
+                communicationService.UpdateAsync(communicationId, request, cancellationToken), uploaded)
             .ConfigureAwait(false);
 
         await workflowLogService
@@ -87,6 +149,160 @@ public sealed class CommunicationsController(
         await NotifyCommunicationsChangedAsync(updated.Id, "manager-communication-updated").ConfigureAwait(false);
 
         return Ok(ToApiDto(updated));
+    }
+
+    [HttpGet("{communicationId:int}/gif/{key:guid}")]
+    [Authorize(Roles = AuthRoles.Manager + "," + AuthRoles.Employee)]
+    public Task<IActionResult> GetGif(int communicationId, Guid key, CancellationToken cancellationToken)
+        => GetAttachmentAsync(communicationId, key, photo: false, cancellationToken);
+
+    [HttpGet("{communicationId:int}/photo/{key:guid}")]
+    [Authorize(Roles = AuthRoles.Manager + "," + AuthRoles.Employee)]
+    public Task<IActionResult> GetPhoto(int communicationId, Guid key, CancellationToken cancellationToken)
+        => GetAttachmentAsync(communicationId, key, photo: true, cancellationToken);
+
+    private async Task<IActionResult> GetAttachmentAsync(int communicationId, Guid key, bool photo, CancellationToken cancellationToken)
+    {
+        int? employeeId = User.IsInRole(AuthRoles.Manager) ? null : GetRequiredEmployeeId();
+        var attachment = await communicationService.GetGifAsync(communicationId, employeeId, cancellationToken, photo, key).ConfigureAwait(false);
+        if (attachment is null || attachment.Key != key || gifStorage.Open(key) is not { } stream)
+            return NotFound();
+
+        Response.Headers.CacheControl = "private, no-store";
+        Response.Headers["X-Content-Type-Options"] = "nosniff";
+        return File(stream, attachment.ContentType);
+    }
+
+    private async Task<(CommunicationGifAttachment? Gif, CommunicationGifAttachment? Photo)> SaveAttachmentsAsync(CancellationToken ct)
+    {
+        var files = (await Request.ReadFormAsync(ct).ConfigureAwait(false)).Files;
+        var gifFile = files.GetFile("File");
+        var photoFile = files.GetFile("Photo");
+        if ((gifFile is null && photoFile is null) ||
+            files.Count != (gifFile is null ? 0 : 1) + (photoFile is null ? 0 : 1))
+        {
+            throw new BadHttpRequestException("Could not upload the attachment. Please try again.");
+        }
+
+        var photo = photoFile is null ? null : await gifStorage.SavePhotoAsync(photoFile, ct).ConfigureAwait(false);
+        try
+        {
+            var gif = gifFile is null ? null : await gifStorage.SaveAsync(gifFile, ct).ConfigureAwait(false);
+            return (gif, photo);
+        }
+        catch
+        {
+            RemoveUnattached(photo);
+            throw;
+        }
+    }
+
+    private sealed class BlockInput
+    {
+        public BlockInput() { }
+
+        public Guid Id { get; init; }
+        public string? Type { get; init; }
+        public string? Text { get; init; }
+        public Guid? MediaKey { get; init; }
+    }
+
+    private static string GetBlockBody(IEnumerable<CommunicationContentBlock> blocks)
+        => string.Join("\n\n", blocks.Where(block => block.Type == "text").Select(block => block.Text));
+
+    private async Task<(IReadOnlyList<CommunicationContentBlock> Blocks, IReadOnlyList<CommunicationGifAttachment> Uploaded)>
+        ReadBlocksAsync(string json, BusinessCommunicationMessageDto? current, CancellationToken ct)
+    {
+        BlockInput?[]? input;
+        try { input = JsonSerializer.Deserialize<BlockInput?[]>(json, BlockJson); }
+        catch (JsonException) { throw InvalidBlocks(); }
+
+        if (input is null || input.Length is 0 or > MaxBlocks ||
+            input.Any(block => block is null || block.Id == Guid.Empty) ||
+            input.Select(block => block!.Id).Distinct().Count() != input.Length)
+            throw InvalidBlocks();
+
+        var files = (await Request.ReadFormAsync(ct).ConfigureAwait(false)).Files;
+        if (files.Sum(file => file.Length) > CommunicationGifStorage.MaxBlockUploadBytes)
+            throw new BadHttpRequestException("New attachments cannot exceed 8 MB per save.");
+
+        var remainingFiles = new HashSet<IFormFile>(files);
+        var retainedMedia = new HashSet<Guid>();
+        var blocks = new List<CommunicationContentBlock>(input.Length);
+        var uploaded = new List<CommunicationGifAttachment>();
+        try
+        {
+            foreach (var item in input)
+            {
+                var block = item!;
+                if (block.Type == "text" && !string.IsNullOrWhiteSpace(block.Text) && block.MediaKey is null)
+                {
+                    blocks.Add(new(block.Id, "text", block.Text.Trim(), null));
+                    continue;
+                }
+
+                if (block.Type is not ("photo" or "gif") || block.Text is not null)
+                    throw InvalidBlocks();
+
+                var file = files.GetFile($"Block-{block.Id:D}");
+                CommunicationGifAttachment? media;
+                if (file is not null && block.MediaKey is null && remainingFiles.Remove(file))
+                {
+                    media = block.Type == "photo"
+                        ? await gifStorage.SavePhotoAsync(file, ct).ConfigureAwait(false)
+                        : await gifStorage.SaveAsync(file, ct).ConfigureAwait(false);
+                    uploaded.Add(media);
+                }
+                else if (file is null && block.MediaKey is Guid key)
+                {
+                    media = current?.Blocks is { } previous
+                        ? previous.FirstOrDefault(candidate => candidate.Id == block.Id && candidate.Type == block.Type)?.Media
+                        : block.Type == "photo" ? current?.Photo : current?.Gif;
+                    if (media?.Key != key || !retainedMedia.Add(key))
+                        throw InvalidBlocks();
+                }
+                else
+                {
+                    throw InvalidBlocks();
+                }
+                blocks.Add(new(block.Id, block.Type, null, media));
+            }
+
+            if (remainingFiles.Count != 0)
+                throw InvalidBlocks();
+            return (blocks, uploaded);
+        }
+        catch
+        {
+            foreach (var file in uploaded) RemoveUnattached(file);
+            throw;
+        }
+    }
+
+    private static BadHttpRequestException InvalidBlocks()
+        => new("Invalid communication content blocks.");
+
+    private void RemoveUnattached(CommunicationGifAttachment? attachment)
+    {
+        if (attachment is null) return;
+        try { gifStorage.Remove(attachment.Key); }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        { logger.LogWarning(error, "Could not clean up an unattached communication image."); }
+    }
+
+    private async Task<BusinessCommunicationMessageDto> SaveMessageAsync(
+        CommunicationGifAttachment? gif, CommunicationGifAttachment? photo, Func<Task<BusinessCommunicationMessageDto>> save,
+        IReadOnlyList<CommunicationGifAttachment>? uploaded)
+    {
+        try { return await save().ConfigureAwait(false); }
+        catch (Exception error) when (error is ValidationException or KeyNotFoundException)
+        {
+            RemoveUnattached(gif);
+            RemoveUnattached(photo);
+            if (uploaded is not null)
+                foreach (var file in uploaded) RemoveUnattached(file);
+            throw;
+        }
     }
 
     [HttpDelete("{communicationId:int}")]
@@ -164,6 +380,9 @@ public sealed class CommunicationsController(
         Id = message.Id,
         Title = message.Title,
         Body = message.Body,
+        Blocks = message.Blocks,
+        Gif = message.Gif,
+        Photo = message.Photo,
         VisibleFromUtc = message.VisibleFromUtc,
         DeadlineAtUtc = message.DeadlineAtUtc,
         CreatedAtUtc = message.CreatedAtUtc,

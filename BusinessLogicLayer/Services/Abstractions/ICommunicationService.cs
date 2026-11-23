@@ -19,6 +19,8 @@ public interface ICommunicationService
 
     Task DeleteAsync(int communicationId, CancellationToken ct = default);
 
+    Task<CommunicationGifAttachment?> GetGifAsync(int communicationId, int? employeeId, CancellationToken ct = default, bool photo = false, Guid? key = null);
+
     Task<IReadOnlyList<CommunicationMessageDto>> GetPendingForEmployeeAsync(
         int employeeId,
         CancellationToken ct = default);

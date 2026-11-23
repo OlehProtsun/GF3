@@ -1,4 +1,10 @@
 [
+  "Invalid communication content blocks.",
+  "New attachments cannot exceed 8 MB per save.",
+  "Message is too long.",
+  "Could not upload the attachment. Please try again.",
+  "Unsupported file format",
+  "File too large",
   "Month closed by manager.",
   "No vacation requests.",
   "No shops available for vacation requests.",
@@ -149,5 +155,7 @@
   "This offer is awaiting manager approval.",
   "The offer is reserved while this pickup request awaits manager approval.",
   "The offer was cancelled by its owner.",
-  "Superseded by exclusive pending pickup request."
+  "Superseded by exclusive pending pickup request.",
+  "Choose a GIF no larger than 3 MB.",
+  "Choose a valid animated GIF up to 900 × 1600 pixels and 3 MB."
 ]

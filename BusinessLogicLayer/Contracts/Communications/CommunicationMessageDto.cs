@@ -2,6 +2,10 @@ namespace BusinessLogicLayer.Contracts.Communications;
 
 public sealed class CommunicationMessageDto
 {
+    public IReadOnlyList<CommunicationContentBlock>? Blocks { get; init; }
+    public CommunicationGifAttachment? Photo { get; set; }
+    public CommunicationGifAttachment? Gif { get; set; }
+
     public int Id { get; set; }
 
     public string Title { get; set; } = string.Empty;

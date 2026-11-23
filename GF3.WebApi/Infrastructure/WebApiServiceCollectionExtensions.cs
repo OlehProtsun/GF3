@@ -105,6 +105,7 @@ public static class WebApiServiceCollectionExtensions
         services.AddScoped<IRealtimeNotifier, RealtimeNotifier>();
         services.AddHttpContextAccessor();
         services.AddScoped<IWorkflowLogService, WorkflowLogService>();
+        services.AddScoped<CommunicationGifStorage>();
         services.AddScoped<EmployeeLaunchService>();
         services.AddScoped<ScheduleVersionCommitService>();
         services.AddScoped<WebApi.ShiftSwaps.ShiftSwapExecutionService>();

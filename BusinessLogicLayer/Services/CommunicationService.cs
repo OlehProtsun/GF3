@@ -1,3 +1,4 @@
+using System.Text.Json;
 using BusinessLogicLayer.Common;
 using BusinessLogicLayer.Contracts.Communications;
 using BusinessLogicLayer.Services.Abstractions;
@@ -58,6 +59,9 @@ public sealed class CommunicationService : ICommunicationService
                 {
                     Title = title,
                     Body = body,
+                    ContentBlocksJson = request.Blocks is null ? null : JsonSerializer.Serialize(request.Blocks),
+                    PhotoAttachmentJson = request.Photo is null ? null : JsonSerializer.Serialize(request.Photo),
+                    GifAttachmentJson = request.Gif is null ? null : JsonSerializer.Serialize(request.Gif),
                     VisibleFromUtc = visibleFromUtc,
                     DeadlineAtUtc = deadlineAtUtc,
                     CreatedAtUtc = nowUtc,
@@ -80,15 +84,46 @@ public sealed class CommunicationService : ICommunicationService
         var existing = await GetRequiredMessageAsync(communicationId, ct).ConfigureAwait(false);
         var nowUtc = DateTimeOffset.UtcNow;
         ApplyEditableFields(existing, request.Title, request.Body, request.VisibleFromUtc, request.DeadlineAtUtc, nowUtc);
+        existing.ContentBlocksJson = request.Blocks is null ? null : JsonSerializer.Serialize(request.Blocks);
+        if (request.Gif is not null)
+            existing.GifAttachmentJson = JsonSerializer.Serialize(request.Gif);
+        else if (request.RemoveGif)
+            existing.GifAttachmentJson = null;
 
-        await _communicationRepository.UpdateAsync(existing, ct).ConfigureAwait(false);
-        return ToDto(existing, nowUtc);
+        if (request.Photo is not null)
+            existing.PhotoAttachmentJson = JsonSerializer.Serialize(request.Photo);
+        else if (request.RemovePhoto)
+            existing.PhotoAttachmentJson = null;
+
+        if (!await _communicationRepository.UpdateMessageAsync(existing, request.Gif is not null || request.RemoveGif, request.Photo is not null || request.RemovePhoto, ct).ConfigureAwait(false))
+            throw new KeyNotFoundException($"Communication message with id {communicationId} was not found.");
+        return ToDto(await GetRequiredMessageAsync(communicationId, ct).ConfigureAwait(false), nowUtc);
     }
 
     public async Task DeleteAsync(int communicationId, CancellationToken ct = default)
     {
         _ = await GetRequiredMessageAsync(communicationId, ct).ConfigureAwait(false);
         await _communicationRepository.DeleteAsync(communicationId, ct).ConfigureAwait(false);
+    }
+
+    public async Task<CommunicationGifAttachment?> GetGifAsync(int communicationId, int? employeeId, CancellationToken ct = default, bool photo = false, Guid? key = null)
+    {
+        var message = await _communicationRepository.GetByIdAsync(communicationId, ct).ConfigureAwait(false);
+        if (message is null)
+            return null;
+
+        if (employeeId is int id)
+        {
+            var now = DateTimeOffset.UtcNow;
+            if ((message.VisibleFromUtc ?? message.CreatedAtUtc) > now || message.DeadlineAtUtc <= now ||
+                await _communicationRepository.DismissalExistsAsync(communicationId, id, ct).ConfigureAwait(false))
+                return null;
+        }
+
+        var blocks = ReadBlocks(message);
+        if (blocks is not null && key is Guid mediaKey)
+            return blocks.FirstOrDefault(block => block.Type == (photo ? "photo" : "gif") && block.Media?.Key == mediaKey)?.Media;
+        return photo ? ReadPhoto(message) : ReadGif(message);
     }
 
     public async Task<IReadOnlyList<CommunicationMessageDto>> GetPendingForEmployeeAsync(
@@ -147,6 +182,9 @@ public sealed class CommunicationService : ICommunicationService
         Id = message.Id,
         Title = message.Title,
         Body = message.Body,
+        Blocks = ReadBlocks(message),
+        Gif = ReadGif(message),
+        Photo = ReadPhoto(message),
         VisibleFromUtc = message.VisibleFromUtc ?? message.CreatedAtUtc,
         DeadlineAtUtc = message.DeadlineAtUtc,
         CreatedAtUtc = message.CreatedAtUtc,
@@ -156,6 +194,15 @@ public sealed class CommunicationService : ICommunicationService
             (message.VisibleFromUtc ?? message.CreatedAtUtc) <= nowUtc &&
             message.DeadlineAtUtc > nowUtc,
     };
+
+    private static IReadOnlyList<CommunicationContentBlock>? ReadBlocks(CommunicationMessageModel message)
+        => message.ContentBlocksJson is { } json ? JsonSerializer.Deserialize<CommunicationContentBlock[]>(json) : null;
+
+    private static CommunicationGifAttachment? ReadPhoto(CommunicationMessageModel message)
+        => message.PhotoAttachmentJson is { } json ? JsonSerializer.Deserialize<CommunicationGifAttachment>(json) : null;
+
+    private static CommunicationGifAttachment? ReadGif(CommunicationMessageModel message)
+        => message.GifAttachmentJson is { } json ? JsonSerializer.Deserialize<CommunicationGifAttachment>(json) : null;
 
     private async Task<CommunicationMessageModel> GetRequiredMessageAsync(int communicationId, CancellationToken ct)
     {
