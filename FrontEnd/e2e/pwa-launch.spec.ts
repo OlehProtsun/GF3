@@ -67,7 +67,7 @@ test("Not now survives reload in the same tab and leaves a fresh tab eligible", 
 
   const fresh = await context.newPage();
   try {
-    await fresh.route("**/*", route => new URL(route.request().url()).hostname === "localhost" ? route.fallback() : route.abort());
+    await fresh.route("**/*", route => ["localhost", "127.0.0.1", "[::1]"].includes(new URL(route.request().url()).hostname) ? route.fallback() : route.abort());
     await mockEmployee(fresh);
     await fresh.goto("/swap");
     await expect(fresh.getByRole("dialog", { name: installTitle })).toBeVisible();
