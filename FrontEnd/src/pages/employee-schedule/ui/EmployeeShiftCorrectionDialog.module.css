@@ -372,3 +372,7 @@
   .header { padding-block: 8px 4px; }
   .body, .footer { padding-block: 6px; }
 }
+
+@container (max-height: 250px) {
+  .commentInput { max-height: max(44px, calc(100cqh - 132px)); }
+}

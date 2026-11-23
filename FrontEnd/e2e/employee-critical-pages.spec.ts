@@ -1,4 +1,5 @@
-import { expect, test } from "@playwright/test";
+import { expect } from "@playwright/test";
+import { test } from "./fixtures/isolatedBackend";
 import {
   createEmployeeAccount,
   deleteEmployeeAccount,
@@ -134,7 +135,8 @@ test.describe("employee critical pages", () => {
         await loginWithCredentials(page, employee.username, employee.password);
         await page.goto("/schedule");
         const trigger = page.getByRole("button", { name: "Export schedule to PDF" });
-        const beforeScroll = await page.evaluate(() => window.scrollY);
+        await trigger.scrollIntoViewIfNeeded();
+        let beforeScroll = await page.evaluate(() => window.scrollY);
         if (fileAction === "download") {
           const [download] = await Promise.all([page.waitForEvent("download"), trigger.click()]);
           expect(download.suggestedFilename()).toBe("synthetic.pdf");
@@ -142,7 +144,11 @@ test.describe("employee critical pages", () => {
           await trigger.click();
           if (fileAction === "activation") {
             await expect(page.getByText("PDF is ready. Tap PDF again to share, or download it.")).toBeVisible();
-            await page.getByRole("button", { name: "Share PDF" }).click();
+            expect(await page.evaluate(() => window.scrollY)).toBe(beforeScroll);
+            const share = page.getByRole("button", { name: "Share PDF" });
+            await share.scrollIntoViewIfNeeded();
+            beforeScroll = await page.evaluate(() => window.scrollY);
+            await share.click();
           }
           await expect.poll(() => page.evaluate(() => Reflect.get(window, "pdfSharedFiles"))).toEqual([
             { name: "synthetic.pdf", type: "application/pdf", size: createSyntheticPdf().length },
@@ -172,7 +178,7 @@ test.describe("employee critical pages", () => {
 
     try {
       await loginWithCredentials(page, employee.username, employee.password);
-      await expect(page.getByRole("heading", { name: "Inbox" })).toBeVisible();
+      await expect(page.getByRole("tab", { name: /^Inbox/ })).toBeVisible();
 
       for (const route of employeeRoutes) {
         await page.goto(route.path);
@@ -192,7 +198,7 @@ test.describe("employee critical pages", () => {
       await page.goto("/database");
 
       await expect(page).toHaveURL(/\/$/);
-      await expect(page.getByRole("heading", { name: "Inbox" })).toBeVisible();
+      await expect(page.getByRole("tab", { name: /^Inbox/ })).toBeVisible();
       await expectNoRequestError(page);
     } finally {
       await deleteEmployeeAccount(request, employee.id, employee.managerAccessToken);

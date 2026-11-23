@@ -1,8 +1,8 @@
-import { expect, test, type Request } from "@playwright/test";
+import { expect, test, type APIRequestContext, type APIResponse, type Request } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
-
-if (process.env.GF3_PICKUP_LIVE_CONFIG) test.use({ trace: "off", video: "off", screenshot: "off" });
+import { test as liveTest } from "./fixtures/isolatedBackend";
+import { loginWithCredentials } from "./helpers";
 
 test("isolated contract workflow: manager settings, pending pickup, publication review, exception and availability", async ({ page }) => {
   test.setTimeout(180_000);
@@ -198,18 +198,15 @@ test("isolated contract workflow: manager settings, pending pickup, publication 
   expect(errors).toEqual([]);
 });
 
-test.describe("real pickup approval with local accounts", () => {
-  test.skip(!process.env.GF3_PICKUP_LIVE_CONFIG, "Requires an isolated local database and temporary account configuration.");
-  test.describe.configure({ mode: "serial" });
-
+liveTest.describe("real pickup approval with local accounts", () => {
   const translations: Record<string, string>[] = ["pl", "uk"].map(language =>
     JSON.parse(readFileSync(new URL(`../src/shared/i18n/${language}.json`, import.meta.url), "utf8")));
   const label = (key: string) => new RegExp(`^(?:${[key, ...translations.map(messages => messages[key] ?? key)]
     .map(value => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})$`);
   type Credentials = { username: string; password: string };
-  type LiveFixture = { containerId: number; scheduleId: number; slotIds: number[]; days: number[]; year: number; month: number; name: string };
+  type LiveFixture = { containerId: number; scheduleId: number; slotId: number; day: number; year: number; month: number; name: string };
   type LiveConfig = { baseURL: string; databasePath: string; ownerId: number; recipientId: number;
-    credentials: Record<"manager" | "owner" | "recipient", Credentials>; fixtures: Record<string, LiveFixture> };
+    credentials: Record<"manager" | "owner" | "recipient", Credentials>; fixture: LiveFixture };
   type DbState = { owner: number; versions: number; histories: number; indexExists: boolean;
     offer: { status: string; acceptedBy: number | null } | null;
     approvals: Array<{ id: number; status: string; employeeId: number }> };
@@ -228,14 +225,58 @@ with sqlite3.connect(Path(sys.argv[1]).as_uri()+'?mode=ro',uri=True) as db:
       'approvals':[{'id':r[0],'status':r[1],'employeeId':r[2]} for r in db.execute('select id,status,employee_id from contract_shift_approval_request where shift_swap_request_id=? order by id',(offer,))]}))
 `, config.databasePath, String(fixture.scheduleId), String(slotId), String(offerId)], { encoding: "utf8" }));
 
+  async function setupPickup(request: APIRequestContext, baseURL: string, databasePath: string): Promise<LiveConfig> {
+    async function read<T>(response: APIResponse): Promise<T> {
+      if (!response.ok()) throw new Error(`${new URL(response.url()).pathname}: HTTP ${response.status()} ${await response.text()}`);
+      return response.json();
+    }
+    const credentials = {
+      manager: { username: "manager", password: "123456" },
+      owner: { username: "pickup-test-owner", password: "824681" },
+      recipient: { username: "pickup-test-recipient", password: "824682" },
+    };
+    const login = await read<{ accessToken: string }>(await request.post("/api/auth/login", { data: credentials.manager }));
+    const pc = await read<{ accessToken: string }>(await request.post("/api/auth/manager-mode", {
+      headers: { Authorization: `Bearer ${login.accessToken}` }, data: { mode: "pc" },
+    }));
+    const headers = { Authorization: `Bearer ${pc.accessToken}` };
+    const create = async (path: string, data: unknown) => read<{ id: number }>(await request.post(path, { headers, data }));
+    const owner = await create("/api/employees", { ...credentials.owner, firstName: "Owner", lastName: "Fixture", contractType: "o_prace" });
+    const recipient = await create("/api/employees", { ...credentials.recipient, firstName: "Recipient", lastName: "Fixture", contractType: "zlecenie" });
+    await read(await request.put("/api/employment-contract-settings", {
+      headers, data: { restrictSwapsToEightHours: true, requirePickupApproval: true,
+        requireBelowMinimumGiveApproval: false, automaticWeekdayAvailability: false },
+    }));
+    const container = await create("/api/containers", { name: "Pickup test container" });
+    const shop = await create("/api/shops", { name: "Pickup test shop", address: "Fixture address" });
+    const now = new Date();
+    const period = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 5));
+    const year = period.getUTCFullYear(), month = period.getUTCMonth() + 1, day = period.getUTCDate();
+    const name = "Pickup test schedule";
+    const graphs = `/api/containers/${container.id}/graphs`;
+    const graph = await create(graphs, {
+      shopId: shop.id, name, year, month, peoplePerShift: 1, shift1Time: "09:00 - 17:00",
+      shift2Time: "17:00 - 21:00", maxHoursPerEmpMonth: 160, maxConsecutiveDays: 5, maxConsecutiveFull: 3, maxFullPerMonth: 10,
+    });
+    await create(`${graphs}/${graph.id}/employees`, { employeeId: owner.id, displayOrder: 0 });
+    await create(`${graphs}/${graph.id}/employees`, { employeeId: recipient.id, displayOrder: 1 });
+    const slot = await create(`${graphs}/${graph.id}/slots`, {
+      dayOfMonth: day, slotNo: 1, fromTime: "09:00", toTime: "17:00", employeeId: owner.id, status: 1,
+    });
+    const published = await request.put(`${graphs}/publication`, {
+      headers, data: { publicationStatus: "public", allowSwap: true },
+    });
+    expect(published.status()).toBe(204);
+    return { baseURL, databasePath, ownerId: owner.id, recipientId: recipient.id, credentials,
+      fixture: { containerId: container.id, scheduleId: graph.id, slotId: slot.id, day, year, month, name } };
+  }
+
   for (const action of ["approve", "reject"] as const) {
-    test(`opr publishes, amin requests, manager ${action}s using the actual API and database`, async ({ browser }, testInfo) => {
-      test.setTimeout(180_000);
-      const config: LiveConfig = JSON.parse(readFileSync(process.env.GF3_PICKUP_LIVE_CONFIG!, "utf8").replace(/^\uFEFF/, ""));
-      expect(["127.0.0.1", "localhost"]).toContain(new URL(config.baseURL).hostname);
-      const fixture = config.fixtures[testInfo.project.name];
-      expect(fixture.name).toMatch(/^__pickup_debug_/);
-      const slotIndex = action === "approve" ? 0 : 1, slotId = fixture.slotIds[slotIndex], day = fixture.days[slotIndex];
+    liveTest(`owner publishes, recipient requests, manager ${action}s using the actual API and database`, async ({ browser, request, isolatedBackend }, testInfo) => {
+      liveTest.setTimeout(180_000);
+      const config = await setupPickup(request, isolatedBackend.url, isolatedBackend.databasePath);
+      const { fixture } = config;
+      const { slotId, day } = fixture;
       const contexts: Awaited<ReturnType<typeof browser.newContext>>[] = [];
       const evidence: Record<string, unknown> = { action, scheduleId: fixture.scheduleId, slotId, ownerId: config.ownerId, recipientId: config.recipientId };
       const api = async (page: import("@playwright/test").Page, method: string, path: string, body?: unknown) => page.evaluate(async input => {
@@ -245,25 +286,10 @@ with sqlite3.connect(Path(sys.argv[1]).as_uri()+'?mode=ro',uri=True) as db:
         return { status: response.status, body: await response.json() };
       }, { method, path, body });
       const login = async (role: "manager" | "owner" | "recipient") => {
-        const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } }); contexts.push(context);
+        const context = await browser.newContext({ baseURL: config.baseURL, viewport: { width: 1440, height: 1000 } }); contexts.push(context);
         const page = await context.newPage(); page.setDefaultTimeout(15_000);
         try {
-          await page.goto(`${config.baseURL}/login`);
-          await page.locator("#login-username").fill(config.credentials[role].username);
-          await page.locator("#login-password").fill(config.credentials[role].password);
-          const [loginResponse] = await Promise.all([
-            page.waitForResponse(response => response.request().method() === "POST" && new URL(response.url()).pathname === "/api/auth/login"),
-            page.locator("button[type=submit]").click(),
-          ]);
-          expect(loginResponse.status(), `Local ${role} test account login must succeed before exercising pickups`).toBe(200);
-          await page.waitForURL(url => !url.pathname.includes("login"));
-          if (role === "manager") {
-            await Promise.all([
-              page.waitForResponse(response => response.request().method() === "POST" && new URL(response.url()).pathname === "/api/auth/manager-mode"),
-              page.getByRole("button").filter({ has: page.getByText(label("PC"), { exact: true }) }).click(),
-            ]);
-            await expect(page.getByRole("heading", { name: label("Choose workspace") })).toHaveCount(0);
-          }
+          await loginWithCredentials(page, config.credentials[role].username, config.credentials[role].password);
           return page;
         } catch (error) {
           const message = Object.values(config.credentials).reduce((text, credentials) => text.split(credentials.password).join("[redacted]"), String(error));
@@ -318,12 +344,13 @@ with sqlite3.connect(Path(sys.argv[1]).as_uri()+'?mode=ro',uri=True) as db:
         expect(ownVisible.isAwaitingManagerApproval).toBe(true);
         await manager.goto(`${config.baseURL}/container/${fixture.containerId}/graphs/${fixture.scheduleId}/edit`);
         const collapseSidebar = manager.getByRole("button", { name: label("Collapse sidebar") });
-        await collapseSidebar.waitFor({ state: "visible" });
-        await collapseSidebar.click();
-        await expect(manager.getByRole("button", { name: label("Open sidebar") })).toBeVisible();
+        if (await collapseSidebar.isVisible()) await collapseSidebar.click();
         await manager.mouse.move(1350, 900);
         await manager.getByRole("button", { name: label("Expand Publication") }).click(); console.log(`pickup-live ${action}: Publication opened`);
-        const reviews = manager.getByRole("region", { name: label("Contract approvals") });
+        await manager.getByRole("button", { name: label("Open details") }).click();
+        const activity = manager.getByRole("dialog", { name: label("Schedule Activity") });
+        await activity.getByRole("tab", { name: /Shift Corrections/ }).click();
+        const reviews = activity.getByRole("region", { name: label("Contract approvals") });
         await reviews.locator(`button[aria-controls="contract-approval-${claim.id}"]`).click();
         const row = reviews.locator("article").filter({ hasText: new RegExp(`#${offer.id}(?!\\d)`) });
         await expect(row.getByText(label("Pending"), { exact: true })).toBeVisible();

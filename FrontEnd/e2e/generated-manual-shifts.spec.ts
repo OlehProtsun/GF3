@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { assertIsolatedBackend } from "./fixtures/isolatedBackend";
 
 test.use({ actionTimeout: 10_000, launchOptions: process.platform === "win32" ? { ignoreDefaultArgs: ["--disable-accelerated-compositing"] } : {} });
 
@@ -14,15 +15,19 @@ test("real backend manual acceptance persists and refreshes both colored cells",
   test.skip(!process.env.GF3_LIVE_URL, "Run through ManualShiftHighlightTests with GF3_RUN_LIVE_BROWSER=1 for an isolated authenticated SQLite backend.");
   test.setTimeout(90_000);
   const url = process.env.GF3_LIVE_URL!;
+  await assertIsolatedBackend(url, process.env.GF3_LIVE_INSTANCE ?? "", process.env.GF3_LIVE_DATABASE);
   const graphId = Number(process.env.GF3_LIVE_GRAPH);
   const containerId = Number(process.env.GF3_LIVE_CONTAINER);
-  const day = testInfo.project.name === "chromium" ? 10 : 11;
+  const day = { chromium: 10, "webkit-laptop": 11, "webkit-iphone-x": 13, "mobile-chrome": 14 }[testInfo.project.name]!;
   const graphPath = `/api/containers/${containerId}/graphs/${graphId}`;
   const manager = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   const employee = await browser.newContext({ viewport: { width: 390, height: 844 } });
   try {
     for (const [context, token] of [[manager, process.env.GF3_LIVE_MANAGER_TOKEN!], [employee, process.env.GF3_LIVE_EMPLOYEE_TOKEN!]] as const) {
-      await context.addInitScript(value => localStorage.setItem("gf3.auth.access-token", value), token);
+      await context.addInitScript(value => {
+        localStorage.setItem("gf3.auth.access-token", value);
+        sessionStorage.setItem("gf3.pwa.install.dismissed", "1");
+      }, token);
     }
     const managerPage = await manager.newPage();
     await managerPage.goto(`${url}/container/${containerId}/graphs/${graphId}/edit`);

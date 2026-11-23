@@ -1,4 +1,5 @@
-import { expect, test } from "@playwright/test";
+import { expect } from "@playwright/test";
+import { test } from "./fixtures/isolatedBackend";
 import { loginAsManager, loginWithCredentials } from "./helpers";
 
 test.describe("manager sidebar layout", () => {

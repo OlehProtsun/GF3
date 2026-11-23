@@ -10,7 +10,9 @@ using WebApi.Services;
 
 var maintenanceMigration = args is ["--gf3-maintenance-migrate"];
 var maintenanceHealth = args is ["--gf3-maintenance-health"];
-var builder = WebApplication.CreateBuilder(maintenanceMigration || maintenanceHealth ? [] : args);
+var browserTest = args is ["--gf3-e2e"];
+var builder = WebApplication.CreateBuilder(maintenanceMigration || maintenanceHealth || browserTest ? [] : args);
+var browserTestStartup = BrowserTestStartup.Configure(builder, browserTest);
 if (maintenanceMigration || maintenanceHealth)
 {
     if (!builder.Environment.IsProduction() ||
@@ -57,7 +59,9 @@ TrustedProxyConfiguration.Configure(builder.Services, builder.Configuration, bui
 
 var app = builder.Build();
 
+browserTestStartup?.VerifyDatabase(app);
 await DatabaseMigrationStartup.ApplyAsync(app);
+browserTestStartup?.MapReadiness(app);
 if (maintenanceMigration)
 {
     await app.DisposeAsync();

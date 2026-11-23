@@ -1,4 +1,5 @@
-import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
+import { expect, type APIRequestContext, type Page } from "@playwright/test";
+import { test } from "./fixtures/isolatedBackend";
 import { createEmployeeAccount, deleteEmployeeAccount, expectNoRequestError, loginAsManager } from "./helpers";
 
 test.use({ actionTimeout: 10_000 });

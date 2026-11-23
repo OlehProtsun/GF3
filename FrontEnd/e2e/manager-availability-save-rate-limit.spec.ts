@@ -1,9 +1,5 @@
-import { spawn, type ChildProcess } from "node:child_process";
-import { once } from "node:events";
-import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
 import { expect, request, test, type APIRequestContext, type APIResponse, type Page } from "@playwright/test";
+import { startIsolatedBackend } from "./fixtures/isolatedBackend";
 import type { AvailabilityGroup, AvailabilitySlot } from "../src/entities/availability-groups/model/types";
 import type { SaveAvailabilityGroupGraphDto, SaveAvailabilityGroupGraphResult } from "../src/entities/availability-groups/api/dto";
 
@@ -12,8 +8,7 @@ const saveGraphPath = root + "/save-graph";
 const employees = Array.from({ length: 5 }, (_, index) => `AvailabilityFixture${index + 1}`);
 const employeeName = (index: number) => `${employees[index]} Worker`;
 
-let backend: ChildProcess | undefined;
-let directory: string | undefined;
+let backend: Awaited<ReturnType<typeof startIsolatedBackend>> | undefined;
 let backendUrl: string;
 let api: APIRequestContext;
 let token: string;
@@ -27,44 +22,11 @@ async function read<T>(response: APIResponse): Promise<T> {
 }
 
 test.beforeAll(async () => {
-  directory = await mkdtemp(join(tmpdir(), "gf3-availability-e2e-"));
-  const apiProject = resolve("../GF3.WebApi");
-  const password = "263819";
-  backend = spawn("dotnet", [join(apiProject, "bin", "Debug", "net10.0", "WebApi.dll"), "--urls", "http://127.0.0.1:0"], {
-    cwd: apiProject,
-    env: {
-      ...process.env,
-      ASPNETCORE_ENVIRONMENT: "Testing",
-      DOTNET_ENVIRONMENT: "Testing",
-      ConnectionStrings__Default: `Data Source=${join(directory, "availability.db")}`,
-      DatabaseStartup__RequireExistingDatabase: "false",
-      GF3_BOOTSTRAP_MANAGER_PASSWORD: password,
-      Jwt__SigningKey: "synthetic-availability-browser-fixture-only-signing-key",
-      Logging__LogLevel__Default: "Warning",
-      "Logging__LogLevel__Microsoft.Hosting.Lifetime": "Information",
-    },
-    windowsHide: true,
-  });
-  const child = backend;
-  backendUrl = await new Promise<string>((ready, reject) => {
-    let output = "";
-    const deadline = setTimeout(() => reject(new Error(`Local Web API did not start:\n${output}`)), 25_000);
-    child.on("error", error => { clearTimeout(deadline); reject(error); });
-    child.on("exit", code => { clearTimeout(deadline); reject(new Error(`Local Web API exited with ${code}:\n${output}`)); });
-    const collect = (chunk: Buffer) => {
-      output = (output + chunk.toString()).slice(-6000);
-      const match = /Now listening on: (http:\/\/127\.0\.0\.1:\d+)/.exec(output);
-      if (match) {
-        clearTimeout(deadline);
-        ready(match[1]);
-      }
-    };
-    child.stdout?.on("data", collect);
-    child.stderr?.on("data", collect);
-  });
+  backend = await startIsolatedBackend();
+  backendUrl = backend.url;
   const auth = await request.newContext({ baseURL: backendUrl });
   try {
-    const login = await read<{ accessToken: string }>(await auth.post("/api/auth/login", { data: { username: "manager", password } }));
+    const login = await read<{ accessToken: string }>(await auth.post("/api/auth/login", { data: { username: "manager", password: "123456" } }));
     const pc = await read<{ accessToken: string }>(await auth.post("/api/auth/manager-mode", {
       headers: { Authorization: `Bearer ${login.accessToken}` }, data: { mode: "pc" },
     }));
@@ -82,13 +44,11 @@ test.beforeAll(async () => {
 });
 
 test.afterAll(async () => {
-  await api?.dispose();
-  if (backend?.pid && backend.exitCode === null && backend.signalCode === null) {
-    const exited = once(backend, "exit");
-    backend.kill();
-    await exited;
+  try {
+    await api?.dispose();
+  } finally {
+    await backend?.close();
   }
-  if (directory) await rm(directory, { recursive: true, force: true, maxRetries: 3 });
 });
 
 type Failure = "rate-limit" | "lost-response";

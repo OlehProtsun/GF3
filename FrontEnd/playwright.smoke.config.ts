@@ -14,7 +14,8 @@ export default defineConfig({
   webServer: {
     command: "npm run dev -- --host localhost",
     url: "http://localhost:5173/login",
-    reuseExistingServer: !process.env.CI,
+    env: { GF3_E2E_NO_PROXY: "1" },
+    reuseExistingServer: false,
     timeout: 120_000,
   },
   projects: [

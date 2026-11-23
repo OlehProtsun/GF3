@@ -6,7 +6,10 @@ test.describe.configure({ mode: "parallel" });
 
 // Match the authenticated API interception used by schedule-hero and swap-restoration.
 async function fixture(page: Page, role = "employee") {
-  await page.addInitScript(() => localStorage.setItem("gf3.auth.access-token", "phone-layout-fixture"));
+  await page.addInitScript(() => {
+    localStorage.setItem("gf3.auth.access-token", "phone-layout-fixture");
+    sessionStorage.setItem("gf3.pwa.install.dismissed", "1");
+  });
   await page.route("**/*", async route => {
     const path = new URL(route.request().url()).pathname;
     if (!path.startsWith("/api/")) return route.continue();
@@ -16,14 +19,14 @@ async function fixture(page: Page, role = "employee") {
     else if (path === "/api/employee-profile/me") body = { employeeId: 12, username: "worker", displayName: "Worker with a long account name", recoveryEmail: "worker@example.com" };
     else if (path === "/api/employee-ui-state") body = { scheduleColumnOrders: {}, readNotificationIds: [], pinnedSwapIds: [] };
     else if (path.includes("notepad")) body = { notes: [], state: { isExpanded: false, isPinned: false, height: 700 } };
-    else if (path === "/api/employee-availability") body = [{ id: 5, name: "Availability", year: 2026, month: 9, canSubmit: true, isEditLocked: false, visibleFromUtc: "2026-09-01T08:00:00Z", visibleToUtc: "2026-10-01T18:00:00Z", slots: [], members: [{ employeeId: 12, firstName: "Worker", lastName: "Bee", displayOrder: 2, slots: [] }, { employeeId: 13, firstName: "Anna", lastName: "First", displayOrder: 1, slots: [] }] }];
+    else if (path === "/api/employee-availability") body = [{ id: 5, name: "Team availability", year: 2026, month: 9, canSubmit: true, isEditLocked: false, visibleFromUtc: "2026-09-01T08:00:00Z", visibleToUtc: "2026-10-01T18:00:00Z", slots: [], members: [{ employeeId: 12, firstName: "Worker", lastName: "Bee", displayOrder: 2, slots: [] }, { employeeId: 13, firstName: "Anna", lastName: "First", displayOrder: 1, slots: [] }] }];
     else if (path === "/api/employee-schedules") body = [{
       id: 10, containerId: 2, containerName: "Team", shopId: 4, shopName: "Central", name: "September", year: 2026, month: 9, publicationStatus: "public", allowSwap: true, publishedAtUtc: new Date().toISOString(),
       employees: [{ id: 1, employeeId: 12, firstName: "Test", lastName: "Worker", displayName: "Test Worker", minHoursMonth: 0, displayOrder: 1 }],
       slots: [{ id: 100, dayOfMonth: 1, slotNo: 1, employeeId: 12, fromTime: "08:00", toTime: "16:00", status: "ASSIGNED" }],
     }];
     else if (path === "/api/employee-shift-swaps") body = Array.from({ length: 12 }, (_, index) => ({
-      id: index + 1, scheduleId: 10, scheduleSlotId: 100, scheduleName: `Offer ${index + 1}`, containerName: "Team", shopName: "Central", year: 2026, month: 9, dayOfMonth: index + 1, fromTime: "08:00", toTime: "16:00", fromEmployeeId: 2, fromEmployeeName: "Other Worker", visibility: "public", status: "open", createdAtUtc: new Date().toISOString(), shiftHours: 8, canAccept: true, canCancel: false, isCreatedByCurrentEmployee: false,
+      id: index + 1, scheduleId: 10, scheduleSlotId: 100, scheduleName: index === 11 ? "Weekend team" : `Offer ${index + 1}`, containerName: "Team", shopName: "Central", year: 2026, month: 9, dayOfMonth: index + 1, fromTime: "08:00", toTime: "16:00", fromEmployeeId: 2, fromEmployeeName: "Other Worker", visibility: "public", status: "open", createdAtUtc: new Date().toISOString(), shiftHours: 8, canAccept: true, canCancel: false, isCreatedByCurrentEmployee: false,
     }));
     else if (path.includes("negotiate")) return route.fulfill({ status: 503 });
     await route.fulfill({ contentType: "application/json", body: JSON.stringify(body) });
@@ -128,9 +131,24 @@ for (const width of [320, 375, 430]) {
     const dialog = page.getByRole("dialog", { name: "Request a shift change" });
     const close = dialog.getByRole("button", { name: "Close shift correction dialog" });
     const comment = dialog.getByRole("textbox", { name: "Comment (optional)" });
-    const scroller = comment.locator("../..");
-    await dialog.getByRole("button", { name: "Change start time from 08:00" }).click();
-    const time = dialog.getByLabel("New start time");
+    const scroller = dialog.locator('[class*="body_"]');
+    const next = dialog.getByRole("button", { name: "Continue", exact: true });
+    const time = dialog.getByLabel("Start time", { exact: true });
+    async function chooseShift() {
+      await dialog.getByRole("button", { name: /September/ }).click();
+      await next.click();
+      await dialog.getByRole("radio", { name: /08:00 – 16:00/ }).click();
+      await next.click();
+    }
+
+    await chooseShift();
+    await time.evaluate(element => element.focus({ preventScroll: true }));
+    await setVisualViewport(page, { height: 310, top: 64 });
+    await expectVisibleField(time, scroller);
+    await expect(time).toHaveValue("08:00");
+    await setVisualViewport(page, null);
+    await time.fill("08:15");
+    await next.click();
 
     await comment.evaluate(element => element.focus({ preventScroll: true }));
     await setVisualViewport(page, { height: 310, top: 64 });
@@ -141,10 +159,6 @@ for (const width of [320, 375, 430]) {
     await expect(comment).toHaveValue("First edited line\nSecond line");
     await expectVisibleField(comment, scroller);
 
-    await time.evaluate(element => element.focus({ preventScroll: true }));
-    await expectVisibleField(time, scroller);
-    await expect(time).toHaveValue("08:00");
-    await comment.evaluate(element => element.focus({ preventScroll: true }));
     await page.setViewportSize({ width: 670, height: 375 });
     await setVisualViewport(page, { height: 200, top: 52 });
     await expectVisibleField(comment, scroller);
@@ -158,6 +172,9 @@ for (const width of [320, 375, 430]) {
     await page.setViewportSize({ width, height: 812 });
 
     await adjust.evaluate(element => (element as HTMLButtonElement).click());
+    await chooseShift();
+    await time.fill("08:15");
+    await next.click();
     await expect(comment).toHaveValue("");
     await comment.scrollIntoViewIfNeeded();
     await expect(comment).toBeInViewport({ ratio: 1 });
@@ -205,7 +222,7 @@ async function oneColumn(page: Page, selector: string) {
 
 async function responsiveContent(page: Page, route: string) {
   if (route === "/availability") {
-    await page.getByRole("button", { name: /^Availability / }).click();
+    await page.getByRole("button", { name: /^Team availability / }).click();
     await expect(page.getByRole("button", { name: /your availability/i }).first()).toBeVisible();
     await oneColumn(page, 'main [class*="shell_"]');
     await expect(page.getByRole("table").getByRole("row")).toHaveCount(31);
@@ -291,7 +308,7 @@ test("Swap search, filters, independent scroll and dialogs", async ({ page }) =>
   await page.goto("/swap");
   await responsiveContent(page, "/swap");
   const search = page.getByRole("searchbox", { name: "Search swaps by giver, receiver, date or schedule" });
-  await search.fill("Offer 12");
+  await search.fill("Weekend team");
   await expect(page.locator('[class*="offerCard_"]')).toHaveCount(1);
   await search.fill("");
   await expect(page.locator('[class*="offerCard_"]')).toHaveCount(12);

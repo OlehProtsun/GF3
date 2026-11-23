@@ -108,13 +108,15 @@ for (const width of [320, 375, 390, 430]) {
     await page.getByRole("dialog").getByRole("radio", { name: /^Not available/ }).click();
     await page.getByRole("dialog").getByRole("button", { name: "Save", exact: true }).click();
     await page.getByRole("button", { name: "Save availability", exact: true }).click();
+    const success = page.getByRole("button", { name: "Close success message" });
+    await expect(success).toBeVisible();
     await expect.poll(() => puts.length).toBe(1);
     expect(Object.keys(puts[0])).toEqual(["slots"]);
     expect(puts[0].slots).toHaveLength(31);
     expect(puts[0].slots[0]).toEqual({ dayOfMonth: 1, kind: 0, intervalStr: null });
     expect(puts[0].slots.slice(1, 4).map(slot => slot.intervalStr)).toEqual(Array(3).fill("15:00 - 21:00"));
     expect(puts[0].slots[4].kind).toBe(1);
-    await page.getByRole("button", { name: "Close success message" }).click();
+    await expect(success).toBeHidden();
     const summary = page.getByRole("region", { name: "Estimated working hours" });
     await expect(summary).toContainText("~15–25 h");
     await expect(summary).toContainText("Actual scheduled hours may differ.");
