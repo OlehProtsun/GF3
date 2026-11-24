@@ -92,7 +92,6 @@ def rehearse_migrations(root, snapshot_path):
     for prefix in range(len(added) + 1):
         prefix_db = prefix_directory / f"prefix-{prefix}.db"
         assert prefix_db.is_file(), f"Synthetic EF prefix {prefix} is missing"
-        maintenance.preserve_reviewed_correction_sequence(frozen, prefix_db)
         assert maintenance.verify_no_data_drift(frozen, prefix_db, columns, target) == prefix
     recovered = root / "maintenance-recovered.db"
     maintenance.snapshot(frozen, recovered, before)
@@ -213,6 +212,8 @@ def maintenance_scenario(root, previous, candidate, baseline, git_dir, before, s
         return original_verify(bundle, acme, address)
 
     def simulate_restart(*args):
+        if scenario == "migration-before-start":
+            raise release.ReleaseError("Synthetic failure before the first migration")
         if scenario == "fence-lost":
             # Exercise the same hazards as a reboot without rebooting the GitHub runner:
             # the kernel table disappears and the Docker daemon re-reads restart policies.
@@ -240,7 +241,7 @@ def maintenance_scenario(root, previous, candidate, baseline, git_dir, before, s
                 release.maintenance_cutover(maintenance, journal, candidate, previous, before, sha, baseline,
                                             historical, expected, columns)
             except release.ReleaseError as error:
-                if scenario in {"migration-failure", "git-failure", "guard-failure"}:
+                if scenario in {"migration-before-start", "migration-failure", "git-failure", "guard-failure"}:
                     assert "were recovered" in str(error), str(error)
                 elif scenario == "fence-lost":
                     assert journal.read()["phase"] == "RECOVERY_REQUIRED" and not (data / "failed-database").exists()
@@ -266,7 +267,7 @@ def maintenance_scenario(root, previous, candidate, baseline, git_dir, before, s
             else:
                 assert scenario == "success"
         assert release.topology() == baseline
-        recovered = scenario in {"migration-failure", "git-failure", "guard-failure"}
+        recovered = scenario in {"migration-before-start", "migration-failure", "git-failure", "guard-failure"}
         activated = previous if recovered else candidate
         assert release.active_bundle() == activated
         assert maintenance.media_stamp(database.parent / maintenance.MEDIA_DIRECTORY) == media_before
@@ -716,7 +717,8 @@ if __name__ == "__main__":
     import sys
 
     scenarios = ("success", "migration-failure", "git-failure", "guard-failure", "failure-after-open", "fence-lost")
-    if len(sys.argv) in (2, 3) and sys.argv[1] in (*scenarios, "partial-restore"):
+    reviewed_scenarios = (*scenarios, "migration-before-start", "partial-restore")
+    if len(sys.argv) in (2, 3) and sys.argv[1] in reviewed_scenarios:
         assert os.geteuid() == 0 and os.environ.get("GF3_DISPOSABLE_CI_RUNNER") == "true"
         os.umask(0o077)
         historical_pair = len(sys.argv) == 3
@@ -732,7 +734,7 @@ if __name__ == "__main__":
             repo = HERE.parents[1]
             build_rehearsal_image(repo, HISTORICAL_PRIOR, "gf3-web:maintenance-prior")
             build_rehearsal_image(repo, HISTORICAL_TARGET, HISTORICAL_TARGET_IMAGE)
-            for case in (*scenarios, "partial-restore"):
+            for case in reviewed_scenarios:
                 subprocess.run(["sudo", "-n", "env", "GF3_DISPOSABLE_CI_RUNNER=true",
                                 "/usr/bin/python3", "-u", str(Path(__file__).resolve()), case], check=True)
             for case in scenarios:

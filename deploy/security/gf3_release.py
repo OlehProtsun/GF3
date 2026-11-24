@@ -1212,6 +1212,7 @@ def maintenance_cutover(tool, transaction, candidate, previous, current, target,
         transaction.advance("READY_TO_REOPEN")
         reopen(candidate, closed, target, "COMPLETED")
     except (Exception, KeyboardInterrupt) as error:
+        recovery_failure = None
         try:
             state = transaction.read()
             if (state["phase"] in {"MIGRATING", "VERIFYING", "ACTIVATING_GIT"}
@@ -1221,6 +1222,8 @@ def maintenance_cutover(tool, transaction, candidate, previous, current, target,
                     stop_maintenance_stack(previous)
                     quiet()
                     stable_database = tool.database_stamp(database)
+                    require(tool.media_stamp(database.parent / tool.MEDIA_DIRECTORY) == state["backup"]["media_stamp"],
+                            "Communication media changed after the final backup")
                     tool.verify_no_data_drift(transaction.bundle / "final.db", database, columns, target_ids)
                     tool.restore_database(database, transaction.bundle, state["backup"], quiet,
                                           lambda: transaction.advance("RESTORING"), stable_database,
@@ -1229,14 +1232,18 @@ def maintenance_cutover(tool, transaction, candidate, previous, current, target,
                     transaction.advance("RECOVERY_READY")
                 reopen(previous, previous_closed, current, "RECOVERED")
                 raise ReleaseError("Maintenance failed and the verified prior database and release were recovered") from None
-        except ReleaseError:
+        except ReleaseError as recovery_error:
             if not os.path.lexists(transaction.path):
                 raise
-        except (Exception, KeyboardInterrupt):
-            pass
+            recovery_failure = str(recovery_error)
+        except (Exception, KeyboardInterrupt) as recovery_error:
+            recovery_failure = (str(recovery_error) if isinstance(recovery_error, tool.MaintenanceError)
+                                else type(recovery_error).__name__)
         detail = str(error) if isinstance(error, (ReleaseError, tool.MaintenanceError)) else type(error).__name__
         if isinstance(error, sqlite3.Error):
             detail += f" ({getattr(error, 'sqlite_errorname', 'SQLite failure')})"
+        if recovery_failure:
+            detail += f"; rollback could not complete: {recovery_failure}"
         transaction.fail(detail)
         raise ReleaseError(f"Maintenance needs intervention: {detail}. Retained transaction: {transaction.bundle}") from None
 

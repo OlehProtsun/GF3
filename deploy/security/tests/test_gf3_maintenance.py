@@ -170,6 +170,26 @@ class MaintenanceTests(unittest.TestCase):
                          ("20261115135735_RefreshManualShiftOffer",) + maintenance.REVIEWED_RELEASE_MIGRATIONS)
         self.assertTrue(all(len(item["tables"]) == len(maintenance.REVIEWED_SCHEMA_TABLES) for item in contracts))
 
+    def test_correction_sequence_accepts_only_the_reviewed_rebuild_value_before_rollback(self):
+        for path, high in ((self.snapshot, 9001), (self.clone, 4)):
+            with closing(sqlite3.connect(path)) as db, db:
+                db.executescript("CREATE TABLE shift_correction_request(id INTEGER PRIMARY KEY AUTOINCREMENT);"
+                                 "INSERT INTO shift_correction_request VALUES (4);")
+                db.execute("UPDATE sqlite_sequence SET seq=?", (high,))
+        with closing(sqlite3.connect(self.snapshot)) as before, closing(sqlite3.connect(self.clone)) as after:
+            self.assertEqual(maintenance.reviewed_correction_sequence(before, after, 4), (9001, 4))
+            with self.assertRaisesRegex(maintenance.MaintenanceError, "outside the reviewed correction rebuild"):
+                maintenance.reviewed_correction_sequence(before, after, 3)
+            with after:
+                after.execute("UPDATE sqlite_sequence SET seq=5")
+            with self.assertRaisesRegex(maintenance.MaintenanceError, "outside the reviewed correction rebuild"):
+                maintenance.reviewed_correction_sequence(before, after, 4)
+            with after:
+                after.execute("UPDATE sqlite_sequence SET seq=4")
+        maintenance.preserve_reviewed_correction_sequence(self.clone, 9001, 4)
+        with closing(sqlite3.connect(self.clone)) as after:
+            self.assertEqual(maintenance.sequence_values(after), {"shift_correction_request": 9001})
+
     def test_reviewed_build_inputs_require_exact_null_delimited_git_diff(self):
         path = "GF3.WebApi/WebApi.csproj"
         old, new = "a" * 40, "b" * 40

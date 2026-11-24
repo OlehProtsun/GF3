@@ -993,25 +993,35 @@ def verify_reviewed_new_values(db, transition, prefix):
 def sequence_values(db):
     if not db.execute("SELECT 1 FROM sqlite_schema WHERE type='table' AND name='sqlite_sequence'").fetchone():
         return {}
-    return dict(db.execute("SELECT name,seq FROM sqlite_sequence ORDER BY name"))
+    rows = list(db.execute("SELECT name,seq FROM sqlite_sequence ORDER BY name"))
+    values = dict(rows)
+    require(len(values) == len(rows), "Duplicate SQLite sequence rows")
+    return values
 
 
-def preserve_reviewed_correction_sequence(snapshot_path, database_path):
-    with closing(open_db(snapshot_path, "ro")) as before, closing(open_db(database_path, "rw")) as after:
-        old = sequence_values(before)
-        current = sequence_values(after)
-        require({key: value for key, value in old.items() if key != "shift_correction_request"} ==
-                {key: value for key, value in current.items() if key != "shift_correction_request"},
-                "Unexpected SQLite sequence changed during the reviewed migration")
-        high = old.get("shift_correction_request")
-        if high is not None and current.get("shift_correction_request", 0) < high:
-            require(after.execute("SELECT 1 FROM sqlite_schema WHERE type='table' AND name='shift_correction_request'").fetchone()
-                    and after.execute("SELECT 1 FROM sqlite_sequence WHERE name='shift_correction_request'").fetchone(),
-                    "Reviewed correction sequence row is missing")
-            after.execute("UPDATE sqlite_sequence SET seq=? WHERE name='shift_correction_request'", (high,))
-            after.commit()
-        require(sequence_values(after).get("shift_correction_request", 0) >= (high or 0),
-                "Reviewed correction sequence high-water mark was lost")
+def reviewed_correction_sequence(before, after, prefix):
+    table = "shift_correction_request"
+    original, current = sequence_values(before), sequence_values(after)
+    previous_high, current_high = original.pop(table, None), current.pop(table, None)
+    require(original == current, "Unexpected SQLite sequence changed during the reviewed migration")
+    if current_high != previous_high:
+        # EF copies the existing rows into a fresh AUTOINCREMENT table. Its sequence
+        # then reflects the largest copied ID (zero when the INSERT SELECT was empty).
+        rebuilt_high, = after.execute("SELECT MAX(0, COALESCE(MAX(id), 0)) FROM shift_correction_request").fetchone()
+        require(prefix >= 4 and current_high == rebuilt_high,
+                "SQLite sequence state changed outside the reviewed correction rebuild")
+    return previous_high, current_high
+
+
+def preserve_reviewed_correction_sequence(database_path, previous_high, current_high):
+    if previous_high is None or current_high is None or current_high >= previous_high:
+        return
+    with closing(open_db(database_path, "rw")) as db, db:
+        updated = db.execute("UPDATE sqlite_sequence SET seq=? WHERE name='shift_correction_request' AND seq=?",
+                             (previous_high, current_high))
+        require(updated.rowcount == 1 and sequence_values(db).get("shift_correction_request") == previous_high,
+                "Reviewed correction sequence changed before its high-water mark could be restored")
+    print(f"Preserved reviewed correction sequence high-water mark: {current_high} -> {previous_high}", flush=True)
 
 
 def expected_schema(before, columns):
@@ -1051,7 +1061,6 @@ def verify_migration(snapshot_path, clone, before_ids, target_ids, columns):
         require(before_ids and transition.schema_prefix_contracts[0]["migrationId"] == before_ids[-1]
                 and target_ids[-1] == transition.schema_prefix_contracts[-1]["migrationId"],
                 "Migration history does not match the reviewed schema prefixes")
-        preserve_reviewed_correction_sequence(snapshot_path, clone)
         columns = transition.nullable_columns
     with closing(open_db(snapshot_path, "ro")) as before, closing(open_db(clone, "ro")) as after:
         # Keep sorter output containing employee data out of host temporary files.
@@ -1073,17 +1082,11 @@ def verify_migration(snapshot_path, clone, before_ids, target_ids, columns):
             require(not before.execute("PRAGMA foreign_key_check").fetchall()
                     and not after.execute("PRAGMA foreign_key_check").fetchall(),
                     "Foreign-key validation failed during reviewed migration")
-            old_sequences, new_sequences = sequence_values(before), sequence_values(after)
-            require({k: v for k, v in old_sequences.items() if k != "shift_correction_request"} ==
-                    {k: v for k, v in new_sequences.items() if k != "shift_correction_request"}
-                    and new_sequences.get("shift_correction_request", 0) >=
-                    old_sequences.get("shift_correction_request", 0),
-                    "SQLite sequence state differs from the reviewed correction rebuild")
         else:
             require(expected_schema(before_schema, columns) == after_schema,
                     "SQLite schema differs from the reviewed column additions")
         for kind, table in before_schema:
-            if kind != "table" or table == HISTORY:
+            if kind != "table" or table == HISTORY or (transition and table == "sqlite_sequence"):
                 continue
             fields = before.execute(f"PRAGMA table_xinfo({quoted(table)})").fetchall()
             actual = after.execute(f"PRAGMA table_xinfo({quoted(table)})").fetchall()
@@ -1101,6 +1104,10 @@ def verify_migration(snapshot_path, clone, before_ids, target_ids, columns):
             names = [field[1] for field in fields]
             require(row_digest(before, table, names) == row_digest(after, table, names),
                     "Existing SQLite rows changed during rehearsal")
+        if transition:
+            sequence = reviewed_correction_sequence(before, after, len(transition.migrations))
+    if transition:
+        preserve_reviewed_correction_sequence(clone, *sequence)
 
 
 def verify_no_data_drift(backup, database, columns=(), target_ids=None):
@@ -1138,19 +1145,14 @@ def verify_no_data_drift(backup, database, columns=(), target_ids=None):
                     and not after.execute("PRAGMA foreign_key_check").fetchall(),
                     "Foreign-key validation failed during recovery preflight")
             for kind, table in before_schema:
-                if kind != "table" or table in {HISTORY, LOCK}:
+                if kind != "table" or table in {HISTORY, LOCK, "sqlite_sequence"}:
                     continue
                 names = [row[1] for row in before.execute(f"PRAGMA table_xinfo({quoted(table)})")]
                 updated = {row[1] for row in after.execute(f"PRAGMA table_xinfo({quoted(table)})")}
                 require(set(names) <= updated, "A pre-existing SQLite column disappeared before recovery")
                 require(row_digest(before, table, names) == row_digest(after, table, names),
                         "Database writes may have occurred since the final backup")
-            original_sequences, current_sequences = sequence_values(before), sequence_values(after)
-            require({k: v for k, v in original_sequences.items() if k != "shift_correction_request"} ==
-                    {k: v for k, v in current_sequences.items() if k != "shift_correction_request"}
-                    and current_sequences.get("shift_correction_request", 0) >=
-                    original_sequences.get("shift_correction_request", 0),
-                    "SQLite sequence state changed outside the reviewed correction rebuild")
+            reviewed_correction_sequence(before, after, prefix)
             return prefix
         expected_ids = tuple(row[0] for row in original_history) if target_ids is None else target_ids
         require(len(current_history) >= len(original_history) and current_history[:len(original_history)] == original_history
