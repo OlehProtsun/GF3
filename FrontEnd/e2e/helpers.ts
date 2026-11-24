@@ -41,8 +41,13 @@ export async function loginWithCredentials(page: Page, username: string, passwor
   await page.reload();
   await expect(page.locator("html")).toHaveAttribute("lang", "en");
   await expect(appShell).toBeVisible();
-  const installPrompt = page.getByRole("dialog", { name: "Add GF to your home screen" });
-  if (await installPrompt.isVisible()) await installPrompt.getByRole("button", { name: "Not now" }).click();
+  if (await page.locator("[data-employee-nav]").count()) await dismissEmployeeInstallPrompt(page);
+}
+
+export async function dismissEmployeeInstallPrompt(page: Page) {
+  if (await page.evaluate(() => sessionStorage.getItem("gf3.pwa.install.dismissed") === "1")) return;
+  const installPrompt = page.getByRole("dialog", { name: /^(Add GF to your home screen|Dodaj GF do ekranu głównego|Додайте GF на головний екран)$/ });
+  await installPrompt.getByRole("button", { name: /^(Not now|Nie teraz|Не зараз)$/ }).click();
 }
 
 export async function loginAsManager(page: Page) {

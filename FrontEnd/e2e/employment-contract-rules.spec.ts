@@ -31,12 +31,16 @@ test("isolated contract workflow: manager settings, pending pickup, publication 
   const availabilityGroup = { id: 1, name: "December availability", year: 2026, month: 12, publicationStatus: "private" };
   const availabilityMembers = [{ id: 2, employeeId: 2, displayOrder: 0, employeeLastModifiedAtUtc: null }];
   const availabilitySlots: Array<{ id: number; availabilityGroupMemberId: number; dayOfMonth: number; kind: number; intervalStr: string | null }> = [];
+  const graphCellStyles: Array<{ id: number; scheduleId: number; employeeId: number; dayOfMonth: number; backgroundColorArgb: number | null; textColorArgb: number | null }> = [];
   const errors: string[] = []; page.on("pageerror", error => errors.push(error.message));
   const activeRequests = new Set<Request>();
   page.on("request", request => { if (new URL(request.url()).pathname.startsWith("/api/")) activeRequests.add(request); });
   page.on("requestfinished", request => activeRequests.delete(request));
   page.on("requestfailed", request => activeRequests.delete(request));
-  await page.addInitScript(() => localStorage.setItem("gf3.auth.access-token", "isolated-contract-browser-test"));
+  await page.addInitScript(() => {
+    localStorage.setItem("gf3.auth.access-token", "isolated-contract-browser-test");
+    sessionStorage.setItem("gf3.pwa.install.dismissed", "1");
+  });
   await page.route("**/api/**", async route => {
     const path = new URL(route.request().url()).pathname, method = route.request().method(); let body: unknown = [];
     if (!path.startsWith("/api/")) return route.continue();
@@ -92,7 +96,34 @@ test("isolated contract workflow: manager settings, pending pickup, publication 
     else if (path === "/api/containers/1/graphs/1") body = graph;
     else if (path === "/api/containers/1/graphs/1/employees") body = [1,2].map(id=>({id,scheduleId:1,employeeId:id,displayOrder:id,minHoursMonth:24,isPriority:false}));
     else if (path === "/api/containers/1/graphs/1/slots") body = slots;
-    else if (path.includes("versions") && method === "POST") { versionWrites++; return route.fulfill({status:500,json:{detail:"Unexpected duplicate version write"}}); }
+    else if (path === "/api/containers/1/graphs/1/cell-styles" && method === "GET") body = graphCellStyles;
+    else if (path === "/api/containers/1/graphs/1/cell-styles/batch" && method === "PUT") {
+      const payload = route.request().postDataJSON() as { changes: Array<{ employeeId: number; dayOfMonth: number; changeBackgroundColor: boolean; backgroundColorArgb?: number | null; changeTextColor: boolean; textColorArgb?: number | null }> };
+      for (const change of payload.changes) {
+        const index = graphCellStyles.findIndex(style => style.employeeId === change.employeeId && style.dayOfMonth === change.dayOfMonth);
+        const current = index < 0 ? null : graphCellStyles[index];
+        const next = { id: current?.id ?? graphCellStyles.length + 1, scheduleId: 1, employeeId: change.employeeId, dayOfMonth: change.dayOfMonth,
+          backgroundColorArgb: change.changeBackgroundColor ? change.backgroundColorArgb ?? null : current?.backgroundColorArgb ?? null,
+          textColorArgb: change.changeTextColor ? change.textColorArgb ?? null : current?.textColorArgb ?? null };
+        if (index < 0) graphCellStyles.push(next); else graphCellStyles[index] = next;
+      }
+      return route.fulfill({status:204});
+    }
+    else if (path.includes("versions") && method === "POST") { versionWrites++; return route.fulfill({status:204}); }
+    else if (path === "/api/availability-groups/save-graph" && method === "POST") {
+      const payload = route.request().postDataJSON();
+      const rows = payload.members.flatMap((member: { employeeId: number; days: Array<{ dayOfMonth: number; kind: number; intervalStr: string | null }> }) => {
+        let availabilityMember = availabilityMembers.find(item => item.employeeId === member.employeeId);
+        if (!availabilityMember) {
+          availabilityMember = { id: Math.max(0, ...availabilityMembers.map(item => item.id)) + 1,
+            employeeId: member.employeeId, displayOrder: availabilityMembers.length, employeeLastModifiedAtUtc: null };
+          availabilityMembers.push(availabilityMember);
+        }
+        return member.days.map(day => ({ id: 0, availabilityGroupMemberId: availabilityMember.id, ...day }));
+      });
+      availabilitySlots.splice(0, availabilitySlots.length, ...rows.map((slot, index) => ({ ...slot, id: index + 1 })));
+      body = { id: payload.id ?? 1, sourceGroupIds: [], changed: true };
+    }
     else if (path === "/api/availability-groups") body = [availabilityGroup];
     else if (path === "/api/availability-groups/1") body = availabilityGroup;
     else if (path === "/api/availability-groups/1/items") body = availabilitySlots.map(slot => ({ ...slot, dayId: slot.id, memberId: slot.availabilityGroupMemberId,
@@ -110,6 +141,7 @@ test("isolated contract workflow: manager settings, pending pickup, publication 
       const days = automatic ? Array.from({length:31},(_,i)=>({id:0,availabilityGroupMemberId:1,dayOfMonth:i+1,kind:[0,6].includes(new Date(2026,11,i+1).getDay())?1:0})) : [{id:1,availabilityGroupMemberId:1,dayOfMonth:1,kind:1}];
       body = [{id:1,name:"Contract availability",year:2026,month:12,isAutomatic:automatic,canSubmit:!automatic,isEditLocked:false,slots:days,members:[{employeeId:1,firstName:"Ada",lastName:"Synthetic",displayOrder:1,slots:days}]}];
     }
+    else if (path === "/api/employee-urlop") body = { shops: [], months: [] };
     else if (path.includes("negotiate")) return route.fulfill({status:503});
     else if (path.includes("notepad")) body = {notes:[],state:{isExpanded:false,isPinned:false,height:400}};
     else if (path === "/api/manager-profile/me") body = {id:1,userName:"manager",displayName:"Synthetic",createdAtUtc:"2026-01-01T00:00:00Z"};
@@ -166,12 +198,28 @@ test("isolated contract workflow: manager settings, pending pickup, publication 
   const preview = page.locator("section").filter({ has: page.getByText("Availability Preview", { exact: true }) });
   await expect(preview.getByRole("button", { name: "Ada Synthetic day 1", exact: true })).toHaveText("+");
   await expect(preview.getByRole("button", { name: "Ada Synthetic day 5", exact: true })).toHaveText("-");
+  await expect.poll(()=>[...activeRequests].map(request=>new URL(request.url()).pathname),{timeout:15_000}).toEqual([]);
+  await expect(page.getByRole("button",{name:"Save",exact:true}).first()).toBeEnabled();
   await page.getByRole("button",{name:"Expand Publication",exact:true}).click();
+  await page.getByRole("button",{name:"Open details",exact:true}).click();
+  const unsavedReviews=page.getByRole("region",{name:"Contract approvals",exact:true});
+  await unsavedReviews.getByRole("button",{name:/Ada Synthetic.*Pending/}).click();
+  await expect(unsavedReviews.getByText("Save your changes before reviewing requests.",{exact:true})).toBeVisible();
+  await expect(unsavedReviews.getByRole("button",{name:"Approve",exact:true})).toBeDisabled();
+  await page.getByRole("dialog",{name:"Schedule Activity",exact:true}).getByRole("button",{name:"Close",exact:true}).click();
+  await page.getByRole("button",{name:"Save",exact:true}).first().click();
+  const saveDialog=page.getByRole("dialog",{name:"Save schedule",exact:true});
+  await saveDialog.getByRole("button",{name:"Save",exact:true}).click();
+  await expect(saveDialog).toBeHidden({timeout:30_000});
+  await navigate("/container/1/graphs/1/edit");
+  await page.getByRole("button",{name:"Expand Publication",exact:true}).click();
+  await page.getByRole("button",{name:"Open details",exact:true}).click();
   const reviews=page.getByRole("region",{name:"Contract approvals",exact:true});
   await reviews.getByRole("button",{name:/Ada Synthetic.*Pending/}).click();
+  const versionsBeforeApproval=versionWrites;
   await reviews.getByRole("button",{name:"Approve",exact:true}).click();
   await page.getByRole("dialog",{name:"Approve shift transfer?"}).getByRole("button",{name:"Approve",exact:true}).click();
-  await expect.poll(()=>slots[0].employeeId).toBe(1); expect(versionWrites).toBe(1);
+  await expect.poll(()=>slots[0].employeeId).toBe(1); expect(versionWrites-versionsBeforeApproval).toBe(1);
   actor="employee"; await navigate("/swap"); await page.getByRole("button",{name:"Create offer",exact:true}).click();
   await page.getByRole("button",{name:/Contract graph/}).click();
   await page.getByRole("radio",{name:/02\.12\.2026.*09:00.*17:00/}).click();
@@ -181,10 +229,12 @@ test("isolated contract workflow: manager settings, pending pickup, publication 
   await expect(page.getByRole("button",{name:"Send request",exact:true})).toBeDisabled();
   await page.getByRole("button",{name:"Request exception",exact:true}).click();
   await expect.poll(()=>approvals.length).toBe(2); expect(directGiveWrites).toBe(0); expect(offers).toHaveLength(1);
+  const versionsBeforeExceptionApproval=versionWrites;
   actor="manager"; await navigate("/container/1/graphs/1/edit"); await page.getByRole("button",{name:"Expand Publication",exact:true}).click();
+  await page.getByRole("button",{name:"Open details",exact:true}).click();
   await page.getByRole("region",{name:"Contract approvals",exact:true}).getByRole("button",{name:/Ada Synthetic.*Pending/}).click();
   await page.getByRole("region",{name:"Contract approvals",exact:true}).getByRole("button",{name:"Approve",exact:true}).click();
-  await expect.poll(()=>offers.length).toBe(2); expect(slots[1].employeeId).toBe(1); expect(versionWrites).toBe(1);
+  await expect.poll(()=>offers.length).toBe(2); expect(slots[1].employeeId).toBe(1); expect(versionWrites).toBe(versionsBeforeExceptionApproval);
   actor="employee"; await page.setViewportSize({width:390,height:844}); await navigate("/availability"); await page.getByRole("button",{name:/Contract availability/}).click();
   await expect(page.getByText("Availability set automatically by contract: + Mon–Fri, − Sat–Sun",{exact:true})).toBeVisible();
   expect(await page.getByRole("button",{name:"Save",exact:true}).count()).toBe(0);
@@ -398,7 +448,7 @@ with sqlite3.connect(Path(sys.argv[1]).as_uri()+'?mode=ro',uri=True) as db:
   }
 });
 
-test("contract approval cards show participants and remain usable at narrow sidebar widths", async ({ page }, testInfo) => {
+test("contract approval cards show participants and remain usable at narrow viewport widths", async ({ page }, testInfo) => {
   test.setTimeout(120_000);
   await page.setViewportSize({width:1440,height:1050});
   const graph={id:1,containerId:1,shopId:1,name:"F35",year:2026,month:10,publicationStatus:"public",allowSwap:true,peoplePerShift:1,
@@ -429,17 +479,16 @@ test("contract approval cards show participants and remain usable at narrow side
     await route.fulfill({json:body});
   });
   await page.goto("/container/1/graphs/1/edit");
-  const sidebar=page.getByRole("button",{name:"Collapse sidebar",exact:true}); await sidebar.waitFor({state:"visible"}); await sidebar.click();
-  await expect(page.getByRole("button",{name:"Open sidebar",exact:true})).toBeVisible(); await page.mouse.move(1350,900);
-  await page.getByRole("button",{name:"Expand Publication",exact:true}).click({timeout:15000});
-  const section=page.getByRole("region",{name:"Contract approvals",exact:true});
+  const sidebar=page.getByRole("button",{name:"Collapse sidebar",exact:true}); if(await sidebar.isVisible()) await sidebar.click();
+  await expect(page.getByRole("button",{name:"Open sidebar",exact:true})).toBeVisible();
+  await page.getByRole("button",{name:"Expand Publication",exact:true}).press("Enter");
+  await page.getByRole("button",{name:"Open details",exact:true}).click();
+  const dialog=page.getByRole("dialog",{name:"Schedule Activity",exact:true});
+  const section=dialog.getByRole("region",{name:"Contract approvals",exact:true});
   await expect(section.getByRole("button",{name:/^ANNA MINIEIEVA/}).first()).toBeVisible();
   for(const width of [280,320,380,450]) {
-    await section.evaluate((element,width)=>{
-      const sidebar=element.closest<HTMLElement>('[class*="sidebarColumn_"]')!;
-      Object.assign(sidebar.style,{width:`${width}px`,maxWidth:`${width}px`,flexBasis:`${width}px`});
-    },width);
-    expect(await section.evaluate(element=>Math.round(element.closest('[class*="sidebarColumn_"]')!.getBoundingClientRect().width))).toBe(width);
+    await page.setViewportSize({width,height:844});
+    expect(await dialog.evaluate(element=>element.getBoundingClientRect().width)).toBeLessThanOrEqual(width);
     await section.screenshot({path:testInfo.outputPath(`approvals-${width}-collapsed.png`)});
     await section.getByRole("button",{name:/^ANNA MINIEIEVA/}).first().click();
     await expect(section.getByRole("group",{name:"Shift transfer"})).toContainText("OLEH PROTSUN");

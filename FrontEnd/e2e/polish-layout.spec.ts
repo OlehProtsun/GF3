@@ -15,7 +15,10 @@ for (const language of ["pl", "uk"] as const) {
         shift1Time: "09:00 - 16:30", shift2Time: "16:30 - 22:00", maxHoursPerEmpMonth: 160, maxConsecutiveDays: 5, maxConsecutiveFull: 3, maxFullPerMonth: 10 };
       const errors: string[] = [];
       page.on("pageerror", error => errors.push(error.message));
-      await page.addInitScript(() => localStorage.setItem("gf3.auth.access-token", "polish-fixture"));
+      await page.addInitScript(() => {
+        localStorage.setItem("gf3.auth.access-token", "polish-fixture");
+        sessionStorage.setItem("gf3.pwa.install.dismissed", "1");
+      });
       await page.route("**/*", async route => {
         const path = new URL(route.request().url()).pathname;
         if (!path.startsWith("/api/")) return route.continue();
@@ -33,6 +36,15 @@ for (const language of ["pl", "uk"] as const) {
         else if (path === "/api/employees") body = [{ id: 1, firstName: "Anna", lastName: "Kowalska" }];
         else if (path === "/api/shops") body = [{ id: 1, name: "Central", address: "Warszawa" }];
         else if (path === "/api/employee-ui-state") body = { scheduleColumnOrders: {}, readNotificationIds: [], pinnedSwapIds: [] };
+        else if (path === "/api/public-holiday-settings") body = { showPublicHolidays: true };
+        else if (path === "/api/employee-urlop") body = { shops: [], months: [] };
+        else if (path === "/api/manager-home/nav-badges") body = { totalPending: 0, graphPending: 0, urlopPending: 0 };
+        else if (path === "/api/manager-home/activity") body = { items: [], allActivityCount: 0, requiresApprovalCount: 0, hasMore: false, nextOffset: 0 };
+        else if (path === "/api/employee-availability") {
+          const slots = [{ id: 1, availabilityGroupMemberId: 1, dayOfMonth: 1, kind: 0 }];
+          body = [{ id: 1, name: "October availability", year: 2026, month: 10, isAutomatic: false, canSubmit: true,
+            isEditLocked: false, slots, members: [{ employeeId: 1, firstName: "Anna", lastName: "Kowalska", displayOrder: 1, slots }] }];
+        }
         else if (path === "/api/employee-schedules") body = [{ id: 10, containerId: 1, containerName: "Main", shopId: 1, shopName: "Central", name: "F27", year: 2026, month: 10, publicationStatus: "public", allowSwap: true,
           publishedAtUtc: new Date().toISOString(),
           employees: [{ id: 1, employeeId: 1, firstName: "Owner", lastName: "Worker", displayName: "Owner Worker", displayOrder: 1 }],
@@ -51,9 +63,13 @@ for (const language of ["pl", "uk"] as const) {
           await expect(page.locator("html")).toHaveAttribute("lang", language);
           const surface = path === "/database" ? page.getByRole("dialog") : page.locator("main").first();
           await expect(surface).toBeVisible({ timeout: 30_000 });
+          if (errors.length) throw new Error(`${language} ${role} ${path}: ${errors.join("; ")}`);
           await expect(page.getByRole("status", { name: labels["Loading page"], exact: true })).toHaveCount(0, { timeout: 30_000 });
-          await expect.poll(() => surface.innerText()).not.toBe("");
-          if (role === "manager" && path !== "/database") await page.getByRole("button", { name: labels["Collapse sidebar"], exact: true }).click();
+          await expect.poll(() => surface.innerText(), { timeout: 5_000, message: `${language} ${role} ${path} at ${width}px should render page content` }).not.toBe("");
+          if (role === "manager" && path !== "/database") {
+            const collapse = page.getByRole("button", { name: labels["Collapse sidebar"], exact: true });
+            if (await collapse.isVisible()) await collapse.click();
+          }
           if (!manager && path === "/swap") {
             await page.getByRole("button", { name: labels["Create offer"], exact: true }).click();
             await page.locator("dialog:modal").getByRole("button", { name: /F27/ }).click();

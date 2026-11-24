@@ -93,15 +93,15 @@ export async function startIsolatedBackend() {
 }
 
 export const test = base.extend<{ isolatedBackend: Awaited<ReturnType<typeof startIsolatedBackend>> }>({
-  // Playwright reads fixture dependencies from the destructured first argument.
-  // eslint-disable-next-line no-empty-pattern
-  isolatedBackend: async ({}, runTest) => {
+  // Allow the isolated server to finish startup without using the browser scenario's time budget.
+  // eslint-disable-next-line no-empty-pattern -- Playwright requires destructured fixture dependencies.
+  isolatedBackend: [async ({}, runTest) => {
     const backend = await startIsolatedBackend();
     try {
       await runTest(backend);
     } finally {
       await backend.close();
     }
-  },
+  }, { timeout: 30_000 }],
   baseURL: async ({ isolatedBackend }, runTest) => { await runTest(isolatedBackend.url); },
 });

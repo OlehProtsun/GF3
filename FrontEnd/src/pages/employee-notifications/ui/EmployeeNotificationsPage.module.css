@@ -344,10 +344,12 @@
   .inboxTabs button {
     min-width: 0;
     width: 100%;
-    gap: 4px;
-    padding-inline: 5px;
-    font-size: 0.7rem;
+    gap: 3px;
+    padding-inline: 3px;
+    font-size: 0.66rem;
   }
+
+  .inboxTabs button span { min-width: 15px; height: 15px; font-size: 0.55rem; }
 
   .sectionIcon {
     width: 40px;

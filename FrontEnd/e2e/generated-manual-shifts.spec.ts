@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { assertIsolatedBackend } from "./fixtures/isolatedBackend";
+import { dismissEmployeeInstallPrompt } from "./helpers";
 
 test.use({ actionTimeout: 10_000, launchOptions: process.platform === "win32" ? { ignoreDefaultArgs: ["--disable-accelerated-compositing"] } : {} });
 
@@ -313,6 +314,7 @@ test("compact manual demand survives editor, profile and employee phone", async 
   }
   state.useEmployee(2);
   await page.goto("/schedule");
+  await dismissEmployeeInstallPrompt(page);
   for (const width of [320, 375, 390]) {
     await page.setViewportSize({ width, height: 740 });
     const more = page.getByRole("button", { name: "More: Shifts", exact: true });
@@ -443,11 +445,7 @@ for (const language of ["en", "pl", "uk"]) {
     test.setTimeout(90_000);
     const fixtureState = await fixture(page, language);
     await page.goto("/container/1/graphs/1/edit");
-    // Use the shared language API so this checks switching as well as translated layout.
-    await page.evaluate(async lang => {
-      const module = await import(/* @vite-ignore */ "/src/shared/i18n/index.ts");
-      module.setLanguage(lang);
-    }, language);
+    // The fixture serves this language through the same account-language API the app uses.
     const titles = { en: "Manual shifts", pl: "Zmiany ręczne", uk: "Ручні зміни" };
     const generateLabels = { en: "Generate", pl: "Generuj", uk: "Згенерувати" };
     const generate = page.getByRole("button", { name: generateLabels[language as keyof typeof generateLabels], exact: true });
@@ -541,7 +539,7 @@ for (const flexible of [true, false]) {
     expect(state.publications[0]).toEqual({manualColumnId:1,dayOfMonth:1,fromTime:"09:00",toTime:"21:00",targetEmployeeId:null,allowPartialAcceptance:flexible});
     await expect(page).toHaveURL(/\/container\/1\/graphs\/1$/, { timeout: 20_000 });
     if (employeeViewport) await page.setViewportSize(employeeViewport);
-    state.useEmployee(2); await page.goto("/swap");
+    state.useEmployee(2); await page.goto("/swap"); await dismissEmployeeInstallPrompt(page);
     await page.getByRole("button",{name:"View offer details for Generated shifts"}).click();
     const details=page.getByRole("dialog",{name:"Offer details"});
     if(!flexible) {
@@ -556,7 +554,7 @@ for (const flexible of [true, false]) {
     await confirm.getByRole("button",{name:"Accept shift",exact:true}).click();
     await expect(confirm).toHaveCount(0);await expect.poll(()=>state.claims.length).toBe(1);
     await expect(page.getByRole("button",{name:"View offer details for Generated shifts"})).toHaveCount(1);
-    state.useEmployee(3);await page.goto("/swap");
+    state.useEmployee(3);await page.goto("/swap"); await dismissEmployeeInstallPrompt(page);
     await page.getByRole("button",{name:"View offer details for Generated shifts"}).click();
     await expect(details).toContainText("15:00–21:00");
     await details.getByRole("button",{name:"Accept shift",exact:true}).click();

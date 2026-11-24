@@ -29,7 +29,7 @@
 .avatar { width: 64px; height: 64px; border-radius: 20px; font-size: 1.35rem; }
 .managerInitials { width: 42px; height: 42px; font-size: 0.86rem; }
 .profileTitle { min-width: 0; display: grid; gap: 4px; }
-.profileTitle strong { color: #152039; font-size: 1.3rem; line-height: 1.2; }
+.profileTitle strong { color: #152039; font-size: 1.3rem; line-height: 1.2; overflow-wrap: anywhere; }
 .profileTitle > span:last-child { color: #64748b; font-size: 0.85rem; }
 .eyebrow { color: #526787; font-size: 0.64rem; font-weight: 750; letter-spacing: 0.06em; text-transform: uppercase; }
 .roleBadge, .badge, .currentPill, .systemPill {

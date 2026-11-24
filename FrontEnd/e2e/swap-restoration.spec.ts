@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { dismissEmployeeInstallPrompt } from "./helpers";
 
 for (const language of ['en', 'pl']) {
   test(`restored swap renders and opens panels in ${language}`, async ({ page }) => {
@@ -28,6 +29,7 @@ for (const language of ['en', 'pl']) {
       await route.fulfill({ contentType: 'application/json', body: JSON.stringify(body) });
     });
     await page.goto('/swap');
+    await dismissEmployeeInstallPrompt(page);
     await page.getByRole('button', { name: language === 'en' ? 'Create offer' : 'Utwórz ofertę', exact: true }).click();
     await expect(page.getByRole('dialog')).toBeVisible();
     const dialog = page.getByRole('dialog');

@@ -111,10 +111,11 @@ test("approval filtering keeps graph ownership and keyboard activation", async (
  await expect(page.getByRole("tab", { name: /Availability/ })).toHaveCount(0);
  const approvals = page.getByRole("tab", { name: /Requires Approval/ });
  const badge = approvals.getByText("3", { exact: true });
+ const aura = () => approvals.evaluate(element => getComputedStyle(element, "::after").animationName);
  await expect(approvals).toHaveCSS("background-color", "rgb(253, 240, 242)");
- await expect(approvals).toHaveCSS("animation-duration", "6s");
+ await expect.poll(aura).toContain("approvalAura");
  await page.emulateMedia({ reducedMotion: "reduce" });
- await expect(approvals).toHaveCSS("animation-name", "none");
+ await expect.poll(aura).toBe("none");
  await expect(badge).toHaveCSS("color", "rgb(172, 25, 54)");
  await approvals.click();
  await expect(approvals).toHaveCSS("background-color", "rgb(248, 216, 224)");
@@ -131,7 +132,7 @@ test("approval filtering keeps graph ownership and keyboard activation", async (
  expect(f.errors).toEqual([]);
 });
 
-test("long shop filters scroll beside the date controls and preserve selection across dates", async ({ page }) => {
+test("long shop filters scroll below the date controls and preserve selection across dates", async ({ page }) => {
  await page.setViewportSize({ width: 1366, height: 768 });
  await fixture(page, events, "en", false, true);
  await page.goto("/");
@@ -141,8 +142,7 @@ test("long shop filters scroll beside the date controls and preserve selection a
  const table = page.getByRole("region", { name: "Scheduled employees" });
  await expect(shops.getByRole("button")).toHaveCount(15);
  const dateBox = (await next.boundingBox())!, shopBox = (await all.boundingBox())!;
- expect(shopBox.x).toBeGreaterThan(dateBox.x + dateBox.width);
- expect(Math.abs(shopBox.y + shopBox.height / 2 - dateBox.y - dateBox.height / 2)).toBeLessThan(5);
+ expect(shopBox.y).toBeGreaterThanOrEqual(dateBox.y + dateBox.height);
  expect(await shops.evaluate(el => el.scrollWidth > el.clientWidth)).toBe(true);
  await shops.evaluate(el => { el.scrollLeft = el.scrollWidth; });
  expect(await shops.evaluate(el => el.scrollLeft)).toBeGreaterThan(0);
@@ -168,10 +168,11 @@ test("custom month selection, paging and unavailable destinations remain safe", 
  await expect(panel.getByRole("link")).toHaveCount(8);
  await expect(page.getByText("This activity's resource is no longer available.")).toBeVisible();
  await expect(page.getByRole("button", { name: "Show more", exact: true })).toHaveCount(0);
- await page.getByRole("button", { name: "Select month", exact: true }).click();
+ await page.getByRole("group", { name: "Period", exact: true }).getByRole("button", { name: "Period", exact: true }).click();
  await expect(page.getByRole("option")).toHaveCount(25);
  await page.getByRole("option", { name: "December 2026", exact: true }).click();
- await expect(page.getByRole("heading", { name: "Who Works on 4 December 2026?", exact: true })).toBeVisible();
+ await expect(page.getByRole("heading", { name: "Who Works Today?", exact: true })).toBeVisible();
+ await expect(page.getByText("Events recorded in December 2026", { exact: true })).toBeVisible();
  await expect(panel.getByRole("link").first()).toBeVisible();
  expect(await page.locator("select").count()).toBe(0);
  expect(f.errors).toEqual([]);
@@ -184,6 +185,12 @@ for (const [width, height] of viewports) test(`balanced dashboard and header geo
  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
  await expect(page.getByText("Overview of today's schedules and recent application activity.")).toBeVisible();
  const cards = page.locator("main section"); await expect(cards).toHaveCount(2);
+ if (width > 1100) {
+  await expect.poll(async () => {
+   const [left, right] = await Promise.all([cards.nth(0).boundingBox(), cards.nth(1).boundingBox()]);
+   return Math.abs(left!.y - right!.y);
+  }).toBeLessThanOrEqual(1);
+ }
  const left = (await cards.nth(0).boundingBox())!, right = (await cards.nth(1).boundingBox())!;
  const minimumMargin = width <= 550 ? 12 : 24;
  expect(left.x).toBeGreaterThanOrEqual(minimumMargin); expect(width - right.x - right.width).toBeGreaterThanOrEqual(minimumMargin);
@@ -195,10 +202,10 @@ for (const [width, height] of viewports) test(`balanced dashboard and header geo
   expect(right.x - left.x - left.width).toBeCloseTo(22, 0);
   expect(right.x + right.width - left.x).toBeLessThanOrEqual(1501);
   const header = (await page.locator("header").filter({ has: heading }).boundingBox())!;
-  expect(header.height).toBeLessThanOrEqual(60);
+  expect(header.y + header.height).toBeLessThanOrEqual(left.y);
   expect(height - left.y - left.height).toBeGreaterThanOrEqual(24);
-  expect(Math.abs(header.x - left.x)).toBeLessThanOrEqual(2);
-  expect(Math.abs(header.x + header.width - right.x - right.width)).toBeLessThanOrEqual(2);
+  expect(header.width).toBeLessThanOrEqual(1100);
+  expect(Math.abs(header.x + header.width / 2 - (left.x + right.x + right.width) / 2)).toBeLessThanOrEqual(2);
  }
  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
  const table = page.getByRole("region", { name: "Scheduled employees", exact: true });

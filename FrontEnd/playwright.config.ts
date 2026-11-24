@@ -9,7 +9,7 @@ const baseURL = `http://127.0.0.1:${port}`;
 
 export default defineConfig({
   testDir: "./e2e",
-  outputDir: "../GF3.Tests/TestResults/playwright",
+  outputDir: `../GF3.Tests/TestResults/playwright/${port}`,
   workers: 2,
   timeout: 30_000,
   expect: {
@@ -24,6 +24,7 @@ export default defineConfig({
     command: `node scripts/playwright-preview.mjs ${port}`,
     url: `${baseURL}/version.json`,
     reuseExistingServer: false,
+    timeout: 120_000,
   },
   projects: [
     {

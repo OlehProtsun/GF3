@@ -23,8 +23,13 @@ for (const role of ["manager", "employee"]) {
       await page.goto(role === "manager" ? "/manager-profile" : "/profile");
       const name = role === "manager" ? page.locator('[class*="profileTitle_"] strong') : page.locator('h1[class*="profileName_"]');
       await expect(name).toHaveText(longName);
-      await expect(name).toHaveCSS("text-overflow", "ellipsis");
-      await expect(name).toHaveCSS("white-space", "nowrap");
+      if (role === "manager") {
+        await expect(name).toHaveCSS("overflow-wrap", "anywhere");
+        await expect(name).toHaveCSS("white-space", "normal");
+      } else {
+        await expect(name).toHaveCSS("text-overflow", "ellipsis");
+        await expect(name).toHaveCSS("white-space", "nowrap");
+      }
       await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
       const overflow = await page.locator("main section").evaluateAll(elements => elements.filter(element => {
         const box = element.getBoundingClientRect();
@@ -58,7 +63,7 @@ test("shared buttons and cards keep long labels inside narrow containers", async
   for (const width of [320, 375, 768]) {
     await page.setViewportSize({ width, height: 900 });
     await page.goto("/e2e/fixtures/viewport.html?case=longText");
-    const button = page.getByRole("button");
+    const button = page.getByRole("button", { name: /^LongActionLabel/ });
     await expect(button).toBeVisible();
     await expect(button.locator("span").last()).toHaveCSS("text-overflow", "ellipsis");
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);

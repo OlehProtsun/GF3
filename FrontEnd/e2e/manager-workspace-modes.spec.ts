@@ -1,5 +1,9 @@
 import { writeFile } from "node:fs/promises";
 import { expect, test, type Page, type Locator, type TestInfo } from "@playwright/test";
+import pl from "../src/shared/i18n/pl.json" with { type: "json" };
+
+const pcChoice = `PC ${pl["Full access"]}`;
+const phoneChoice = `${pl.Phone} ${pl["Read only"]}`;
 
 test.use({ timezoneId: "Europe/Warsaw", launchOptions: process.platform === "win32" ? { ignoreDefaultArgs: ["--disable-accelerated-compositing"] } : {} });
 
@@ -11,6 +15,7 @@ async function fixture(page: Page, initialMode: "choose" | "pc" | "phone" | "gue
   const errors: string[] = [];
   page.on("pageerror", error => errors.push(error.message));
   if (mode !== "guest") await page.addInitScript(() => localStorage.setItem("gf3.auth.access-token", "fixture-token"));
+  if (role === "employee") await page.addInitScript(() => sessionStorage.setItem("gf3.pwa.install.dismissed", "1"));
   const session = () => ({ role, workspaceMode: role === "manager" ? mode : null, managerId: role === "manager" ? 1 : null, employeeId: role === "employee" ? 12 : null, userName: "manager", displayName: "Manager Workspace", isSystemManager: true });
   const employees = Array.from({ length: options.workerCount ?? 6 }, (_, index) => ({ id: index + 2, firstName: "Worker", lastName: options.longNames ? `A very long employee surname ${index + 1}` : `${index + 1}`, hasLoginAccount: true, isOnline: index === 0, username: `worker${index}`, email: `worker${index}@example.com`, phone: "123456" }));
   const graph = { id: 3, containerId: 1, shopId: 4, name: "Private schedule", note: options.manualColumn ? `[[GF3_GRAPH_META:${JSON.stringify({ manualColumns: [{ id: 1, label: "Manual coverage", cells: { "1": "Reserve coverage" } }] })}]]` : "", year: 2026, month: 10, publicationStatus: "private", peoplePerShift: 1, shift1Time: "08:00 - 16:00", shift2Time: "16:00 - 20:00", maxHoursPerEmpMonth: 160, maxConsecutiveDays: 5, maxConsecutiveFull: 3, maxFullPerMonth: 10 };
@@ -35,10 +40,11 @@ async function fixture(page: Page, initialMode: "choose" | "pc" | "phone" | "gue
     if (mode === "choose" && !path.startsWith("/api/regulations/")) return json({ code: "manager_workspace_mode_required" }, 403);
     let data: unknown = [];
     if (path === "/api/account-language") data = { language: options.language ?? "en" };
+    else if (path === "/api/manager-home/activity") data = { items: [], allActivityCount: 0, requiresApprovalCount: 0, categoryCounts: {}, hasMore: false, nextOffset: 0 };
     else if (path === "/api/manager-profile/me") data = { id: 1, displayName: "Manager Workspace", userName: "manager", recoveryEmail: "manager@example.com", isSystem: true };
     else if (path === "/api/manager-profile/managers") data = [];
     else if (path === "/api/employees") data = employees;
-    else if (path.startsWith("/api/employees/") && !path.includes("regulation")) data = employees.find(item => String(item.id) === path.split("/")[3]);
+    else if (/^\/api\/employees\/\d+$/.test(path)) data = employees.find(item => String(item.id) === path.split("/")[3]);
     else if (path === "/api/containers") data = [{ id: 1, name: "All manager container", note: "Full manager records" }];
     else if (path === "/api/containers/1") data = { id: 1, name: "All manager container", note: "Full manager records" };
     else if (path === "/api/containers/1/graphs") data = graphs;
@@ -58,12 +64,18 @@ async function fixture(page: Page, initialMode: "choose" | "pc" | "phone" | "gue
   });
   return { unsafe, errors, failExchange: (value: boolean) => { failExchange = value; }, requireLegal: () => { pending = true; } };
 }
+
+async function collapseSidebarIfOpen(page: Page) {
+  const collapse = page.getByRole("button", { name: "Collapse sidebar", exact: true });
+  if (await collapse.isVisible()) await collapse.click();
+}
+
 async function login(page: Page) {
   await page.waitForLoadState("networkidle"); await page.goto("/login");
-  await page.getByRole("textbox", { name: "Username" }).fill("manager");
-  await page.getByRole("textbox", { name: "Password" }).fill("123456");
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Choose workspace" })).toBeVisible();
+  await page.getByRole("textbox", { name: pl.Username }).fill("manager");
+  await page.getByRole("textbox", { name: pl.Password }).fill("123456");
+  await page.getByRole("button", { name: pl["Sign in"], exact: true }).click();
+  await expect(page.getByRole("heading", { name: pl["Choose workspace"] })).toBeVisible();
 }
 
 test("PC container schedule tiles preserve open and MultiOpen selection", async ({ page }) => {
@@ -211,8 +223,8 @@ test("PC Schedule Profile preserves single and multi-schedule confirmations", as
 });
 
 const legalDestinations = ["/legal/index.html", "/legal/regulamin.html", "/legal/polityka-prywatnosci.html"];
-async function legalFooter(page: Page, destinations: string[]) {
-  const nav = page.getByRole("navigation", { name: "Legal documents", exact: true });
+async function legalFooter(page: Page, destinations: string[], name = "Legal documents") {
+  const nav = page.getByRole("navigation", { name, exact: true });
   await expect(nav).toHaveCount(1);
   await expect(nav.getByRole("link")).toHaveCount(destinations.length);
   for (const href of destinations) await expect(nav.locator(`a[href="${href}"]`)).toHaveCount(1);
@@ -221,9 +233,9 @@ async function legalFooter(page: Page, destinations: string[]) {
 test("legal footer remains on login in both password input modes", async ({ page }) => {
   await fixture(page);
   await page.goto("/login");
-  for (const mode of ["PC", "Phone", "PC"]) {
-    await page.getByRole("group", { name: "Password input mode" }).getByRole("button", { name: mode, exact: true }).click();
-    await legalFooter(page, [...legalDestinations, "/legal/pliki-cookies.html"]);
+  for (const mode of ["PC", "PIN", "PC"]) {
+    await page.getByRole("group", { name: pl["Password input mode"] }).getByRole("button", { name: mode, exact: true }).click();
+    await legalFooter(page, [...legalDestinations, "/legal/pliki-cookies.html"], pl["Legal documents"]);
   }
 });
 
@@ -237,6 +249,8 @@ test("legal footer exists only on manager PC account profile", async ({ page }) 
     await page.goto(path);
     await expect(page.locator("aside").first()).toBeVisible();
     await expect(page.getByRole("navigation", { name: "Legal documents", exact: true })).toHaveCount(0);
+    const expand = page.getByRole("button", { name: "Open sidebar", exact: true });
+    if (await expand.isVisible()) await expand.click();
     await page.getByRole("link", { name: "Open manager profile", exact: true }).click();
     await expect(page).toHaveURL(/\/manager-profile$/);
     await legalFooter(page, legalDestinations);
@@ -377,20 +391,20 @@ test("Manager Phone navigation matches Employee navigation geometry", async ({ p
 
 test("login chooser selects original PC shell and edit controls", async ({ page }) => {
   const f = await fixture(page); await login(page);
-  for (const name of ["PC Full access", "Phone Read only"]) {
+  for (const name of [pcChoice, phoneChoice]) {
     const choice = page.getByRole("button", { name, exact: true });
     await expect(choice).toHaveCSS("box-shadow", "none");
     await expect(choice).toHaveCSS("border-top-color", "rgb(226, 232, 240)");
   }
-  await expect(page.getByRole("button", { name: "PC Full access", exact: true }).locator("svg")).toHaveCSS("transform", "matrix(1, 0, 0, -1, 0, 0)");
-  await page.getByRole("button", { name: "PC Full access", exact: true }).click();
+  await expect(page.getByRole("button", { name: pcChoice, exact: true }).locator("svg")).toHaveCSS("transform", "matrix(1, 0, 0, -1, 0, 0)");
+  await page.getByRole("button", { name: pcChoice, exact: true }).click();
   await page.waitForLoadState("networkidle"); await page.goto("/employee"); await expect(page.getByRole("button", { name: "Add New" })).toBeVisible(); await expect(page.locator("aside").first()).toBeVisible(); expect(f.errors).toEqual([]);
 });
 test("Phone switches both ways, refresh persists and back never exposes an editor", async ({ page }) => {
-  const f = await fixture(page); await login(page); await page.getByRole("button", { name: "Phone Read only", exact: true }).click();
+  const f = await fixture(page); await login(page); await page.getByRole("button", { name: phoneChoice, exact: true }).click();
   await expect(page.locator("[data-manager-phone]")).toBeVisible(); await page.waitForLoadState("networkidle"); await page.reload(); await expect(page.locator("[data-manager-phone]")).toBeVisible();
   await page.waitForLoadState("networkidle"); await page.getByRole("link", { name: "More", exact: true }).click(); await page.waitForLoadState("networkidle"); await page.getByRole("button", { name: /Switch to Desktop/ }).click(); await expect(page.locator("[data-manager-phone]")).toHaveCount(0); await page.waitForLoadState("networkidle");
-  await page.evaluate(() => { history.pushState({}, "", "/employee/2/edit"); dispatchEvent(new PopStateEvent("popstate")); }); await expect(page.getByRole("heading", { name: "Edit Employee", exact: true })).toBeVisible(); await page.waitForLoadState("networkidle"); await page.goto("/manager-profile"); await page.getByRole("button", { name: "Collapse sidebar" }).click(); await expect(page.getByRole("button", { name: /Switch to Phone/ })).toBeVisible(); await page.getByRole("button", { name: /Switch to Phone/ }).click();
+  await page.evaluate(() => { history.pushState({}, "", "/employee/2/edit"); dispatchEvent(new PopStateEvent("popstate")); }); await expect(page.getByRole("heading", { name: "Edit Employee", exact: true })).toBeVisible(); await page.waitForLoadState("networkidle"); await page.goto("/manager-profile"); await collapseSidebarIfOpen(page); await expect(page.getByRole("button", { name: /Switch to Phone/ })).toBeVisible(); await page.getByRole("button", { name: /Switch to Phone/ }).click();
   await expect(page.locator("[data-manager-phone]")).toBeVisible(); await page.waitForLoadState("networkidle"); await page.goBack(); await expect(page.locator("[data-manager-phone]")).toBeVisible(); expect(new URL(page.url()).pathname).not.toContain("/edit"); await noManagement(page); expect(f.errors).toEqual([]);
 });
 for (const width of [320, 375, 390, 430, 768, 1440]) {
@@ -428,6 +442,7 @@ for (const width of [320, 375, 390, 430, 768, 1440]) {
     await expect(page.locator("[data-phone-schedule-information]")).toBeVisible();
     await expect(page.getByRole("button", { name: /Expand Schedule Information|Collapse Schedule Information/ })).toHaveCount(0);
     const summary = page.locator('[data-phone-schedule-summary]');
+    await summary.locator("xpath=ancestor::section[1]").getByRole("button").click();
     await expect(summary.locator(":scope > details")).toHaveCount(6);
     await expect(summary.locator("table")).toHaveCount(0);
     await summary.locator("summary").first().click();
@@ -456,9 +471,9 @@ for (const width of [320, 375, 390, 430, 768, 1440]) {
 }
 test("failed switch retains current UI and retry works; legal gate remains in choose and phone", async ({ page }) => {
   const f = await fixture(page, "choose"); f.requireLegal(); await page.waitForLoadState("networkidle"); await page.goto("/");
-  await expect(page.getByRole("dialog", { name: "Required rules" })).toBeVisible(); await page.getByRole("checkbox").check(); await page.getByRole("button", { name: "Accept and continue" }).click();
-  await expect(page.getByRole("dialog")).toHaveCount(0); f.failExchange(true); await page.getByRole("button", { name: "Phone Read only" }).click(); await expect(page.getByRole("alert").filter({ hasText: "Mode change failed" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Choose workspace" })).toBeVisible(); f.failExchange(false); await page.getByRole("button", { name: "Phone Read only" }).click(); await expect(page.locator("[data-manager-phone]")).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Required rules" })).toBeVisible(); await page.getByRole("checkbox").check(); await page.getByRole("button", { name: pl["Accept and continue"] }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0); f.failExchange(true); await page.getByRole("button", { name: phoneChoice }).click(); await expect(page.getByRole("alert").filter({ hasText: pl["Mode change failed. Please try again."] })).toBeVisible();
+  await expect(page.getByRole("heading", { name: pl["Choose workspace"] })).toBeVisible(); f.failExchange(false); await page.getByRole("button", { name: phoneChoice }).click(); await expect(page.locator("[data-manager-phone]")).toBeVisible();
   await page.waitForLoadState("networkidle"); await page.goto("/more"); f.failExchange(true); await page.getByRole("button", { name: /Switch to Desktop/ }).click(); await expect(page.locator("[data-manager-phone]")).toBeVisible(); await expect(page.getByRole("alert").filter({ hasText: "Mode change failed" })).toBeVisible();
   f.requireLegal(); await page.reload(); await expect(page.getByRole("dialog", { name: "Required rules" })).toBeVisible();
 });
@@ -468,9 +483,9 @@ test("unsafe replay returns 403", async ({ page }) => {
   expect(result).toEqual({ status: 403, code: "manager_phone_read_only" });
 });
 test("employee login never shows workspace choice", async ({ page }) => {
-  await fixture(page, "guest", "employee"); await page.waitForLoadState("networkidle"); await page.goto("/login"); await expect(page.getByRole("button", { name: /Phone/ })).toBeVisible();
-  await page.getByRole("textbox", { name: "Username" }).fill("worker"); await page.getByRole("textbox", { name: "Password" }).fill("123456"); await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await expect(page.locator("nav[aria-label='Employee sections']:visible").first()).toBeVisible(); await expect(page.getByRole("heading", { name: "Choose workspace" })).toHaveCount(0);
+  await fixture(page, "guest", "employee"); await page.waitForLoadState("networkidle"); await page.goto("/login"); await expect(page.getByRole("button", { name: "PIN", exact: true })).toBeVisible();
+  await page.getByRole("textbox", { name: pl.Username }).fill("worker"); await page.getByRole("textbox", { name: pl.Password }).fill("123456"); await page.getByRole("button", { name: pl["Sign in"], exact: true }).click();
+  await expect(page.locator("nav[aria-label='Employee sections']:visible").first()).toBeVisible(); await expect(page.getByRole("heading", { name: pl["Choose workspace"] })).toHaveCount(0);
 });
 
 test("chooser keyboard focus and reduced motion; phone nav touch targets", async ({ page }, testInfo) => {
@@ -516,7 +531,7 @@ for (const workerCount of [0, 1, 6]) {
 
 test("rounded chooser logout ends the session", async ({ page }) => {
  await fixture(page, "choose"); await page.goto("/");
- const logout = page.getByRole("button", { name: "Log out", exact: true }); await expect(logout).toBeVisible();
+ const logout = page.getByRole("button", { name: pl["Log out"], exact: true }); await expect(logout).toBeVisible();
  expect((await logout.boundingBox())!.height).toBeGreaterThanOrEqual(44);
  await expect(logout).toHaveCSS("border-radius", "999px"); await logout.click(); await expect(page).toHaveURL(/\/login$/);
 });
@@ -564,8 +579,10 @@ test("phone search, descending containers, pin priority, metrics and long employ
  await expect(firstSchedule.getByText("October 2026")).toBeVisible();
  await expect(firstSchedule.getByText("6 employees")).toBeVisible();
  await expect(firstSchedule.getByText("48h 0m")).toBeVisible();
- const stats = page.getByRole("heading", { name: "Statistics" }).locator(".."); await expect(stats.locator("table")).toHaveCount(0);
- await expect(stats.locator("article")).toHaveCount(7); await stats.locator("article details summary").first().click(); await expect(stats.locator("article").first()).toContainText("Central"); await noOverflow(page);
+ const stats = page.locator("[data-phone-container-statistics]"); await expect(stats.locator("table")).toHaveCount(0);
+ await stats.getByRole("button", { name: "Statistics", exact: true }).click();
+ await expect(stats.locator("article")).toHaveCount(7); await stats.locator("article").first().getByRole("button", { name: "Shops", exact: true }).click();
+ await expect(stats.locator("article").first().getByText("Central", { exact: true })).toBeVisible(); await noOverflow(page);
  await page.setViewportSize({ width: 320, height: 560 });
  await noOverflow(page);
  expect(await firstSchedule.evaluate(card => card.scrollWidth <= card.clientWidth)).toBe(true);
@@ -608,11 +625,11 @@ for (const width of [320, 375, 390, 430]) {
     expect(await corner.evaluate(element => Number(getComputedStyle(element).zIndex))).toBeGreaterThan(await header.evaluate(element => Number(getComputedStyle(element).zIndex)));
     await reachesViewport(scroll, scroll.locator("tbody tr").last().locator("td").last());
     await recordGeometry(testInfo, "sticky-matrix-axes", { before, geometry, cornerBox, headerBox, dayBox });
-    const summary = page.locator("[data-phone-schedule-summary]"); await expect(summary.locator(":scope > details")).toHaveCount(workerCount);
+    const summary = page.locator("[data-phone-schedule-summary]"); await summary.locator("xpath=ancestor::section[1]").getByRole("button").click(); await expect(summary.locator(":scope > details")).toHaveCount(workerCount);
     expect(await summary.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true); await expect(summary.locator("table")).toHaveCount(0);
     const search = page.getByRole("searchbox", { name: "Search schedule summary by employee name or surname" });
     await search.fill("surname 1"); await expect(summary.locator(":scope > details")).toHaveCount(1); await expect(summary).toContainText("Worker A very long employee surname 1");
-    await summary.locator("summary").click(); await expect(summary).toContainText("08:00"); await expect(summary).toContainText("16:00"); await expect(summary.locator("details > summary dl dd").nth(2)).toHaveText("8");
+    await summary.locator("summary").click(); await expect(summary).toContainText("08:00"); await expect(summary).toContainText("16:00"); await expect(summary.locator("details > summary dl dd").nth(3)).toHaveText("8");
     await search.fill("missing employee"); await expect(page.getByRole("status")).toContainText('No employees found');
     await search.fill(""); await expect(summary.locator(":scope > details")).toHaveCount(workerCount);
     await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
@@ -629,11 +646,12 @@ for (const width of [320, 375, 390, 430]) {
 
 
 test("PC schedule retains its desktop matrix dimensions and full summary table", async ({ page }) => {
+ await page.setViewportSize({ width: 1440, height: 900 });
  await fixture(page, "pc", "manager", { longNames: true }); await page.goto("/container/1/graphs/3");
  await expect(page.getByText("Schedule Summary", { exact: true })).toBeVisible(); await page.waitForLoadState("networkidle");
  await expect(page.locator("[data-manager-phone], [data-phone-matrix-scroll], [data-phone-schedule-summary]")).toHaveCount(0);
  const table = page.locator('[class*="summaryTableScroll"] table'); await expect(table).toBeVisible();
- await expect(table.locator("thead th")).toHaveCount(128); await expect(table.locator("tbody")).toContainText("08:00");
+ await expect(table.locator("thead th")).toHaveCount(130); await expect(table.locator("tbody")).toContainText("08:00");
  const matrixHeader = page.locator('table').first().locator("thead th").nth(1);
  expect((await matrixHeader.boundingBox())!.width).toBeGreaterThan(156);
 });
@@ -646,7 +664,7 @@ for (const language of ["en", "pl"] as const) for (const width of [320, 375, 390
   await page.route("**/api/availability-groups/5", route => route.fulfill({ contentType: "application/json", body: JSON.stringify({ id: 5, name: "DyspozycyjnoÃ…â€ºÃ„â€¡ BardzoDÃ…â€šugiePolskieNazwisko ZespoÃ…â€šu", year: 2026, month: 10, publicationStatus: "public", visibleFromUtc: "2026-10-01T08:00:00Z", visibleToUtc: "2026-10-31T18:00:00Z" }) }));
   await page.goto("/container/1/graphs/3");
   const information = page.locator("[data-phone-schedule-information]"); await expect(information).toBeVisible();
-  const summary = page.locator("[data-phone-schedule-summary]"); await expect(summary.locator(":scope > details")).toHaveCount(6);
+  const summary = page.locator("[data-phone-schedule-summary]"); await summary.locator("xpath=ancestor::section[1]").getByRole("button").click(); await expect(summary.locator(":scope > details")).toHaveCount(6);
   const matrix = page.locator("[data-phone-matrix-scroll]");
   expect(await information.evaluate(element => Boolean(element.compareDocumentPosition(document.querySelector('[data-phone-matrix-scroll]')!) & Node.DOCUMENT_POSITION_FOLLOWING))).toBe(true);
   expect(await summary.evaluate(element => Boolean(document.querySelector('[data-phone-matrix-scroll]')!.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING))).toBe(true);
@@ -657,23 +675,29 @@ for (const language of ["en", "pl"] as const) for (const width of [320, 375, 390
   const region = (await matrix.boundingBox())!; const corner = (await matrix.locator("thead th").first().boundingBox())!;
   expect(Math.abs(corner.x - region.x)).toBeLessThanOrEqual(2); expect(Math.abs(corner.y - region.y)).toBeLessThanOrEqual(2);
   await matrix.evaluate(element => { element.scrollLeft = 0; element.scrollTop = 0; }); await matrix.locator("tbody button").first().click(); await expect(page.getByRole("dialog")).toBeVisible();
-  await page.getByRole("button", { name: /Close related schedule|Zamknij powiÃ„â€¦zany grafik/ }).click();
+  await page.getByRole("button", { name: language === "en" ? "Close related schedule" : pl["Close related schedule"] }).click();
   await noOverflow(page); await noManagement(page);
-  await page.goto("/container/1"); const statistics = page.locator("[data-phone-container-statistics]"); await expect(statistics.locator("article")).toHaveCount(7);
-  const firstCard = statistics.locator("article").first(); expect(await firstCard.locator("dl").first().locator("dd").allTextContents()).toEqual(["1", "30", "16"]);
-  await firstCard.locator("summary").click(); await expect(firstCard).toContainText("Central"); await expect(firstCard.locator("details dd")).toHaveText("16");
+  await page.goto("/container/1"); const statistics = page.locator("[data-phone-container-statistics]");
+  await statistics.getByRole("button", { name: language === "en" ? "Statistics" : pl.Statistics, exact: true }).click();
+  await expect(statistics.locator("article")).toHaveCount(7);
+  const firstCard = statistics.locator("article").first(); await expect(firstCard.locator("dl").first().locator("dd")).toHaveText(["1", "30", "0", "16"]);
+  await firstCard.getByRole("button", { name: language === "en" ? "Shops" : pl.Shops, exact: true }).click();
+  await expect(firstCard.getByText("Central", { exact: true })).toBeVisible(); await expect(firstCard.locator("dl").last().locator("dd")).toHaveText("16");
   const columns = await statistics.locator('[class*="_metrics_"]').evaluate(element => getComputedStyle(element).gridTemplateColumns.split(" ").length); expect(columns).toBe(width === 320 ? 1 : 2);
   await noOverflow(page); await noManagement(page);
-  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
-  const totalBox = (await statistics.locator("article").last().boundingBox())!;
-  const statisticsNav = (await page.getByRole("navigation").last().boundingBox())!;
-  expect(totalBox.y + totalBox.height).toBeLessThanOrEqual(statisticsNav.y);
+  const total = statistics.locator("article").last();
+  await expect.poll(async () => {
+    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+    const totalBox = (await total.boundingBox())!;
+    const statisticsNav = (await page.getByRole("navigation").last().boundingBox())!;
+    return totalBox.y + totalBox.height - statisticsNav.y;
+  }).toBeLessThanOrEqual(0);
   if (width === 390) await page.screenshot({ path: testInfo.outputPath(`statistics-${language}.png`), fullPage: true });
   await page.getByRole("link", { name: /Back|Wstecz/, exact: true }).click(); await expect(page).toHaveURL(/\/container$/);
   await page.goto("/availability/5"); const availability = page.locator("[data-phone-availability-information]"); await expect(availability).toBeVisible();
-  await expect(page.getByText(language === "en" ? "Availability Profile" : "Profil dyspozycyjnoÃ…â€ºci", { exact: true })).toBeVisible();
+  await expect(page.getByText(language === "en" ? "Availability Profile" : pl["Availability Profile"], { exact: true })).toBeVisible();
   await expect(page.locator("main details, main nav")).toHaveCount(0); await expect(availability).toContainText("DyspozycyjnoÃ…â€ºÃ„â€¡ BardzoDÃ…â€šugiePolskieNazwisko ZespoÃ…â€šu");
-  await expect(availability).toContainText(language === "en" ? "Public" : "UdostÃ„â„¢pnione"); await expect(availability).toContainText("2026");
+  await expect(availability).toContainText(language === "en" ? "Public" : pl.Public); await expect(availability).toContainText("2026");
   await expect(availability).toContainText("6"); await expect(availability.locator('[class*="_visibilityEndpoint_"]')).toHaveCount(2);
   const availabilityMatrix = page.locator("[data-phone-matrix-scroll]"); await availabilityMatrix.scrollIntoViewIfNeeded(); await availabilityMatrix.evaluate(element => { element.scrollLeft = element.scrollWidth; });
   await expect.poll(() => availabilityMatrix.evaluate(element => element.scrollLeft)).toBeGreaterThan(0); await reachesViewport(availabilityMatrix, availabilityMatrix.locator("thead th").last());
@@ -708,7 +732,7 @@ for (const height of [720, 1000]) test(`Desktop profile switch is accessible and
  const title = page.getByRole("heading", { name: "Home", exact: true }); await expect(title).toBeVisible();
  await page.goto("/manager-profile");
  await expect(page.locator("aside").getByRole("button", { name: /Switch to Phone|Log out/ })).toHaveCount(0);
- await page.getByRole("button", { name: "Collapse sidebar" }).click();
+ await collapseSidebarIfOpen(page);
  const card = page.locator('section[aria-labelledby="manager-account-actions-heading"]');
  const mode = card.getByRole("button", { name: "Switch to Phone", exact: true });
  await expect(mode).toBeVisible();
@@ -731,31 +755,30 @@ test("PC Home restores data and interactions through PC Phone PC without login",
  await page.goto("/");
  await expect(page.getByRole("heading", { name: "Home", exact: true })).toBeVisible();
  await expect(page.getByRole("heading", { name: "Coming Soon" })).toHaveCount(0);
- await page.getByRole("button", { name: "Collapse sidebar", exact: true }).click();
+ await collapseSidebarIfOpen(page);
  const today = page.locator("section").filter({ has: page.getByText("Who Works Today?", { exact: true }) });
  await expect(today.getByRole("table")).toBeVisible();
- await expect(today.getByRole("button", { name: "Show Worker 1's schedule" }).first()).toBeVisible();
- await page.getByRole("button", { name: "Expand this month details" }).click();
- await expect(page.locator("#home-month-details")).toHaveAttribute("aria-hidden", "false");
- await expect(page.locator("#home-month-details").getByText("Private schedule", { exact: true })).toBeVisible();
- await expect(page.locator("#home-month-details").getByText("Central", { exact: true })).toBeVisible();
- await page.getByRole("button", { name: "Expand all", exact: true }).click();
- for (const id of [3, 6]) await expect(page.locator(`#home-schedule-${id}-content`).getByRole("table")).toBeVisible();
- await page.getByRole("button", { name: "Collapse all", exact: true }).click();
- for (const id of [3, 6]) await expect(page.locator(`#home-schedule-${id}-content`)).toHaveAttribute("aria-hidden", "true");
- await today.getByRole("button", { name: "Show Worker 1's schedule" }).first().click();
- await expect(page.locator("#home-schedule-3-content").getByRole("table")).toBeVisible();
- await page.getByRole("button", { name: "Open schedule", exact: true }).first().click();
+ const workerSchedules = today.getByRole("link", { name: /^Open schedule for Worker 1:/ });
+ await expect(workerSchedules).toHaveCount(2);
+ await expect(workerSchedules.nth(0)).toHaveAttribute("href", "/container/1/graphs/3");
+ await expect(workerSchedules.nth(1)).toHaveAttribute("href", "/container/1/graphs/6");
+ const dashboardDate = page.getByRole("group", { name: "Date", exact: true });
+ await dashboardDate.getByRole("button", { name: "Next day" }).click();
+ await expect(page.getByRole("heading", { name: "Who Works on 2 October 2026?" })).toBeVisible();
+ await expect(page.getByText("No employees scheduled for this date.")).toBeVisible();
+ await dashboardDate.getByRole("button", { name: "Today", exact: true }).click();
+ await expect(workerSchedules).toHaveCount(2);
+ const period = page.getByRole("group", { name: "Period", exact: true });
+ await period.getByRole("button", { name: "Previous month" }).click();
+ await expect(period.getByRole("button", { name: "Period", exact: true })).toHaveText("September 2026");
+ await expect(workerSchedules).toHaveCount(2);
+ await workerSchedules.first().click();
  await expect(page).toHaveURL(/\/container\/1\/graphs\/3$/);
- await page.goto("/");
- await page.getByRole("button", { name: "Collapse sidebar", exact: true }).click();
- await page.getByRole("button", { name: "Open container", exact: true }).first().click();
- await expect(page).toHaveURL(/\/container\?openContainerId=1$/);
  await page.goto("/");
  await expect(page.getByText("Who Works Today?", { exact: true })).toBeVisible();
  await page.waitForLoadState("networkidle");
  await page.goto("/manager-profile");
- await page.getByRole("button", { name: "Collapse sidebar" }).click();
+ await collapseSidebarIfOpen(page);
  await page.getByRole("button", { name: "Switch to Phone", exact: true }).click();
  await expect(page.getByRole("heading", { name: "Coming Soon", exact: true })).toBeVisible();
  await expect(page.getByText("Who Works Today?", { exact: true })).toHaveCount(0);
@@ -769,6 +792,7 @@ test("PC Home restores data and interactions through PC Phone PC without login",
  await page.getByRole("button", { name: "Switch to Desktop", exact: true }).click();
  await expect(page.getByRole("heading", { name: "Home", exact: true })).toBeVisible();
  await expect(today.getByRole("table")).toBeVisible();
+ await expect(workerSchedules).toHaveCount(2);
  await expect(page.getByRole("heading", { name: "Coming Soon" })).toHaveCount(0);
  expect(requests.filter(path => path === "/api/auth/login")).toEqual([]);
  expect(f.errors).toEqual([]);
@@ -780,7 +804,7 @@ test("PC profile actions preserve exchange failure, retry and phone More", async
   await page.goto("/manager-profile");
   const card = page.locator('section[aria-labelledby="manager-account-actions-heading"]');
   await expect(page.locator("aside").getByRole("button", { name: /Switch to Phone|Log out/ })).toHaveCount(0);
-  await page.getByRole("button", { name: "Collapse sidebar" }).click();
+  await collapseSidebarIfOpen(page);
   await expect(card.getByRole("button", { name: "Log out", exact: true })).toBeVisible();
   for (const width of [320, 390, 768, 1440]) {
     await page.setViewportSize({ width, height: 900 });
@@ -812,7 +836,7 @@ test("PC profile failure keeps actions and local logout available", async ({ pag
   await page.route("**/api/auth/logout", route => route.fulfill({ status: 503, json: {} }));
   await page.goto("/manager-profile");
   await expect(page.getByText("Could not load manager profile.", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Collapse sidebar" }).click();
+  await collapseSidebarIfOpen(page);
   const card = page.locator('section[aria-labelledby="manager-account-actions-heading"]');
   await expect(card.getByRole("button", { name: "Switch to Phone", exact: true })).toBeVisible();
   await card.getByRole("button", { name: "Log out", exact: true }).click();

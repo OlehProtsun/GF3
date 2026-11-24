@@ -573,7 +573,7 @@
 .languageRow button {
   min-width: 0;
   width: 100%;
-  min-height: 44px;
+  min-height: 45px;
   justify-content: flex-end;
   gap: 10px;
   padding: 8px 0 8px 4px;

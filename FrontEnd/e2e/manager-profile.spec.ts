@@ -102,7 +102,8 @@ test("profile retains editing, numeric passwords, team permissions, confirmation
   expect(state.deletions).toEqual([2]);
   await page.reload();
   await expect(details.getByLabel("Display name", { exact: true })).toHaveValue("Updated Manager");
-  await page.getByRole("button", { name: "Collapse sidebar", exact: true }).click();
+  const collapseSidebar = page.getByRole("button", { name: "Collapse sidebar", exact: true });
+  if (await collapseSidebar.isVisible()) await collapseSidebar.click();
   await expect.poll(() => page.locator("aside").first().evaluate(element => element.getBoundingClientRect().bottom)).toBeLessThanOrEqual(0);
   await page.getByRole("button", { name: /Actual manager document.pdf/ }).click();
   await expect.poll(state.downloads).toBe(1);

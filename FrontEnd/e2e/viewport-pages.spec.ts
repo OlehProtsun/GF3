@@ -5,13 +5,18 @@ for (const role of ["manager", "employee"]) {
     test.setTimeout(90_000);
     const errors: string[] = [];
     page.on("pageerror", error => errors.push(error.message));
-    await page.addInitScript(() => localStorage.setItem("gf3.auth.access-token", "viewport-fixture"));
+    await page.addInitScript(() => {
+      localStorage.setItem("gf3.auth.access-token", "viewport-fixture");
+      sessionStorage.setItem("gf3.pwa.install.dismissed", "1");
+    });
     await page.route("**/*", async route => {
       const path = new URL(route.request().url()).pathname;
       if (!path.startsWith("/api/")) return route.continue();
       let body: unknown = [];
-      if (path === "/api/auth/session") body = { role, managerId: role === "manager" ? 1 : null, employeeId: role === "employee" ? 1 : null, userName: "viewport", displayName: "Test account" };
+      if (path === "/api/auth/session") body = { role, managerId: role === "manager" ? 1 : null, employeeId: role === "employee" ? 1 : null, workspaceMode: "pc", isSystemManager: role === "manager", userName: "viewport", displayName: "Test account" };
       else if (path === "/api/account-language") body = { language: "en" };
+      else if (path === "/api/manager-home/activity") body = { items: [], allActivityCount: 0, requiresApprovalCount: 0, categoryCounts: {}, hasMore: false, nextOffset: 0 };
+      else if (path === "/api/employee-urlop") body = { shops: [], months: [] };
       else if (path === "/api/manager-profile/me") body = { id: 1, userName: "viewport", displayName: "Test account", recoveryEmail: "test@example.com", isOnline: true, isSystem: false };
       else if (path === "/api/employee-profile/me") body = { employeeId: 1, username: "viewport", displayName: "Test account", recoveryEmail: "test@example.com", phone: "+48123456789" };
       else if (path.includes("notepad")) body = { notes: [], state: { isExpanded: false, isPinned: false, height: 700 } };

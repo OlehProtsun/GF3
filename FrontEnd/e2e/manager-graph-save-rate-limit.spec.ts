@@ -244,7 +244,8 @@ async function workspace(page: Page, baseURL: string, loseThirdBatch: boolean,
 
 async function editFive(page: Page, paintMany: boolean) {
   await page.goto(editorUrl(ids[0]));
-  await page.getByRole("button", { name: "Collapse sidebar", exact: true }).click();
+  const collapseSidebar = page.getByRole("button", { name: "Collapse sidebar", exact: true });
+  if (await collapseSidebar.isVisible()) await collapseSidebar.click();
   for (const [index, id] of ids.entries()) {
     if (index) {
       await page.getByRole("tab", { name: "Graph " + id }).click();
@@ -305,7 +306,8 @@ for (const loseCommittedReadback of [false, true]) test(`seven-graph slot normal
   await page.setViewportSize({ width: 1600, height: 960 });
   const fixture = await workspace(page, baseURL!, false, { graphIds: seven, roster, incident, loseCommittedReadback, throttle: false });
   await page.goto(`/container/7/graphs/36/edit?openGraphIds=${seven.join(",")}`);
-  await page.getByRole("button", { name: "Collapse sidebar", exact: true }).click();
+  const collapseSidebar = page.getByRole("button", { name: "Collapse sidebar", exact: true });
+  if (await collapseSidebar.isVisible()) await collapseSidebar.click();
   const cells = (slots: FixtureSlot[]) => {
     const map = new Map<string, string[]>();
     for (const slot of slots) if (slot.employeeId) {
@@ -343,7 +345,7 @@ for (const loseCommittedReadback of [false, true]) test(`seven-graph slot normal
   expect(fixture.states.get(39)!.versionCount).toBe(1);
   await testInfo.attach("seven-graph-save-traffic", { body: JSON.stringify(fixture.metrics()), contentType: "application/json" });
   await page.goto(`/container/7/graphs/39/edit?openGraphIds=${seven.join(",")}`);
-  await page.getByRole("button", { name: "Collapse sidebar", exact: true }).click();
+  if (await collapseSidebar.isVisible()) await collapseSidebar.click();
   await expect(matrix(page)).toBeVisible();
   await expect(page.getByRole("button", { name: "Restore draft" })).toHaveCount(0);
   // A second edit after reopening must save normally and leave no stale checkpoint/inert UI.
@@ -455,7 +457,8 @@ test("ten graphs save 5000 styled cells with bounded traffic and verified reload
   const fixture = await workspace(page, baseURL!, false, { graphIds: ten, roster: Array.from({ length: 20 }, (_, i) => i + 1), throttle: false, enforceLimits: true });
   await page.setViewportSize({ width: 1600, height: 1000 });
   await page.goto(`/container/7/graphs/34/edit?openGraphIds=${ten.join(",")}`);
-  await page.getByRole("button", { name: "Collapse sidebar", exact: true }).click();
+  const collapseSidebar = page.getByRole("button", { name: "Collapse sidebar", exact: true });
+  if (await collapseSidebar.isVisible()) await collapseSidebar.click();
   for (const [index, id] of ten.entries()) {
     if (index) await page.getByRole("tab", { name: `Graph ${id}`, exact: true }).click();
     await expect(scheduleCell(page, "1:1")).toBeVisible({ timeout: 30000 });

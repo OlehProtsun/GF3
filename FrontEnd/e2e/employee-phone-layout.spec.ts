@@ -16,6 +16,10 @@ async function fixture(page: Page, role = "employee") {
     let body: unknown = [];
     if (path === "/api/auth/session") body = { role, employeeId: role === "employee" ? 12 : null, managerId: role === "manager" ? 1 : null, userName: "worker", displayName: "Worker with a long account name", isSystemManager: true };
     else if (path === "/api/account-language") body = { language: "en" };
+    else if (path === "/api/public-holiday-settings") body = { showPublicHolidays: true };
+    else if (path === "/api/employee-urlop") body = { months: [], shops: [] };
+    else if (path === "/api/manager-home/nav-badges") body = { totalPending: 0, graphPending: 0, urlopPending: 0 };
+    else if (path === "/api/manager-home/activity") body = { items: [], allActivityCount: 0, requiresApprovalCount: 0, hasMore: false, nextOffset: 0, categoryCounts: {} };
     else if (path === "/api/employee-profile/me") body = { employeeId: 12, username: "worker", displayName: "Worker with a long account name", recoveryEmail: "worker@example.com" };
     else if (path === "/api/employee-ui-state") body = { scheduleColumnOrders: {}, readNotificationIds: [], pinnedSwapIds: [] };
     else if (path.includes("notepad")) body = { notes: [], state: { isExpanded: false, isPinned: false, height: 700 } };
@@ -428,14 +432,15 @@ test("manager desktop navigation and public login remain isolated", async ({ pag
   await page.setViewportSize({ width: 1440, height: 900 });
   await fixture(page, "manager");
   await page.goto("/");
-  await expect(page.locator('aside[class*="sidebar_"]')).toBeVisible();
+  await page.getByRole("button", { name: "Open sidebar", exact: true }).click();
+  await expect(page.getByRole("navigation", { name: "Manager navigation" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Open manager profile" })).toBeVisible();
   await expect(page.locator('[data-employee-nav]')).toHaveCount(0);
   expect(await page.locator("main").first().evaluate(element => getComputedStyle(element).containerName)).toBe("none");
   await page.evaluate(() => localStorage.removeItem("gf3.auth.access-token"));
   await page.route("**/api/auth/session", route => route.fulfill({ status: 401, contentType: "application/json", body: JSON.stringify({ message: "Unauthenticated" }) }));
   await page.goto("/login");
-  await expect(page.getByRole("button", { name: /Sign in|Log in|Zaloguj się/ }).first()).toBeVisible();
+  await expect(page.getByRole("button", { name: /Sign in|Log in|Zaloguj się|Увійти/ }).first()).toBeVisible();
   await expect(page.locator('[data-employee-nav]')).toHaveCount(0);
   expect(await page.evaluate(() => [...document.querySelectorAll("*")].some(element => getComputedStyle(element).containerName === "employee-workspace"))).toBe(false);
 });

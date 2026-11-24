@@ -329,6 +329,8 @@ test("custom private Give submits without newer abort APIs and cancellation appe
   const sent = page.waitForRequest(r => new URL(r.url()).pathname === "/api/employee-shift-swaps" && r.method() === "POST", { timeout: 5_000 });
   await page.getByRole("button", { name: "Send request" }).click();
   expect((await sent).postDataJSON()).toEqual({ allowPartialAcceptance: false, requestKind: "give", scheduleId: 10, scheduleSlotId: 100, fromTime: "09:15", toTime: "16:15", targetEmployeeId: 2 });
+  await expect(page.getByRole("heading", { name: "Swap request sent successfully!", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Done", exact: true }).click();
   await page.getByRole("button", { name: "View offer details for F27" }).click();
   await page.getByRole("button", { name: "Cancel offer", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "Offer details" })).toHaveCount(0);
@@ -569,6 +571,7 @@ for (const viewport of [{ width: 320, height: 568 }, { width: 320, height: 640 }
     const scroll = async (region: import("@playwright/test").Locator, action: string) => {
       if (viewport.height < 600) return; // Compact mode intentionally has one outer scroller.
       const frame = region.locator("..");
+      await region.evaluate(el => { el.scrollTop = 0; });
       await expect(frame).toHaveAttribute("data-scroll-top", "false");
       await expect(frame).toHaveAttribute("data-scroll-bottom", "true");
       const before = (await modal.getByRole("button", { name: action, exact: true }).boundingBox())!;
@@ -722,8 +725,11 @@ for (const viewport of [{ width: 320, height: 568 }, { width: 375, height: 667 }
       const dialog = page.locator("dialog:modal");
       expect(await dialog.evaluate(element => element.scrollWidth <= element.clientWidth)).toBeTruthy();
       if (mode === "exchange" && viewport.width === 390) await page.screenshot({ path: test.info().outputPath("exchange-review.png"), fullPage: true });
-      await send.click(); await expect(page.locator("dialog:modal")).toHaveCount(0);
+      await send.click();
+      await expect(page.getByRole("heading", { name: "Swap request sent successfully!", exact: true })).toBeVisible();
       expect(state.offers[0].status).toBe("open");
+      await page.getByRole("button", { name: "Done", exact: true }).click();
+      await expect(page.locator("dialog:modal")).toHaveCount(0);
       await expect(page.locator('[class*="swapBackdrop"] path')).toHaveAttribute("d", silhouette!);
       await page.reload();
       if (mode === "exchange") {
@@ -928,6 +934,7 @@ for (const width of [320, 375, 390, 430, 1280]) {
     expect(state.offers).toHaveLength(0);
     await page.screenshot({ path: test.info().outputPath("review-custom.png") });
     await dialog.getByRole("button", { name: "Send request", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Swap request sent successfully!", exact: true })).toBeVisible();
     expect(state.offers[0]).toMatchObject({ fromTime: "09:15", toTime: "16:30", requestKind: "give" });
   });
 }
@@ -997,6 +1004,8 @@ for (const width of [320, 375, 390, 430]) {
     await modal.getByRole("button", { name: "Continue", exact: true }).click();
     await expect(modal.getByRole("region", { name: "Employee shift (they give)" })).toContainText("5.5h");
     await modal.getByRole("button", { name: "Send request" }).click();
+    await expect(page.getByRole("heading", { name: "Swap request sent successfully!", exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Done", exact: true }).click();
     await expect(modal).toHaveCount(0);
     expect(state.offers[0]).toMatchObject({ requestKind: "exchange", returnScheduleId: 30, returnScheduleSlotId: 999, fromTime: "09:00", toTime: "16:30", returnFromTime: "10:15", returnToTime: "15:45" });
   });

@@ -94,7 +94,7 @@ The [first hosted CI run](https://github.com/OlehProtsun/GF3/actions/runs/452718
 
 The [candidate CI rerun](https://github.com/OlehProtsun/GF3/actions/runs/45274656553) on `93c9e9a4cddd3520fde7d951d1887a3508500373` ended in **failure**. [Build and test](https://github.com/OlehProtsun/GF3/actions/runs/45274656553/job/138043186000) passed with 1,931 backend tests, 57 host-guard tests and 1,544 Vitest tests passing. Vitest retained its one existing skip. [Playwright smoke](https://github.com/OlehProtsun/GF3/actions/runs/45274656553/job/138050699005) passed all 12 tests on Ubuntu 24.04. The [Docker job](https://github.com/OlehProtsun/GF3/actions/runs/45274656553/job/138057323139) built the image and pulled the stock Nginx image. Its cutover and rollback rehearsal failed at `deploy/security/tests/rehearse_release.py:63` on `assert target[-2:] == added`. The fixture assumes the November 14–15 additive migrations end the history. The candidate ends with the November 23 communication migrations. Hosted ingress was consequently skipped. The matching ingress harness passed locally.
 
-**Open release gates** are GSAP and `@gsap/react`, non-permissive OS packages, final native and asset attribution, a completed full browser run, hosted CI, protected SQLite maintenance, coordinated media restore and device verification. The physical device checklist covers iOS Safari and Android Chrome installation, cold start, Guide, rotation, Back/Close, photo and GIF playback, and reduced motion. The draft PR is held under the user's updated instructions. Merge and deploy are blocked.
+At this point the release gates included GSAP and `@gsap/react`, non-permissive OS packages, final native and asset attribution, a passing full browser run, hosted CI, protected SQLite maintenance, coordinated media restore and device verification. The follow-up below records the later CI run and browser results.
 
 The candidate commits change 71 paths relative to the plan's source baseline, including the Web API, repositories, frontend, relevant tests, Dockerfile, CI, release assets README and license audit. The QA evidence from the final CI run is recorded locally while the exact tested candidate remains the feature branch tip.
 
@@ -117,7 +117,6 @@ The protected preflight was exercised locally with a read-only Git adapter using
 - A separate scratch SQLite database contained one committed row referencing a sentinel in `communication-gifs/`. Both `gf3_release.backup` and `gf3_maintenance.final_backup` produced a valid restored row with `integrity_check=ok`, zero foreign-key errors and the same database SHA-256 `c3a72be26e6a1ef04b31f8286d0ae2ecaf606c9c93c3a36a964b81cc5023f55d`. Both backups omitted the attachment.
 - Production attachments live under `/data/communication-gifs`. The Dockerfile assigns `/data` to `app:app`. The live volume's ownership and permissions, coordinated backup of SQLite and attachments, production preflight for the full chain, abort and rollback before the first live write remain unverified. They require the separately reviewed maintenance procedure in Plan 78.
 - Physical iOS and Android verification remains open. The browser checks use desktop Chromium, mobile emulation and Windows WebKit.
-- **Application QA incomplete.** The ordered migration, swap, correction, schedule/PDF, PWA/guide, communications/media, and cross-module verification steps remain pending. There is no candidate SHA or candidate CI evidence.
 
 ## Follow-up · CI rehearsal and E2E isolation
 
@@ -126,6 +125,35 @@ The protected preflight was exercised locally with a read-only Git adapter using
 - The read-only check of `%LOCALAPPDATA%/GF3/SQLite.db` identified two active synthetic records from the earlier run. Employee `56`, account `13`, username `employee.pdf.e2e.1795469708530-imbrtj`. Employee `57`, account `14`, username `employee.pdf.e2e.1795469708062-0cvmym`. Each has one login and two online workflow entries. Both remain in place pending authorization for cleanup. Production was outside this inspection.
 - The disposable SQLite and media restore exercise confirmed that both shipped backup functions omit `communication-gifs`. After a simulated candidate failure, the original SQLite restored with matching SHA-256 `93b9cb8e0d51f974f56a0045c9f703872335ef2305a36d1b548a3e27bd1253a2`, intact history and foreign keys. A separate scratch copy of the fixture GIF restored with matching SHA-256 `978b08c1c3d5ba751491d4a991942f05231ffa59c79fc2338f441b1c839706a5`. This is a proof on a disposable fixture, independent of the protected deployment procedure.
 - The license inventory now links Webflow's GSAP product terms and commercial-use announcement. They confirm that GF3's observed application and promo usage can use GSAP without library fees under the custom license. Remaining native binaries and static component notices, shipped asset rights and the final release notice bundle are recorded in the [license report](third-party-licenses.md).
+
+### Hosted CI and full browser run
+
+GitHub Actions run [45293016387](https://github.com/OlehProtsun/GF3/actions/runs/45293016387) passed all three jobs for `ba4942faf44e0e0774c0caa144295dfbf62bd4af`: Build and test, Playwright smoke, and Docker image. CI recorded **1,931 backend tests passed**, **57 host guard tests passed**, **1,544 Vitest tests passed and 1 skipped**, and **0 lint errors and 21 warnings**. The Docker job built the image and passed the disposable cutover, rollback, HTTP and HTTPS ingress steps. A separate local production image smoke passed authentication, ordered photo/text/GIF delivery, WebP conversion, private headers and corrupt-file rejection. The protected PROD2 data and media restore gate remains open. The hosted result applies to the published commit, before the local browser follow-up changes.
+
+The full local Playwright run completed all four project groups on the earlier checkout, before the latest fixture and application fixes:
+
+| Browser project | Passed | Failed | Skipped |
+| --- | ---: | ---: | ---: |
+| Chromium | 364 | 126 | 2 |
+| Mobile Chrome | 355 | 129 | 8 |
+| WebKit laptop | 356 | 133 | 3 |
+| WebKit iPhone X | 348 | 135 | 9 |
+| Total | 1,423 | 523 | 22 |
+
+The configured skips include project-specific viewport coverage, Chromium service-worker coverage and the separate isolated live acceptance case. The opt-in manual-shift acceptance passed separately using a disposable real backend and all four browser projects. The iPhone X profile is emulation, so installed iOS and Android PWA checks still require physical devices.
+
+The full Chromium repeat at port `5290` finished with **480 passed, 10 failed and 2 skipped** (`GF3.Tests/TestResults/plan78-final-chromium.json`). It used an earlier revision of the local fixtures. Failures included the older Home dashboard expectations, manager route navigation, graph preview teardown, swap scroll-start state, Urlop offset after a click, and viewport stress fixtures. Later targeted runs passed manager navigation, unsaved graph generation, the 390×844 swap scroll/focus test, the 768 px Urlop offset test, Home workspace switching and all four populated dialog sizes in Chromium. The same four dialog sizes, Home switching, motion, profile truncation and the manager route checks passed iPhone WebKit. iPhone WebKit also passed contract approval and rejection at narrow widths and correction history in EN, PL and UK. The repeat of the other three full browser projects has no final result yet.
+
+Follow-up failures traced to stale fixtures include the Polish guest and workspace chooser labels, the explicit swap confirmation after sending, the Home period control, and the employee PWA install dialog intercepting unrelated workflows. The approval pulse on Home now respects reduced motion. The employee account language control now also meets its 44 px measured touch target in iPhone WebKit. Dedicated PWA tests still exercise the install dialog.
+
+- Targeted reruns passed **48 PIN and swap cases** in Chrome Mobile and both WebKit profiles, **12 PWA, Guide and communications smoke cases** in Chromium and iPhone WebKit, and **3 day-off shift request cases** in Chromium (EN, PL and UK). The SQLite migration rerun passed **9 of 9** on disposable databases. The separate restore fixture reproduced the missing media in both standard backups and verified the hashes after restoring SQLite and the separately copied GIF.
+- A later sequential iPhone WebKit run passed **2 of 2** for saving and reopening a persisted graph and for comparing a swap across two schedules (`GF3.Tests/TestResults/plan78-targeted-5308.json`). The graph case confirmed HTTP 201, the saved name via the real API and the expected activity requests for the persisted graph. The case closes the editor panels on the narrow viewport before selecting Save. The comparison case exercised keyboard scrolling and activation in mobile WebKit, and the targeted Chromium run exercised wheel and keyboard scrolling.
+- The follow-up Windows .NET Release run under `Category!=LocalOnly` passed **1,931 of 1,931**, with no skips (`GF3.Tests/TestResults/plan78-followup-release.trx`). Local TypeScript/Vite build and ESLint passed, with **21 lint warnings**. The local concurrent Vitest run had **1,543 passed, 1 timeout and 1 skipped**. All three tests in the file that timed out passed in a separate run with the original timeout.
+- The local production Docker build with the follow-up UI changes succeeded (`linux/amd64`, image index `sha256:feee34343e538a578cc16dba2597cc2c7133ef0de121f2f3960239ad6739c8be`). With networking disabled and SQLite on a scratch volume, the container passed health and build metadata, login, ordered photo/text/GIF, WebP conversion, private headers and corrupt-file rejection.
+- A repeat read-only query of the working Windows database found the same two previously identified synthetic employee accounts under the checked E2E prefixes. Production data was outside that check.
+- A Windows fail-fast repeat started the published Web API twice with invalid SQLite configuration. The runtime database mismatch and the EF design-time override each stopped startup with the expected guard error before creating any database file.
+
+Release status stays **BLOCKED** pending a clean complete E2E rerun, exact-head CI, physical-device verification, and the production maintenance and license gates. No draft PR was opened.
 
 ### Reproducing the remaining release checks
 

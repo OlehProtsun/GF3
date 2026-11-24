@@ -6,7 +6,7 @@ for (const size of [{ width: 1280, height: 720 }, { width: 1440, height: 800 }, 
     test.setTimeout(90_000);
     await page.setViewportSize(size);
     const errors: string[] = [];
-    page.on("pageerror", e => errors.push(e.message));
+    page.on("pageerror", e => errors.push(e.stack ?? e.message));
     await page.addInitScript(() => localStorage.setItem("gf3.auth.access-token", "viewport-fixture"));
     await page.route("**/*", async route => {
       const path = new URL(route.request().url()).pathname;
@@ -21,9 +21,33 @@ for (const size of [{ width: 1280, height: 720 }, { width: 1440, height: 800 }, 
     for (const name of ["transferFull", "availabilityRelated", "versions", "history", "correction", "communication", "regulation", "saving", "manual"]) {
       await test.step(name, async () => {
         await page.goto(`/e2e/fixtures/viewport.html?case=${name}`);
-        if (name === "manual") await page.locator('[class*="shiftPickerButton_"]').click();
+        await page.waitForLoadState("networkidle");
+        expect(errors, `Browser errors in the ${name} fixture`).toEqual([]);
+        if (name === "manual") {
+          const shifts = page.getByRole("region", { name: "Available shifts", exact: true });
+          await expect(shifts.getByRole("button")).toHaveCount(360);
+          const lastShift = shifts.getByRole("button").last();
+          await lastShift.click();
+          await expect(lastShift).toHaveAttribute("aria-pressed", "true");
+          await page.getByRole("button", { name: "Specific employee", exact: true }).click();
+          const picker = page.getByRole("button", { name: "employee list", exact: true });
+          await picker.click();
+          const list = page.getByRole("listbox", { name: "employee list", exact: true });
+          await expect(list.getByRole("option")).toHaveCount(24);
+          await expect(list.locator('xpath=..')).toBeInViewport({ ratio: 1 });
+          expect(await list.evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
+          const lastEmployee = list.getByRole("option").last();
+          const employeeName = (await lastEmployee.innerText()).trim();
+          await page.screenshot({ path: test.info().outputPath(`${name}.png`) });
+          await lastEmployee.click();
+          await expect(picker).toContainText(employeeName);
+          await expect(page.getByRole("button", { name: "Publish shift" })).toBeEnabled();
+          return;
+        }
         if (name === "versions") await expect(page.getByRole("button", { name: /Commit 25,/ })).toBeVisible();
-        const surface = page.locator('[class*="surface_"]').filter({ visible: true }).first();
+        const surface = (name === "saving"
+          ? page.getByRole("status", { name: "Saving changes" }).locator('[class*="panel_"]')
+          : page.locator('[class*="surface_"], [aria-modal="true"] > [class*="dialog_"]')).filter({ visible: true }).first();
         await expect(surface).toBeVisible();
         const box = (await surface.boundingBox())!;
         expect(box.x).toBeGreaterThanOrEqual(0);
@@ -39,8 +63,12 @@ for (const size of [{ width: 1280, height: 720 }, { width: 1440, height: 800 }, 
           if (!(await lastAction.isDisabled())) await lastAction.click({ trial: true, timeout: 5000 });
         }
         if (name === "history") {
-          await expect(surface.getByText("After", { exact: true })).toBeInViewport({ ratio: 0.98 });
-          if (size.width > 1180) await expect(surface.getByText("Before", { exact: true })).toBeInViewport({ ratio: 0.98 });
+          const after = surface.getByText("After", { exact: true });
+          await after.scrollIntoViewIfNeeded();
+          await expect(after).toBeInViewport({ ratio: 0.98 });
+          const before = surface.getByText("Before", { exact: true });
+          if (size.width <= 1180) await before.scrollIntoViewIfNeeded();
+          await expect(before).toBeInViewport({ ratio: 0.98 });
         }
         if (name === "versions") {
           await page.getByRole("button", { name: /^Commit 1,/ }).click();

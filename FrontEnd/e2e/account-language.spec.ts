@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { dismissEmployeeInstallPrompt } from "./helpers";
 
 test.use({ reducedMotion: "reduce" });
 
@@ -117,6 +118,7 @@ test("account language defaults to Polish, persists English and Ukrainian and st
   identity = { ...identity, role: "employee", managerId: null, employeeId: 1, userName: "worker" };
   await page.setViewportSize({ width: 320, height: 900 });
   await page.goto("/profile");
+  await dismissEmployeeInstallPrompt(page);
   await expect(page.getByRole("button", { name: "Język aplikacji", exact: true })).toHaveText("Polski");
   await expect(page.getByRole("heading", { name: "Dane konta" })).toBeVisible();
   {
@@ -130,11 +132,17 @@ test("account language defaults to Polish, persists English and Ukrainian and st
       const label = element.querySelector("label")!.getBoundingClientRect();
       const button = element.querySelector("button")!.getBoundingClientRect();
       const icon = element.querySelector("svg")!.getBoundingClientRect();
-      return Math.abs(label.y + label.height / 2 - button.y - button.height / 2) <= 2
-        && Math.abs(icon.y + icon.height / 2 - button.y - button.height / 2) <= 2
-        && label.right <= button.left + 1 && label.left >= row.left && button.right <= row.right + 1
-        && row.left >= 0 && row.right <= innerWidth + 1 && button.height >= 44;
-    })).toBe(true);
+      const center = (rect: DOMRect) => rect.y + rect.height / 2;
+      return [
+        Math.abs(center(label) - center(button)) > 2 && `label center ${center(label)}, button center ${center(button)}`,
+        Math.abs(center(icon) - center(button)) > 2 && `icon center ${center(icon)}, button center ${center(button)}`,
+        label.right > button.left + 1 && `label right ${label.right}, button left ${button.left}`,
+        label.left < row.left && `label left ${label.left}, row left ${row.left}`,
+        button.right > row.right + 1 && `button right ${button.right}, row right ${row.right}`,
+        (row.left < 0 || row.right > innerWidth + 1) && `row ${row.left}–${row.right}, viewport ${innerWidth}`,
+        button.height < 44 && `button height ${button.height}`,
+      ].filter(Boolean);
+    })).toEqual([]);
   }
 
   await choose("pl", "English");
@@ -151,11 +159,17 @@ test("account language defaults to Polish, persists English and Ukrainian and st
       const label = element.querySelector("label")!.getBoundingClientRect();
       const button = element.querySelector("button")!.getBoundingClientRect();
       const icon = element.querySelector("svg")!.getBoundingClientRect();
-      return Math.abs(label.y + label.height / 2 - button.y - button.height / 2) <= 2
-        && Math.abs(icon.y + icon.height / 2 - button.y - button.height / 2) <= 2
-        && label.right <= button.left + 1 && label.left >= row.left && button.right <= row.right + 1
-        && row.left >= 0 && row.right <= innerWidth + 1 && button.height >= 44;
-    })).toBe(true);
+      const center = (rect: DOMRect) => rect.y + rect.height / 2;
+      return [
+        Math.abs(center(label) - center(button)) > 2 && `label center ${center(label)}, button center ${center(button)}`,
+        Math.abs(center(icon) - center(button)) > 2 && `icon center ${center(icon)}, button center ${center(button)}`,
+        label.right > button.left + 1 && `label right ${label.right}, button left ${button.left}`,
+        label.left < row.left && `label left ${label.left}, row left ${row.left}`,
+        button.right > row.right + 1 && `button right ${button.right}, row right ${row.right}`,
+        (row.left < 0 || row.right > innerWidth + 1) && `row ${row.left}–${row.right}, viewport ${innerWidth}`,
+        button.height < 44 && `button height ${button.height}`,
+      ].filter(Boolean);
+    })).toEqual([]);
   }
 
   await choose("en", "Українська");
@@ -173,11 +187,17 @@ test("account language defaults to Polish, persists English and Ukrainian and st
       const label = element.querySelector("label")!.getBoundingClientRect();
       const button = element.querySelector("button")!.getBoundingClientRect();
       const icon = element.querySelector("svg")!.getBoundingClientRect();
-      return Math.abs(label.y + label.height / 2 - button.y - button.height / 2) <= 2
-        && Math.abs(icon.y + icon.height / 2 - button.y - button.height / 2) <= 2
-        && label.right <= button.left + 1 && label.left >= row.left && button.right <= row.right + 1
-        && row.left >= 0 && row.right <= innerWidth + 1 && button.height >= 44;
-    })).toBe(true);
+      const center = (rect: DOMRect) => rect.y + rect.height / 2;
+      return [
+        Math.abs(center(label) - center(button)) > 2 && `label center ${center(label)}, button center ${center(button)}`,
+        Math.abs(center(icon) - center(button)) > 2 && `icon center ${center(icon)}, button center ${center(button)}`,
+        label.right > button.left + 1 && `label right ${label.right}, button left ${button.left}`,
+        label.left < row.left && `label left ${label.left}, row left ${row.left}`,
+        button.right > row.right + 1 && `button right ${button.right}, row right ${row.right}`,
+        (row.left < 0 || row.right > innerWidth + 1) && `row ${row.left}–${row.right}, viewport ${innerWidth}`,
+        button.height < 44 && `button height ${button.height}`,
+      ].filter(Boolean);
+    })).toEqual([]);
   }
 
   await choose("uk", "Polski");
