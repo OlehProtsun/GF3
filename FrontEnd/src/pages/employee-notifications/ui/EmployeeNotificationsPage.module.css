@@ -334,7 +334,7 @@
 
   .inboxTabs {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(min-content, 1fr));
     width: 100%;
     max-width: none;
     gap: 3px;
@@ -342,8 +342,7 @@
   }
 
   .inboxTabs button {
-    min-width: 0;
-    width: 100%;
+    min-width: min-content;
     gap: 3px;
     padding-inline: 3px;
     font-size: 0.66rem;

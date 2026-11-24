@@ -106,9 +106,9 @@ export function useSwapModalEnvironment(dialogRef: RefObject<HTMLDialogElement |
       cancelAnimationFrame(focusFrame);
       dialog.close();
       for (const restore of restoreStyles.reverse()) restore();
+      if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true });
       for (const { element, left, top } of backgroundScrollers) { element.scrollLeft = left; element.scrollTop = top; }
       window.scrollTo({ ...pagePosition, behavior: "instant" });
-      if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true });
     };
   }, [dialogRef, returnFocusRef, active]);
 }
