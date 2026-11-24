@@ -226,7 +226,7 @@ def bootstrap_paths(git, before, target, raw):
     require(isinstance(build_inputs, dict) and set(build_inputs) <= REVIEWED_BUILD_INPUTS,
             "Tooling review contains an unsupported build input")
     if build_inputs:
-        diff = git("diff", "--raw", "--no-abbrev", "--no-renames", "--no-ext-diff", before, target, "--").split("\0")
+        diff = git("diff", "--raw", "--no-abbrev", "--no-renames", "--no-ext-diff", "-z", before, target, "--").split("\0")
         actual = {}
         for header, path in zip(diff[:-1:2], diff[1::2], strict=True):
             old_mode, new_mode, old_blob, new_blob, status = header.removeprefix(":").split()

@@ -170,6 +170,19 @@ class MaintenanceTests(unittest.TestCase):
                          ("20261115135735_RefreshManualShiftOffer",) + maintenance.REVIEWED_RELEASE_MIGRATIONS)
         self.assertTrue(all(len(item["tables"]) == len(maintenance.REVIEWED_SCHEMA_TABLES) for item in contracts))
 
+    def test_reviewed_build_inputs_require_exact_null_delimited_git_diff(self):
+        path = "GF3.WebApi/WebApi.csproj"
+        old, new = "a" * 40, "b" * 40
+        review = {"before": "before", "target": "target", "blobs": {},
+                  "reviewed_build_inputs": {path: {"status": "M", "before": old, "after": new}}}
+        git = Mock(return_value=f":100644 100644 {old} {new} M\0{path}\0")
+        self.assertEqual(maintenance.bootstrap_paths(git, "before", "target", json.dumps(review)), {path})
+        git.assert_called_once_with("diff", "--raw", "--no-abbrev", "--no-renames", "--no-ext-diff",
+                                    "-z", "before", "target", "--")
+        git.return_value += f":100644 100644 {old} {new} M\0Elsewhere.csproj\0"
+        with self.assertRaisesRegex(maintenance.MaintenanceError, "Unreviewed critical build input"):
+            maintenance.bootstrap_paths(git, "before", "target", json.dumps(review))
+
     def test_only_complete_regular_append_only_migrations_pass(self):
         migration = f"{maintenance.MIGRATIONS}/{AFTER[-1]}"
 
