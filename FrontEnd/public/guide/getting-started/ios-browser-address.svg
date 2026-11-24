@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="591" height="469" viewBox="0 0 591 469" role="img" aria-labelledby="title desc">
+  <title id="title">Open the GF sign-in page</title><desc id="desc">A generic mobile browser address bar above a sign-in page.</desc>
+  <rect width="591" height="469" fill="#eef1f5"/><rect x="18" y="17" width="555" height="435" rx="28" fill="#fff" stroke="#d7dce4"/>
+  <rect x="36" y="35" width="519" height="53" rx="16" fill="#f0f2f6"/><circle cx="57" cy="61" r="7" fill="#8793a5"/>
+  <rect x="77" y="48" width="421" height="26" rx="13" fill="#fff"/><text x="91" y="66" font-family="Arial,sans-serif" font-size="14" fill="#475467">app-gf.com</text>
+  <text x="295" y="148" text-anchor="middle" font-family="Arial,sans-serif" font-size="21" font-weight="700" fill="#202939">GF</text>
+  <text x="295" y="178" text-anchor="middle" font-family="Arial,sans-serif" font-size="14" fill="#667085">Employee sign in</text>
+  <rect x="135" y="207" width="321" height="51" rx="9" fill="#fff" stroke="#cbd2dc"/><text x="153" y="238" font-family="Arial,sans-serif" font-size="13" fill="#98a2b3">Username</text>
+  <rect x="135" y="273" width="321" height="51" rx="9" fill="#fff" stroke="#cbd2dc"/><text x="153" y="304" font-family="Arial,sans-serif" font-size="13" fill="#98a2b3">Password</text>
+  <rect x="135" y="341" width="321" height="46" rx="9" fill="#2867d8"/><text x="295" y="369" text-anchor="middle" font-family="Arial,sans-serif" font-size="14" font-weight="700" fill="#fff">Sign in</text>
+  <rect x="260" y="426" width="71" height="5" rx="2.5" fill="#c3c8d0"/>
+</svg>

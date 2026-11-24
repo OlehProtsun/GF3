@@ -167,23 +167,35 @@ public sealed class AdminDbService : IAdminDbService
             throw new ValidationException("Database path is required.");
         }
 
-        var normalizedPath = Path.GetFullPath(databasePath.Trim());
-        if (!File.Exists(normalizedPath))
+        var requestedPath = Path.GetFullPath(databasePath.Trim());
+        if (!File.Exists(requestedPath))
         {
             throw new ValidationException("Selected database file does not exist.");
         }
 
-        var previousPath = _databaseWorkspace.DatabasePath;
-        _databaseWorkspace.SetDatabasePath(normalizedPath);
+        var normalizedPath = requestedPath;
+        string? stagedDirectory = null;
+        if (_databaseWorkspace.IsBackupBundleDatabase(requestedPath))
+        {
+            stagedDirectory = Path.Combine(_databaseWorkspace.WorkspaceRootPath, "restored", Guid.NewGuid().ToString("N"));
+            normalizedPath = await _databaseWorkspace.MaterializeBackupAsync(requestedPath, stagedDirectory, ct).ConfigureAwait(false);
+        }
+        else if (IsBareWorkspaceBackup(requestedPath) && await _databaseWorkspace.HasReferencedMediaAsync(requestedPath, ct).ConfigureAwait(false))
+        {
+            throw new ValidationException("This legacy backup contains communication media references but has no verified media bundle.");
+        }
 
+        var previousPath = _databaseWorkspace.DatabasePath;
         try
         {
+            _databaseWorkspace.SetDatabasePath(normalizedPath);
             await EnsureSelectedDatabaseIsReadyAsync(ct).ConfigureAwait(false);
             SqliteDatabaseSelectionStore.Save(normalizedPath, _localApplicationDataRoot);
         }
         catch
         {
             _databaseWorkspace.SetDatabasePath(previousPath);
+            if (stagedDirectory is not null && Directory.Exists(stagedDirectory)) Directory.Delete(stagedDirectory, recursive: true);
             throw;
         }
 
@@ -222,6 +234,16 @@ public sealed class AdminDbService : IAdminDbService
         await using var scope = _serviceScopeFactory.CreateAsyncScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         await dbContext.Database.MigrateAsync(ct).ConfigureAwait(false);
+    }
+
+    private bool IsBareWorkspaceBackup(string path)
+        => IsWithinDirectory(path, _databaseWorkspace.AutomaticBackupDirectoryPath)
+            || IsWithinDirectory(path, _databaseWorkspace.ManualCopyDirectoryPath);
+
+    private static bool IsWithinDirectory(string path, string directory)
+    {
+        var relative = Path.GetRelativePath(Path.GetFullPath(directory), Path.GetFullPath(path));
+        return !Path.IsPathRooted(relative) && relative != ".." && !relative.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal);
     }
 
     private static void ValidateImportFile(byte[] fileBytes, int maxImportBytes)

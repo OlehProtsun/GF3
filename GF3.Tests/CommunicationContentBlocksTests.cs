@@ -65,6 +65,50 @@ public sealed class CommunicationContentBlocksTests
         var newPhoto = replaced.Blocks!.Single(item => item.Id == photo.Id).Media!.Key;
         Assert.NotEqual(photoKey, newPhoto);
         Assert.Equal(gifKey, replaced.Blocks!.Single(item => item.Id == gif.Id).Media!.Key);
+
+        var sourceWorkspace = new SqliteDatabaseWorkspace(database.DatabasePath);
+        var backup = await sourceWorkspace.CreateManualCopyAsync(default);
+        var archiveDirectory = Path.GetDirectoryName(backup.Path)!;
+        var restoredDirectory = Path.Combine(database.RootPath, "restored", Guid.NewGuid().ToString("N"));
+        var restoredPath = await sourceWorkspace.MaterializeBackupAsync(backup.Path, restoredDirectory, default);
+        var archiveGif = File.ReadAllBytes(Path.Combine(archiveDirectory, "communication-gifs", $"{gifKey:N}.gif"));
+        var archivePhoto = File.ReadAllBytes(Path.Combine(archiveDirectory, "communication-gifs", $"{newPhoto:N}.gif"));
+        var restoredWorkspace = new SqliteDatabaseWorkspace(restoredPath);
+        var restoredOptions = new DbContextOptionsBuilder<AppDbContext>().UseSqlite(restoredWorkspace.ConnectionString).Options;
+        await using (var restoredDb = new AppDbContext(restoredOptions))
+        {
+            var restoredController = Controller(restoredDb, restoredWorkspace);
+            SetUser(restoredController, employee.Id);
+            var restoredMessage = Assert.Single(Messages(await restoredController.GetPending(default)));
+            Assert.Equal(new[] { first.Id, gif.Id, photo.Id }, restoredMessage.Blocks!.Select(item => item.Id));
+
+            var servedGif = Assert.IsType<FileStreamResult>(await restoredController.GetGif(created.Id, gifKey, default));
+            await using (servedGif.FileStream)
+            {
+                using var bytes = new MemoryStream();
+                await servedGif.FileStream.CopyToAsync(bytes);
+                Assert.Equal("image/gif", servedGif.ContentType);
+                Assert.Equal(archiveGif, bytes.ToArray());
+            }
+            var servedPhoto = Assert.IsType<FileStreamResult>(await restoredController.GetPhoto(created.Id, newPhoto, default));
+            await using (servedPhoto.FileStream)
+            {
+                using var bytes = new MemoryStream();
+                await servedPhoto.FileStream.CopyToAsync(bytes);
+                Assert.Equal(archivePhoto, bytes.ToArray());
+                using var codec = SKCodec.Create(new MemoryStream(bytes.ToArray()));
+                Assert.NotNull(codec);
+                Assert.Equal("image/webp", servedPhoto.ContentType);
+            }
+            Assert.IsType<NoContentResult>(await restoredController.Dismiss(created.Id, default));
+            Assert.Empty(Messages(await restoredController.GetPending(default)));
+        }
+        Assert.Equal(archiveGif, File.ReadAllBytes(Path.Combine(archiveDirectory, "communication-gifs", $"{gifKey:N}.gif")));
+        Assert.Equal(archivePhoto, File.ReadAllBytes(Path.Combine(archiveDirectory, "communication-gifs", $"{newPhoto:N}.gif")));
+        SetUser(controller, employee.Id);
+        Assert.Single(Messages(await controller.GetPending(default)));
+
+        SetUser(controller);
         var manager = Assert.Single(Messages(await controller.GetAll(default)));
         SetUser(controller, employee.Id);
         var visible = Assert.Single(Messages(await controller.GetPending(default)));
@@ -164,9 +208,12 @@ public sealed class CommunicationContentBlocksTests
     };
 
     private static CommunicationsController Controller(AppDbContext db, SqliteTestDatabase database)
+        => Controller(db, new SqliteDatabaseWorkspace(database.DatabasePath));
+
+    private static CommunicationsController Controller(AppDbContext db, SqliteDatabaseWorkspace workspace)
     {
         var controller = new CommunicationsController(new CommunicationService(new CommunicationRepository(db)), new NoopWorkflowLogService(),
-            new CommunicationGifStorage(new SqliteDatabaseWorkspace(database.DatabasePath)), NullLogger<CommunicationsController>.Instance);
+            new CommunicationGifStorage(workspace), NullLogger<CommunicationsController>.Instance);
         SetUser(controller);
         return controller;
     }

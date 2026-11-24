@@ -9,6 +9,7 @@ const buildId = process.env.GF3_BUILD_ID?.trim() || new Date().toISOString();
 export default defineConfig({
   root: projectRoot,
   define: { __GF3_BUILD_ID__: JSON.stringify(buildId) },
+  esbuild: { legalComments: "inline" },
   plugins: [react(), svgr(), {
     name: "gf3-release",
     generateBundle() {

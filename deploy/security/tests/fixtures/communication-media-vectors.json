@@ -1,0 +1,9 @@
+{
+  "legacy": { "Key": "01234567-89ab-cdef-0123-456789abcdef", "Size": 4, "FileName": "legacy.gif" },
+  "photo": { "Key": "01234567-89ab-cdef-0123-456789abcdef", "Size": 4, "FileName": "photo.webp", "ContentType": "image/webp" },
+  "blocks": [
+    { "Id": "89abcdef-0123-4567-89ab-cdef01234567", "Type": "text", "Text": "caption", "Media": null },
+    { "Id": "fedcba98-7654-3210-fedc-ba9876543210", "Type": "gif", "Text": null,
+      "Media": { "Key": "01234567-89ab-cdef-0123-456789abcdef", "Size": 4, "FileName": "legacy.gif" } }
+  ]
+}

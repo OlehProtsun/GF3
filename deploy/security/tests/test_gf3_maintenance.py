@@ -133,6 +133,43 @@ class MaintenanceTests(unittest.TestCase):
         with self.assertRaisesRegex(maintenance.MaintenanceError, "Duplicate"):
             maintenance.review_plan('{"target": "old", "target": "new"}', "before", "new")
 
+    def test_reviewed_seven_migration_chain_is_pinned_to_exact_baseline_and_git_blobs(self):
+        target = "a" * 40
+
+        def git(*args):
+            path = args[1].split(":", 1)[1]
+            migration = Path(path).name.removesuffix(".Designer.cs").removesuffix(".cs")
+            source, designer = maintenance.REVIEWED_RELEASE_BLOBS[migration]
+            return designer if path.endswith(".Designer.cs") else source
+
+        plan = maintenance.migration_plan(git, maintenance.RELEASE_BASELINE, target, maintenance.REVIEWED_RELEASE_MIGRATIONS)
+        self.assertIsInstance(plan, maintenance.ReviewedReleaseTransition)
+        self.assertEqual(plan.migrations, maintenance.REVIEWED_RELEASE_MIGRATIONS)
+        self.assertEqual(len(plan.schema_prefix_contracts), 8)
+        self.assertEqual(len(plan.expected_new_values), 8)
+        with self.assertRaisesRegex(maintenance.MaintenanceError, "does not match the reviewed schema prefixes"):
+            maintenance.verify_migration(None, None, (), (), plan)
+        with self.assertRaisesRegex(maintenance.MaintenanceError, "pinned PROD2 baseline"):
+            maintenance.migration_plan(git, "b" * 40, target, maintenance.REVIEWED_RELEASE_MIGRATIONS)
+        migrations = maintenance.REVIEWED_RELEASE_MIGRATIONS
+        for changed in (migrations[:-1], migrations[::-1], (*migrations, "20261123150000_Unknown")):
+            with self.subTest(migrations=changed), self.assertRaisesRegex(maintenance.MaintenanceError, "complete ordered chain"):
+                maintenance.migration_plan(git, maintenance.RELEASE_BASELINE, target, changed)
+        for extension in (".cs", ".Designer.cs"):
+            suffix = f"/{migrations[0]}{extension}"
+            with self.subTest(extension=extension), self.assertRaisesRegex(maintenance.MaintenanceError, "blob changed"):
+                maintenance.migration_plan(lambda *args: "0" * 40 if args[1].endswith(suffix) else git(*args),
+                                           maintenance.RELEASE_BASELINE, target, migrations)
+
+    def test_schema_contract_constant_matches_ef_generated_fixture(self):
+        fixture = Path(__file__).parent / "fixtures" / "reviewed-schema-prefix-contracts.json"
+        contracts = json.loads(fixture.read_text(encoding="utf-8"))
+        self.assertEqual(maintenance.REVIEWED_SCHEMA_PREFIX_CONTRACTS, contracts)
+        self.assertEqual(len(contracts), 8)
+        self.assertEqual(tuple(item["migrationId"] for item in contracts),
+                         ("20261115135735_RefreshManualShiftOffer",) + maintenance.REVIEWED_RELEASE_MIGRATIONS)
+        self.assertTrue(all(len(item["tables"]) == len(maintenance.REVIEWED_SCHEMA_TABLES) for item in contracts))
+
     def test_only_complete_regular_append_only_migrations_pass(self):
         migration = f"{maintenance.MIGRATIONS}/{AFTER[-1]}"
 
@@ -229,6 +266,64 @@ class MaintenanceTests(unittest.TestCase):
             self.assertNotEqual(maintenance.database_stamp(self.live), backup["source"])
         with closing(maintenance.open_db(bundle / "final.db", "ro")) as snapshot:
             self.assertEqual(snapshot.execute("SELECT id FROM employee ORDER BY id").fetchall(), [(1,), (2,)])
+
+    def test_referenced_and_fenced_full_media_bundles_validate_and_restore(self):
+        vectors = json.loads((Path(__file__).parent / "fixtures" / "communication-media-vectors.json").read_text(encoding="utf-8"))
+        key = vectors["legacy"]["Key"].replace("-", "").lower()
+        media = self.root / maintenance.MEDIA_DIRECTORY
+        media.mkdir()
+        payload = b"1234"
+        (media / (key + ".gif")).write_bytes(payload)
+        retained = "fedcba9876543210fedcba9876543210.gif"
+        (media / retained).write_bytes(b"retained")
+        with closing(sqlite3.connect(self.live)) as db, db:
+            db.execute("CREATE TABLE communication_message(gif_attachment_json TEXT, photo_attachment_json TEXT, content_blocks_json TEXT)")
+            db.execute("INSERT INTO communication_message VALUES (?, ?, ?)",
+                       (json.dumps(vectors["legacy"]), json.dumps(vectors["photo"]), json.dumps(vectors["blocks"])))
+        with closing(sqlite3.connect(self.live)) as db:
+            refs = maintenance.referenced_media(db)
+        self.assertEqual(refs, {key + ".gif": len(payload)})
+        referenced = self.root / "referenced"
+        referenced.mkdir()
+        maintenance.snapshot(self.live, referenced / "SQLite.db", BEFORE)
+        entries = maintenance.copy_media_snapshot(referenced / "SQLite.db", media, referenced / maintenance.MEDIA_DIRECTORY)
+        manifest = maintenance._write_backup_manifest(referenced, referenced / "SQLite.db", entries, "referenced")
+        self.assertEqual(maintenance.verify_backup_bundle(referenced, manifest), referenced / "SQLite.db")
+        self.assertEqual({path.name for path in (referenced / maintenance.MEDIA_DIRECTORY).iterdir()}, {key + ".gif"})
+
+        bundle = self.root / "fenced"
+        bundle.mkdir()
+        backup = maintenance.final_backup(self.live, bundle, BEFORE, Mock(), Mock())
+        (media / (key + ".gif")).write_bytes(b"changed-media-bytes")
+        maintenance.restore_database(self.live, bundle, backup, Mock(), Mock())
+        self.assertEqual((media / (key + ".gif")).read_bytes(), payload)
+        self.assertEqual((media / retained).read_bytes(), b"retained")
+        self.assertEqual((bundle / "failed-database" / maintenance.MEDIA_DIRECTORY / (key + ".gif")).read_bytes(), b"changed-media-bytes")
+
+    def test_media_parser_rejects_duplicate_keys_invalid_size_and_missing_files(self):
+        key = "0123456789abcdef0123456789abcdef"
+        with closing(sqlite3.connect(self.live)) as db, db:
+            db.execute("CREATE TABLE communication_message(gif_attachment_json TEXT, photo_attachment_json TEXT, content_blocks_json TEXT)")
+            db.execute("INSERT INTO communication_message VALUES (?, NULL, NULL)",
+                       ('{"Key":"' + key + '","key":"' + key + '","Size":1}',))
+        with closing(sqlite3.connect(self.live)) as db:
+            with self.assertRaises(maintenance.MaintenanceError):
+                maintenance.referenced_media(db)
+
+    def test_ordinary_release_backup_includes_referenced_media_from_db_override(self):
+        key = "0123456789abcdef0123456789abcdef"
+        media = self.root / maintenance.MEDIA_DIRECTORY
+        media.mkdir()
+        payload = b"ordinary-backup-media"
+        (media / (key + ".gif")).write_bytes(payload)
+        with closing(sqlite3.connect(self.live)) as db, db:
+            db.execute("CREATE TABLE communication_message(gif_attachment_json TEXT)")
+            db.execute("INSERT INTO communication_message VALUES (?)", (json.dumps({"Key": key, "Size": len(payload)}),))
+        bundle = self.root / "ordinary"
+        bundle.mkdir()
+        release.backup(bundle, "unused", self.live)
+        self.assertEqual((bundle / maintenance.MEDIA_DIRECTORY / (key + ".gif")).read_bytes(), payload)
+        self.assertEqual(maintenance.verify_backup_bundle(bundle).name, "SQLite.db")
 
     def test_process_death_keeps_the_persisted_reopen_boundary(self):
         source = """

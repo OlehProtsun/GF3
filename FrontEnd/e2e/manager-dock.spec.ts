@@ -100,7 +100,12 @@ test("reduced motion and scrolling boundaries keep faces within the rail", async
   const glow = await rail.evaluate(el => (el as HTMLElement).style.getPropertyValue("--dock-glow-y"));
   await home.hover(); await page.waitForTimeout(400);
   expect(await transform(home)).toEqual({ scale: 1, x: 0, y: 0 });
-  expect(await rail.evaluate(el => (el as HTMLElement).style.getPropertyValue("--dock-glow-y"))).toBe(glow);
+  const reducedState = await rail.evaluate(el => ({
+    glow: (el as HTMLElement).style.getPropertyValue("--dock-glow-y"),
+    reduced: window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+    hover: window.matchMedia("(hover: hover) and (pointer: fine)").matches,
+  }));
+  expect(reducedState.glow, JSON.stringify(reducedState)).toBe(glow);
   expect(await home.locator('[class*="dockFaceInner"]').evaluate(el => getComputedStyle(el, "::after").display)).toBe("none");
   await page.getByRole("button", { name: "Collapse sidebar", exact: true }).first().click();
   await expect(rail).toBeHidden();

@@ -184,6 +184,26 @@ public sealed class SqliteAdministrationTests
         Assert.True(selected.IsActive);
         Assert.Equal(Path.GetFullPath(secondDatabasePath), persistedPath);
     }
+
+    [Fact]
+    public async Task AdminDbService_SelectBackupMaterializesWorkingCopyAndKeepsArchiveUnchanged()
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        await using var provider = BuildAdminProvider(database);
+        await using var scope = provider.CreateAsyncScope();
+        var service = scope.ServiceProvider.GetRequiredService<IAdminDbService>();
+        var backup = await service.CreateManualCopyAsync();
+        var archiveDatabase = backup.Path;
+        var archiveHash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(archiveDatabase)));
+
+        var selected = await service.SelectDatabaseAsync(archiveDatabase);
+
+        Assert.NotEqual(Path.GetFullPath(archiveDatabase), Path.GetFullPath(selected.Path));
+        Assert.Contains(Path.Combine(database.RootPath, "restored"), selected.Path, StringComparison.OrdinalIgnoreCase);
+        Assert.True(Directory.Exists(Path.Combine(Path.GetDirectoryName(selected.Path)!, "communication-gifs")));
+        Assert.Equal(archiveHash, Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(archiveDatabase))));
+        Assert.Throws<InvalidOperationException>(() => new SqliteDatabaseWorkspace(archiveDatabase));
+    }
     private static ServiceProvider BuildAdminProvider(SqliteTestDatabase database)
     {
         var services = new ServiceCollection();

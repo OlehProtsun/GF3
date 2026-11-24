@@ -32,7 +32,7 @@ REF = f"refs/heads/{BRANCH}"
 TRACKING_REF = f"refs/remotes/origin/{BRANCH}"
 WORKFLOW_ID = 306281689
 WORKFLOW_PATH = ".github/workflows/ci.yml"
-JOBS = {"Build and test", "Docker image"}
+JOBS = {"Build and test", "Playwright smoke", "Docker image"}
 APPROVAL = Path("/etc/gfctl/approved-release.conf")
 MAINTENANCE_REVIEW = Path("/etc/gfctl/maintenance-review.json")
 MAINTENANCE_TOOLING_REVIEW = Path("/etc/gfctl/maintenance-tooling-review.json")
@@ -392,7 +392,7 @@ def prepare_ordinary(check_only, initial_current, initial_target):
     print(f"Changed files ({len(paths)}):")
     for status, name in paths:
         print(f"  {status} {ascii(name)}")
-    print(f"GitHub CI: success (run {ci[0]}, attempt {ci[1]}; Build and test, Docker image)\n"
+    print(f"GitHub CI: success (run {ci[0]}, attempt {ci[1]}; Build and test, Playwright smoke, Docker image)\n"
           f"Preflight: passed\nPinned Nginx image: {approval[2]}\n"
           f"Active release bundle: {bundle}\nBackup and rollback: {rollback}\n"
           "The engine verifies a fresh SQLite backup and rollback bundle before cutover.",
@@ -440,7 +440,7 @@ def prepare_ordinary(check_only, initial_current, initial_target):
     return 0
 
 
-def maintenance_state(target, live=False):
+def maintenance_state(target, live=False, reviewed_baseline=None):
     release.no_active_maintenance()
     current = check_checkout()
     release.require(current != target and fetch_tip() == target, "Expected the exact incoming PROD2 tip")
@@ -448,8 +448,12 @@ def maintenance_state(target, live=False):
     release.require(manifest["sha"] == current, "Git HEAD differs from the active release")
     approval = read_approval()
     environment = protected_file(release.ROOT / "deploy/.env")
-    review = (protected_file(MAINTENANCE_TOOLING_REVIEW) if os.path.lexists(MAINTENANCE_TOOLING_REVIEW) else b""
-              ) if live else protected_file(MAINTENANCE_REVIEW)
+    if current == reviewed_baseline:
+        review = protected_file(MAINTENANCE_TOOLING_REVIEW)
+    elif live:
+        review = protected_file(MAINTENANCE_TOOLING_REVIEW) if os.path.lexists(MAINTENANCE_TOOLING_REVIEW) else b""
+    else:
+        review = protected_file(MAINTENANCE_REVIEW)
     baseline = release.topology()
     verify_health(current, baseline, approval[2])
     containers = tuple(release.container(name)["Id"] for name in ("gf3-app", "nginx"))
@@ -475,14 +479,16 @@ def maintenance_rehearse(target, deploy=False):
     release.require(sys.stdin.isatty() and release.SHA.fullmatch(target),
                     "Maintenance rehearsal requires an interactive terminal and the full target SHA")
     def state():
-        return maintenance_state(target, live=True) if deploy else maintenance_state(target)
+        return maintenance_state(target, live=deploy, reviewed_baseline=tool.RELEASE_BASELINE)
 
     with release.lock(DEPLOY_LOCK):
+        tool = release.maintenance_tool(target, Path(__file__).absolute())
         reviewed = state()
         current, _, _, _, environment, review, baseline, *_ = reviewed
-        tool = release.maintenance_tool(target, Path(__file__).absolute())
+        reviewed_transition = current == tool.RELEASE_BASELINE
         try:
-            paths, before_ids, target_ids, columns = maintenance_changes(tool, current, target, review, deploy)
+            paths, before_ids, target_ids, columns = maintenance_changes(
+                tool, current, target, review, deploy or reviewed_transition)
         except tool.MaintenanceError as error:
             raise release.ReleaseError(str(error)) from None
         with candidate(target, environment) as source:
@@ -526,10 +532,13 @@ def maintenance_rehearse(target, deploy=False):
             with release.lock(DEPLOY_LOCK):
                 release.require(state() == reviewed, "Maintenance review changed during build")
                 release.maintenance_tool(target, Path(__file__).absolute())
-                tool.snapshot(release.maintenance_database(baseline[2]), snapshot, before_ids)
+                source_database = release.maintenance_database(baseline[2])
+                tool.snapshot(source_database, snapshot, before_ids)
+                tool.copy_media_snapshot(snapshot, source_database.parent / tool.MEDIA_DIRECTORY,
+                                         bundle / tool.MEDIA_DIRECTORY, full=False)
             stage("isolated-startup")
             tool.rehearse(release.command, release.docker_json, audit["image"], bundle,
-                          snapshot, before_ids, target_ids, columns, verify_modes=deploy)
+                          snapshot, before_ids, target_ids, columns, verify_modes=deploy or reviewed_transition)
         finally:
             snapshot.unlink(missing_ok=True)
         with release.lock(DEPLOY_LOCK):

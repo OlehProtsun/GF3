@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="591" height="175" viewBox="0 0 591 175" role="img" aria-labelledby="title desc">
+  <title id="title">Choose an action from the share sheet</title><desc id="desc">A generic share panel with a page preview and action buttons.</desc>
+  <rect width="591" height="175" fill="#e8ebf0"/><rect x="15" y="12" width="561" height="151" rx="22" fill="#fff" stroke="#d5dae2"/>
+  <rect x="31" y="28" width="270" height="116" rx="14" fill="#f3f5f8"/><rect x="47" y="43" width="82" height="57" rx="8" fill="#dbeafe"/><circle cx="88" cy="67" r="15" fill="#7ca7eb"/>
+  <rect x="145" y="47" width="128" height="9" rx="4" fill="#667085"/><rect x="145" y="67" width="102" height="7" rx="3" fill="#c3cad4"/><rect x="145" y="83" width="115" height="7" rx="3" fill="#c3cad4"/><text x="47" y="124" font-family="Arial,sans-serif" font-size="12" fill="#475467">GF page</text>
+  <g fill="#fff" stroke="#cbd2dc"><circle cx="352" cy="62" r="22"/><circle cx="414" cy="62" r="22"/><circle cx="476" cy="62" r="22"/><circle cx="538" cy="62" r="22"/></g>
+  <g fill="#2867d8"><circle cx="352" cy="62" r="9"/><path d="M407 62h14m-7-7 7 7-7 7" fill="none" stroke="#2867d8" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M469 56h14v13h-14z"/><path d="M532 67l6-10 6 10" fill="none" stroke="#2867d8" stroke-width="3"/></g>
+  <g font-family="Arial,sans-serif" font-size="10" fill="#475467" text-anchor="middle"><text x="352" y="104">Share</text><text x="414" y="104">Copy</text><text x="476" y="104">Save</text><text x="538" y="104">More</text></g>
+  <rect x="251" y="153" width="89" height="4" rx="2" fill="#c3c8d0"/>
+</svg>

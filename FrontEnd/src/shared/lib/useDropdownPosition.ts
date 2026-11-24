@@ -40,19 +40,28 @@ export function useDropdownPosition(
       });
     };
 
+    let resizeFrame = 0;
+    const scheduleUpdate = () => {
+      cancelAnimationFrame(resizeFrame);
+      resizeFrame = requestAnimationFrame(() => {
+        resizeFrame = 0;
+        update();
+      });
+    };
     update();
     const observer = new ResizeObserver(update);
     if (triggerRef.current) observer.observe(triggerRef.current);
     if (dropdownRef.current) observer.observe(dropdownRef.current);
-    window.addEventListener("resize", update);
+    window.addEventListener("resize", scheduleUpdate);
     window.addEventListener("scroll", update, true);
-    viewport?.addEventListener("resize", update);
+    viewport?.addEventListener("resize", scheduleUpdate);
     viewport?.addEventListener("scroll", update);
     return () => {
+      cancelAnimationFrame(resizeFrame);
       observer.disconnect();
-      window.removeEventListener("resize", update);
+      window.removeEventListener("resize", scheduleUpdate);
       window.removeEventListener("scroll", update, true);
-      viewport?.removeEventListener("resize", update);
+      viewport?.removeEventListener("resize", scheduleUpdate);
       viewport?.removeEventListener("scroll", update);
     };
   }, [open, triggerRef, dropdownRef, placement, preferredWidth]);
