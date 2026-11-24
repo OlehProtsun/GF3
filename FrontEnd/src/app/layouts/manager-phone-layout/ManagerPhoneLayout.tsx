@@ -21,8 +21,12 @@ export function ManagerPhoneLayout({ children }: PropsWithChildren) {
   useEffect(() => {
     if (previousCollapsedRef.current === isTabsCollapsed) return;
     previousCollapsedRef.current = isTabsCollapsed;
-    if (isTabsCollapsed) openButtonRef.current?.focus({ preventScroll: true });
-    else navigationRef.current?.querySelector<HTMLAnchorElement>('[aria-current="page"]')?.focus({ preventScroll: true });
+    const frame = requestAnimationFrame(() => {
+      const target = isTabsCollapsed ? openButtonRef.current
+        : navigationRef.current?.querySelector<HTMLAnchorElement>('[aria-current="page"]');
+      target?.focus({ preventScroll: true });
+    });
+    return () => cancelAnimationFrame(frame);
   }, [isTabsCollapsed]);
   const { pathname } = useLocation();
   return <div className={styles.layout} data-manager-phone>

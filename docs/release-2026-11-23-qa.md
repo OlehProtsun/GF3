@@ -621,3 +621,20 @@ The [first feature dispatch](https://github.com/OlehProtsun/GF3/actions/runs/454
 The correction follow-up passed Linux host tests (65/65) and local restore checks at reviewed prefixes 0, 4 and 7. Each restored the original database digest, correction high-water mark and media. Interruption between database and media installation retained the staged media and forensic copy. The [next feature dispatch](https://github.com/OlehProtsun/GF3/actions/runs/45442144255) covers the Linux kernel fence on that correction.
 
 The full WebKit laptop diagnostic found overflow of the Polish Inbox label at 320 px and a scroll displacement after closing offer details at 667 × 375. Both targeted WebKit reproductions passed after the corresponding fixes. The affected Vitest suites passed 115/115. The rebuilt Linux amd64 application image passed its license checks under the app account at `sha256:4a037c425c0461be1183c89c210e1496f427a94de9092777cd0b4e29283abfa9`. The earlier browser counts are diagnostic evidence for their source revision. Record the final matrix and CI against the candidate used for review.
+
+## CI and remaining browser verification
+
+The [CI dispatch for `8c28ddfa22d8a7d1ccdf67872e766210ca35027d`](https://github.com/OlehProtsun/GF3/actions/runs/45446123077) passed all three jobs. The Docker job verified the seven migrations and eight prefixes, row and media integrity, rollback before and after committed migrations, Git and Guard failures, failure after reopening, fence loss, interrupted media installation, the historical additive cases, and isolated HTTP/HTTPS ingress. This is disposable Ubuntu QA evidence.
+
+The retained full E2E reports under the local ignored `GF3.Tests/TestResults` directory cover different source revisions:
+
+| Profile | Passed | Skipped | Failed |
+| --- | ---: | ---: | ---: |
+| Chromium | 490 | 2 | 0 |
+| Mobile Chrome | 484 | 8 | 0 |
+| WebKit laptop | 484 | 3 | 5 |
+| WebKit iPhone X | 480 | 9 | 3 |
+
+The WebKit failures covered Polish notification overflow, schedule entrance sampling, adjacent More previews, reduced motion in the dock, manager navigation on mode changes, and swap scroll restoration. Isolated WebKit passed the More and swap reproductions. The follow-up wraps tab labels at narrow widths, restores phone navigation focus after the inert state updates, and samples the entrance on the browser animation timeline. The mode-change fixture now waits for the holiday response to finish before reload. WebKit previously cancelled that mocked request during document replacement and reported an access-control error. The reload and Back scenario passed twice on each WebKit profile after the change. The affected Chromium and Mobile Chrome scenarios passed 14/14. The updated application image built and passed its notice checks at `sha256:1aa97721a330ad21a082bebcc8334239233f5d9470f21fea2f8686df064a811c`.
+
+A complete clean matrix on one frozen candidate, physical device checks, and owner confirmation of the flagged shipped assets remain merge gates. All six Bash blocks in the operator instructions passed syntax checks. Host commands require operator review and authorization. [Operator instructions](gfctl-prod2-database-maintenance.md)

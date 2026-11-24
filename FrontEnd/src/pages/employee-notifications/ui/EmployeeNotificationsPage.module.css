@@ -334,7 +334,7 @@
 
   .inboxTabs {
     display: grid;
-    grid-template-columns: repeat(2, minmax(min-content, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     width: 100%;
     max-width: none;
     gap: 3px;
@@ -342,13 +342,17 @@
   }
 
   .inboxTabs button {
-    min-width: min-content;
+    min-width: 0;
+    min-height: 31px;
+    height: auto;
+    white-space: normal;
+    overflow-wrap: anywhere;
     gap: 3px;
     padding-inline: 3px;
     font-size: 0.66rem;
   }
 
-  .inboxTabs button span { min-width: 15px; height: 15px; font-size: 0.55rem; }
+  .inboxTabs button span { flex-shrink: 0; min-width: 15px; height: 15px; font-size: 0.55rem; }
 
   .sectionIcon {
     width: 40px;

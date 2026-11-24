@@ -40,6 +40,7 @@ async function fixture(page: Page, initialMode: "choose" | "pc" | "phone" | "gue
     if (mode === "choose" && !path.startsWith("/api/regulations/")) return json({ code: "manager_workspace_mode_required" }, 403);
     let data: unknown = [];
     if (path === "/api/account-language") data = { language: options.language ?? "en" };
+    else if (path === "/api/public-holiday-settings") data = { showPublicHolidays: true };
     else if (path === "/api/manager-home/activity") data = { items: [], allActivityCount: 0, requiresApprovalCount: 0, categoryCounts: {}, hasMore: false, nextOffset: 0 };
     else if (path === "/api/manager-profile/me") data = { id: 1, displayName: "Manager Workspace", userName: "manager", recoveryEmail: "manager@example.com", isSystem: true };
     else if (path === "/api/manager-profile/managers") data = [];
@@ -401,11 +402,25 @@ test("login chooser selects original PC shell and edit controls", async ({ page 
   await page.waitForLoadState("networkidle"); await page.goto("/employee"); await expect(page.getByRole("button", { name: "Add New" })).toBeVisible(); await expect(page.locator("aside").first()).toBeVisible(); expect(f.errors).toEqual([]);
 });
 test("Phone switches both ways, refresh persists and back never exposes an editor", async ({ page }) => {
-  const f = await fixture(page); await login(page); await page.getByRole("button", { name: phoneChoice, exact: true }).click();
-  await expect(page.locator("[data-manager-phone]")).toBeVisible(); await page.waitForLoadState("networkidle"); await page.reload(); await expect(page.locator("[data-manager-phone]")).toBeVisible();
+  const f = await fixture(page); await login(page);
+  const holidaySettings = page.waitForResponse(response =>
+    new URL(response.url()).pathname === "/api/public-holiday-settings" && response.ok());
+  await page.getByRole("button", { name: phoneChoice, exact: true }).click();
+  await expect(page.locator("[data-manager-phone]")).toBeVisible();
+  await (await holidaySettings).finished();
+  await page.waitForLoadState("networkidle");
+  await page.reload();
+  await expect(page.locator("[data-manager-phone]")).toBeVisible();
   await page.waitForLoadState("networkidle"); await page.getByRole("link", { name: "More", exact: true }).click(); await page.waitForLoadState("networkidle"); await page.getByRole("button", { name: /Switch to Desktop/ }).click(); await expect(page.locator("[data-manager-phone]")).toHaveCount(0); await page.waitForLoadState("networkidle");
-  await page.evaluate(() => { history.pushState({}, "", "/employee/2/edit"); dispatchEvent(new PopStateEvent("popstate")); }); await expect(page.getByRole("heading", { name: "Edit Employee", exact: true })).toBeVisible(); await page.waitForLoadState("networkidle"); await page.goto("/manager-profile"); await collapseSidebarIfOpen(page); await expect(page.getByRole("button", { name: /Switch to Phone/ })).toBeVisible(); await page.getByRole("button", { name: /Switch to Phone/ }).click();
-  await expect(page.locator("[data-manager-phone]")).toBeVisible(); await page.waitForLoadState("networkidle"); await page.goBack(); await expect(page.locator("[data-manager-phone]")).toBeVisible(); expect(new URL(page.url()).pathname).not.toContain("/edit"); await noManagement(page); expect(f.errors).toEqual([]);
+  await page.evaluate(() => { history.pushState({}, "", "/employee/2/edit"); dispatchEvent(new PopStateEvent("popstate")); });
+  await expect(page.getByRole("heading", { name: "Edit Employee", exact: true })).toBeVisible();
+  const profile = page.getByRole("link", { name: "Open manager profile", exact: true });
+  if (!await profile.isVisible()) await page.getByRole("button", { name: "Open sidebar", exact: true }).click();
+  await profile.click();
+  await expect(page).toHaveURL(/\/manager-profile$/);
+  await collapseSidebarIfOpen(page);
+  await page.getByRole("button", { name: /Switch to Phone/ }).click();
+  await expect(page.locator("[data-manager-phone]")).toBeVisible(); await page.waitForLoadState("networkidle"); await page.goBack(); await expect(page.locator("[data-manager-phone]")).toBeVisible(); await page.waitForLoadState("networkidle"); expect(new URL(page.url()).pathname).not.toContain("/edit"); await noManagement(page); expect(f.errors).toEqual([]);
 });
 for (const width of [320, 375, 390, 430, 768, 1440]) {
   test(`Phone all manager data, matrix scrolling and shell at ${width}px`, async ({ page }, testInfo) => {
@@ -730,6 +745,7 @@ for (const width of [320, 375, 390, 430]) test(`Home Coming Soon centered in Pho
 for (const height of [720, 1000]) test(`Desktop profile switch is accessible and reaches phone Home at ${height}px`, async ({ page }) => {
  await page.setViewportSize({ width: 1440, height }); const f = await fixture(page, "pc"); await page.goto("/");
  const title = page.getByRole("heading", { name: "Home", exact: true }); await expect(title).toBeVisible();
+ await page.waitForLoadState("networkidle");
  await page.goto("/manager-profile");
  await expect(page.locator("aside").getByRole("button", { name: /Switch to Phone|Log out/ })).toHaveCount(0);
  await collapseSidebarIfOpen(page);

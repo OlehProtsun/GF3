@@ -122,20 +122,28 @@ for (const reducedMotion of ["no-preference", "reduce"] as const) {
       (link as HTMLAnchorElement).click();
       const deadline = performance.now() + 2000;
       const samples: { elapsed: number; time: number; y: number; scale: number; opacity: string }[] = [];
-      let started: number | undefined;
-      await new Promise<void>(resolve => {
-        const sample = () => {
+      const entrance = await new Promise<{ hero: HTMLElement; animation: Animation } | null>(resolve => {
+        const findEntrance = () => {
           const hero = document.querySelector<HTMLElement>('[data-employee-motion="from-top"]');
-          if (hero && getComputedStyle(hero).transform !== "none") {
-            started ??= performance.now();
-            const matrix = new DOMMatrixReadOnly(getComputedStyle(hero).transform);
-            samples.push({ elapsed: performance.now() - started, time: Number(hero.getAnimations()[0]?.currentTime ?? 0), y: matrix.m42, scale: matrix.m11, opacity: getComputedStyle(hero.parentElement!).opacity });
-          }
-          if (performance.now() > deadline || (started !== undefined && performance.now() - started >= 650)) resolve();
-          else setTimeout(sample, 20);
+          const animation = hero?.getAnimations()[0];
+          if (hero && animation) resolve({ hero, animation });
+          else if (performance.now() > deadline) resolve(null);
+          else requestAnimationFrame(findEntrance);
         };
-        setTimeout(sample, 20);
+        requestAnimationFrame(findEntrance);
       });
+      if (!entrance) return samples;
+      const { hero, animation } = entrance;
+      animation.pause();
+      await animation.ready;
+      const duration = Number(animation.effect?.getComputedTiming().duration ?? 0);
+      // Sample the browser's interpolation on its animation timeline even when the runner drops frames.
+      for (let time = 0; time < duration; time += 20) {
+        animation.currentTime = time;
+        const matrix = new DOMMatrixReadOnly(getComputedStyle(hero).transform);
+        samples.push({ elapsed: time, time, y: matrix.m42, scale: matrix.m11, opacity: getComputedStyle(hero.parentElement!).opacity });
+      }
+      animation.finish();
       return samples;
     });
     await test.info().attach("hero-frame-samples", { body: JSON.stringify(entrance), contentType: "application/json" });

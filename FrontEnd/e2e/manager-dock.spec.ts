@@ -92,9 +92,9 @@ test("restored sidebar retains badges, gloss and proximity motion after reopenin
   }
 });
 test("reduced motion and scrolling boundaries keep faces within the rail", async ({ page }) => {
-  await summary(page); await loginAsManager(page);
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.setViewportSize({ width: 390, height: 720 });
+  await summary(page); await loginAsManager(page);
   const rail = page.locator("#manager-sidebar-navigation");
   const home = rail.getByRole("link", { name: "Home", exact: true });
   const glow = await rail.evaluate(el => (el as HTMLElement).style.getPropertyValue("--dock-glow-y"));
