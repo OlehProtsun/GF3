@@ -766,27 +766,33 @@ describe("schedule selector", () => {
       if (mode === "matrix") await user.click(screen.getByRole("button", { name: "Show daily schedule view" }));
     }
   });
-  test("selects another schedule and updates matrix and metadata", async () => {
+  test("shows every month immediately and updates the matrix and metadata when selecting an older schedule", async () => {
     vi.setSystemTime(new Date("2026-05-15T12:00:00Z"));
     const user = userEvent.setup();
-    const second = { ...schedules[1], month: 10, lastUpdatedAtUtc: "2026-10-04T12:01:00Z" };
-    mocks.scheduleQuery.mockReturnValue({ data: [schedules[0], second], isLoading: false });
+    const older = { ...schedules[1], id: 3, name: "March Schedule", month: 3, lastUpdatedAtUtc: "2026-03-04T12:01:00Z" };
+    const later = { ...schedules[1], id: 4, name: "October Schedule", month: 10 };
+    mocks.scheduleQuery.mockReturnValue({ data: [older, schedules[1], later, schedules[0]], isLoading: false });
     renderPage();
     await user.click(screen.getByRole("button", { name: "Select schedule. Current schedule: May Schedule" }));
     const dialog = screen.getByRole("dialog", { name: "Select schedule" });
     const firstRow = within(dialog).getByRole("button", { name: /^May Schedule/ });
-    expect(within(dialog).getByText("May 2026", { exact: true })).toBeVisible();
+    expect(within(dialog).getAllByRole("heading", { level: 3 }).map(heading => heading.textContent)).toEqual([
+      "May 2026", "October 2026", "March 2026",
+    ]);
+    expect(firstRow.parentElement).toContainElement(within(dialog).getByRole("button", { name: /^Second May Schedule/ }));
+    expect(within(dialog).queryByRole("button", { name: "View other schedules" })).not.toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "View More", exact: true })).toBeVisible();
     expect(screen.getByRole("button", { name: "Export schedule to PDF" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Request a shift correction" })).toBeInTheDocument();
     expect(firstRow).toHaveAttribute("aria-pressed", "true");
     expect(firstRow).toHaveFocus();
     expect(within(dialog).getByText(/Updated 28 Jun 2026/)).toBeVisible();
-    await user.click(within(dialog).getByRole("button", { name: /^Second May Schedule/ }));
+    await user.click(within(dialog).getByRole("button", { name: /^March Schedule/ }));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    const trigger = screen.getByRole("button", { name: "Select schedule. Current schedule: Second May Schedule" });
-    expect(trigger).toHaveTextContent("October 2026");
-    expect(trigger).toHaveTextContent(/Updated 04 Oct 2026/);
-    expect(mocks.matrix.mock.calls.at(-1)?.[0].graph.id).toBe(2);
+    const trigger = screen.getByRole("button", { name: "Select schedule. Current schedule: March Schedule" });
+    expect(trigger).toHaveTextContent("March 2026");
+    expect(trigger).toHaveTextContent(/Updated 04 Mar 2026/);
+    expect(mocks.matrix.mock.calls.at(-1)?.[0].graph.id).toBe(3);
   });
 
   test("opens a related published preview without replacing the selected own schedule", async () => {
@@ -798,6 +804,8 @@ describe("schedule selector", () => {
     renderPage();
     const trigger = screen.getByRole("button", { name: "Select schedule. Current schedule: May Schedule" });
     await user.click(trigger);
+    expect(mocks.listPublic).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: /^Related Preview/ })).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "View More", exact: true }));
     await user.click(await screen.findByRole("button", { name: /^Related Preview/ }));
     const view = screen.getByRole("dialog", { name: "Schedule Preview" });

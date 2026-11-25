@@ -11,7 +11,7 @@ import { usePublicHolidayVisibility } from "@app/providers/PublicHolidayVisibili
 import { queryKeys } from "@shared/api/queryKeys";
 import { dateTimeFormat, t } from "@shared/i18n";
 import { formatScheduleLastUpdate } from "@shared/lib/scheduleLastUpdate";
-import { CheckIcon, ChevronLeftIcon, ChevronRightIcon, CloseIcon, EyeIcon, ScheduleIcon } from "@shared/ui/icons";
+import { CheckIcon, ChevronLeftIcon, ChevronRightIcon, CloseIcon, ScheduleIcon } from "@shared/ui/icons";
 import { CardSection } from "@shared/ui/sections";
 import { buildDailyScheduleDays, buildDailyScheduleWorkers, EmployeeScheduleDailyBody, getDefaultDailyScheduleDay } from "./EmployeeScheduleDailyBody";
 import { EmployeeScheduleHeaderActions } from "./EmployeeScheduleHeaderActions";
@@ -37,14 +37,12 @@ export function EmployeeScheduleSelectDialog({ open, ...props }: EmployeeSchedul
 
 function ScheduleSelectSheet({ schedules, selectedScheduleId, onSelect, onClose }: Omit<EmployeeScheduleSelectDialogProps, "open">) {
   const titleId = useId();
-  const listId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const titleRef = useRef<HTMLHeadingElement>(null);
   const restoreScroll = useRef<number | null>(null);
   const publicScroll = useRef(0);
   const selectionScroll = useRef(0);
-  const [expanded, setExpanded] = useState(false);
   const [view, setView] = useState<ScheduleView>("select");
   const [previewScheduleId, setPreviewScheduleId] = useState<number | null>(null);
   const { data: publicSchedules, isError: publicError } = useQuery({
@@ -65,9 +63,6 @@ function ScheduleSelectSheet({ schedules, selectedScheduleId, onSelect, onClose 
   }
 
   const groups = [...groupsByMonth];
-  const recentGroups = groups.filter(([, group], index) =>
-    index < 2 || group.some(schedule => schedule.id === selectedScheduleId));
-  const visibleGroups = expanded ? groups : recentGroups;
 
   useLayoutEffect(() => {
     const previousFocus = document.activeElement;
@@ -148,7 +143,7 @@ function ScheduleSelectSheet({ schedules, selectedScheduleId, onSelect, onClose 
       list.removeEventListener("scroll", updateFades);
       observer?.disconnect();
     };
-  }, [schedules, expanded, selectedScheduleId, view, publicSchedules, publicError]);
+  }, [schedules, selectedScheduleId, view, publicSchedules, publicError]);
 
   return createPortal(
     <div className={styles.overlay} role="dialog" aria-modal="true" aria-labelledby={titleId}
@@ -172,8 +167,8 @@ function ScheduleSelectSheet({ schedules, selectedScheduleId, onSelect, onClose 
           </div>
           <button type="button" className={styles.close} aria-label={t("Close")} onClick={onClose}><CloseIcon size={18} /></button>
         </header>
-        <div className={styles.list} id={listId} ref={listRef} data-preview={view === "preview" || undefined}>
-          {view === "select" && visibleGroups.map(([key, group], index) => {
+        <div className={styles.list} ref={listRef} data-preview={view === "preview" || undefined}>
+          {view === "select" && groups.map(([key, group], index) => {
             const { year, month } = group[0];
             const period = periodFormatter.format(new Date(Date.UTC(year, month - 1, 1)));
             return (
@@ -228,14 +223,6 @@ function ScheduleSelectSheet({ schedules, selectedScheduleId, onSelect, onClose 
           )}
           {view === "preview" && previewScheduleId !== null && <SchedulePreview key={previewScheduleId} scheduleId={previewScheduleId} />}
         </div>
-        {view === "select" && groups.length > recentGroups.length && (
-          <button type="button" className={styles.disclosure} aria-expanded={expanded} aria-controls={listId}
-            onClick={() => setExpanded(value => !value)}>
-            <EyeIcon size={20} />
-            <span>{expanded ? t("Show fewer schedules") : t("View other schedules")}</span>
-            <ChevronRightIcon size={17} />
-          </button>
-        )}
       </div>
     </div>,
     document.body,
