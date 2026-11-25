@@ -1,6 +1,7 @@
 """Disposable deployment/recovery exercise. Run only on a local or CI Docker engine."""
 
 import ast
+import errno
 import importlib.util
 from contextlib import closing, nullcontext
 import json
@@ -11,6 +12,7 @@ import shutil
 import socket
 import sqlite3
 import subprocess
+import sys
 import tempfile
 import time
 from unittest.mock import patch
@@ -19,6 +21,7 @@ from unittest.mock import patch
 HERE = Path(__file__).resolve().parents[1]
 spec = importlib.util.spec_from_file_location("gf3_release", HERE / "gf3_release.py")
 release = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = release
 spec.loader.exec_module(release)
 spec = importlib.util.spec_from_file_location("gf3_guard", HERE / "gf3_guard.py")
 guard = importlib.util.module_from_spec(spec)
@@ -26,6 +29,9 @@ spec.loader.exec_module(guard)
 spec = importlib.util.spec_from_file_location("gf3_maintenance", HERE / "gf3_maintenance.py")
 maintenance = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(maintenance)
+spec = importlib.util.spec_from_file_location("gf3_prepare_release", HERE / "gf3_prepare_release.py")
+prepare = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(prepare)
 if os.name == "nt":
     release.ENV = dict(os.environ)
     release.ENV.pop("DOCKER_HOST", None)
@@ -46,6 +52,7 @@ production_command = release.command
 HISTORICAL_PRIOR = "353f8e23dbd3f6c9989e7df2198346b72c700487"
 HISTORICAL_TARGET = "1175c39461e149a7bb35f428babed28279727899"
 HISTORICAL_TARGET_IMAGE = "gf3-web:maintenance-target"
+ONE_BUNDLE_SCENARIOS = ("full-chain", "final-backup-failure", "final-backup-fence-lost")
 
 
 def free_port():
@@ -146,15 +153,18 @@ def rehearse_migrations(root, snapshot_path):
 def maintenance_scenario(root, previous, candidate, baseline, git_dir, before, sha, scenario, sql, tags, columns, added):
     """Run the real maintenance engine on the runner's disposable Docker volume and nftables."""
     database = release.maintenance_database(baseline[2])
+    database_inode = database.stat().st_ino
     with closing(sqlite3.connect(database)) as db:
         historical = tuple(row[0] for row in db.execute('SELECT MigrationId FROM "__EFMigrationsHistory" ORDER BY MigrationId'))
     assert not set(historical).intersection(added)
     expected = historical + added
     media_before = maintenance.media_stamp(database.parent / maintenance.MEDIA_DIRECTORY)
-    data = root / "recovery"
-    data.mkdir(mode=0o700)
-    journal = maintenance.Journal(release.STATE, data, release.store)
-    journal.begin({"before": before, "target": sha})
+    full_chain = scenario in ONE_BUNDLE_SCENARIOS
+    if not full_chain:
+        data = root / "recovery"
+        data.mkdir(mode=0o700)
+        journal = maintenance.Journal(release.STATE, data, release.store)
+        journal.begin({"before": before, "target": sha})
     release.activate(previous)
     timer = [True, True]
     real_command = release.command
@@ -225,6 +235,7 @@ def maintenance_scenario(root, previous, candidate, baseline, git_dir, before, s
         return result
 
     def interrupt_restore(database, bundle, metadata, assert_quiet, consume_restore, expected_stamp, record_progress):
+        assert not full_chain and scenario != "migration-before-start", "Pre-migration recovery must never replace SQLite"
         def progress(value):
             record_progress(value)
             if scenario == "partial-restore" and value["stage"] == "database-installed":
@@ -237,11 +248,19 @@ def maintenance_scenario(root, previous, candidate, baseline, git_dir, before, s
               patch.object(release, "guard_result", guard_result), patch.object(release, "verify_web", observe_web),
               patch.object(release, "migrate_fenced", simulate_restart),
               patch.object(maintenance, "restore_database", interrupt_restore)):
+            if full_chain:
+                rehearse_one_bundle(root, previous, candidate, baseline, before, sha, scenario,
+                                    historical, expected, columns, tags, sql)
+                assert timer == ([True, False] if scenario == "final-backup-fence-lost" else [True, True])
+                return
             try:
                 release.maintenance_cutover(maintenance, journal, candidate, previous, before, sha, baseline,
                                             historical, expected, columns)
             except release.ReleaseError as error:
-                if scenario in {"migration-before-start", "migration-failure", "git-failure", "guard-failure"}:
+                if scenario == "migration-before-start":
+                    assert "recovered using the existing SQLite database" in str(error), str(error)
+                    assert database.stat().st_ino == database_inode and not (data / "failed-database").exists()
+                elif scenario in {"migration-failure", "git-failure", "guard-failure"}:
                     assert "were recovered" in str(error), str(error)
                 elif scenario == "fence-lost":
                     assert journal.read()["phase"] == "RECOVERY_REQUIRED" and not (data / "failed-database").exists()
@@ -286,6 +305,146 @@ def maintenance_scenario(root, previous, candidate, baseline, git_dir, before, s
     finally:
         # This test operates only on a disposable runner and must clean up any fenced failure case.
         subprocess.run(["nft", "delete", "table", "inet", "gf3_maintenance"], capture_output=True)
+
+
+def rehearse_one_bundle(root, previous, staged, baseline, before, target, scenario, historical, expected, columns, tags, sql):
+    """Use the real prepare and deploy entry points, with local substitutes for host trust inputs."""
+    database = release.maintenance_database(baseline[2])
+    media = database.parent / maintenance.MEDIA_DIRECTORY
+    late_media = media / ("f" * 32 + ".gif")
+    approval = root / "approved-release.conf"
+    repo_digest = release.docker_json("image", "inspect", "nginx:stable-alpine")[0]["RepoDigests"][0]
+    pin = "nginx@" + repo_digest.rsplit("@", 1)[1]
+    release.write(approval, f"APPROVED_SHA={before}\nNGINX_IMAGE={pin}\n".encode())
+    release.store(previous / "release.json", {"sha": before})
+    tag = f"gf3-app:{root.name}"
+    tags.append(tag)
+    release.command("docker", "build", "--tag", tag, "--label", f"org.opencontainers.image.revision={target}",
+                    "-", data="FROM gf3-web:ci\n")
+    image = release.docker_json("image", "inspect", tag)[0]["Id"]
+    config = json.loads((staged / "compose.json").read_text())
+    original_git, snapshot, manifest, backend = release.git, release.snapshot, maintenance._write_backup_manifest, release.backend
+    deploy_lock = root / "deploy.lock"
+    before_backup = None
+
+    def git(*args, root=None):
+        if args[:2] == ("remote", "get-url"):
+            return "https://github.com/OlehProtsun/GF3.git\n"
+        if args[0] == "fetch":
+            return original_git("update-ref", "refs/remotes/origin/PROD2", target)
+        return original_git(*args, root=None if root == release.ROOT else root)
+
+    def state(sha, **kwargs):
+        release.no_active_maintenance()
+        assert sha == target and release.git("rev-parse", "HEAD").strip() == before
+        assert release.active_bundle() == previous and release.topology() == baseline
+        return (before, previous, {"sha": before}, prepare.read_approval(), b"fixture", b"fixture", baseline,
+                tuple(release.container(name)["Id"] for name in ("gf3-app", "nginx")),
+                (previous / "compose.json").read_bytes(), (1, 1))
+
+    def changes(*_):
+        return [], historical, expected, columns
+
+    def load_helper(code, namespace):
+        exec(code, namespace)
+        namespace.update(APPROVAL=approval, maintenance_state=state, maintenance_changes=changes,
+                         candidate=lambda *_: nullcontext(root))
+
+    def stage(candidate, work, cidr, volume, nginx_image, app_image):
+        assert (work, cidr, volume, nginx_image, app_image) == (root, baseline[1], baseline[2], pin, image)
+        config["services"]["gf3-app"]["image"] = app_image
+        release.save_compose(candidate, config)
+        (candidate / "guard-enabled").touch()
+
+    def capture_previous(bundle, volume):
+        snapshot(bundle, volume)
+        tags.extend(service["image"] for service in json.loads((bundle / "compose.json").read_text())["services"].values())
+
+    def confirm(prompt):
+        if "Begin" in prompt:
+            # This write happens after the rehearsal and must be captured by the fenced backup.
+            sql("INSERT INTO rehearsal_marker VALUES ('after-rehearsal')")
+            late_media.write_bytes(b"synthetic late media")
+            return "yes"
+        return target
+
+    def deploy(action, bundle, sha, nonce):
+        assert action == "maintenance-deploy"
+        assert not list(bundle.glob("rehearsal-*")) and not (bundle / "SQLite.db").exists()
+        with release.lock(deploy_lock):
+            release.no_active_maintenance()
+            release.maintenance_deploy(bundle, sha, nonce)
+        return 0
+
+    def write_manifest(bundle, db, media_entries, mode):
+        nonlocal before_backup
+        journal = maintenance.Journal(release.STATE, bundle, release.store)
+        journal.require_phase("FENCED")
+        before_backup = maintenance.database_stamp(database)
+        if scenario == "final-backup-fence-lost":
+            release.command("nft", "delete", "table", "inet", "gf3_maintenance")
+        if scenario != "full-chain":
+            raise OSError(errno.ENOSPC, "synthetic backup manifest write failure")
+        return manifest(bundle, db, media_entries, mode)
+
+    def start_backend(bundle):
+        if scenario == "final-backup-failure":
+            assert maintenance.database_stamp(database) == before_backup, "Recovery altered the fenced SQLite files"
+        return backend(bundle)
+
+    with (patch.object(prepare, "release", release), patch.object(prepare, "APPROVAL", approval),
+          patch.object(prepare, "DEPLOY_LOCK", deploy_lock), patch.object(prepare, "maintenance_state", state),
+          patch.object(prepare, "maintenance_changes", changes), patch.object(prepare, "candidate", lambda *_: nullcontext(root)),
+          patch.object(prepare, "engine", deploy), patch.object(sys.stdin, "isatty", return_value=True),
+          patch("builtins.input", side_effect=confirm), patch.object(release, "git", git),
+          patch.object(release, "maintenance_tool", return_value=maintenance), patch.object(release, "exec", load_helper, create=True),
+          patch.object(release, "preflight"), patch.object(release, "stage_bundle", stage),
+          patch.object(release, "snapshot", capture_previous), patch.object(release, "backend", start_backend),
+          patch.object(maintenance, "image_id", return_value=image),
+          patch.object(maintenance, "_write_backup_manifest", write_manifest)):
+        try:
+            assert prepare.maintenance_rehearse(target, deploy=True) == 0
+        except release.ReleaseError as error:
+            if scenario == "final-backup-failure":
+                assert "recovered using the existing SQLite database" in str(error), str(error)
+            elif scenario == "final-backup-fence-lost":
+                assert "Maintenance needs intervention" in str(error), str(error)
+            else:
+                raise
+        else:
+            assert scenario == "full-chain"
+
+    bundle, = release.STATE.glob(f"maintenance-{target[:12]}-*")
+    assert (bundle / "capability-consumed.json").exists() and not (bundle / "capability.json").exists()
+    assert json.loads((bundle / "rehearsal.json").read_text())["stage"] == "passed"
+    assert not (bundle / "failed-database").exists()
+    assert late_media.read_bytes() == b"synthetic late media"
+    journal = maintenance.Journal(release.STATE, bundle, release.store)
+    if scenario == "final-backup-fence-lost":
+        state = journal.read()
+        assert state["phase"] == "RECOVERY_REQUIRED" and state["failed_in"] == "FENCED"
+        assert not state["writes_may_resume"]
+        assert all(not release.container(name)["State"]["Running"] for name in ("gf3-app", "nginx"))
+    else:
+        assert not journal.path.exists() and release.topology() == baseline
+        assert subprocess.run(["nft", "list", "table", "inet", "gf3_maintenance"], capture_output=True).returncode != 0
+        state = json.loads((bundle / "transaction.json").read_text())
+        if scenario == "full-chain":
+            assert state["phase"] == "COMPLETED" and state["writes_may_resume"]
+            assert release.active_bundle() == Path(state["candidate"])
+            final = maintenance.verify_final_backup(bundle, state["backup"])
+            maintenance.verify_migration(final, database, historical, expected, columns)
+            assert (bundle / maintenance.MEDIA_DIRECTORY / late_media.name).read_bytes() == late_media.read_bytes()
+        else:
+            assert state["phase"] == "RECOVERED" and state["failed_in"] == "FENCED" and state["writes_may_resume"]
+            assert "backup" not in state and not (bundle / maintenance.BACKUP_MANIFEST).exists()
+            assert release.active_bundle() == previous
+            assert release.container("gf3-app")["Image"] == release.docker_json("image", "inspect", tags[0])[0]["Id"]
+    assert release.git("rev-parse", "HEAD", root=root / "checkout").strip() == (target if scenario == "full-chain" else before)
+    with closing(maintenance.open_db(database, "ro")) as connection:
+        maintenance.verify(connection, expected if scenario == "full-chain" else historical)
+        assert connection.execute("SELECT value FROM rehearsal_marker WHERE value='after-rehearsal'").fetchone()
+    print(f"Single-bundle maintenance rehearsal passed on Linux Docker: {scenario}")
 
 
 def main(scenario=None, historical_pair=False):
@@ -380,7 +539,11 @@ def main(scenario=None, historical_pair=False):
         before = release.git("rev-parse", "HEAD", root=git_dir).strip()
         release.git("switch", "-c", "candidate", root=git_dir)
         (git_dir / "release-marker").write_text(marker)
-        release.git("add", "release-marker", root=git_dir)
+        if scenario in ONE_BUNDLE_SCENARIOS:
+            migrations = git_dir / "DataAccessLayer/Migrations"
+            migrations.mkdir(parents=True)
+            (migrations / "fixture.txt").write_text("candidate migration fingerprint\n")
+        release.git("add", ".", root=git_dir)
         release.git("-c", "user.name=GF3 Fixture", "-c", "user.email=gf3@example.test",
                     "commit", "-m", "candidate", root=git_dir)
         sha = release.git("rev-parse", "HEAD", root=git_dir).strip()
@@ -714,11 +877,9 @@ def build_rehearsal_image(repo, revision, image):
 
 
 if __name__ == "__main__":
-    import sys
-
     scenarios = ("success", "migration-failure", "git-failure", "guard-failure", "failure-after-open", "fence-lost")
-    reviewed_scenarios = (*scenarios, "migration-before-start", "partial-restore")
-    if len(sys.argv) in (2, 3) and sys.argv[1] in reviewed_scenarios:
+    reviewed_scenarios = (*ONE_BUNDLE_SCENARIOS, *scenarios[1:], "migration-before-start", "partial-restore")
+    if len(sys.argv) in (2, 3) and sys.argv[1] in {*scenarios, *reviewed_scenarios}:
         assert os.geteuid() == 0 and os.environ.get("GF3_DISPOSABLE_CI_RUNNER") == "true"
         os.umask(0o077)
         historical_pair = len(sys.argv) == 3

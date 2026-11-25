@@ -1130,6 +1130,7 @@ def maintenance_cutover(tool, transaction, candidate, previous, current, target,
     docker_data_users(database, baseline[2], {container("gf3-app")["Id"]})
     transaction.advance("FENCING")
     fence = install_fence(baseline)
+    pre_backup_database = None
 
     def quiet():
         verify_fence(fence)
@@ -1170,11 +1171,18 @@ def maintenance_cutover(tool, transaction, candidate, previous, current, target,
         transaction.advance(complete)
         transaction.finish()
 
+    def verify_original_database(stamp):
+        with closing(tool.open_db(database, "ro")) as connection:
+            tool.verify(connection, before_ids)
+        quiet()
+        require(tool.database_stamp(database) == stamp, "SQLite changed during pre-migration recovery verification")
+
     try:
         with lock(RUNTIME / "state/guard.lock"):
             stop_maintenance_stack(previous)
         quiet()
         transaction.advance("FENCED", fence=fence)
+        pre_backup_database = tool.database_stamp(database)
         print("Public ingress is fenced and SQLite writers are stopped.", flush=True)
         backup = tool.final_backup(database, transaction.bundle, before_ids, quiet,
                                    lambda metadata: transaction.advance("BACKED_UP", backup=metadata))
@@ -1212,36 +1220,52 @@ def maintenance_cutover(tool, transaction, candidate, previous, current, target,
         transaction.advance("READY_TO_REOPEN")
         reopen(candidate, closed, target, "COMPLETED")
     except (Exception, KeyboardInterrupt) as error:
+        detail = str(error) if isinstance(error, (ReleaseError, tool.MaintenanceError)) else type(error).__name__
+        if isinstance(error, sqlite3.Error):
+            detail += f" ({getattr(error, 'sqlite_errorname', 'SQLite failure')})"
         recovery_failure = None
+        recovered = None
         try:
             state = transaction.read()
-            if (state["phase"] in {"MIGRATING", "VERIFYING", "ACTIVATING_GIT"}
-                    and not state["writes_may_resume"]
-                    and git("rev-parse", "HEAD").strip() == current):
+            can_recover = (not state["writes_may_resume"] and active_bundle() == previous_active
+                           and git("rev-parse", "HEAD").strip() == current)
+            if can_recover and state["phase"] in {"FENCED", "BACKED_UP"}:
+                with lock(RUNTIME / "state/guard.lock"):
+                    verify_guard_quiet()
+                    quiet()
+                    require(pre_backup_database is not None and tool.database_stamp(database) == pre_backup_database,
+                            "SQLite changed or was not verified before the final backup")
+                    verify_original_database(pre_backup_database)
+                    transaction.advance("RECOVERY_READY", failed_in=state["phase"], failure=detail)
+                reopen(previous, previous_closed, current, "RECOVERED")
+                recovered = "Maintenance failed before migration. The prior release was recovered using the existing SQLite database"
+            elif can_recover and state["phase"] in {"MIGRATING", "VERIFYING", "ACTIVATING_GIT"}:
                 with lock(RUNTIME / "state/guard.lock"):
                     stop_maintenance_stack(previous)
                     quiet()
                     stable_database = tool.database_stamp(database)
                     require(tool.media_stamp(database.parent / tool.MEDIA_DIRECTORY) == state["backup"]["media_stamp"],
                             "Communication media changed after the final backup")
-                    tool.verify_no_data_drift(transaction.bundle / "final.db", database, columns, target_ids)
-                    tool.restore_database(database, transaction.bundle, state["backup"], quiet,
-                                          lambda: transaction.advance("RESTORING"), stable_database,
-                                          lambda progress: transaction.write({**transaction.read(), "restore_progress": progress}))
-                    restore_geo(previous)
-                    transaction.advance("RECOVERY_READY")
+                    if state["phase"] == "MIGRATING" and stable_database == state["backup"]["source"]:
+                        verify_original_database(stable_database)
+                        transaction.advance("RECOVERY_READY", failed_in=state["phase"], failure=detail)
+                        recovered = "Maintenance failed. The prior release was recovered using the existing SQLite database"
+                    else:
+                        tool.verify_no_data_drift(transaction.bundle / "final.db", database, columns, target_ids)
+                        tool.restore_database(database, transaction.bundle, state["backup"], quiet,
+                                              lambda: transaction.advance("RESTORING"), stable_database,
+                                              lambda progress: transaction.write({**transaction.read(), "restore_progress": progress}))
+                        restore_geo(previous)
+                        transaction.advance("RECOVERY_READY")
+                        recovered = "Maintenance failed and the verified prior database and release were recovered"
                 reopen(previous, previous_closed, current, "RECOVERED")
-                raise ReleaseError("Maintenance failed and the verified prior database and release were recovered") from None
         except ReleaseError as recovery_error:
-            if not os.path.lexists(transaction.path):
-                raise
             recovery_failure = str(recovery_error)
         except (Exception, KeyboardInterrupt) as recovery_error:
             recovery_failure = (str(recovery_error) if isinstance(recovery_error, tool.MaintenanceError)
                                 else type(recovery_error).__name__)
-        detail = str(error) if isinstance(error, (ReleaseError, tool.MaintenanceError)) else type(error).__name__
-        if isinstance(error, sqlite3.Error):
-            detail += f" ({getattr(error, 'sqlite_errorname', 'SQLite failure')})"
+        if recovered and recovery_failure is None:
+            raise ReleaseError(f"{recovered}: {detail}. Retained transaction: {transaction.bundle}") from None
         if recovery_failure:
             detail += f"; rollback could not complete: {recovery_failure}"
         transaction.fail(detail)
