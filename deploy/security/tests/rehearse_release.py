@@ -322,12 +322,12 @@ def rehearse_one_bundle(root, previous, staged, baseline, before, target, scenar
     deploy_lock = root / "deploy.lock"
     before_backup = None
 
-    def git(*args, **kwargs):
+    def git(*args, root=None):
         if args[:2] == ("remote", "get-url"):
             return "https://github.com/OlehProtsun/GF3.git\n"
         if args[0] == "fetch":
             return original_git("update-ref", "refs/remotes/origin/PROD2", target)
-        return original_git(*args, **kwargs)
+        return original_git(*args, root=None if root == release.ROOT else root)
 
     def state(sha, **kwargs):
         release.no_active_maintenance()
@@ -365,7 +365,6 @@ def rehearse_one_bundle(root, previous, staged, baseline, before, target, scenar
 
     def deploy(action, bundle, sha, nonce):
         assert action == "maintenance-deploy"
-        assert not (bundle / maintenance.MEDIA_DIRECTORY).exists()
         assert not list(bundle.glob("rehearsal-*")) and not (bundle / "SQLite.db").exists()
         with release.lock(deploy_lock):
             release.no_active_maintenance()
@@ -414,6 +413,7 @@ def rehearse_one_bundle(root, previous, staged, baseline, before, target, scenar
     assert (bundle / "capability-consumed.json").exists() and not (bundle / "capability.json").exists()
     assert json.loads((bundle / "rehearsal.json").read_text())["stage"] == "passed"
     assert not (bundle / "failed-database").exists()
+    assert late_media.read_bytes() == b"synthetic late media"
     journal = maintenance.Journal(release.STATE, bundle, release.store)
     if scenario == "final-backup-fence-lost":
         state = journal.read()
