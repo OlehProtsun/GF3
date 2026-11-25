@@ -153,6 +153,7 @@ def rehearse_migrations(root, snapshot_path):
 def maintenance_scenario(root, previous, candidate, baseline, git_dir, before, sha, scenario, sql, tags, columns, added):
     """Run the real maintenance engine on the runner's disposable Docker volume and nftables."""
     database = release.maintenance_database(baseline[2])
+    database_inode = database.stat().st_ino
     with closing(sqlite3.connect(database)) as db:
         historical = tuple(row[0] for row in db.execute('SELECT MigrationId FROM "__EFMigrationsHistory" ORDER BY MigrationId'))
     assert not set(historical).intersection(added)
@@ -234,7 +235,7 @@ def maintenance_scenario(root, previous, candidate, baseline, git_dir, before, s
         return result
 
     def interrupt_restore(database, bundle, metadata, assert_quiet, consume_restore, expected_stamp, record_progress):
-        assert not full_chain, "Pre-migration recovery must never replace SQLite"
+        assert not full_chain and scenario != "migration-before-start", "Pre-migration recovery must never replace SQLite"
         def progress(value):
             record_progress(value)
             if scenario == "partial-restore" and value["stage"] == "database-installed":
@@ -256,7 +257,10 @@ def maintenance_scenario(root, previous, candidate, baseline, git_dir, before, s
                 release.maintenance_cutover(maintenance, journal, candidate, previous, before, sha, baseline,
                                             historical, expected, columns)
             except release.ReleaseError as error:
-                if scenario in {"migration-before-start", "migration-failure", "git-failure", "guard-failure"}:
+                if scenario == "migration-before-start":
+                    assert "recovered using the existing SQLite database" in str(error), str(error)
+                    assert database.stat().st_ino == database_inode and not (data / "failed-database").exists()
+                elif scenario in {"migration-failure", "git-failure", "guard-failure"}:
                     assert "were recovered" in str(error), str(error)
                 elif scenario == "fence-lost":
                     assert journal.read()["phase"] == "RECOVERY_REQUIRED" and not (data / "failed-database").exists()
@@ -875,7 +879,7 @@ def build_rehearsal_image(repo, revision, image):
 if __name__ == "__main__":
     scenarios = ("success", "migration-failure", "git-failure", "guard-failure", "failure-after-open", "fence-lost")
     reviewed_scenarios = (*ONE_BUNDLE_SCENARIOS, *scenarios[1:], "migration-before-start", "partial-restore")
-    if len(sys.argv) in (2, 3) and sys.argv[1] in reviewed_scenarios:
+    if len(sys.argv) in (2, 3) and sys.argv[1] in {*scenarios, *reviewed_scenarios}:
         assert os.geteuid() == 0 and os.environ.get("GF3_DISPOSABLE_CI_RUNNER") == "true"
         os.umask(0o077)
         historical_pair = len(sys.argv) == 3
