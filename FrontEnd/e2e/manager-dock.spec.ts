@@ -1,4 +1,5 @@
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
+import { test } from "./fixtures/isolatedBackend";
 import { loginAsManager } from "./helpers";
 
 test.use({ launchOptions: process.platform === "win32" ? { ignoreDefaultArgs: ["--disable-accelerated-compositing"] } : {} });
@@ -91,15 +92,20 @@ test("restored sidebar retains badges, gloss and proximity motion after reopenin
   }
 });
 test("reduced motion and scrolling boundaries keep faces within the rail", async ({ page }) => {
-  await summary(page); await loginAsManager(page);
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.setViewportSize({ width: 390, height: 720 });
+  await summary(page); await loginAsManager(page);
   const rail = page.locator("#manager-sidebar-navigation");
   const home = rail.getByRole("link", { name: "Home", exact: true });
   const glow = await rail.evaluate(el => (el as HTMLElement).style.getPropertyValue("--dock-glow-y"));
   await home.hover(); await page.waitForTimeout(400);
   expect(await transform(home)).toEqual({ scale: 1, x: 0, y: 0 });
-  expect(await rail.evaluate(el => (el as HTMLElement).style.getPropertyValue("--dock-glow-y"))).toBe(glow);
+  const reducedState = await rail.evaluate(el => ({
+    glow: (el as HTMLElement).style.getPropertyValue("--dock-glow-y"),
+    reduced: window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+    hover: window.matchMedia("(hover: hover) and (pointer: fine)").matches,
+  }));
+  expect(reducedState.glow, JSON.stringify(reducedState)).toBe(glow);
   expect(await home.locator('[class*="dockFaceInner"]').evaluate(el => getComputedStyle(el, "::after").display)).toBe("none");
   await page.getByRole("button", { name: "Collapse sidebar", exact: true }).first().click();
   await expect(rail).toBeHidden();

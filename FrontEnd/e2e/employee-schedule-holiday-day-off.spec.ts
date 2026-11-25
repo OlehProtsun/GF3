@@ -4,7 +4,10 @@ for (const enabled of [true, false]) {
   test(`daily schedule has four distinct day states, holidays ${enabled}`, async ({ page }, info) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.emulateMedia({ reducedMotion: "reduce" });
-    await page.addInitScript(() => localStorage.setItem("gf3.auth.access-token", "holiday-day-off-fixture"));
+    await page.addInitScript(() => {
+      localStorage.setItem("gf3.auth.access-token", "holiday-day-off-fixture");
+      sessionStorage.setItem("gf3.pwa.install.dismissed", "1");
+    });
     await page.route("**/api/**", async route => {
       const path = new URL(route.request().url()).pathname;
       let body: unknown = [];

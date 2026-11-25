@@ -83,7 +83,10 @@ vi.mock("@entities/employee-ui-state", async () => {
 
 vi.mock("@entities/shift-swaps", async importOriginal => ({
   ...(await importOriginal<typeof import("@entities/shift-swaps")>()),
-  useShiftSwapPreviewQuery: (payload: unknown) => mocks.preview(payload),
+  useShiftSwapPreviewQuery: (payload: unknown) => {
+    const preview = mocks.preview(payload);
+    return { ...preview, refetchWithSignal: async () => preview.data };
+  },
   useShiftSwapReturnCandidatesQuery: () => ({ data: { items: [], hasMore: false }, isFetching: false }),
   useEmployeeShiftSwapsQuery: () => mocks.swapsQuery(),
   useEmployeeShiftSwapEmployeesQuery: () => mocks.employeesQuery(),

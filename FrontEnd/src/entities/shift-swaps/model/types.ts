@@ -107,6 +107,8 @@ export type SwapWizardRequest = CreateShiftSwapInput & (
   | { requestKind: "exchange"; targetEmployeeId: number; returnScheduleId: number; returnScheduleSlotId: number; returnFromTime: string; returnToTime: string }
 );
 
+export type ShiftSwapEligibleWindow = { fromTime: string; toTime: string };
+
 export type ShiftSwapReturnCandidate = {
   requiresWholeShift?: boolean;
   scheduleId: number; scheduleName: string; shopName: string;
@@ -114,7 +116,8 @@ export type ShiftSwapReturnCandidate = {
   fromTime: string; toTime: string; durationMinutes: number;
   canSelect: boolean; unavailableReason?: string | null;
   suggestedFromTime?: string | null; suggestedToTime?: string | null;
-  eligibleWindows?: { fromTime: string; toTime: string }[];
+  eligibleWindows?: ShiftSwapEligibleWindow[];
+  reservedWindows?: ShiftSwapEligibleWindow[];
 };
 export type ShiftSwapReturnCandidatePage = {
   items: ShiftSwapReturnCandidate[]; page: number; pageSize: number; hasMore: boolean;

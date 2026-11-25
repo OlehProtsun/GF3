@@ -429,20 +429,47 @@ def nginx_test(bundle):
     return output
 
 
-def backup(bundle, volume, db_path=None):
+def backup(bundle, volume, db_path=None, maintenance_helpers=None):
     db = db_path or Path(docker_json("volume", "inspect", volume)[0]["Mountpoint"]) / "SQLite.db"
     require(db.is_file(), "SQLite database missing in the existing volume")
-    destination = bundle / "SQLite.db"
-    with closing(sqlite3.connect(db.as_uri() + "?mode=ro", uri=True, timeout=10)) as source:
-        with closing(sqlite3.connect(destination)) as copy:
-            deadline = time.monotonic() + 120
+    if maintenance_helpers is None:
+        helper_path = Path(__file__).absolute().with_name("gf3_maintenance.py")
+        module = ModuleType("gf3_maintenance")
+        exec(compile(helper_path.read_bytes(), str(helper_path), "exec"), module.__dict__)
+        maintenance_helpers = module
+    staging = Path(tempfile.mkdtemp(prefix=".backup-", dir=bundle))
+    try:
+        destination = staging / "SQLite.db"
+        with closing(sqlite3.connect(db.as_uri() + "?mode=ro", uri=True, timeout=10)) as source:
+            with closing(sqlite3.connect(destination)) as copy:
+                deadline = time.monotonic() + 120
 
-            def progress(*_):
-                require(time.monotonic() < deadline, "SQLite backup timed out")
+                def progress(*_):
+                    require(time.monotonic() < deadline, "SQLite backup timed out")
 
-            source.backup(copy, pages=256, progress=progress)
-            require(copy.execute("PRAGMA quick_check").fetchall() == [("ok",)], "SQLite backup failed integrity check")
-    print("SQLite online backup verified")
+                source.backup(copy, pages=256, progress=progress)
+                require(copy.execute("PRAGMA integrity_check").fetchall() == [("ok",)]
+                        and copy.execute("PRAGMA foreign_key_check").fetchall() == [], "SQLite backup failed integrity check")
+        destination.chmod(0o600)
+        media = maintenance_helpers.copy_media_snapshot(destination, db.parent / "communication-gifs",
+                                                        staging / "communication-gifs", full=False)
+        manifest = maintenance_helpers._write_backup_manifest(staging, destination, media, "referenced")
+        maintenance_helpers.verify_backup_bundle(staging, manifest)
+        require(not (bundle / "SQLite.db").exists() and not (bundle / "communication-gifs").exists()
+                and not (bundle / "backup-manifest.json").exists(), "Ordinary backup destination is not empty")
+        os.replace(destination, bundle / "SQLite.db")
+        os.replace(staging / "communication-gifs", bundle / "communication-gifs")
+        os.replace(staging / "backup-manifest.json", bundle / "backup-manifest.json")
+        if os.name != "nt":
+            descriptor = os.open(bundle, os.O_RDONLY | os.O_DIRECTORY)
+            try:
+                os.fsync(descriptor)
+            finally:
+                os.close(descriptor)
+        maintenance_helpers.verify_backup_bundle(bundle)
+        print("SQLite and communication media online backup verified")
+    finally:
+        shutil.rmtree(staging, ignore_errors=True)
 
 
 def backend(bundle):
@@ -1152,10 +1179,12 @@ def maintenance_cutover(tool, transaction, candidate, previous, current, target,
         backup = tool.final_backup(database, transaction.bundle, before_ids, quiet,
                                    lambda metadata: transaction.advance("BACKED_UP", backup=metadata))
         tool.verify_final_backup(transaction.bundle, backup)
-        print(f"Final SQLite backup verified: {transaction.bundle / 'final.db'}", flush=True)
+        print(f"Final SQLite and communication media backup verified: {transaction.bundle / 'final.db'}", flush=True)
         quiet()
         def assert_unchanged():
-            require(tool.database_stamp(database) == backup["source"], "Database changed after the final backup")
+            require(tool.database_stamp(database) == backup["source"]
+                    and tool.media_stamp(database.parent / tool.MEDIA_DIRECTORY) == backup["media_stamp"],
+                    "Database or communication media changed after the final backup")
 
         assert_unchanged()
         transaction.advance("MIGRATING")
@@ -1165,6 +1194,7 @@ def maintenance_cutover(tool, transaction, candidate, previous, current, target,
         quiet()
         tool.checkpoint_for_read_only_health(database)
         stable_database = tool.database_stamp(database)
+        stable_media = tool.media_stamp(database.parent / tool.MEDIA_DIRECTORY)
         address = private_health(private, baseline)
         # Guard uses the same project and Nginx instance while ingress is private.
         (private / "guard-enabled").touch()
@@ -1174,12 +1204,15 @@ def maintenance_cutover(tool, transaction, candidate, previous, current, target,
             verify_fence(fence)
             verify_web(private, address=address)
         require(topology() == baseline, "Docker topology changed before activation")
-        require(tool.database_stamp(database) == stable_database, "Database changed during read-only verification")
+        require(tool.database_stamp(database) == stable_database
+                and tool.media_stamp(database.parent / tool.MEDIA_DIRECTORY) == stable_media,
+                "Database or communication media changed during read-only verification")
         transaction.advance("ACTIVATING_GIT")
         finalize_git(candidate, target)
         transaction.advance("READY_TO_REOPEN")
         reopen(candidate, closed, target, "COMPLETED")
     except (Exception, KeyboardInterrupt) as error:
+        recovery_failure = None
         try:
             state = transaction.read()
             if (state["phase"] in {"MIGRATING", "VERIFYING", "ACTIVATING_GIT"}
@@ -1189,21 +1222,28 @@ def maintenance_cutover(tool, transaction, candidate, previous, current, target,
                     stop_maintenance_stack(previous)
                     quiet()
                     stable_database = tool.database_stamp(database)
+                    require(tool.media_stamp(database.parent / tool.MEDIA_DIRECTORY) == state["backup"]["media_stamp"],
+                            "Communication media changed after the final backup")
                     tool.verify_no_data_drift(transaction.bundle / "final.db", database, columns, target_ids)
                     tool.restore_database(database, transaction.bundle, state["backup"], quiet,
-                                          lambda: transaction.advance("RESTORING"), stable_database)
+                                          lambda: transaction.advance("RESTORING"), stable_database,
+                                          lambda progress: transaction.write({**transaction.read(), "restore_progress": progress}))
                     restore_geo(previous)
                     transaction.advance("RECOVERY_READY")
                 reopen(previous, previous_closed, current, "RECOVERED")
                 raise ReleaseError("Maintenance failed and the verified prior database and release were recovered") from None
-        except ReleaseError:
+        except ReleaseError as recovery_error:
             if not os.path.lexists(transaction.path):
                 raise
-        except (Exception, KeyboardInterrupt):
-            pass
+            recovery_failure = str(recovery_error)
+        except (Exception, KeyboardInterrupt) as recovery_error:
+            recovery_failure = (str(recovery_error) if isinstance(recovery_error, tool.MaintenanceError)
+                                else type(recovery_error).__name__)
         detail = str(error) if isinstance(error, (ReleaseError, tool.MaintenanceError)) else type(error).__name__
         if isinstance(error, sqlite3.Error):
             detail += f" ({getattr(error, 'sqlite_errorname', 'SQLite failure')})"
+        if recovery_failure:
+            detail += f"; rollback could not complete: {recovery_failure}"
         transaction.fail(detail)
         raise ReleaseError(f"Maintenance needs intervention: {detail}. Retained transaction: {transaction.bundle}") from None
 

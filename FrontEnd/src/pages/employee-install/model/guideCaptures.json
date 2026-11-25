@@ -1,0 +1,2042 @@
+{
+  "ios-open": {
+    "src": "getting-started/safari-gf-login.webp",
+    "width": 591,
+    "height": 469,
+    "highlight": [
+      33.8,
+      84.6,
+      33.7,
+      10.7
+    ]
+  },
+  "ios-share": {
+    "src": "getting-started/safari-share-button.webp",
+    "width": 591,
+    "height": 166,
+    "highlight": [
+      44.8,
+      54.8,
+      10.2,
+      35.5
+    ]
+  },
+  "ios-share-sheet": {
+    "src": "getting-started/safari-share-sheet.webp",
+    "width": 591,
+    "height": 175,
+    "highlight": [
+      2.7,
+      10.3,
+      48.7,
+      80
+    ]
+  },
+  "ios-add": {
+    "src": "getting-started/safari-share-actions.webp",
+    "width": 591,
+    "height": 436,
+    "highlight": [
+      5.1,
+      77.3,
+      89.7,
+      16.5
+    ]
+  },
+  "ios-confirm": {
+    "src": "getting-started/safari-home-screen-confirm.webp",
+    "width": 591,
+    "height": 351,
+    "highlight": [
+      84.9,
+      5.7,
+      12.7,
+      13.1
+    ]
+  },
+  "ios-launch": {
+    "src": "getting-started/ios-home-screen.webp",
+    "width": 310,
+    "height": 151,
+    "highlight": [
+      29.4,
+      8.6,
+      38.4,
+      78.1
+    ]
+  },
+  "android-open": {
+    "src": "getting-started/android-chrome-open.webp",
+    "width": 420,
+    "height": 381,
+    "highlight": [
+      90.2,
+      3.1,
+      8.3,
+      8.9
+    ]
+  },
+  "android-menu": {
+    "src": "getting-started/android-chrome-menu.webp",
+    "width": 305,
+    "height": 557
+  },
+  "android-add": {
+    "src": "getting-started/android-add-to-home-screen.webp",
+    "width": 304,
+    "height": 355,
+    "highlight": [
+      3.6,
+      67.3,
+      92.1,
+      13.8
+    ]
+  },
+  "android-install": {
+    "src": "getting-started/android-choose-install.webp",
+    "width": 420,
+    "height": 271,
+    "highlight": [
+      6,
+      32.5,
+      87.9,
+      28
+    ]
+  },
+  "android-confirm": {
+    "src": "getting-started/android-confirm-install.webp",
+    "width": 426,
+    "height": 255,
+    "highlight": [
+      70.7,
+      70.2,
+      19.7,
+      14.9
+    ]
+  },
+  "nav-profile": {
+    "src": "profile/nav-profile.webp",
+    "width": 382,
+    "height": 84,
+    "highlight": [
+      59.5,
+      14.3,
+      23.7,
+      71.4
+    ]
+  },
+  "profile-guide": {
+    "src": "profile/profile-guide.webp",
+    "width": 346,
+    "height": 115,
+    "highlight": [
+      2.3,
+      5.2,
+      95.4,
+      72.9
+    ]
+  },
+  "profile-overview": {
+    "src": "profile/profile-overview.webp",
+    "width": 328,
+    "height": 141,
+    "highlight": [
+      7.3,
+      16.2,
+      85.3,
+      43.8
+    ]
+  },
+  "profile-edit": {
+    "src": "profile/profile-edit.webp",
+    "width": 328,
+    "height": 244,
+    "highlight": [
+      7.3,
+      71.7,
+      85.3,
+      18.9
+    ]
+  },
+  "profile-language": {
+    "src": "profile/profile-language.webp",
+    "width": 328,
+    "height": 135,
+    "highlight": [
+      7.3,
+      29.7,
+      85.3,
+      40
+    ]
+  },
+  "profile-email": {
+    "src": "profile/profile-email.webp",
+    "width": 328,
+    "height": 258,
+    "highlight": [
+      7.9,
+      41.1,
+      84.1,
+      17.8
+    ]
+  },
+  "profile-password": {
+    "src": "profile/profile-password.webp",
+    "width": 328,
+    "height": 194,
+    "highlight": [
+      7.3,
+      64.6,
+      85.3,
+      23.7
+    ]
+  },
+  "profile-code": {
+    "src": "profile/profile-code.webp",
+    "width": 296,
+    "height": 163,
+    "highlight": [
+      2.7,
+      3.9,
+      94.6,
+      28.2
+    ]
+  },
+  "profile-logout": {
+    "src": "profile/profile-logout.webp",
+    "width": 346,
+    "height": 116,
+    "highlight": [
+      4.9,
+      27.7,
+      90.2,
+      58.6
+    ]
+  },
+  "alerts-tabs": {
+    "src": "notifications/alerts-tabs.webp",
+    "width": 265,
+    "height": 52,
+    "highlight": [
+      4.5,
+      20.2,
+      44.9,
+      59.6
+    ]
+  },
+  "alerts-read": {
+    "src": "notifications/alerts-read.webp",
+    "width": 316,
+    "height": 203,
+    "highlight": [
+      6,
+      41.5,
+      43,
+      16.7
+    ]
+  },
+  "alerts-all-read": {
+    "src": "notifications/alerts-all-read.webp",
+    "width": 316,
+    "height": 96,
+    "highlight": [
+      19.6,
+      58.3,
+      77.8,
+      35.4
+    ]
+  },
+  "alerts-news": {
+    "src": "notifications/alerts-news.webp",
+    "width": 316,
+    "height": 107,
+    "highlight": [
+      20.9,
+      15.9,
+      27.7,
+      16.4
+    ]
+  },
+  "nav-schedule": {
+    "src": "schedules/nav-schedule.webp",
+    "width": 382,
+    "height": 84,
+    "highlight": [
+      31.6,
+      14.3,
+      23.7,
+      71.4
+    ]
+  },
+  "schedule-overview": {
+    "src": "schedules/schedule-overview.webp",
+    "width": 346,
+    "height": 280,
+    "highlight": [
+      53.8,
+      42.3,
+      35.3,
+      5.4
+    ]
+  },
+  "schedule-selector": {
+    "src": "schedules/schedule-selector.webp",
+    "width": 324,
+    "height": 116,
+    "highlight": [
+      5.6,
+      34.9,
+      66.9,
+      50.9
+    ]
+  },
+  "schedule-matrix": {
+    "src": "schedules/schedule-matrix.webp",
+    "width": 356,
+    "height": 191,
+    "highlight": [
+      2.3,
+      3.4,
+      97.7,
+      17.9
+    ]
+  },
+  "schedule-correction": {
+    "src": "schedules/schedule-correction.webp",
+    "width": 356,
+    "height": 40,
+    "highlight": [
+      66.3,
+      25.6,
+      5.3,
+      47.5
+    ]
+  },
+  "schedule-correction-bubble": {
+    "src": "schedules/schedule-correction-bubble.webp",
+    "width": 266,
+    "height": 109,
+    "highlight": [
+      3,
+      5.7,
+      94,
+      88
+    ]
+  },
+  "schedule-open": {
+    "src": "schedules/schedule-open.webp",
+    "width": 356,
+    "height": 40,
+    "highlight": [
+      66.3,
+      25.6,
+      5.3,
+      47.5
+    ]
+  },
+  "schedule-open-bubble": {
+    "src": "schedules/schedule-open-bubble.webp",
+    "width": 266,
+    "height": 91,
+    "highlight": [
+      3,
+      6.9,
+      94,
+      86.2
+    ]
+  },
+  "schedule-complete": {
+    "src": "schedules/schedule-complete.webp",
+    "width": 356,
+    "height": 40,
+    "highlight": [
+      66.3,
+      25.6,
+      5.3,
+      47.5
+    ]
+  },
+  "schedule-complete-bubble": {
+    "src": "schedules/schedule-complete-bubble.webp",
+    "width": 266,
+    "height": 91,
+    "highlight": [
+      3,
+      6.9,
+      94,
+      86.2
+    ]
+  },
+  "schedule-eye": {
+    "src": "schedules/schedule-eye.webp",
+    "width": 324,
+    "height": 81,
+    "highlight": [
+      62.8,
+      8,
+      11.1,
+      44.4
+    ]
+  },
+  "schedule-pdf": {
+    "src": "schedules/schedule-pdf.webp",
+    "width": 324,
+    "height": 81,
+    "highlight": [
+      76.4,
+      8,
+      21.2,
+      44.4
+    ]
+  },
+  "schedule-daily": {
+    "src": "schedules/schedule-daily.webp",
+    "width": 324,
+    "height": 247,
+    "highlight": [
+      2.8,
+      3,
+      94.4,
+      32
+    ]
+  },
+  "hours-month": {
+    "src": "work-hours/hours-month.webp",
+    "width": 346,
+    "height": 201,
+    "highlight": [
+      6.7,
+      35.6,
+      42.2,
+      21.9
+    ]
+  },
+  "hours-year": {
+    "src": "work-hours/hours-year.webp",
+    "width": 346,
+    "height": 201,
+    "highlight": [
+      51.2,
+      35.6,
+      42.2,
+      21.9
+    ]
+  },
+  "hours-columns": {
+    "src": "work-hours/hours-columns.webp",
+    "width": 316,
+    "height": 134,
+    "highlight": [
+      2.9,
+      5.6,
+      94.3,
+      26.9
+    ]
+  },
+  "hours-total": {
+    "src": "work-hours/hours-total.webp",
+    "width": 316,
+    "height": 101,
+    "highlight": [
+      2.9,
+      56,
+      94.3,
+      36.6
+    ]
+  },
+  "adjust": {
+    "src": "corrections/adjust.webp",
+    "width": 324,
+    "height": 113,
+    "highlight": [
+      74.9,
+      44.3,
+      19.5,
+      30.1
+    ]
+  },
+  "adjust-schedule": {
+    "src": "corrections/adjust-schedule.webp",
+    "width": 390,
+    "height": 217,
+    "highlight": [
+      6.9,
+      28,
+      86.2,
+      44.2
+    ]
+  },
+  "adjust-shift": {
+    "src": "corrections/adjust-shift.webp",
+    "width": 390,
+    "height": 152,
+    "highlight": [
+      6.9,
+      29.4,
+      86.2,
+      41.4
+    ]
+  },
+  "adjust-time": {
+    "src": "corrections/adjust-time.webp",
+    "width": 390,
+    "height": 315,
+    "highlight": [
+      10.3,
+      43.1,
+      79.5,
+      14
+    ]
+  },
+  "adjust-day-off": {
+    "src": "corrections/adjust-day-off.webp",
+    "width": 390,
+    "height": 294,
+    "highlight": [
+      10.3,
+      39.4,
+      79.5,
+      21.4
+    ]
+  },
+  "adjust-comment": {
+    "src": "corrections/adjust-comment.webp",
+    "width": 390,
+    "height": 261,
+    "highlight": [
+      10.3,
+      29,
+      79.5,
+      42
+    ]
+  },
+  "adjust-review": {
+    "src": "corrections/adjust-review.webp",
+    "width": 390,
+    "height": 419,
+    "highlight": [
+      6.9,
+      41.9,
+      86.2,
+      5.5
+    ]
+  },
+  "adjust-send": {
+    "src": "corrections/adjust-send.webp",
+    "width": 390,
+    "height": 156,
+    "highlight": [
+      44.8,
+      35.3,
+      48.3,
+      29.5
+    ]
+  },
+  "adjust-success": {
+    "src": "corrections/adjust-success.webp",
+    "width": 390,
+    "height": 254,
+    "highlight": [
+      21.4,
+      45.6,
+      57.3,
+      9.1
+    ]
+  },
+  "swap-page": {
+    "src": "swaps/swap-page.webp",
+    "width": 390,
+    "height": 226,
+    "highlight": [
+      49,
+      3.5,
+      43.8,
+      25.7
+    ]
+  },
+  "login": {
+    "src": "getting-started/login.webp",
+    "width": 380,
+    "height": 276,
+    "highlight": [
+      9.4,
+      35.9,
+      81.1,
+      18.1
+    ]
+  },
+  "profile-password-fields": {
+    "src": "profile/profile-password-fields.webp",
+    "width": 296,
+    "height": 227,
+    "highlight": [
+      2.7,
+      13.6,
+      94.6,
+      67.8
+    ]
+  },
+  "nav-alerts": {
+    "src": "notifications/nav-alerts.webp",
+    "width": 382,
+    "height": 84,
+    "highlight": [
+      3.7,
+      14.3,
+      14.9,
+      71.4
+    ]
+  },
+  "alerts-link": {
+    "src": "notifications/alerts-link.webp",
+    "width": 316,
+    "height": 132,
+    "highlight": [
+      50.9,
+      60.7,
+      43,
+      25.8
+    ]
+  },
+  "schedule-picker": {
+    "src": "schedules/schedule-picker.webp",
+    "width": 390,
+    "height": 289,
+    "highlight": [
+      5.9,
+      16.8,
+      34.2,
+      8.7
+    ]
+  },
+  "schedule-more": {
+    "src": "schedules/schedule-more.webp",
+    "width": 390,
+    "height": 152,
+    "highlight": [
+      5.9,
+      59.2,
+      88.2,
+      35.6
+    ]
+  },
+  "schedule-public": {
+    "src": "schedules/schedule-public.webp",
+    "width": 390,
+    "height": 189,
+    "highlight": [
+      24.9,
+      50.5,
+      24.4,
+      10.6
+    ]
+  },
+  "schedule-preview": {
+    "src": "schedules/schedule-preview.webp",
+    "width": 390,
+    "height": 344,
+    "highlight": [
+      17.2,
+      14.1,
+      65.6,
+      7.3
+    ]
+  },
+  "swap-history-button": {
+    "src": "swaps/swap-history-button.webp",
+    "width": 390,
+    "height": 132,
+    "highlight": [
+      7.2,
+      34.8,
+      43.8,
+      43.9
+    ]
+  },
+  "swap-history": {
+    "src": "swaps/swap-history.webp",
+    "width": 368,
+    "height": 358,
+    "highlight": [
+      6.8,
+      9,
+      86.4,
+      84.4
+    ]
+  },
+  "swap-schedule": {
+    "src": "swaps/swap-schedule.webp",
+    "width": 382,
+    "height": 247,
+    "highlight": [
+      7.3,
+      34.7,
+      85.3,
+      30.8
+    ]
+  },
+  "alerts-unread": {
+    "src": "notifications/alerts-unread.webp",
+    "width": 316,
+    "height": 135,
+    "highlight": [
+      20.9,
+      12.6,
+      73.1,
+      13
+    ]
+  },
+  "availability-period": {
+    "src": "availability-urlop/availability-period.webp",
+    "width": 378,
+    "height": 248,
+    "highlight": [
+      10.6,
+      54.4,
+      78.8,
+      27.4
+    ]
+  },
+  "availability-urlop": {
+    "src": "availability-urlop/availability-urlop.webp",
+    "width": 346,
+    "height": 117,
+    "highlight": [
+      50,
+      23.9,
+      41.9,
+      37.6
+    ]
+  },
+  "urlop-panel": {
+    "src": "availability-urlop/urlop-panel.webp",
+    "width": 316,
+    "height": 240,
+    "highlight": [
+      2.5,
+      27.5,
+      46,
+      18.3
+    ]
+  },
+  "swap-shift": {
+    "src": "swaps/swap-shift.webp",
+    "width": 382,
+    "height": 217,
+    "highlight": [
+      7.1,
+      34.8,
+      85.9,
+      30.4
+    ]
+  },
+  "swap-partial": {
+    "src": "swaps/swap-partial.webp",
+    "width": 382,
+    "height": 204,
+    "highlight": [
+      50.5,
+      39.2,
+      42.1,
+      21.6
+    ]
+  },
+  "swap-everyone": {
+    "src": "swaps/swap-everyone.webp",
+    "width": 382,
+    "height": 238,
+    "highlight": [
+      7.3,
+      31.8,
+      85.3,
+      36.4
+    ]
+  },
+  "swap-specific": {
+    "src": "swaps/swap-specific.webp",
+    "width": 382,
+    "height": 207,
+    "highlight": [
+      7.1,
+      36.3,
+      85.9,
+      27.1
+    ]
+  },
+  "swap-exchange": {
+    "src": "swaps/swap-exchange.webp",
+    "width": 382,
+    "height": 234,
+    "highlight": [
+      7.1,
+      36.7,
+      85.9,
+      26.9
+    ]
+  },
+  "swap-review": {
+    "src": "swaps/swap-review.webp",
+    "width": 382,
+    "height": 340,
+    "highlight": [
+      22,
+      47.1,
+      54,
+      5.8
+    ]
+  },
+  "swap-send": {
+    "src": "swaps/swap-send.webp",
+    "width": 382,
+    "height": 112,
+    "highlight": [
+      6.5,
+      40.2,
+      86.9,
+      42.9
+    ]
+  },
+  "swap-success": {
+    "src": "swaps/swap-success.webp",
+    "width": 382,
+    "height": 253,
+    "highlight": [
+      14.6,
+      45.5,
+      70.7,
+      9.1
+    ]
+  },
+  "swap-offer": {
+    "src": "swaps/swap-offer.webp",
+    "width": 382,
+    "height": 267,
+    "highlight": [
+      6.5,
+      11.2,
+      30.4,
+      9.8
+    ]
+  },
+  "swap-accept": {
+    "src": "swaps/swap-accept.webp",
+    "width": 382,
+    "height": 251,
+    "highlight": [
+      50,
+      41.9,
+      43.2,
+      15.9
+    ]
+  },
+  "swap-confirm": {
+    "src": "swaps/swap-confirm.webp",
+    "width": 390,
+    "height": 226,
+    "highlight": [
+      24.9,
+      44.4,
+      66.2,
+      11.1
+    ]
+  },
+  "availability-day": {
+    "src": "availability-urlop/availability-day.webp",
+    "width": 292,
+    "height": 177,
+    "highlight": [
+      20.9,
+      39.9,
+      32.5,
+      20.3
+    ]
+  },
+  "login-submit": {
+    "src": "getting-started/login-submit.webp",
+    "width": 380,
+    "height": 141,
+    "highlight": [
+      9.4,
+      48.9,
+      81.1,
+      36.6
+    ]
+  },
+  "availability-editor": {
+    "src": "availability-urlop/availability-editor.webp",
+    "width": 390,
+    "height": 414,
+    "highlight": [
+      4.1,
+      23.4,
+      91.8,
+      56
+    ]
+  },
+  "login-password": {
+    "src": "getting-started/login-password.webp",
+    "width": 380,
+    "height": 160,
+    "highlight": [
+      9.4,
+      47.1,
+      81.1,
+      31.3
+    ]
+  },
+  "login-workspace": {
+    "src": "getting-started/login-workspace.webp",
+    "width": 390,
+    "height": 226,
+    "highlight": [
+      3.1,
+      64.2,
+      93.8,
+      31.9
+    ]
+  },
+  "profile-language-open": {
+    "src": "profile/profile-language-open.webp",
+    "width": 254,
+    "height": 164,
+    "highlight": [
+      3.1,
+      3.7,
+      93.7,
+      92.1
+    ]
+  },
+  "profile-save": {
+    "src": "profile/profile-save.webp",
+    "width": 328,
+    "height": 194,
+    "highlight": [
+      7.3,
+      64.9,
+      85.3,
+      23.7
+    ]
+  },
+  "profile-verification": {
+    "src": "profile/profile-verification.webp",
+    "width": 296,
+    "height": 192,
+    "highlight": [
+      2.7,
+      21.3,
+      94.6,
+      24
+    ]
+  },
+  "profile-new-password": {
+    "src": "profile/profile-new-password.webp",
+    "width": 296,
+    "height": 192,
+    "highlight": [
+      2.7,
+      55.2,
+      94.6,
+      24
+    ]
+  },
+  "profile-password-confirm": {
+    "src": "profile/profile-password-confirm.webp",
+    "width": 296,
+    "height": 219,
+    "highlight": [
+      2.7,
+      68.9,
+      94.6,
+      21
+    ]
+  },
+  "alerts-example-schedule": {
+    "src": "notifications/alerts-example-schedule.webp",
+    "width": 316,
+    "height": 192,
+    "highlight": [
+      50.9,
+      73.2,
+      43,
+      17.7
+    ]
+  },
+  "alerts-example-swap": {
+    "src": "notifications/alerts-example-swap.webp",
+    "width": 316,
+    "height": 192,
+    "highlight": [
+      50.9,
+      72.9,
+      43,
+      17.7
+    ]
+  },
+  "alerts-example-open-shift": {
+    "src": "notifications/alerts-example-open-shift.webp",
+    "width": 316,
+    "height": 192,
+    "highlight": [
+      50.9,
+      73.1,
+      43,
+      17.7
+    ]
+  },
+  "alerts-example-accepted": {
+    "src": "notifications/alerts-example-accepted.webp",
+    "width": 316,
+    "height": 192,
+    "highlight": [
+      50.9,
+      73.4,
+      43,
+      17.7
+    ]
+  },
+  "alerts-news-read": {
+    "src": "notifications/alerts-news-read.webp",
+    "width": 316,
+    "height": 118,
+    "highlight": [
+      6,
+      56.6,
+      43,
+      28.8
+    ]
+  },
+  "hours-month-open": {
+    "src": "work-hours/hours-month-open.webp",
+    "width": 160,
+    "height": 119,
+    "highlight": [
+      5,
+      5.5,
+      90,
+      89.1
+    ]
+  },
+  "alerts-example-availability": {
+    "src": "notifications/alerts-example-availability.webp",
+    "width": 316,
+    "height": 192,
+    "highlight": [
+      50.9,
+      73,
+      43,
+      17.7
+    ]
+  },
+  "schedule-day-off": {
+    "src": "schedules/schedule-day-off.webp",
+    "width": 346,
+    "height": 217,
+    "highlight": [
+      7.5,
+      27.9,
+      85,
+      57.1
+    ]
+  },
+  "hours-year-open": {
+    "src": "work-hours/hours-year-open.webp",
+    "width": 160,
+    "height": 119,
+    "highlight": [
+      5,
+      5.5,
+      90,
+      89.1
+    ]
+  },
+  "urlop-date": {
+    "src": "availability-urlop/urlop-date.webp",
+    "width": 302,
+    "height": 302,
+    "highlight": [
+      2.7,
+      36.4,
+      12.7,
+      27.2
+    ]
+  },
+  "urlop-submit": {
+    "src": "availability-urlop/urlop-submit.webp",
+    "width": 316,
+    "height": 135,
+    "highlight": [
+      51.4,
+      50.4,
+      46,
+      31.1
+    ]
+  },
+  "adjust-add-shift": {
+    "src": "corrections/adjust-add-shift.webp",
+    "width": 390,
+    "height": 335,
+    "highlight": [
+      10.3,
+      43.5,
+      79.5,
+      13.1
+    ]
+  },
+  "nav-swap": {
+    "src": "swaps/nav-swap.webp",
+    "width": 382,
+    "height": 84,
+    "highlight": [
+      45.6,
+      14.3,
+      23.7,
+      71.4
+    ]
+  },
+  "availability-nav": {
+    "src": "availability-urlop/availability-nav.webp",
+    "width": 382,
+    "height": 84,
+    "highlight": [
+      17.6,
+      14.3,
+      23.7,
+      71.4
+    ]
+  },
+  "availability-calendar": {
+    "src": "availability-urlop/availability-calendar.webp",
+    "width": 340,
+    "height": 301,
+    "highlight": [
+      2.7,
+      2.6,
+      97.3,
+      29.2
+    ]
+  },
+  "urlop-month": {
+    "src": "availability-urlop/urlop-month.webp",
+    "width": 316,
+    "height": 230,
+    "highlight": [
+      51.4,
+      28.7,
+      46,
+      19.1
+    ]
+  },
+  "urlop-history": {
+    "src": "schedules/urlop-history.webp",
+    "width": 316,
+    "height": 148,
+    "highlight": [
+      2.5,
+      45.9,
+      94.9,
+      34
+    ]
+  },
+  "swap-manual-shift": {
+    "src": "swaps/swap-manual-shift.webp",
+    "width": 382,
+    "height": 217,
+    "highlight": [
+      7.1,
+      34.9,
+      85.9,
+      30.4
+    ]
+  },
+  "swap-manual-full": {
+    "src": "swaps/swap-manual-full.webp",
+    "width": 382,
+    "height": 214,
+    "highlight": [
+      7.3,
+      39.7,
+      42.1,
+      20.6
+    ]
+  },
+  "swap-manual-exact": {
+    "src": "swaps/swap-manual-exact.webp",
+    "width": 382,
+    "height": 149,
+    "highlight": [
+      13.9,
+      43.9,
+      4.7,
+      12.1
+    ]
+  },
+  "swap-manual-flexible": {
+    "src": "swaps/swap-manual-flexible.webp",
+    "width": 382,
+    "height": 149,
+    "highlight": [
+      13.9,
+      43.9,
+      4.7,
+      12.1
+    ]
+  },
+  "swap-manual-full-review": {
+    "src": "swaps/swap-manual-full-review.webp",
+    "width": 382,
+    "height": 340,
+    "highlight": [
+      22,
+      47.1,
+      54,
+      5.8
+    ]
+  },
+  "swap-manual-full-success": {
+    "src": "swaps/swap-manual-full-success.webp",
+    "width": 382,
+    "height": 273,
+    "highlight": [
+      14.6,
+      45.8,
+      70.7,
+      8.4
+    ]
+  },
+  "swap-manual-time": {
+    "src": "swaps/swap-manual-time.webp",
+    "width": 382,
+    "height": 284,
+    "highlight": [
+      51.6,
+      42.3,
+      38.7,
+      15.5
+    ]
+  },
+  "swap-manual-half-review": {
+    "src": "swaps/swap-manual-half-review.webp",
+    "width": 382,
+    "height": 310,
+    "highlight": [
+      22,
+      46.8,
+      54,
+      6.3
+    ]
+  },
+  "swap-manual-first-open": {
+    "src": "swaps/swap-manual-first-open.webp",
+    "width": 362,
+    "height": 133,
+    "highlight": [
+      2.2,
+      4.5,
+      95.6,
+      90.8
+    ]
+  },
+  "swap-manual-reserved": {
+    "src": "swaps/swap-manual-reserved.webp",
+    "width": 382,
+    "height": 220,
+    "highlight": [
+      7.1,
+      23.1,
+      85.9,
+      54.1
+    ]
+  },
+  "swap-manual-second-time": {
+    "src": "swaps/swap-manual-second-time.webp",
+    "width": 382,
+    "height": 280,
+    "highlight": [
+      9.7,
+      42.1,
+      38.7,
+      15.7
+    ]
+  },
+  "swap-manual-two": {
+    "src": "swaps/swap-manual-two.webp",
+    "width": 366,
+    "height": 321,
+    "highlight": [
+      2.7,
+      3.1,
+      94.5,
+      37.6
+    ]
+  },
+  "swap-manual-cancel": {
+    "src": "swaps/swap-manual-cancel.webp",
+    "width": 382,
+    "height": 118,
+    "highlight": [
+      6,
+      44.3,
+      88,
+      39
+    ]
+  },
+  "swap-manual-cancelled": {
+    "src": "swaps/swap-manual-cancelled.webp",
+    "width": 368,
+    "height": 208,
+    "highlight": [
+      7.6,
+      33.8,
+      84.8,
+      53.4
+    ]
+  },
+  "swap-manual-search": {
+    "src": "swaps/swap-manual-search.webp",
+    "width": 382,
+    "height": 185,
+    "highlight": [
+      7.1,
+      37.9,
+      85.9,
+      23.8
+    ]
+  },
+  "swap-manual-give": {
+    "src": "swaps/swap-manual-give.webp",
+    "width": 382,
+    "height": 283,
+    "highlight": [
+      7.1,
+      38.9,
+      85.9,
+      22.2
+    ]
+  },
+  "swap-manual-specific-review": {
+    "src": "swaps/swap-manual-specific-review.webp",
+    "width": 382,
+    "height": 367,
+    "highlight": [
+      22,
+      45.5,
+      54,
+      5.3
+    ]
+  },
+  "swap-manual-return-action": {
+    "src": "swaps/swap-manual-return-action.webp",
+    "width": 382,
+    "height": 215,
+    "highlight": [
+      19.9,
+      39.9,
+      31.6,
+      20.5
+    ]
+  },
+  "swap-manual-return-schedule": {
+    "src": "swaps/swap-manual-return-schedule.webp",
+    "width": 382,
+    "height": 247,
+    "highlight": [
+      7.3,
+      34.7,
+      85.3,
+      30.8
+    ]
+  },
+  "swap-manual-return-shift": {
+    "src": "swaps/swap-manual-return-shift.webp",
+    "width": 382,
+    "height": 297,
+    "highlight": [
+      7.1,
+      39,
+      85.9,
+      22.2
+    ]
+  },
+  "swap-manual-exchange-review": {
+    "src": "swaps/swap-manual-exchange-review.webp",
+    "width": 382,
+    "height": 401,
+    "highlight": [
+      22,
+      47.6,
+      49.5,
+      4.9
+    ]
+  },
+  "swap-manual-incoming": {
+    "src": "swaps/swap-manual-incoming.webp",
+    "width": 362,
+    "height": 133,
+    "highlight": [
+      2.2,
+      4.5,
+      95.6,
+      90.8
+    ]
+  },
+  "swap-manual-accept-full": {
+    "src": "swaps/swap-manual-accept-full.webp",
+    "width": 382,
+    "height": 130,
+    "highlight": [
+      6,
+      49.6,
+      88,
+      35.4
+    ]
+  },
+  "swap-manual-confirm-full": {
+    "src": "swaps/swap-manual-confirm-full.webp",
+    "width": 390,
+    "height": 236,
+    "highlight": [
+      24.9,
+      44.6,
+      66.2,
+      10.6
+    ]
+  },
+  "swap-manual-claim": {
+    "src": "swaps/swap-manual-claim.webp",
+    "width": 382,
+    "height": 448,
+    "highlight": [
+      6,
+      14.3,
+      88,
+      71.2
+    ]
+  },
+  "swap-manual-confirm-part": {
+    "src": "swaps/swap-manual-confirm-part.webp",
+    "width": 390,
+    "height": 236,
+    "highlight": [
+      24.9,
+      44.6,
+      66.2,
+      10.6
+    ]
+  },
+  "swap-manual-residual": {
+    "src": "swaps/swap-manual-residual.webp",
+    "width": 362,
+    "height": 133,
+    "highlight": [
+      2.2,
+      4.5,
+      95.6,
+      90.8
+    ]
+  },
+  "swap-manual-held": {
+    "src": "swaps/swap-manual-held.webp",
+    "width": 382,
+    "height": 190,
+    "highlight": [
+      2.4,
+      44.9,
+      95.3,
+      9.9
+    ]
+  },
+  "swap-manual-conflict": {
+    "src": "swaps/swap-manual-conflict.webp",
+    "width": 382,
+    "height": 186,
+    "highlight": [
+      31.4,
+      46,
+      42.2,
+      7.8
+    ]
+  },
+  "swap-manual-accepted": {
+    "src": "swaps/swap-manual-accepted.webp",
+    "width": 368,
+    "height": 249,
+    "highlight": [
+      7.6,
+      31.9,
+      84.8,
+      57.4
+    ]
+  },
+  "swap-manual-filters": {
+    "src": "swaps/swap-manual-filters.webp",
+    "width": 390,
+    "height": 210,
+    "highlight": [
+      5.6,
+      41.9,
+      88.7,
+      16.2
+    ]
+  },
+  "swap-manual-copy": {
+    "src": "swaps/swap-manual-copy.webp",
+    "width": 362,
+    "height": 150,
+    "highlight": [
+      85.6,
+      38.5,
+      8.8,
+      21.3
+    ]
+  },
+  "swap-manual-approval-action": {
+    "src": "swaps/swap-manual-approval-action.webp",
+    "width": 382,
+    "height": 126,
+    "highlight": [
+      6,
+      47.7,
+      88,
+      36.5
+    ]
+  },
+  "swap-daily-pending": {
+    "src": "swaps/swap-daily-pending.webp",
+    "width": 210,
+    "height": 80,
+    "highlight": [
+      80,
+      25,
+      9,
+      23.8
+    ]
+  },
+  "swap-daily-pending-bubble": {
+    "src": "swaps/swap-daily-pending-bubble.webp",
+    "width": 266,
+    "height": 91,
+    "highlight": [
+      3,
+      6.6,
+      94,
+      86.2
+    ]
+  },
+  "swap-daily-completed": {
+    "src": "swaps/swap-daily-completed.webp",
+    "width": 210,
+    "height": 80,
+    "highlight": [
+      80,
+      25,
+      9,
+      23.8
+    ]
+  },
+  "swap-daily-completed-bubble": {
+    "src": "swaps/swap-daily-completed-bubble.webp",
+    "width": 266,
+    "height": 91,
+    "highlight": [
+      3,
+      6.6,
+      94,
+      86.2
+    ]
+  },
+  "swap-claim-window": {
+    "src": "swaps/swap-claim-window.webp",
+    "width": 382,
+    "height": 204,
+    "highlight": [
+      6,
+      41.8,
+      88,
+      16.1
+    ]
+  },
+  "swap-exception-example": {
+    "src": "swaps/swap-exception-example.webp",
+    "width": 382,
+    "height": 135,
+    "highlight": [
+      6.5,
+      50.4,
+      86.9,
+      35.6
+    ]
+  },
+  "swap-rule-example": {
+    "src": "swaps/swap-rule-example.webp",
+    "width": 382,
+    "height": 280,
+    "highlight": [
+      50.5,
+      42.1,
+      42.1,
+      15.7
+    ]
+  },
+  "swap-manual-approval-history": {
+    "src": "swaps/swap-manual-approval-history.webp",
+    "width": 328,
+    "height": 173,
+    "highlight": [
+      10.7,
+      60.9,
+      31.5,
+      20.8
+    ]
+  },
+  "hours-location": {
+    "src": "work-hours/hours-location.webp",
+    "width": 378,
+    "height": 296,
+    "highlight": [
+      24.1,
+      64.5,
+      25.7,
+      5.1
+    ]
+  },
+  "hours-period-controls": {
+    "src": "work-hours/hours-period-controls.webp",
+    "width": 346,
+    "height": 200,
+    "highlight": [
+      6.7,
+      35.3,
+      86.7,
+      22
+    ]
+  },
+  "hours-read-total": {
+    "src": "work-hours/hours-read-total.webp",
+    "width": 316,
+    "height": 375,
+    "highlight": [
+      2.9,
+      88.1,
+      94.3,
+      9.9
+    ]
+  },
+  "schedule-order-header": {
+    "src": "schedules/schedule-order-header.webp",
+    "width": 356,
+    "height": 99,
+    "highlight": [
+      24.7,
+      13.7,
+      46.3,
+      20.4
+    ]
+  },
+  "schedule-order-dialog": {
+    "src": "schedules/schedule-order-dialog.webp",
+    "width": 390,
+    "height": 405,
+    "highlight": [
+      6.2,
+      26.1,
+      87.7,
+      47.9
+    ]
+  },
+  "schedule-order-handle": {
+    "src": "schedules/schedule-order-handle.webp",
+    "width": 390,
+    "height": 151,
+    "highlight": [
+      80,
+      36.9,
+      10.3,
+      26.5
+    ]
+  },
+  "schedule-order-drag": {
+    "src": "schedules/schedule-order-drag.webp",
+    "width": 390,
+    "height": 247,
+    "highlight": [
+      9.5,
+      38.7,
+      81,
+      22.7
+    ]
+  },
+  "schedule-order-apply": {
+    "src": "schedules/schedule-order-apply.webp",
+    "width": 390,
+    "height": 106,
+    "highlight": [
+      70.2,
+      36.5,
+      23.6,
+      48.7
+    ]
+  },
+  "schedule-order-reset": {
+    "src": "schedules/schedule-order-reset.webp",
+    "width": 390,
+    "height": 99,
+    "highlight": [
+      6.2,
+      49,
+      24.2,
+      32.3
+    ]
+  },
+  "schedule-order-reset-apply": {
+    "src": "schedules/schedule-order-reset-apply.webp",
+    "width": 390,
+    "height": 107,
+    "highlight": [
+      70.2,
+      36.1,
+      23.6,
+      48.2
+    ]
+  },
+  "availability-custom": {
+    "src": "availability-urlop/availability-custom.webp",
+    "width": 390,
+    "height": 232,
+    "highlight": [
+      14.9,
+      40.9,
+      29.7,
+      18.1
+    ]
+  },
+  "availability-presets": {
+    "src": "availability-urlop/availability-presets.webp",
+    "width": 390,
+    "height": 176,
+    "highlight": [
+      7.4,
+      30.7,
+      85.1,
+      18.2
+    ]
+  },
+  "availability-edit-presets": {
+    "src": "availability-urlop/availability-edit-presets.webp",
+    "width": 390,
+    "height": 192,
+    "highlight": [
+      7.4,
+      62.5,
+      14.8,
+      16.7
+    ]
+  },
+  "availability-multiple": {
+    "src": "availability-urlop/availability-multiple.webp",
+    "width": 390,
+    "height": 273,
+    "highlight": [
+      4.1,
+      20.5,
+      30,
+      9.9
+    ]
+  },
+  "availability-save": {
+    "src": "availability-urlop/availability-save.webp",
+    "width": 314,
+    "height": 175,
+    "highlight": [
+      6.4,
+      64.5,
+      59.6,
+      24
+    ]
+  },
+  "availability-saved": {
+    "src": "availability-urlop/availability-saved.webp",
+    "width": 292,
+    "height": 167,
+    "highlight": [
+      20.9,
+      39.3,
+      32.5,
+      21.6
+    ]
+  },
+  "availability-restrictions": {
+    "src": "availability-urlop/availability-restrictions.webp",
+    "width": 378,
+    "height": 197,
+    "highlight": [
+      10.6,
+      35.7,
+      78.8,
+      34.5
+    ]
+  },
+  "urlop-shops-open": {
+    "src": "availability-urlop/urlop-shops-open.webp",
+    "width": 275,
+    "height": 118,
+    "highlight": [
+      2.9,
+      5.1,
+      93.8,
+      89.8
+    ]
+  },
+  "urlop-month-open": {
+    "src": "availability-urlop/urlop-month-open.webp",
+    "width": 274,
+    "height": 118,
+    "highlight": [
+      2.9,
+      5.1,
+      94.2,
+      89.8
+    ]
+  },
+  "urlop-selected": {
+    "src": "availability-urlop/urlop-selected.webp",
+    "width": 302,
+    "height": 292,
+    "highlight": [
+      2.7,
+      36,
+      12.7,
+      28.1
+    ]
+  },
+  "urlop-status": {
+    "src": "availability-urlop/urlop-status.webp",
+    "width": 316,
+    "height": 281,
+    "highlight": [
+      2.5,
+      39.3,
+      94.9,
+      17.9
+    ]
+  },
+  "urlop-colleagues": {
+    "src": "availability-urlop/urlop-colleagues.webp",
+    "width": 316,
+    "height": 109,
+    "highlight": [
+      2.5,
+      59.9,
+      94.9,
+      34.4
+    ]
+  },
+  "swap-guide-list": {
+    "src": "swaps/swap-guide-list.webp",
+    "width": 390,
+    "height": 474,
+    "highlight": [
+      5.6,
+      24.9,
+      88.7,
+      25.5
+    ]
+  },
+  "swap-guide-labels-public": {
+    "src": "swaps/swap-guide-labels-public.webp",
+    "width": 362,
+    "height": 133,
+    "highlight": [
+      22.9,
+      65.3,
+      70.7,
+      18.8
+    ]
+  },
+  "swap-guide-labels-mine": {
+    "src": "swaps/swap-guide-labels-mine.webp",
+    "width": 362,
+    "height": 134,
+    "highlight": [
+      22.9,
+      65.4,
+      70.7,
+      18.7
+    ]
+  },
+  "swap-guide-labels-private": {
+    "src": "swaps/swap-guide-labels-private.webp",
+    "width": 362,
+    "height": 134,
+    "highlight": [
+      22.9,
+      65.3,
+      70.7,
+      18.7
+    ]
+  },
+  "swap-guide-labels-held": {
+    "src": "swaps/swap-guide-labels-held.webp",
+    "width": 362,
+    "height": 164,
+    "highlight": [
+      22.9,
+      53.2,
+      70.7,
+      33.5
+    ]
+  },
+  "swap-guide-labels-locked": {
+    "src": "swaps/swap-guide-labels-locked.webp",
+    "width": 362,
+    "height": 153,
+    "highlight": [
+      22.9,
+      56.9,
+      70.7,
+      16.3
+    ]
+  },
+  "swap-guide-labels-approval": {
+    "src": "swaps/swap-guide-labels-approval.webp",
+    "width": 362,
+    "height": 163,
+    "highlight": [
+      22.9,
+      53.4,
+      70.7,
+      33.7
+    ]
+  },
+  "swap-guide-labels-finished": {
+    "src": "swaps/swap-guide-labels-finished.webp",
+    "width": 362,
+    "height": 152,
+    "highlight": [
+      22.9,
+      57.1,
+      70.7,
+      16.4
+    ]
+  },
+  "swap-guide-open-card": {
+    "src": "swaps/swap-guide-open-card.webp",
+    "width": 362,
+    "height": 133,
+    "highlight": [
+      2.5,
+      5.3,
+      95,
+      89.3
+    ]
+  },
+  "swap-guide-close": {
+    "src": "swaps/swap-guide-close.webp",
+    "width": 382,
+    "height": 140,
+    "highlight": [
+      83,
+      7.1,
+      10.5,
+      28.6
+    ]
+  },
+  "swap-guide-details": {
+    "src": "swaps/swap-guide-details.webp",
+    "width": 382,
+    "height": 431,
+    "highlight": [
+      6,
+      29,
+      88,
+      54.6
+    ]
+  },
+  "swap-guide-actions": {
+    "src": "swaps/swap-guide-actions.webp",
+    "width": 382,
+    "height": 167,
+    "highlight": [
+      6,
+      64.9,
+      88,
+      27.5
+    ]
+  },
+  "swap-guide-confirm": {
+    "src": "swaps/swap-guide-confirm.webp",
+    "width": 390,
+    "height": 217,
+    "highlight": [
+      9,
+      71.5,
+      82.1,
+      23.8
+    ]
+  },
+  "swap-guide-labels-history": {
+    "src": "swaps/swap-guide-labels-history.webp",
+    "width": 368,
+    "height": 202,
+    "highlight": [
+      26.9,
+      67.1,
+      54.3,
+      13.4
+    ]
+  },
+  "swap-guide-labels-accepted": {
+    "src": "swaps/swap-guide-labels-accepted.webp",
+    "width": 328,
+    "height": 156,
+    "highlight": [
+      24,
+      49.6,
+      69.6,
+      37.8
+    ]
+  },
+  "swap-guide-unavailable": {
+    "src": "swaps/swap-guide-unavailable.webp",
+    "width": 382,
+    "height": 150,
+    "highlight": [
+      31.4,
+      23.4,
+      57.9,
+      19.4
+    ]
+  },
+  "login-modes": {
+    "src": "getting-started/login-modes.webp",
+    "width": 380,
+    "height": 135,
+    "highlight": [
+      9.4,
+      33.5,
+      27.9,
+      23.1
+    ]
+  },
+  "login-pin-launch": {
+    "src": "getting-started/login-pin-launch.webp",
+    "width": 380,
+    "height": 180,
+    "highlight": [
+      9.4,
+      43.4,
+      81.1,
+      28.7
+    ]
+  },
+  "login-pin-keypad": {
+    "src": "getting-started/login-pin-keypad.webp",
+    "width": 390,
+    "height": 661,
+    "highlight": [
+      32.9,
+      18.2,
+      34.2,
+      2.4
+    ]
+  }
+}

@@ -31,4 +31,8 @@ public class WorkflowLogEntryModel
     [Required]
     [Column("action")]
     public string Action { get; set; } = string.Empty;
+
+    [MaxLength(7)]
+    [Column("launch_mode")]
+    public string? LaunchMode { get; set; }
 }

@@ -10,7 +10,7 @@ The helper detects appended EF migration pairs from the exact PROD2 diff. The or
 
 The helper builds the exact image and runs both the EF startup process and a read-only health host on a private database copy. It prints the SHA, the number of pending migrations, the rehearsal result and the downtime warning. The operator then confirms the maintenance and types the complete target SHA. The engine consumes a protected capability once after checking the exact tip, current release, installed tools, review digest, migration fingerprint, CI attempt and image ID again.
 
-The one-time tooling transition may require a separate `/etc/gfctl/maintenance-tooling-review.json` record. It binds `before` and `target` SHAs to a `blobs` object containing the exact reviewed Git object ID of each changed member of `BOOTSTRAP_PATHS`. It must be root-owned and mode 0600. Routine schema updates derive the column plan from Git and require no per-deploy review file. The optional [13] operation retains its independent clone-only review file.
+The seven-migration transition requires `/etc/gfctl/maintenance-tooling-review.json` owned by root with mode 0600. It binds the full `before` and `target` SHAs to `blobs` for the changed `BOOTSTRAP_PATHS` and `reviewed_build_inputs` for approved build files. The protected helper validates the same reviewed transition for [11] and clone-only [13]. Older nullable-only rehearsals retain the separate `maintenance-review.json` format.
 
 ## Fence and recovery boundary
 
@@ -32,11 +32,33 @@ The first supported PROD2 migration pair adds `shift_correction_request.comment`
 
 Schedule a separate authorized root tooling window. The existing one-click runbook must already be installed with [11] invoking the protected libexec helper. Either reviewed menu checksum below is accepted. If the current menu uses a checkout-local helper or has another checksum, start with a separately reviewed transition using [the one-click rollout](gfctl-prod2-rollout.md). The commands below expect the managed Ubuntu layout, nftables, local Docker volumes, an active Guard timer, a known running release, and a clean checkout. Coordinate any other privileged automation before starting.
 
-Wait for a reviewed merge and successful **PROD2 push CI** on the exact currently fetched target. Verify both required jobs. Draft PR CI is only rehearsal evidence. Separately provide `/root/gf3-maintenance-reviewed` (root-owned, mode 0700) containing these three root-owned mode-0600 files:
+Wait for a reviewed merge and successful **PROD2 push CI** on the exact currently fetched target. Verify all three required jobs: Build and test, Playwright smoke, and Docker image. Draft PR CI is only rehearsal evidence. Separately provide `/root/gf3-maintenance-reviewed` (root-owned, mode 0700) containing these three root-owned mode-0600 files:
 
 - `PROD2.sha` with one line containing the full reviewed target.
-- `maintenance-tooling-review.json` with `before`, `target` and `blobs` as described above. Include each changed bootstrap path and its exact target Git blob ID. Compare against the actual active release, including any application changes that accompany the migrations.
+- `maintenance-tooling-review.json` with full `before` and `target`, `blobs` and `reviewed_build_inputs`. Include each changed bootstrap path and its exact target Git blob ID. For every changed critical build file approved by the exact list in `REVIEWED_BUILD_INPUTS`, record its relative path as a key and `{"status":"M","before":"<old Git blob>","after":"<new Git blob>"}` as its value. For additions use `"status":"A"` and `"before":null`. Reject any unexpected critical path or file mode.
 - `SHA256SUMS` with one standard `sha256sum` text entry for each of `gf3_release.py`, `gf3_prepare_release.py`, `gf3_maintenance.py`, `Program.cs`, `gfctl-prod2-maintenance-menu.patch` and `maintenance-tooling-review.json`. Obtain it independently from the tooling review.
+
+Before creating these files, inspect the actual live release in a read-only operator check. Record the current active directory, full SHA and disk capacity, and confirm an independently retained, verified SQLite/media backup. The following commands only inspect state. Run the Git review against the fetched merge SHA after PROD2 push CI is green. The commands produce review evidence for the operator.
+
+```bash
+cd /opt/gf
+before=1175c39461e149a7bb35f428babed28279727899
+active=$(readlink -e /var/lib/gf3-deploy/active)
+test -n "$active"
+test "$(git rev-parse HEAD)" = "$before"
+python3 -c 'import json,sys; assert json.load(open(sys.argv[1]))["sha"] == sys.argv[2]' "$active/release.json" "$before"
+df -h /var/lib/gf3-deploy /var/lib/docker
+systemctl is-active gf3-guard.timer
+test ! -e /var/lib/gf3-deploy/maintenance-active.json && test ! -L /var/lib/gf3-deploy/maintenance-active.json
+# Set target to the full merge SHA independently verified in PROD2 push CI.
+target=REPLACE_WITH_REVIEWED_PROD2_MERGE_SHA
+[[ "$target" =~ ^[0-9a-f]{40}$ ]]
+test "$(git rev-parse refs/remotes/origin/PROD2)" = "$target"
+git merge-base --is-ancestor "$before" "$target"
+git diff --raw --no-abbrev --no-renames --no-ext-diff "$before" "$target" --
+```
+
+Compare the protected active manifest and actual Docker image, named volume, current HTTPS health, installed tool hashes and EF history with the reviewed baseline. Use a private copy of the retained backup to inspect SQLite. Leave the host on the active release if any value differs, disk space is inadequate or the backup cannot be verified.
 
 Use a root Bash session. Run this shared block for either installation or tool rollback.
 
@@ -120,6 +142,11 @@ test -z "$(git --no-optional-locks status --porcelain --untracked-files=all)"
 git fetch --no-tags origin refs/heads/PROD2:refs/remotes/origin/PROD2
 test "$(git rev-parse refs/remotes/origin/PROD2)" = "$sha"
 test "$(git symbolic-ref HEAD)" = refs/heads/PROD2
+test "$(git rev-parse HEAD)" = 1175c39461e149a7bb35f428babed28279727899
+active=$(readlink -e "$state/active")
+protected "$active"
+protected "$active/release.json"
+python3 -c 'import json,sys; assert json.load(open(sys.argv[1]))["sha"] == sys.argv[2]' "$active/release.json" "$(git rev-parse HEAD)"
 approval_before=$(sha256sum /etc/gfctl/approved-release.conf)
 stage=$(mktemp -d /root/gf3-maintenance-stage.XXXXXXXX)
 backup=$(mktemp -d /root/gf3-maintenance-backup.XXXXXXXX)
@@ -174,6 +201,18 @@ unlock_tools
 test "$(sha256sum /etc/gfctl/approved-release.conf)" = "$approval_before"
 ```
 
+Once the installed helper passes `--check-only`, run the clone-only command in an interactive root session. The Menu [13] runs the same command when available.
+
+```bash
+cd /opt/gf
+read -r sha < /root/gf3-maintenance-reviewed/PROD2.sha
+[[ "$sha" =~ ^[0-9a-f]{40}$ ]]
+test "$(git rev-parse refs/remotes/origin/PROD2)" = "$sha"
+/usr/bin/python3 -I /usr/local/libexec/gf3/gf3_prepare_release.py --maintenance-rehearse "$sha"
+```
+
+Confirm the clone rehearsal and type the complete SHA when prompted. Require seven pending migrations, a passed rehearsal audit tied to that SHA, and live health on the old SHA before proceeding. Retain the separate verified backup and the installation rollback bundle. Repeat the review against the new tip if PROD2 changes.
+
 ### Roll back the tooling installation
 
 Use a fresh root Bash session with the shared block above. Select the recorded rollback bundle. This procedure is only for a failed installation before the production release advances or a maintenance transaction begins. An unfinished journal or changed Git release stops it. A release rollback requires the recovery procedure below.
@@ -203,8 +242,36 @@ unlock_tools
 
 In an approved deployment window, launch `sudo /usr/local/bin/gfctl` and choose `[11] Deploy PROD2`. Ordinary releases use the existing prompts and cutover. For a supported migration, review the exact SHA, pending migrations, isolated rehearsal result and downtime warning. Confirm and enter the full SHA. Downtime begins when production ingress is fenced after approval. Its duration depends on SQLite size, the health checks and any recovery. Keep the second operator session available.
 
+After [11] reports success, run these read-only checks in a root shell. Compare the container image and volume against the active manifest and the reviewed topology. Check the verified recovery bundle's database digest and media manifest separately.
+
+```bash
+cd /opt/gf
+read -r sha < /root/gf3-maintenance-reviewed/PROD2.sha
+[[ "$sha" =~ ^[0-9a-f]{40}$ ]]
+active=$(readlink -e /var/lib/gf3-deploy/active)
+test -n "$active"
+test "$(git rev-parse HEAD)" = "$sha"
+python3 -c 'import json,sys; assert json.load(open(sys.argv[1]))["sha"] == sys.argv[2]' "$active/release.json" "$sha"
+docker ps --filter label=com.docker.compose.project=gf3 --format '{{.Names}} {{.Image}} {{.Status}}'
+docker inspect gf3-gf3-app-1 --format '{{.Image}} {{range .Mounts}}{{if eq .Destination "/data"}}{{.Name}}{{end}}{{end}} {{.State.Health.Status}}'
+curl --proto '=https' --max-time 10 --fail --silent --show-error https://app-gf.com/api/health |
+  python3 -c 'import json,sys; d=json.load(sys.stdin); assert d["status"] == "ok" and d["canConnect"] is True'
+systemctl is-enabled gf3-guard.timer
+systemctl is-active gf3-guard.timer
+test ! -e /var/lib/gf3-deploy/maintenance-active.json && test ! -L /var/lib/gf3-deploy/maintenance-active.json
+```
+
 Verify the reported SHA and HTTPS health, then compare Git HEAD with the root-only active release manifest under `/var/lib/gf3-deploy/active`. The final backup is `final.db` in the printed maintenance bundle. The completed or recovered bundle stores the recorded backup digest and original EF history in `transaction.json`. For an unfinished transaction, the root-only `/var/lib/gf3-deploy/maintenance-active.json` is the active record. Use disposable copies for offline backup inspection. Compare SHA-256 with the journal and run `PRAGMA integrity_check;` and `SELECT MigrationId FROM __EFMigrationsHistory ORDER BY MigrationId;`. Limit output to integrity results, migration IDs and release metadata because the backups contain production employee data.
 
 For a failed or interrupted deployment, start with the engine outcome, active journal, actual firewall, Docker process and mount state, Git HEAD and the retained bundle. Pause competing privileged automation. A verified automatic recovery reopens the previous app and keeps evidence of the attempt. `RECOVERY_REQUIRED` or an unfinished journal needs incident review before reopening traffic. If `writes_may_resume` is true, use controlled forward repair or a data recovery plan that accounts for subsequent writes. Do not remove the journal, restart writers or manually restore the backup as a shortcut. The optional [13] remains a clone-only diagnostic with its own review file and cannot approve a live release.
 
 The disposable Linux CI uses real Docker, nftables, Nginx and SQLite with prior and candidate images. Guard timer operations use a test double. The fence-loss rehearsal restarts Docker, and process-death coverage verifies the journal persists. A full guest OS reboot and production-specific installed Guard/host compatibility require separate verification.
+
+## Required sequence for the reviewed seven-migration candidate
+
+This is an operator handoff. The coding session did not connect to PROD2, install host tools, or write to a live database.
+
+1. Before merge or deployment, an operator reads the protected active-release manifest on the host and records its full Git SHA, image and named volume, installed tool hashes, EF history, application health, and available disk space. Validate a separately retained backup outside the affected volume. Use a private clone or sanitized disposable fixture for rehearsal. Stop if the host baseline SHA or schema differs from `1175c39461e149a7bb35f428babed28279727899`; do not infer the workstation database as host state.
+2. After separate authorization and reviewed merge to `PROD2`, require successful PROD2 **push** CI for the exact final merge SHA: Build and test, Playwright smoke, and Docker image. Build the protected tool package from that full SHA. Independently review the exact `before`, `target`, migration source/Designer blobs, complete critical-input diff and hashes, and package `SHA256SUMS`; use host-derived values and do not reuse workstation guesses.
+3. In a separately authorized tooling window, install the reviewed package with the existing protected installer and verify its hashes and health. Run the existing rehearsal on a private clone of the actual baseline. Confirm the full seven-migration schema/data contract, combined SQLite/media checkpoint, rollback before writes resume, no rollback after the write boundary, isolated migration/health modes, HTTPS and Guard checks. Only after every gate passes should the operator provide the full target SHA and exact confirmation to `[11]`.
+4. `[11]` fences ingress and writers, creates and validates the final full media/database snapshot, runs isolated EF migrate and read-only health, records the write-resume boundary, then reopens the app. Check Git/image/database history/media hashes and permissions, HTTPS and Guard. Before the boundary, recovery is allowed only under the verified fence. After it, never restore an older snapshot automatically. Keep old snapshots pending an approved retention policy. A code review or CI result is not live deployment authorization.

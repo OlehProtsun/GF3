@@ -14,7 +14,10 @@ async function fixture(page: Page, language = "en") {
   const errors: string[] = [];
   page.on("pageerror", error => errors.push(error.message));
   await page.clock.setFixedTime(new Date("2026-11-01T10:00:00Z"));
-  await page.addInitScript(() => localStorage.setItem("gf3.auth.access-token", "urlop-fixture"));
+  await page.addInitScript(() => {
+    localStorage.setItem("gf3.auth.access-token", "urlop-fixture");
+    sessionStorage.setItem("gf3.pwa.install.dismissed", "1");
+  });
   const employees = [{ id: 7, employeeId: 7, firstName: "Ada", lastName: "Worker", displayName: "Ada Worker", hasLoginAccount: true, isOnline: false, displayOrder: 0 }, { id: 8, employeeId: 8, firstName: "Other", lastName: "Worker", displayName: "Other Worker", hasLoginAccount: true, isOnline: false, displayOrder: 1 }];
   const graph = { id: 10, containerId: 1, shopId: 1, shopName: "A", name: "November", year: 2026, month: 11, publicationStatus: "public", allowSwap: true,
     peoplePerShift: 1, shift1Time: "09:00 - 17:00", shift2Time: "", maxHoursPerEmpMonth: 160, maxConsecutiveDays: 5, maxConsecutiveFull: 3, maxFullPerMonth: 10, availabilityGroupId: null };
@@ -94,7 +97,10 @@ async function fixture(page: Page, language = "en") {
   return { state, shops, puts, errors, open: async (role: string, path: string) => {
     await page.waitForLoadState("networkidle");
     state.role = role; await page.goto(path);
-    if (role === "manager" && state.mode === "pc") await page.getByRole("button", { name: language === "pl" ? "Zwiń pasek boczny" : language === "uk" ? "Згорнути бічну панель" : "Collapse sidebar", exact: true }).click();
+    if (role === "manager" && state.mode === "pc") {
+      const collapse = page.getByRole("button", { name: language === "pl" ? "Zwiń pasek boczny" : language === "uk" ? "Згорнути бічну панель" : "Collapse sidebar", exact: true });
+      if (await collapse.isVisible()) await collapse.click();
+    }
   } };
 }
 
@@ -234,7 +240,8 @@ test("shop list counters, search, keyboard, deep links and dirty browser Back", 
   await expect(page.getByRole("heading", { name: "B", exact: true })).toBeVisible();
   await page.reload();
   await expect(page.getByRole("heading", { name: "B", exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Collapse sidebar", exact: true }).click();
+  const collapse = page.getByRole("button", { name: "Collapse sidebar", exact: true });
+  if (await collapse.isVisible()) await collapse.click();
   await page.getByRole("button", { name: "Add vacation", exact: true }).click();
   await page.getByRole("dialog", { name: "Add vacation", exact: true }).getByRole("button", { name: "2026-11-04", exact: true }).click();
   await page.goBack();
@@ -378,7 +385,8 @@ test("monthly dashboard overflow, exact dates, navigation and accessible modal a
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({ path: test.info().outputPath("urlop-overview-sidebar-expanded.png"), fullPage: true, scale: "css", animations: "disabled" });
-  await page.getByRole("button", { name: "Collapse sidebar", exact: true }).click();
+  const collapse = page.getByRole("button", { name: "Collapse sidebar", exact: true });
+  if (await collapse.isVisible()) await collapse.click();
   await choose(page, "Month", "December");
   await page.getByRole("button", { name: "Next month", exact: true }).click();
   await expect(page.getByRole("button", { name: "Year", exact: true })).toHaveText("2027");
@@ -480,10 +488,13 @@ for (const width of [320, 390, 768]) test(`month changes keep real page scrollin
   await page.setViewportSize({ width, height: 740 });
   const f = await fixture(page); await f.open("manager", "/urlop/1");
   await expect(page.getByRole("button", { name: "Add vacation", exact: true })).toBeEnabled();
+  const next = page.getByRole("button", { name: "Next month", exact: true });
+  await next.focus();
+  await expect(next).toBeFocused();
   await page.evaluate(() => window.scrollTo({ top: 180, behavior: "instant" }));
   const before = await page.evaluate(() => window.scrollY); expect(before).toBeGreaterThan(0);
   f.state.monthDelay = 300;
-  await page.getByRole("button", { name: "Next month", exact: true }).click();
+  await page.keyboard.press("Enter");
   await expect(page.getByRole("heading", { name: "December 2026", exact: true })).toBeVisible();
   await expect(page.getByRole("region", { name: "Vacation calendar", exact: true })).toHaveAttribute("aria-busy", "false");
   expect(Math.abs((await page.evaluate(() => window.scrollY)) - before)).toBeLessThanOrEqual(4);

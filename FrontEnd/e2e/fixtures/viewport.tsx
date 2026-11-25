@@ -4,6 +4,8 @@ import { RecordTile } from "../../src/shared/ui/components/RecordTile";
 import { ProfileSummaryCard } from "../../src/shared/ui/components/ProfileSummaryCard";
 import { AvailabilityDateTimeField } from "../../src/entities/availability-groups/ui/AvailabilityPublicationCard";
 import { createRoot } from "react-dom/client";
+import { setLanguage } from "../../src/shared/i18n";
+import { QueryClient, QueryClientProvider } from "../../src/shared/lib/tanstack/react-query";
 import "../../src/index.css";
 import { ConfirmDialog } from "../../src/shared/ui/ConfirmDialog/ConfirmDialog";
 import { AvailabilityGroupFormDialog } from "../../src/entities/availability-groups/ui/AvailabilityGroupFormDialog";
@@ -41,4 +43,7 @@ const cases = {
   presets: <div style={{ position: "fixed", bottom: 20, right: 16, width: 300 }}><ContainerGraphPresetSelect presets={[]} selectedPresetId={null} shops={[]} isLoading={false} onSelect={noop} onAddPreset={noop} /></div>,
 };
 const name = new URLSearchParams(location.search).get("case") as keyof typeof cases;
-createRoot(document.getElementById("root")!).render(cases[name] ?? cases.colors);
+setLanguage("en");
+createRoot(document.getElementById("root")!).render(
+  <QueryClientProvider client={new QueryClient()}>{cases[name] ?? cases.colors}</QueryClientProvider>,
+);

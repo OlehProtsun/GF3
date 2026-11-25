@@ -9,6 +9,7 @@ const buildId = process.env.GF3_BUILD_ID?.trim() || new Date().toISOString();
 export default defineConfig({
   root: projectRoot,
   define: { __GF3_BUILD_ID__: JSON.stringify(buildId) },
+  esbuild: { legalComments: "inline" },
   plugins: [react(), svgr(), {
     name: "gf3-release",
     generateBundle() {
@@ -40,7 +41,7 @@ export default defineConfig({
     host: "localhost",
     port: 5173,
     strictPort: true,
-    proxy: {
+    proxy: process.env.GF3_E2E_NO_PROXY === "1" ? undefined : {
       "/api": {
         target: "https://localhost:54294",
         changeOrigin: true,

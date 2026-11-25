@@ -1,4 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
+import { assertIsolatedBackend } from "./fixtures/isolatedBackend";
+import { dismissEmployeeInstallPrompt } from "./helpers";
 
 test.use({ actionTimeout: 10_000, launchOptions: process.platform === "win32" ? { ignoreDefaultArgs: ["--disable-accelerated-compositing"] } : {} });
 
@@ -14,15 +16,19 @@ test("real backend manual acceptance persists and refreshes both colored cells",
   test.skip(!process.env.GF3_LIVE_URL, "Run through ManualShiftHighlightTests with GF3_RUN_LIVE_BROWSER=1 for an isolated authenticated SQLite backend.");
   test.setTimeout(90_000);
   const url = process.env.GF3_LIVE_URL!;
+  await assertIsolatedBackend(url, process.env.GF3_LIVE_INSTANCE ?? "", process.env.GF3_LIVE_DATABASE);
   const graphId = Number(process.env.GF3_LIVE_GRAPH);
   const containerId = Number(process.env.GF3_LIVE_CONTAINER);
-  const day = testInfo.project.name === "chromium" ? 10 : 11;
+  const day = { chromium: 10, "webkit-laptop": 11, "webkit-iphone-x": 13, "mobile-chrome": 14 }[testInfo.project.name]!;
   const graphPath = `/api/containers/${containerId}/graphs/${graphId}`;
   const manager = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   const employee = await browser.newContext({ viewport: { width: 390, height: 844 } });
   try {
     for (const [context, token] of [[manager, process.env.GF3_LIVE_MANAGER_TOKEN!], [employee, process.env.GF3_LIVE_EMPLOYEE_TOKEN!]] as const) {
-      await context.addInitScript(value => localStorage.setItem("gf3.auth.access-token", value), token);
+      await context.addInitScript(value => {
+        localStorage.setItem("gf3.auth.access-token", value);
+        sessionStorage.setItem("gf3.pwa.install.dismissed", "1");
+      }, token);
     }
     const managerPage = await manager.newPage();
     await managerPage.goto(`${url}/container/${containerId}/graphs/${graphId}/edit`);
@@ -206,6 +212,7 @@ test("adjacent More previews replace each other and fit available viewport space
   ];
   const state = await fixture(page, "en", undefined, false, Object.fromEntries(values.map((raw, index) => [String(index + 1), raw])));
   const originalNote = state.getNote();
+  await page.clock.install();
   await page.setViewportSize({ width: 1280, height: 900 });
   for (const path of ["/container/1/graphs/1", "/container/1/graphs/1/edit"]) {
     await page.goto(path);
@@ -213,12 +220,16 @@ test("adjacent More previews replace each other and fit available viewport space
     const popup = page.getByRole("tooltip");
     await expect(buttons).toHaveCount(4, { timeout: 20_000 });
     await buttons.first().scrollIntoViewIfNeeded();
+    await page.mouse.move(0, 0);
+    await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000));
     for (let index = 0; index < 3; index++) {
       const bounds = await buttons.nth(index).boundingBox();
       expect(bounds).not.toBeNull();
       await page.mouse.move(bounds!.x + bounds!.width / 2, bounds!.y + bounds!.height / 2);
+      await page.clock.runFor(40);
       await expect(popup).toHaveCount(0);
     }
+    await page.clock.resume();
     await buttons.nth(3).hover();
     await expect(popup).toHaveCount(1);
     await expect(popup).toHaveText("18:00 - 22:00");
@@ -308,6 +319,7 @@ test("compact manual demand survives editor, profile and employee phone", async 
   }
   state.useEmployee(2);
   await page.goto("/schedule");
+  await dismissEmployeeInstallPrompt(page);
   for (const width of [320, 375, 390]) {
     await page.setViewportSize({ width, height: 740 });
     const more = page.getByRole("button", { name: "More: Shifts", exact: true });
@@ -338,11 +350,12 @@ test("manager phone keeps compact More visible under automatic width cap", async
   for (const width of [320, 375, 390, 430]) {
     await page.setViewportSize({ width, height: 740 });
     const more = page.getByRole("button", { name: "More: Shifts", exact: true });
+    const openPreview = () => testInfo.project.use.hasTouch ? more.tap() : more.click();
     await expect(more).toBeVisible({ timeout: 20_000 });
     await more.scrollIntoViewIfNeeded();
     await expect(more).toBeVisible();
     expect(await more.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
-    if (testInfo.project.use.hasTouch) await more.tap(); else await more.click();
+    await openPreview();
     const popup = page.getByRole("tooltip");
     await expect(popup).toBeVisible();
     await expect(popup.locator(":scope > div")).toHaveCount(29);
@@ -353,9 +366,9 @@ test("manager phone keeps compact More visible under automatic width cap", async
     await popup.evaluate(el => { el.scrollTop = 200; });
     await expect(popup).toBeVisible();
     await page.keyboard.press("Escape"); await expect(popup).toHaveCount(0);
-    await more.click(); await expect(popup).toBeVisible();
+    await openPreview(); await expect(popup).toBeVisible();
     await page.locator("body").dispatchEvent("pointerdown"); await expect(popup).toHaveCount(0);
-    await more.click(); await expect(popup).toBeVisible();
+    await openPreview(); await expect(popup).toBeVisible();
     await more.locator("xpath=ancestor::table/..").evaluate(el => el.dispatchEvent(new Event("scroll")));
     await expect(popup).toHaveCount(0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
@@ -438,11 +451,7 @@ for (const language of ["en", "pl", "uk"]) {
     test.setTimeout(90_000);
     const fixtureState = await fixture(page, language);
     await page.goto("/container/1/graphs/1/edit");
-    // Use the shared language API so this checks switching as well as translated layout.
-    await page.evaluate(async lang => {
-      const module = await import(/* @vite-ignore */ "/src/shared/i18n/index.ts");
-      module.setLanguage(lang);
-    }, language);
+    // The fixture serves this language through the same account-language API the app uses.
     const titles = { en: "Manual shifts", pl: "Zmiany ręczne", uk: "Ручні зміни" };
     const generateLabels = { en: "Generate", pl: "Generuj", uk: "Згенерувати" };
     const generate = page.getByRole("button", { name: generateLabels[language as keyof typeof generateLabels], exact: true });
@@ -536,7 +545,7 @@ for (const flexible of [true, false]) {
     expect(state.publications[0]).toEqual({manualColumnId:1,dayOfMonth:1,fromTime:"09:00",toTime:"21:00",targetEmployeeId:null,allowPartialAcceptance:flexible});
     await expect(page).toHaveURL(/\/container\/1\/graphs\/1$/, { timeout: 20_000 });
     if (employeeViewport) await page.setViewportSize(employeeViewport);
-    state.useEmployee(2); await page.goto("/swap");
+    state.useEmployee(2); await page.goto("/swap"); await dismissEmployeeInstallPrompt(page);
     await page.getByRole("button",{name:"View offer details for Generated shifts"}).click();
     const details=page.getByRole("dialog",{name:"Offer details"});
     if(!flexible) {
@@ -551,7 +560,7 @@ for (const flexible of [true, false]) {
     await confirm.getByRole("button",{name:"Accept shift",exact:true}).click();
     await expect(confirm).toHaveCount(0);await expect.poll(()=>state.claims.length).toBe(1);
     await expect(page.getByRole("button",{name:"View offer details for Generated shifts"})).toHaveCount(1);
-    state.useEmployee(3);await page.goto("/swap");
+    state.useEmployee(3);await page.goto("/swap"); await dismissEmployeeInstallPrompt(page);
     await page.getByRole("button",{name:"View offer details for Generated shifts"}).click();
     await expect(details).toContainText("15:00–21:00");
     await details.getByRole("button",{name:"Accept shift",exact:true}).click();

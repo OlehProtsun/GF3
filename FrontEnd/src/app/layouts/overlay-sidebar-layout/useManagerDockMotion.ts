@@ -23,8 +23,10 @@ export function useManagerDockMotion(navRef: RefObject<HTMLElement | null>) {
         gsap.set(face, { scale: 1, x: 0, y: 0 });
         scaleX.tween.invalidate(); scaleY.tween.invalidate(); x.tween.invalidate(); y.tween.invalidate();
       });
-      const active = root.querySelector<HTMLElement>('[aria-current="page"]')?.getBoundingClientRect();
-      root.style.setProperty("--dock-glow-y", active ? `${active.top + active.height / 2 - root.getBoundingClientRect().top}px` : "50%");
+      if (!reduced?.matches) {
+        const active = root.querySelector<HTMLElement>('[aria-current="page"]')?.getBoundingClientRect();
+        root.style.setProperty("--dock-glow-y", active ? `${active.top + active.height / 2 - root.getBoundingClientRect().top}px` : "50%");
+      }
     };
     const measure = () => {
       const previousPointer = pointer;
@@ -50,6 +52,10 @@ export function useManagerDockMotion(navRef: RefObject<HTMLElement | null>) {
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => {
         frame = 0;
+        if (reduced?.matches || !hover?.matches) {
+          reset();
+          return;
+        }
         root.style.setProperty("--dock-glow-y", `${Math.max(0, Math.min(box.height, y - box.top))}px`);
         nodes.forEach(node => {
           const anchorBox = node.anchor.getBoundingClientRect();

@@ -14,6 +14,7 @@ export function useCreateCommunicationMutation() {
   const queryClient = useQueryClient();
 
   return useMutation({
+    meta: { handlesErrorInline: true },
     mutationFn: (payload: CreateCommunicationMessageDto) => communicationsApi.create(payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.communications.managerList() });
@@ -25,6 +26,7 @@ export function useUpdateCommunicationMutation() {
   const queryClient = useQueryClient();
 
   return useMutation({
+    meta: { handlesErrorInline: true },
     mutationFn: (payload: UpdateCommunicationMessageDto) => communicationsApi.update(payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.communications.managerList() });

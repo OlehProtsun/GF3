@@ -3,6 +3,7 @@ import { usePublicHolidayVisibility } from "@app/providers/PublicHolidayVisibili
 import { getPolishPublicHoliday } from "@shared/lib/polishPublicHolidays";
 import { t, numberFormat, dateTimeFormat } from "@shared/i18n";
 import { useEmployeeApprovedUrlopQuery, approvedKeys } from "@entities/urlop";
+import { warsawToday } from "@entities/urlop/model/calendar";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { NavLink } from "react-router-dom";
@@ -10,7 +11,6 @@ import { useAuth } from "@app/providers/AuthProvider";
 import {
   useEmployeeScheduleListQuery,
   type EmployeeSchedule,
-  type EmployeeScheduleEmployee,
   type EmployeeScheduleSlot,
 } from "@entities/employee-schedule";
 import {
@@ -18,30 +18,31 @@ import {
   useEmployeeShiftCorrectionsQuery,
   type CreateShiftCorrectionInput,
 } from "@entities/shift-corrections";
-import {
-  formatGraphIntervals,
-  getGraphCellKey,
-  mergeGraphIntervalsForDisplay,
-  type GraphMatrixCellMap,
-  type GraphMatrixColumn,
-} from "@entities/containers/model/graphWorkspace";
-import { parseGraphNoteContent } from "@entities/containers/model/graphNote";
+import { getGraphCellKey, type GraphMatrixColumn } from "@entities/containers/model/graphWorkspace";
 import { ContainerGraphMatrix } from "@entities/containers/ui/ContainerGraphMatrix";
-import { getEmployeeFullName } from "@entities/employees/model/presentation";
 import { employeeUiStateApi, useEmployeeUiStateQuery } from "@entities/employee-ui-state";
-import { getErrorMessage, isRequestCanceledError, type DownloadedFile } from "@shared/api/httpClient";
+import { useEmployeeShiftSwapsQuery } from "@entities/shift-swaps";
+import { getErrorMessage } from "@shared/api/httpClient";
 import { downloadExportFile } from "@entities/exports/lib/download";
 import { employeeScheduleApi } from "@entities/employee-schedule/api/employeeScheduleApi";
 import { formatScheduleLastUpdate } from "@shared/lib/scheduleLastUpdate";
 import { ErrorBanner } from "@shared/ui/components/ErrorBanner";
 import { SearchableSelect, type SearchableSelectOption } from "@shared/ui/components/SearchableSelect";
-import { AvailabilityIcon, EyeIcon, NewsIcon, ScheduleIcon, StatisticsIcon } from "@shared/ui/icons";
+import { AvailabilityIcon, NewsIcon, ScheduleIcon, StatisticsIcon } from "@shared/ui/icons";
 import { CardSection } from "@shared/ui/sections";
 import workspaceStyles from "@pages/shared/EmployeeWorkspacePage.module.css";
 import loadingStyles from "@shared/ui/SavingOverlay/SavingOverlay.module.css";
 import { EmployeeScheduleColumnOrderDialog } from "./EmployeeScheduleColumnOrderDialog";
 import { EmployeeScheduleSelectDialog } from "./EmployeeScheduleSelectDialog";
+import { rankEmployeeSchedules } from "./rankEmployeeSchedules";
+import { ScheduleShiftBadges } from "./PendingCorrectionBadge";
+import { buildScheduleShiftStatuses, getScheduleStatusTone } from "./scheduleShiftStatuses";
+import { getPendingCorrectionDays } from "./pendingScheduleCorrections";
 import { EmployeeShiftCorrectionDialog } from "./EmployeeShiftCorrectionDialog";
+import { buildScheduleMatrixCellMap, buildScheduleMatrixColumns, buildScheduleMatrixDisplayCellMap } from "./employeeScheduleMatrix";
+import { buildDailyScheduleDays, buildDailyScheduleWorkers, EmployeeScheduleDailyBody, getDefaultDailyScheduleDay, parseTimeMinutes } from "./EmployeeScheduleDailyBody";
+import { useSchedulePdfExport } from "./useSchedulePdfExport";
+import { EmployeeScheduleHeaderActions } from "./EmployeeScheduleHeaderActions";
 import styles from "./EmployeeSchedulePage.module.css";
 import { EmployeeScheduleHero } from "./EmployeeScheduleHero";
 
@@ -60,16 +61,6 @@ const scheduleMonthOnlyFormatter = dateTimeFormat("en-GB", {
   timeZone: "UTC",
 });
 
-const scheduleWeekdayFormatter = dateTimeFormat("en-GB", {
-  weekday: "long",
-  timeZone: "UTC",
-});
-
-const scheduleWeekdayShortFormatter = dateTimeFormat("en-GB", {
-  weekday: "short",
-  timeZone: "UTC",
-});
-
 function formatScheduleMonth(schedule: Pick<EmployeeSchedule, "year" | "month">) {
   return scheduleMonthFormatter.format(new Date(Date.UTC(schedule.year, schedule.month - 1, 1)));
 }
@@ -84,21 +75,6 @@ function getDaysInMonth(year: number, month: number) {
 
 function getWeekdayIndex(year: number, month: number, dayOfMonth: number) {
   return new Date(Date.UTC(year, month - 1, dayOfMonth)).getUTCDay();
-}
-
-function parseTimeMinutes(value: string) {
-  const match = value.trim().match(/^(\d{1,2}):(\d{2})/);
-  if (!match) {
-    return null;
-  }
-
-  const hour = Number(match[1]);
-  const minute = Number(match[2]);
-  if (!Number.isInteger(hour) || !Number.isInteger(minute)) {
-    return null;
-  }
-
-  return Math.min(23, Math.max(0, hour)) * 60 + Math.min(59, Math.max(0, minute));
 }
 
 function getSlotDurationHours(slot: EmployeeScheduleSlot) {
@@ -250,282 +226,6 @@ function buildScheduleHoursSummary(
   };
 }
 
-function buildScheduleMatrixColumn(
-  employeeId: number,
-  label: string,
-  graphEmployeeId: number | null = null,
-  minHoursMonth: number | null = null,
-): GraphMatrixColumn {
-  return {
-    employeeId,
-    kind: "employee",
-    manualColumnId: null,
-    graphEmployeeId,
-    label,
-    minHoursMonth,
-    totalMinutes: 0,
-    totalText: "",
-  };
-}
-
-function buildManualColumnEmployeeId(columnId: number) {
-  return -Math.abs(columnId);
-}
-
-function buildManualScheduleMatrixColumn(column: { id: number; label: string }): GraphMatrixColumn {
-  return {
-    employeeId: buildManualColumnEmployeeId(column.id),
-    kind: "manual",
-    manualColumnId: column.id,
-    graphEmployeeId: null,
-    label: column.label,
-    minHoursMonth: null,
-    totalMinutes: 0,
-    totalText: "",
-  };
-}
-
-function getScheduleEmployeeLabel(employee: EmployeeScheduleEmployee) {
-  return employee.displayName?.trim() || getEmployeeFullName(employee, t("Employee #{0}", employee.employeeId));
-}
-
-function sortScheduleEmployees(employees: EmployeeScheduleEmployee[]) {
-  return [...employees].sort((left, right) => {
-    if (left.displayOrder !== right.displayOrder) {
-      return left.displayOrder - right.displayOrder;
-    }
-
-    return getScheduleEmployeeLabel(left).localeCompare(getScheduleEmployeeLabel(right));
-  });
-}
-
-type DailyScheduleWorker = {
-  employeeId: number;
-  label: string;
-  shifts: EmployeeScheduleSlot[];
-  relatedScheduleNames: string[];
-  isAllDay: boolean;
-  firstStartMinutes: number;
-};
-
-function isAllDayScheduleSlot(slot: EmployeeScheduleSlot) {
-  const fromTime = slot.fromTime.trim();
-  const toTime = slot.toTime.trim();
-  return fromTime === "00:00" && (toTime === "00:00" || toTime === "23:59" || toTime === "24:00");
-}
-
-function buildDailyScheduleWorkers(
-  schedule: EmployeeSchedule,
-  dayOfMonth: number,
-  fallbackEmployeeId: number,
-  fallbackLabel: string,
-) {
-  const employeesById = new Map((schedule.employees ?? []).map(employee => [employee.employeeId, employee] as const));
-  const slotsByEmployeeId = new Map<number, EmployeeScheduleSlot[]>();
-  for (const slot of schedule.slots) {
-    const employeeId = slot.employeeId;
-    if (slot.dayOfMonth !== dayOfMonth || !employeeId || employeeId < 0) continue;
-    const employeeSlots = slotsByEmployeeId.get(employeeId) ?? [];
-    employeeSlots.push(slot);
-    slotsByEmployeeId.set(employeeId, employeeSlots);
-  }
-
-  const relatedNamesByEmployeeId = new Map<number, Set<string>>();
-  for (const assignment of schedule.relatedScheduleAssignments ?? []) {
-    if (assignment.dayOfMonth !== dayOfMonth || !(assignment.employeeId > 0)) continue;
-    const names = relatedNamesByEmployeeId.get(assignment.employeeId) ?? new Set<string>();
-    names.add(assignment.scheduleName.trim() || t("Schedule #{0}", assignment.scheduleId));
-    relatedNamesByEmployeeId.set(assignment.employeeId, names);
-  }
-
-  const getWorkerLabel = (employeeId: number) => {
-    const employee = employeesById.get(employeeId);
-    return employee ? getScheduleEmployeeLabel(employee) : employeeId === fallbackEmployeeId
-      ? fallbackLabel
-      : t("Employee #{0}", employeeId);
-  };
-
-  const workers = [...slotsByEmployeeId.entries()].map<DailyScheduleWorker>(([employeeId, slots]) => {
-    const sortedSlots = [...slots].sort((left, right) =>
-      (parseTimeMinutes(left.fromTime) ?? Number.MAX_SAFE_INTEGER) -
-        (parseTimeMinutes(right.fromTime) ?? Number.MAX_SAFE_INTEGER) ||
-      left.toTime.localeCompare(right.toTime),
-    );
-    return {
-      employeeId,
-      label: getWorkerLabel(employeeId),
-      shifts: sortedSlots,
-      relatedScheduleNames: [...(relatedNamesByEmployeeId.get(employeeId) ?? [])]
-        .sort((left, right) => left.localeCompare(right)),
-      isAllDay: sortedSlots.some(isAllDayScheduleSlot),
-      firstStartMinutes: parseTimeMinutes(sortedSlots[0]?.fromTime ?? "") ?? Number.MAX_SAFE_INTEGER,
-    };
-  });
-
-  const timedWorkers = workers
-    .filter(worker => !worker.isAllDay)
-    .sort((left, right) =>
-      left.firstStartMinutes - right.firstStartMinutes || left.label.localeCompare(right.label),
-    );
-  const allDayWorkers = workers
-    .filter(worker => worker.isAllDay)
-    .sort((left, right) => left.label.localeCompare(right.label));
-  const middleIndex = Math.ceil(timedWorkers.length / 2);
-  const relatedOnlyWorkers = [...relatedNamesByEmployeeId]
-    .filter(([employeeId]) => !slotsByEmployeeId.has(employeeId))
-    .map<DailyScheduleWorker>(([employeeId, names]) => ({
-      employeeId,
-      label: getWorkerLabel(employeeId),
-      shifts: [],
-      relatedScheduleNames: [...names].sort((left, right) => left.localeCompare(right)),
-      isAllDay: false,
-      firstStartMinutes: Number.MAX_SAFE_INTEGER,
-    }))
-    .sort((left, right) => left.label.localeCompare(right.label) || left.employeeId - right.employeeId);
-
-  return [
-    ...timedWorkers.slice(0, middleIndex),
-    ...allDayWorkers,
-    ...timedWorkers.slice(middleIndex),
-    ...relatedOnlyWorkers,
-  ];
-}
-
-function formatDailyWorkerShifts(worker: DailyScheduleWorker) {
-  const relatedNames = worker.relatedScheduleNames.join(", ");
-  if (worker.shifts.length === 0) return relatedNames;
-
-  const ownShifts = worker.isAllDay
-    ? t("All day")
-    : formatGraphIntervals(mergeGraphIntervalsForDisplay(worker.shifts, { mergeTouching: true }));
-  return relatedNames && ownShifts ? `${ownShifts}, ${relatedNames}` : ownShifts || relatedNames;
-}
-
-function buildScheduleMatrixColumns(
-  schedule: EmployeeSchedule | null,
-  fallbackEmployeeId: number,
-  fallbackLabel: string,
-): GraphMatrixColumn[] {
-  const employees = schedule?.employees ?? [];
-  const parsedGraphNote = parseGraphNoteContent(schedule?.note);
-  const manualColumns = parsedGraphNote.manualColumns.map(buildManualScheduleMatrixColumn);
-
-  if (employees.length === 0 && manualColumns.length === 0) {
-    return [buildScheduleMatrixColumn(fallbackEmployeeId, fallbackLabel)];
-  }
-
-  const usedEmployeeIds = new Set<number>();
-  const employeeColumns = sortScheduleEmployees(employees).reduce<GraphMatrixColumn[]>((columns, employee) => {
-    if (usedEmployeeIds.has(employee.employeeId)) {
-      return columns;
-    }
-
-    usedEmployeeIds.add(employee.employeeId);
-    columns.push(buildScheduleMatrixColumn(
-      employee.employeeId,
-      getScheduleEmployeeLabel(employee),
-      employee.id,
-      employee.minHoursMonth ?? null,
-    ));
-    return columns;
-  }, []);
-  const columnsByEmployeeId = new Map(
-    [...employeeColumns, ...manualColumns].map(column => [column.employeeId, column] as const),
-  );
-  const fallbackColumnOrder = [...employeeColumns, ...manualColumns].map(column => column.employeeId);
-  const requestedColumnOrder = parsedGraphNote.columnOrder.length > 0
-    ? parsedGraphNote.columnOrder
-    : fallbackColumnOrder;
-  const resolvedColumns = requestedColumnOrder
-    .map(columnId => columnsByEmployeeId.get(columnId))
-    .filter((column): column is GraphMatrixColumn => Boolean(column));
-
-  fallbackColumnOrder.forEach(columnId => {
-    const column = columnsByEmployeeId.get(columnId);
-    if (column && !resolvedColumns.some(item => item.employeeId === column.employeeId)) {
-      resolvedColumns.push(column);
-    }
-  });
-
-  return resolvedColumns;
-}
-
-function buildScheduleMatrixCellMap(schedule: EmployeeSchedule | null, fallbackEmployeeId: number): GraphMatrixCellMap {
-  if (!schedule) {
-    return {};
-  }
-
-  const parsedGraphNote = parseGraphNoteContent(schedule.note);
-  const slotsByCell = new Map<string, EmployeeScheduleSlot[]>();
-  schedule.slots.forEach(slot => {
-    const employeeId = slot.employeeId && slot.employeeId > 0 ? slot.employeeId : fallbackEmployeeId;
-    const cellKey = getGraphCellKey(employeeId, slot.dayOfMonth);
-    const cellSlots = slotsByCell.get(cellKey) ?? [];
-    cellSlots.push(slot);
-    slotsByCell.set(cellKey, cellSlots);
-  });
-
-  const slotCellMap = [...slotsByCell.entries()].reduce<GraphMatrixCellMap>((cellMap, [cellKey, cellSlots]) => {
-    const value = formatGraphIntervals(mergeGraphIntervalsForDisplay(cellSlots, { mergeTouching: true }));
-
-    if (value) {
-      cellMap[cellKey] = value;
-    }
-
-    return cellMap;
-  }, {});
-
-  const manualCellMap = parsedGraphNote.manualColumns.reduce<GraphMatrixCellMap>((cellMap, column) => {
-    Object.entries(column.cells).forEach(([dayOfMonth, value]) => {
-      const parsedDayOfMonth = Number(dayOfMonth);
-      if (!value.trim() || !Number.isInteger(parsedDayOfMonth)) {
-        return;
-      }
-
-      cellMap[getGraphCellKey(buildManualColumnEmployeeId(column.id), parsedDayOfMonth)] = value;
-    });
-
-    return cellMap;
-  }, {});
-
-  return {
-    ...slotCellMap,
-    ...manualCellMap,
-  };
-}
-
-function buildScheduleMatrixDisplayCellMap(
-  selectedSchedule: EmployeeSchedule | null,
-  cellMap: GraphMatrixCellMap,
-): { cellMap: GraphMatrixCellMap; mutedSuffixMap: GraphMatrixCellMap } {
-  if (!selectedSchedule) {
-    return { cellMap, mutedSuffixMap: {} };
-  }
-
-  const scheduleNamesByCell = new Map<string, Set<string>>();
-  (selectedSchedule.relatedScheduleAssignments ?? []).forEach(assignment => {
-    const cellKey = getGraphCellKey(assignment.employeeId, assignment.dayOfMonth);
-    const scheduleName = assignment.scheduleName.trim() || t("Schedule #{0}", assignment.scheduleId);
-    const scheduleNames = scheduleNamesByCell.get(cellKey) ?? new Set<string>();
-    scheduleNames.add(scheduleName);
-    scheduleNamesByCell.set(cellKey, scheduleNames);
-  });
-
-  const mutedSuffixMap: GraphMatrixCellMap = {};
-  const displayCellMap = [...scheduleNamesByCell.entries()].reduce<GraphMatrixCellMap>((result, [cellKey, scheduleNames]) => {
-    const sortedScheduleNames = [...scheduleNames].sort((left, right) => left.localeCompare(right));
-    const currentValue = cellMap[cellKey]?.trim();
-    const relatedScheduleNames = sortedScheduleNames.join(", ");
-    mutedSuffixMap[cellKey] = relatedScheduleNames;
-    result[cellKey] = currentValue && currentValue !== "-"
-      ? `${currentValue}, ${relatedScheduleNames}`
-      : relatedScheduleNames;
-    return result;
-  }, { ...cellMap });
-
-  return { cellMap: displayCellMap, mutedSuffixMap };
-}
-
 const employeeScheduleColumnOrderStorageVersion = 1;
 const employeeScheduleColumnOrderStoragePrefix = "gf3:employee-schedule-column-order";
 
@@ -609,9 +309,16 @@ export function EmployeeSchedulePage() {
   const { session } = useAuth();
   const scheduleQuery = useEmployeeScheduleListQuery();
   const shiftCorrectionsQuery = useEmployeeShiftCorrectionsQuery(Boolean(session?.employeeId));
+  const shiftSwapsQuery = useEmployeeShiftSwapsQuery(Boolean(session?.employeeId));
   const createShiftCorrectionMutation = useCreateShiftCorrectionMutation();
   const { data: uiState, refetch: refetchUiState } = useEmployeeUiStateQuery(Boolean(session?.employeeId));
   const schedules = useMemo(() => scheduleQuery.data ?? [], [scheduleQuery.data]);
+  const currentEmployeeId = session?.employeeId && session.employeeId > 0 ? session.employeeId : null;
+  const currentMonth = warsawToday().slice(0, 7);
+  const rankedSchedules = useMemo(
+    () => currentEmployeeId === null ? [] : rankEmployeeSchedules(schedules, currentEmployeeId, currentMonth),
+    [schedules, currentEmployeeId, currentMonth],
+  );
   const columnOrderStorageKey = getEmployeeScheduleColumnOrderStorageKey(
     session?.employeeId ?? null,
     session?.userName,
@@ -639,8 +346,9 @@ export function EmployeeSchedulePage() {
   const [selectedDayOfMonth, setSelectedDayOfMonth] = useState<number | null>(null);
   const activeDailyScheduleDayRef = useRef<HTMLButtonElement | null>(null);
   const [isShiftCorrectionDialogOpen, setIsShiftCorrectionDialogOpen] = useState(false);
+  const correctionSendingRef = useRef(false);
   const [shiftCorrectionError, setShiftCorrectionError] = useState<string | null>(null);
-  const [shiftCorrectionSuccess, setShiftCorrectionSuccess] = useState<string | null>(null);
+  const [shiftCorrectionSubmitted, setShiftCorrectionSubmitted] = useState(false);
   const [preferenceSaveError, setPreferenceSaveError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -669,29 +377,20 @@ export function EmployeeSchedulePage() {
     }
   }, [columnOrderStorageKey, refetchUiState, setPreferenceSaveError, uiState]);
   const [selectedSummaryPeriodKey, setSelectedSummaryPeriodKey] = useState<string | null>(null);
-  const [pdfExportError, setPdfExportError] = useState<string | null>(null);
-  const [isPdfLoading, setIsPdfLoading] = useState(false);
-  const [isPdfPreparing, setIsPdfPreparing] = useState(false);
-  const [pdfFile, setPdfFile] = useState<DownloadedFile | null>(null);
-  const pdfRequestAbortRef = useRef<AbortController | null>(null);
-
   const selectedSchedule = useMemo(
-    () => schedules.find(schedule => schedule.id === selectedScheduleId) ?? schedules[0] ?? null,
-    [schedules, selectedScheduleId],
+    () => rankedSchedules.find(schedule => schedule.id === selectedScheduleId) ?? rankedSchedules[0] ?? null,
+    [rankedSchedules, selectedScheduleId],
+  );
+  const pendingCorrectionDays = useMemo(
+    () => getPendingCorrectionDays(selectedSchedule, currentEmployeeId, shiftCorrectionsQuery.data ?? []),
+    [selectedSchedule, currentEmployeeId, shiftCorrectionsQuery.data],
   );
   const urlop = useEmployeeApprovedUrlopQuery(selectedSchedule?.shopId ?? 0, selectedSchedule?.year ?? 0, selectedSchedule?.month ?? 0);
   const urlopCellKeys = approvedKeys(urlop.data ?? [], selectedSchedule?.shopId ?? 0, selectedSchedule?.year ?? 2000, selectedSchedule?.month ?? 1);
 
-  useEffect(() => {
-    setIsPdfLoading(false);
-    setIsPdfPreparing(false);
-    setPdfFile(null);
-    setPdfExportError(null);
-    return () => {
-      pdfRequestAbortRef.current?.abort();
-      pdfRequestAbortRef.current = null;
-    };
-  }, [selectedSchedule?.id, session?.employeeId, session?.userName]);
+  const { pdfExportError, isPdfLoading, isPdfPreparing, pdfFile, setPdfFile, handleExportPdf } = useSchedulePdfExport(
+    selectedSchedule?.id, employeeScheduleApi.exportPdf, session?.employeeId, session?.userName,
+  );
 
   useEffect(() => {
     setSelectedDayOfMonth(null);
@@ -739,60 +438,33 @@ export function EmployeeSchedulePage() {
     [summaryYears],
   );
   const displayName = session?.displayName?.trim() || session?.userName || t("Employee");
-  const currentEmployeeId = session?.employeeId && session.employeeId > 0 ? session.employeeId : null;
+  const shiftStatuses = useMemo(
+    () => buildScheduleShiftStatuses(selectedSchedule, currentEmployeeId, displayName, pendingCorrectionDays, shiftSwapsQuery.data ?? []),
+    [selectedSchedule, currentEmployeeId, displayName, pendingCorrectionDays, shiftSwapsQuery.data],
+  );
+  const matrixBadges = useMemo(() => new Map(
+    [...shiftStatuses].flatMap(([day, employees]) => [...employees].map(([id, status]) => [
+      getGraphCellKey(id, day),
+      {
+        content: <ScheduleShiftBadges status={status} />,
+        tone: getScheduleStatusTone(status),
+        count: Number(Boolean(status.correctionPending)) + Number(status.open.length > 0) + Number(status.accepted.length > 0),
+      },
+    ] as const)),
+  ), [language, shiftStatuses]);
   const fallbackMatrixEmployeeId = currentEmployeeId ?? 1;
-  const correctionUnavailableDays = useMemo(() => {
-    const days = new Set<number>();
-    if (!selectedSchedule) return days;
-    schedules.filter(schedule => schedule.publicationStatus === "public" &&
-      schedule.year === selectedSchedule.year && schedule.month === selectedSchedule.month).forEach(schedule => {
-      schedule.slots.filter(slot => isCurrentEmployeeSlot(slot, currentEmployeeId))
-        .forEach(slot => days.add(slot.dayOfMonth));
-      schedule.relatedScheduleAssignments?.filter(assignment => assignment.employeeId === currentEmployeeId)
-        .forEach(assignment => days.add(assignment.dayOfMonth));
-    });
-    return days;
-  }, [currentEmployeeId, schedules, selectedSchedule]);
-  const dailyScheduleDays = useMemo(() => {
-    if (!selectedSchedule) {
-      return [];
-    }
-
-    return Array.from({ length: getDaysInMonth(selectedSchedule.year, selectedSchedule.month) }, (_, index) => {
-      const dayOfMonth = index + 1;
-      const date = new Date(Date.UTC(selectedSchedule.year, selectedSchedule.month - 1, dayOfMonth));
-      const isWorkingDay = currentEmployeeId !== null && currentEmployeeId > 0 && (
-        selectedSchedule.slots.some(slot => slot.dayOfMonth === dayOfMonth && slot.employeeId === currentEmployeeId) ||
-        (selectedSchedule.relatedScheduleAssignments ?? []).some(assignment =>
-          assignment.dayOfMonth === dayOfMonth && assignment.employeeId === currentEmployeeId,
-        )
-      );
-
-      return {
-        dayOfMonth,
-        weekdayLong: scheduleWeekdayFormatter.format(date),
-        weekdayShort: scheduleWeekdayShortFormatter.format(date).replace(".", ""),
-        isWorkingDay,
-      };
-    });
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- Translation helpers read the current language internally.
-  }, [currentEmployeeId, selectedSchedule, language]);
-  const defaultDailyScheduleDay = useMemo(() => {
-    if (!selectedSchedule || dailyScheduleDays.length === 0) {
-      return 1;
-    }
-
-    const now = new Date();
-    if (now.getUTCFullYear() === selectedSchedule.year && now.getUTCMonth() + 1 === selectedSchedule.month) {
-      return Math.min(now.getUTCDate(), dailyScheduleDays.length);
-    }
-
-    return dailyScheduleDays.find(day => day.isWorkingDay)?.dayOfMonth ?? 1;
-  }, [dailyScheduleDays, selectedSchedule]);
+  const dailyScheduleDays = useMemo(
+    () => buildDailyScheduleDays(selectedSchedule, currentEmployeeId),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Translation helpers read the current language internally.
+    [currentEmployeeId, selectedSchedule, language],
+  );
+  const defaultDailyScheduleDay = useMemo(
+    () => getDefaultDailyScheduleDay(selectedSchedule, dailyScheduleDays),
+    [dailyScheduleDays, selectedSchedule],
+  );
   const activeDailyScheduleDay = selectedDayOfMonth && selectedDayOfMonth <= dailyScheduleDays.length
     ? selectedDayOfMonth
     : defaultDailyScheduleDay;
-  const activeDailyScheduleDayInfo = dailyScheduleDays.find(day => day.dayOfMonth === activeDailyScheduleDay) ?? null;
 
   useLayoutEffect(() => {
     if (scheduleViewMode !== "daily") {
@@ -890,64 +562,19 @@ export function EmployeeSchedulePage() {
     setColumnOrderDialogEmployeeId(null);
   };
 
-  const handleExportPdf = async () => {
-    if (!selectedSchedule || pdfRequestAbortRef.current) {
-      return;
-    }
-
-    setPdfExportError(null);
-    const scheduleId = selectedSchedule.id;
-    const controller = new AbortController();
-    pdfRequestAbortRef.current = controller;
-    setIsPdfLoading(true);
-    setIsPdfPreparing(!pdfFile);
-    try {
-      const file = pdfFile ?? await employeeScheduleApi.exportPdf(scheduleId, controller.signal);
-      if (controller.signal.aborted || pdfRequestAbortRef.current !== controller) return;
-      if (file.blob.size === 0 || !(file.contentType ?? file.blob.type).toLowerCase().includes("application/pdf")) {
-        throw new Error(t("Could not export this schedule to PDF."));
-      }
-      const preparedFile = { ...file, fileName: file.fileName?.trim() || `GF3_Graph_${scheduleId}.pdf` };
-      setIsPdfPreparing(false);
-      const shareFile = new File([file.blob], preparedFile.fileName, { type: "application/pdf" });
-      if (typeof navigator.share === "function" && navigator.canShare?.({ files: [shareFile] })) {
-        try {
-          await navigator.share({ files: [shareFile] });
-        } catch (error) {
-          if (controller.signal.aborted) return;
-          const name = typeof error === "object" && error !== null && "name" in error ? error.name : "";
-          if (name === "NotAllowedError") {
-            // A slow export can consume Safari's activation window; reuse the file on the next direct tap.
-            setPdfFile(preparedFile);
-            return;
-          }
-          if (name !== "AbortError") throw error;
-        }
-      } else {
-        downloadExportFile(preparedFile, preparedFile.fileName);
-      }
-      if (!controller.signal.aborted) setPdfFile(null);
-    } catch (error) {
-      if (!controller.signal.aborted && !isRequestCanceledError(error))
-        setPdfExportError(getErrorMessage(error, t("Could not export this schedule to PDF.")));
-    } finally {
-      if (pdfRequestAbortRef.current === controller) {
-        pdfRequestAbortRef.current = null;
-        setIsPdfLoading(false);
-        setIsPdfPreparing(false);
-      }
-    }
-  };
-
   const handleSubmitShiftCorrection = (input: CreateShiftCorrectionInput) => {
+    if (shiftCorrectionSubmitted || correctionSendingRef.current || createShiftCorrectionMutation.isPending) return;
+    correctionSendingRef.current = true;
     setShiftCorrectionError(null);
-    setShiftCorrectionSuccess(null);
     createShiftCorrectionMutation.mutate(input, {
       onSuccess: () => {
-        setIsShiftCorrectionDialogOpen(false);
-        setShiftCorrectionSuccess(t("Shift correction request sent to your manager."));
+        correctionSendingRef.current = false;
+        setShiftCorrectionSubmitted(true);
       },
-      onError: error => setShiftCorrectionError(getErrorMessage(error, t("Could not send the shift correction request."))),
+      onError: error => {
+        correctionSendingRef.current = false;
+        setShiftCorrectionError(getErrorMessage(error, t("Could not send the shift correction request.")));
+      },
     });
   };
 
@@ -971,33 +598,14 @@ export function EmployeeSchedulePage() {
         </span>
       </button>
       <button type="button" className={`${styles.openSchedulePdfButton} ${styles.openScheduleCorrectionButton}`}
-        onClick={() => { setShiftCorrectionError(null); setIsShiftCorrectionDialogOpen(true); }}
+        onClick={() => { setShiftCorrectionError(null); setShiftCorrectionSubmitted(false); setIsShiftCorrectionDialogOpen(true); }}
         title={t("Request a shift correction")} aria-label={t("Request a shift correction")}>{t("Adjust")}</button>
     </div>
   ) : null;
 
-  const scheduleViewToggleLabel = t(scheduleViewMode === "matrix" ? "Show daily schedule view" : "Show schedule matrix view");
   const scheduleHeaderActions = (
-    <div className={styles.openScheduleActions}>
-      <button
-        ref={scheduleViewToggleRef}
-        type="button"
-        className={[
-          styles.scheduleViewToggle,
-          scheduleViewMode === "daily" ? styles.scheduleViewToggleActive : "",
-        ].filter(Boolean).join(" ")}
-        aria-label={scheduleViewToggleLabel}
-        aria-pressed={scheduleViewMode === "daily"}
-        title={scheduleViewToggleLabel}
-        onClick={handleToggleScheduleView}
-      >
-        <EyeIcon size={20} />
-      </button>
-      <button type="button" className={styles.openSchedulePdfButton} onClick={handleExportPdf}
-        disabled={isPdfLoading} aria-busy={isPdfLoading}
-        title={t(isPdfLoading ? "Preparing PDF..." : pdfFile ? "Share PDF" : "Export schedule to PDF")}
-        aria-label={t(isPdfLoading ? "Preparing PDF..." : pdfFile ? "Share PDF" : "Export schedule to PDF")}><NewsIcon size={14} />PDF</button>
-    </div>
+    <EmployeeScheduleHeaderActions daily={scheduleViewMode === "daily"} toggleRef={scheduleViewToggleRef}
+      onToggle={handleToggleScheduleView} onExportPdf={handleExportPdf} pdfLoading={isPdfLoading} pdfReady={Boolean(pdfFile)} />
   );
 
   return (
@@ -1028,7 +636,6 @@ export function EmployeeSchedulePage() {
         }}>{t("Download PDF")}</button>
       </div> : null}
       {preferenceSaveError ? <div data-employee-motion="schedule-content" data-motion-key={`preferenceSaveError:${preferenceSaveError}`}><ErrorBanner dismissible>{preferenceSaveError}</ErrorBanner></div> : null}
-      {shiftCorrectionSuccess ? <div className={styles.shiftCorrectionSuccess} role="status" data-employee-motion="schedule-content" data-motion-key={shiftCorrectionSuccess}>{shiftCorrectionSuccess}</div> : null}
 
       <EmployeeScheduleHero
         schedules={schedules}
@@ -1070,6 +677,7 @@ export function EmployeeSchedulePage() {
               columns={scheduleMatrixColumns}
               cellMap={scheduleMatrixDisplay.cellMap}
               mutedSuffixMap={scheduleMatrixDisplay.mutedSuffixMap}
+              readOnlyCellAdornments={matrixBadges}
               title={t("Schedules")}
               headerCenterSlot={scheduleSelectorRow}
               headerClassName={styles.openScheduleHeader}
@@ -1098,65 +706,17 @@ export function EmployeeSchedulePage() {
               headerRightClassName={styles.openScheduleHeaderRight}
               headerRightSlot={scheduleHeaderActions}
             >
-              <div className={styles.dailyScheduleShell}>
-                <div className={styles.dailyScheduleDays} role="tablist" aria-label={t("Schedule days")}>
-                  {dailyScheduleDays.map(day => {
-                    const isSelected = day.dayOfMonth === activeDailyScheduleDay;
-                    const holiday = showPublicHolidays && selectedSchedule
-                      ? getPolishPublicHoliday(selectedSchedule.year, selectedSchedule.month, day.dayOfMonth) : null;
-                    return (
-                      <button
-                        key={day.dayOfMonth}
-                        ref={isSelected ? activeDailyScheduleDayRef : undefined}
-                        type="button"
-                        role="tab"
-                        aria-selected={isSelected}
-                        aria-controls="daily-schedule-content"
-                        aria-label={`${day.weekdayLong} ${day.dayOfMonth}, ${day.isWorkingDay ? t("working day") : t("day off")}${holiday ? `, ${t("Holiday")}: ${t(holiday.name)}` : ""}`}
-                        title={holiday ? t(holiday.name) : undefined}
-                        className={[
-                          styles.dailyScheduleDay,
-                          holiday ? styles.dailyScheduleDayHoliday : "",
-                          day.isWorkingDay ? styles.dailyScheduleDayWorking : styles.dailyScheduleDayOff,
-                          isSelected ? styles.dailyScheduleDaySelected : "",
-                        ].filter(Boolean).join(" ")}
-                        onClick={() => setSelectedDayOfMonth(day.dayOfMonth)}
-                      >
-                        <span>{day.weekdayShort}</span>
-                        <strong>{day.dayOfMonth}</strong>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <div
-                  id="daily-schedule-content"
-                  data-employee-motion="schedule-content"
-                  data-motion-key={`${selectedSchedule.id}:${activeDailyScheduleDay}`}
-                  className={styles.dailyScheduleBody}
-                  role="tabpanel"
-                  aria-label={`${activeDailyScheduleDayInfo?.weekdayLong ?? t("Day")} ${activeDailyScheduleDay}`}
-                >
-                  <div className={styles.dailyScheduleDate} aria-hidden="true">
-                    <span>{activeDailyScheduleDayInfo?.weekdayLong ?? t("Day")}</span>
-                    <strong>{activeDailyScheduleDay}</strong>
-                  </div>
-
-                  <div className={styles.dailyScheduleWorkers}>
-                    {dailyScheduleWorkers.length > 0 ? dailyScheduleWorkers.map(worker => (
-                      <article key={worker.employeeId} className={styles.dailyScheduleWorker}>
-                        <span>{worker.label}</span>
-                        <strong>{formatDailyWorkerShifts(worker)}</strong>
-                      </article>
-                    )) : (
-                      <div className={styles.dailyScheduleEmpty}>
-                        <strong>{t("No one is scheduled.")}</strong>
-                        <span>{t("This day has no assigned shifts.")}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
+              <EmployeeScheduleDailyBody
+                panelId="daily-schedule-content"
+                selectedSchedule={selectedSchedule}
+                dailyScheduleDays={dailyScheduleDays}
+                activeDailyScheduleDay={activeDailyScheduleDay}
+                dailyScheduleWorkers={dailyScheduleWorkers}
+                shiftStatuses={shiftStatuses.get(activeDailyScheduleDay)}
+                activeDailyScheduleDayRef={activeDailyScheduleDayRef}
+                showPublicHolidays={showPublicHolidays}
+                onSelectDay={setSelectedDayOfMonth}
+              />
             </CardSection>
           ) : null}
 
@@ -1165,7 +725,7 @@ export function EmployeeSchedulePage() {
 
       <EmployeeScheduleSelectDialog
         open={isScheduleSelectOpen}
-        schedules={schedules}
+        schedules={rankedSchedules}
         selectedScheduleId={selectedSchedule?.id ?? null}
         onSelect={handleSelectSchedule}
         onClose={() => setIsScheduleSelectOpen(false)}
@@ -1181,12 +741,13 @@ export function EmployeeSchedulePage() {
 
       <EmployeeShiftCorrectionDialog
         open={isShiftCorrectionDialogOpen}
-        schedule={selectedSchedule}
+        schedules={rankedSchedules}
         employeeId={currentEmployeeId}
         existingRequests={shiftCorrectionsQuery.data ?? []}
-        unavailableDays={correctionUnavailableDays}
+        activeSwaps={shiftSwapsQuery.data ?? []}
         isSending={createShiftCorrectionMutation.isPending}
         errorMessage={shiftCorrectionError}
+        submitted={shiftCorrectionSubmitted}
         onCancel={() => { setIsShiftCorrectionDialogOpen(false); setShiftCorrectionError(null); }}
         onSubmit={handleSubmitShiftCorrection}
       />

@@ -11,14 +11,11 @@ public sealed class SchedulePdfFontResolver : IFontResolver
 
     private SchedulePdfFontResolver(string? configuredPath)
     {
-        var candidates = !string.IsNullOrWhiteSpace(configuredPath)
-            ? new[] { configuredPath }
-            : OperatingSystem.IsWindows()
-                ? new[] { Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "Fonts", "calibri.ttf"),
-                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "Fonts", "Carlito-Regular.ttf") }
-                : new[] { "/usr/share/fonts/truetype/crosextra/Carlito-Regular.ttf" };
-        var path = candidates.FirstOrDefault(File.Exists)
-            ?? throw new InvalidOperationException("Schedule PDF font is missing. Install Carlito or configure PdfExport:FontFilePath.");
+        var path = !string.IsNullOrWhiteSpace(configuredPath)
+            ? configuredPath
+            : Path.Combine(AppContext.BaseDirectory, "Resources", "Fonts", "Carlito-Regular.ttf");
+        if (!File.Exists(path))
+            throw new InvalidOperationException("Schedule PDF font is missing. Install Carlito or configure PdfExport:FontFilePath.");
         _font = File.ReadAllBytes(path);
         if (_font.Length < 4 || !((_font[0] == 0 && _font[1] == 1 && _font[2] == 0 && _font[3] == 0)
             || System.Text.Encoding.ASCII.GetString(_font, 0, 4) == "OTTO"))

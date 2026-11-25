@@ -1,0 +1,52 @@
+.badge, .bubble {
+  --status-border: #f5c78d;
+  --status-ink: #9a4b12;
+  --status-fill: #ffedd5;
+  --status-surface: #fffaf3;
+}
+
+[data-tone="open"]:is(.badge, .bubble) {
+  --status-border: #a8c9f8;
+  --status-ink: #1d4ed8;
+  --status-fill: #dbeafe;
+  --status-surface: #f5f9ff;
+}
+
+[data-tone="accepted"]:is(.badge, .bubble) {
+  --status-border: #9edcb5;
+  --status-ink: #166534;
+  --status-fill: #dcfce7;
+  --status-surface: #f5fcf7;
+}
+
+.badge {
+  box-sizing: border-box;
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: var(--schedule-status-badge-size, 19px);
+  height: var(--schedule-status-badge-size, 19px);
+  padding: 0;
+  border: 1px solid var(--status-border);
+  border-radius: 50%;
+  background: var(--status-fill);
+  color: var(--status-ink);
+  cursor: pointer;
+}
+
+.badge:focus-visible { outline: 2px solid var(--status-ink); outline-offset: -2px; }
+.bubble {
+  position: fixed;
+  z-index: 1850;
+  box-sizing: border-box;
+  overflow-y: auto;
+  padding: 10px 12px;
+  border: 1px solid var(--status-border);
+  border-radius: 14px;
+  background: var(--status-surface);
+  box-shadow: 0 8px 22px #0f172a1f;
+  color: var(--status-ink);
+  font-size: .78rem;
+  line-height: 1.4;
+}
+.bubble p { margin: 4px 0 0; }

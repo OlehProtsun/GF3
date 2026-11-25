@@ -54,7 +54,9 @@ function createQueryClient() {
           return;
         }
 
-        pushErrorAlertFromError(error, t("Could not complete the requested action."));
+        if (mutation.meta?.handlesErrorInline !== true) {
+          pushErrorAlertFromError(error, t("Could not complete the requested action."));
+        }
 
         if (isDev) {
           console.error("[Mutation error]", mutation.options.mutationKey, error);

@@ -13,11 +13,11 @@ public sealed class CreateShiftCorrectionRequest
     [Range(1, 31)]
     public int? DayOfMonth { get; init; }
 
-    [Required]
-    public string RequestedFromTime { get; init; } = string.Empty;
+    public string? RequestedFromTime { get; init; }
 
-    [Required]
-    public string RequestedToTime { get; init; } = string.Empty;
+    public string? RequestedToTime { get; init; }
+
+    public string? RequestType { get; init; }
 
     [MaxLength(1000)]
     public string? Comment { get; init; }

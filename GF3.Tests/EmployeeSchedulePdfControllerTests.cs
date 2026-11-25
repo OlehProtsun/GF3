@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using BusinessLogicLayer.Services.Abstractions;
+using GF3.Tests.Infrastructure;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -72,6 +73,40 @@ public sealed class EmployeeSchedulePdfControllerTests
             .Cast<AuthorizeAttribute>().Single().Roles);
     }
 
+    [Theory]
+    [InlineData("ok")]
+    [InlineData("export")]
+    [InlineData("render")]
+    public async Task GetPublicPdf_EnforcesRelatedPublishedScopeAndUsesPreviewExport(string scenario)
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        await using var db = database.CreateContext();
+        var fixture = await EmployeePublicSchedulesTests.Seed(db);
+        var failure = new InvalidOperationException("private fixture template detail");
+        var exporter = new Exporter { Error = scenario == "export" ? failure : null };
+        var renderer = new Renderer { Error = scenario == "render" ? failure : null };
+        var controller = Create(exporter, renderer, fixture.Owner.ToString());
+        foreach (var denied in fixture.Hidden)
+            Assert.IsType<NotFoundResult>(await controller.GetPublicPdf(denied, db, default));
+        Assert.Null(exporter.PreviewRequest);
+        var result = await controller.GetPublicPdf(fixture.Preview, db, default);
+        Assert.Equal((fixture.Container, fixture.Preview), exporter.PreviewRequest);
+        Assert.Equal("private, no-store", controller.Response.Headers.CacheControl.ToString());
+        if (scenario == "ok")
+        {
+            var file = Assert.IsType<FileContentResult>(result);
+            Assert.Equal("application/pdf", file.ContentType);
+            Assert.EndsWith(".pdf", file.FileDownloadName);
+            Assert.Equal(renderer.Bytes, file.FileContents);
+        }
+        else
+        {
+            var problem = Assert.IsType<ProblemDetails>(Assert.IsType<ObjectResult>(result).Value);
+            Assert.Equal("pdf_generation_error", problem.Type);
+            Assert.DoesNotContain("private fixture", problem.Detail);
+        }
+    }
+
     private static EmployeeSchedulePdfController Create(Exporter exporter, Renderer renderer, string? claim = "7")
         => new(exporter, renderer, NullLogger<EmployeeSchedulePdfController>.Instance)
         {
@@ -85,10 +120,16 @@ public sealed class EmployeeSchedulePdfControllerTests
     {
         public Exception? Error { get; init; }
         public (int, int) Request { get; private set; }
+        public (int, int)? PreviewRequest { get; private set; }
         public Task<(byte[] content, string fileName)> ExportPublishedGraphToXlsxAsync(int employeeId, int graphId, CancellationToken ct = default)
         {
             Request = (employeeId, graphId);
             return Error is null ? Task.FromResult((new byte[] { 1 }, "matrix.xlsx")) : Task.FromException<(byte[], string)>(Error);
+        }
+        public Task<(byte[] content, string fileName)> ExportPublishedPreviewToXlsxAsync(int containerId, int graphId, CancellationToken ct = default)
+        {
+            PreviewRequest = (containerId, graphId);
+            return Error is null ? Task.FromResult((new byte[] { 1 }, "preview.xlsx")) : Task.FromException<(byte[], string)>(Error);
         }
         public Task<(byte[] content, string fileName)> ExportGraphToXlsxAsync(int containerId, int graphId, bool includeStyles, bool includeEmployees, CancellationToken ct = default)
             => throw new NotSupportedException();

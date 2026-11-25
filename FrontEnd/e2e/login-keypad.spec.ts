@@ -7,7 +7,7 @@ test("phone keypad accepts presses along all four edges", async ({ page, isMobil
     localStorage.setItem("gf3.auth.password-mode", "phone");
   });
   await page.goto("/login");
-  await page.getByRole("button", { name: "Enter password", exact: true }).click();
+  await page.getByRole("button", { name: /^(Enter password|Wpisz hasło|Уведіть пароль)$/ }).click();
   const key = page.getByRole("button", { name: "1", exact: true });
   await expect(key).toBeEnabled();
   const box = await key.boundingBox();
@@ -27,6 +27,6 @@ test("phone keypad accepts presses along all four edges", async ({ page, isMobil
       await page.waitForTimeout(150);
       await page.mouse.up();
     }
-    await expect(page.getByRole("status", { name: `${index + 1} of 6 digits entered` })).toBeVisible();
+    await expect(page.getByRole("status", { name: new RegExp(`^(?:${index + 1} of 6 digits entered|Wprowadzono ${index + 1} z 6 cyfr|Уведено цифр: ${index + 1} з 6)$`) })).toBeVisible();
   }
 });

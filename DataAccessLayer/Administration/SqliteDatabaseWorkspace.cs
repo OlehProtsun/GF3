@@ -41,6 +41,11 @@ public interface ISqliteDatabaseWorkspace
     string AutomaticBackupDirectoryPath { get; }
     string ManualCopyDirectoryPath { get; }
     int AutomaticBackupRetentionLimit { get; }
+    bool IsBackupBundleDatabase(string databasePath) => SqliteMediaBackup.IsBundleDatabasePath(databasePath);
+    Task<bool> HasReferencedMediaAsync(string databasePath, CancellationToken ct)
+        => SqliteMediaBackup.HasReferencedMediaAsync(databasePath, ct);
+    Task<string> MaterializeBackupAsync(string databasePath, string workingDirectory, CancellationToken ct)
+        => SqliteMediaBackup.MaterializeAsync(Path.GetDirectoryName(Path.GetFullPath(databasePath))!, workingDirectory, ct);
     string SetDatabasePath(string databasePath);
     SqliteDatabaseWorkspaceState GetWorkspaceState();
     Task<SqliteDatabaseFileEntry> CreateAutomaticBackupAsync(CancellationToken ct);
@@ -63,10 +68,12 @@ public sealed class SqliteDatabaseWorkspace : ISqliteDatabaseWorkspace
     };
 
     private readonly object _gate = new();
+    private readonly SemaphoreSlim _snapshotGate = new(1, 1);
     private string _databasePath;
 
     public SqliteDatabaseWorkspace(string databasePath)
     {
+        RejectArchivePath(databasePath);
         _databasePath = NormalizeDatabasePath(databasePath);
         EnsureDatabaseDirectory(_databasePath);
     }
@@ -83,8 +90,14 @@ public sealed class SqliteDatabaseWorkspace : ISqliteDatabaseWorkspace
 
     public int AutomaticBackupRetentionLimit => AutomaticBackupRetentionLimitValue;
 
+    public bool IsBackupBundleDatabase(string databasePath) => SqliteMediaBackup.IsBundleDatabasePath(databasePath);
+
+    public Task<string> MaterializeBackupAsync(string databasePath, string workingDirectory, CancellationToken ct)
+        => SqliteMediaBackup.MaterializeAsync(Path.GetDirectoryName(Path.GetFullPath(databasePath))!, workingDirectory, ct);
+
     public string SetDatabasePath(string databasePath)
     {
+        RejectArchivePath(databasePath);
         var normalizedPath = NormalizeDatabasePath(databasePath);
         EnsureDatabaseDirectory(normalizedPath);
 
@@ -146,15 +159,23 @@ public sealed class SqliteDatabaseWorkspace : ISqliteDatabaseWorkspace
 
         Directory.CreateDirectory(destinationDirectoryPath);
 
-        var destinationPath = BuildCopyPath(workspacePaths.DatabasePath, destinationDirectoryPath, copyKind);
-        await BackupDatabaseAsync(workspacePaths.DatabasePath, destinationPath, ct).ConfigureAwait(false);
-
-        if (enforceRetention)
+        await _snapshotGate.WaitAsync(ct).ConfigureAwait(false);
+        string bundlePath;
+        try
         {
-            ApplyAutomaticBackupRetention(destinationDirectoryPath, workspacePaths.DatabasePath);
+            bundlePath = BuildBundlePath(workspacePaths.DatabasePath, destinationDirectoryPath, copyKind);
+            await SqliteMediaBackup.CreateAsync(workspacePaths.DatabasePath, bundlePath, ct).ConfigureAwait(false);
+            if (enforceRetention)
+            {
+                ApplyAutomaticBackupRetention(destinationDirectoryPath, workspacePaths.DatabasePath);
+            }
+        }
+        finally
+        {
+            _snapshotGate.Release();
         }
 
-        return CreateEntry(destinationPath, workspacePaths, ResolveCategory(destinationPath, workspacePaths));
+        return CreateBundleEntry(bundlePath, workspacePaths, ResolveCategory(bundlePath, workspacePaths));
     }
 
     private static IEnumerable<SqliteDatabaseFileEntry> EnumerateAvailableDatabases(WorkspacePaths workspacePaths)
@@ -164,6 +185,7 @@ public sealed class SqliteDatabaseWorkspace : ISqliteDatabaseWorkspace
         AddDirectoryEntries(entries, workspacePaths.WorkspaceRootPath, workspacePaths, "database");
         AddDirectoryEntries(entries, workspacePaths.AutomaticBackupDirectoryPath, workspacePaths, "backup");
         AddDirectoryEntries(entries, workspacePaths.ManualCopyDirectoryPath, workspacePaths, "manualCopy");
+        AddDirectoryEntries(entries, Path.Combine(workspacePaths.WorkspaceRootPath, "restored"), workspacePaths, "database");
 
         return entries.Values
             .OrderByDescending(entry => entry.IsActive)
@@ -181,9 +203,15 @@ public sealed class SqliteDatabaseWorkspace : ISqliteDatabaseWorkspace
             return [];
         }
 
-        return Directory.EnumerateFiles(directoryPath)
+        var files = Directory.EnumerateFiles(directoryPath)
             .Where(IsSupportedDatabaseFile)
             .Select(path => CreateEntry(path, workspacePaths, category))
+            .ToArray();
+        var bundles = Directory.EnumerateDirectories(directoryPath)
+            .SelectMany(path => IsCompletedBundle(path)
+                ? [CreateBundleEntry(path, workspacePaths, category)]
+                : IsRestoredWorkingDirectory(path) ? [CreateEntry(Path.Combine(path, "SQLite.db"), workspacePaths, category)] : Array.Empty<SqliteDatabaseFileEntry>());
+        return files.Concat(bundles)
             .OrderByDescending(entry => entry.LastModifiedUtc ?? DateTime.MinValue)
             .ThenBy(entry => entry.Name, StringComparer.OrdinalIgnoreCase)
             .ToArray();
@@ -200,9 +228,9 @@ public sealed class SqliteDatabaseWorkspace : ISqliteDatabaseWorkspace
             return;
         }
 
-        foreach (var filePath in Directory.EnumerateFiles(directoryPath).Where(IsSupportedDatabaseFile))
+        foreach (var entry in EnumerateDirectoryEntries(directoryPath, workspacePaths, category))
         {
-            entries[filePath] = CreateEntry(filePath, workspacePaths, category);
+            entries[entry.Path] = entry;
         }
     }
 
@@ -221,28 +249,27 @@ public sealed class SqliteDatabaseWorkspace : ISqliteDatabaseWorkspace
         };
     }
 
-    private static string BuildCopyPath(string sourceDatabasePath, string destinationDirectoryPath, string copyKind)
+    private static SqliteDatabaseFileEntry CreateBundleEntry(string bundlePath, WorkspacePaths workspacePaths, string category)
     {
-        var fileNameWithoutExtension = Path.GetFileNameWithoutExtension(sourceDatabasePath);
-        var extension = Path.GetExtension(sourceDatabasePath);
-        if (string.IsNullOrWhiteSpace(extension))
+        var databasePath = Path.Combine(bundlePath, "SQLite.db");
+        var file = new FileInfo(databasePath);
+        var directory = new DirectoryInfo(bundlePath);
+        return new SqliteDatabaseFileEntry
         {
-            extension = ".db";
-        }
-
-        var timestamp = DateTime.Now.ToString("yyyyMMdd-HHmmssfff");
-        return Path.Combine(destinationDirectoryPath, $"{fileNameWithoutExtension}-{copyKind}-{timestamp}{extension}");
+            Name = directory.Name,
+            Path = databasePath,
+            Category = category,
+            FileSizeBytes = file.Exists ? file.Length : 0,
+            LastModifiedUtc = directory.Exists ? directory.LastWriteTimeUtc : null,
+            IsActive = PathsEqual(databasePath, workspacePaths.DatabasePath),
+        };
     }
 
-    private static async Task BackupDatabaseAsync(string sourceDatabasePath, string destinationDatabasePath, CancellationToken ct)
+    private static string BuildBundlePath(string sourceDatabasePath, string destinationDirectoryPath, string copyKind)
     {
-        await using var sourceConnection = new SqliteConnection(BuildConnectionString(sourceDatabasePath));
-        await sourceConnection.OpenAsync(ct).ConfigureAwait(false);
-
-        await using var destinationConnection = new SqliteConnection(BuildConnectionString(destinationDatabasePath));
-        await destinationConnection.OpenAsync(ct).ConfigureAwait(false);
-
-        sourceConnection.BackupDatabase(destinationConnection);
+        var fileNameWithoutExtension = Path.GetFileNameWithoutExtension(sourceDatabasePath);
+        var timestamp = DateTime.UtcNow.ToString("yyyyMMdd-HHmmssfff");
+        return Path.Combine(destinationDirectoryPath, $"{fileNameWithoutExtension}-{copyKind}-{timestamp}-{Guid.NewGuid():N}");
     }
 
     private static void ApplyAutomaticBackupRetention(string automaticBackupDirectoryPath, string activeDatabasePath)
@@ -252,23 +279,27 @@ public sealed class SqliteDatabaseWorkspace : ISqliteDatabaseWorkspace
             return;
         }
 
-        var deletableBackups = Directory.EnumerateFiles(automaticBackupDirectoryPath)
-            .Where(IsSupportedDatabaseFile)
-            .Where(path => !PathsEqual(path, activeDatabasePath))
-            .Select(path => new FileInfo(path))
+        var deletableBackups = Directory.EnumerateFileSystemEntries(automaticBackupDirectoryPath)
+            .Where(path => IsSupportedDatabaseFile(path) || (Directory.Exists(path) && IsCompletedBundle(path)))
+            .Where(path => !PathsEqual(path, activeDatabasePath) && !PathsEqual(Path.Combine(path, "SQLite.db"), activeDatabasePath))
+            .Select(path => new FileSystemInfoWrapper(path))
             .OrderByDescending(file => file.LastWriteTimeUtc)
             .ThenByDescending(file => file.CreationTimeUtc)
             .ToArray();
 
         foreach (var obsoleteBackup in deletableBackups.Skip(AutomaticBackupRetentionLimitValue))
         {
-            obsoleteBackup.Delete();
+            if (obsoleteBackup.IsDirectory) Directory.Delete(obsoleteBackup.Path, recursive: true);
+            else File.Delete(obsoleteBackup.Path);
         }
     }
 
     private static string ResolveCategory(string filePath, WorkspacePaths workspacePaths)
     {
         var parentDirectoryPath = Path.GetDirectoryName(filePath) ?? string.Empty;
+
+        if (IsWithin(parentDirectoryPath, workspacePaths.AutomaticBackupDirectoryPath)) return "backup";
+        if (IsWithin(parentDirectoryPath, workspacePaths.ManualCopyDirectoryPath)) return "manualCopy";
 
         if (PathsEqual(parentDirectoryPath, workspacePaths.AutomaticBackupDirectoryPath))
         {
@@ -305,6 +336,12 @@ public sealed class SqliteDatabaseWorkspace : ISqliteDatabaseWorkspace
             return Directory.GetParent(directoryPath)?.FullName ?? directoryPath;
         }
 
+        if (string.Equals(folderName, "restored", StringComparison.OrdinalIgnoreCase))
+            return Directory.GetParent(directoryPath)?.FullName ?? directoryPath;
+        if (Directory.GetParent(directoryPath) is { } parent &&
+            (parent.Name.Equals(AutomaticBackupFolderName, StringComparison.OrdinalIgnoreCase) || parent.Name.Equals(ManualCopyFolderName, StringComparison.OrdinalIgnoreCase) || parent.Name.Equals("restored", StringComparison.OrdinalIgnoreCase)))
+            return Directory.GetParent(parent.FullName)?.FullName ?? parent.FullName;
+
         return directoryPath;
     }
 
@@ -318,6 +355,12 @@ public sealed class SqliteDatabaseWorkspace : ISqliteDatabaseWorkspace
         return Path.GetFullPath(databasePath.Trim());
     }
 
+    private static void RejectArchivePath(string databasePath)
+    {
+        if (SqliteMediaBackup.IsBundleDatabasePath(databasePath))
+            throw new InvalidOperationException("A backup archive cannot be opened as the active database. Select it through database administration to create a working copy.");
+    }
+
     private static void EnsureDatabaseDirectory(string databasePath)
     {
         var directoryPath = Path.GetDirectoryName(databasePath)
@@ -328,6 +371,18 @@ public sealed class SqliteDatabaseWorkspace : ISqliteDatabaseWorkspace
 
     private static bool IsSupportedDatabaseFile(string filePath)
         => SupportedExtensions.Contains(Path.GetExtension(filePath));
+
+    private static bool IsCompletedBundle(string path)
+        => File.Exists(Path.Combine(path, "SQLite.db")) && File.Exists(Path.Combine(path, "backup-manifest.json")) && Directory.Exists(Path.Combine(path, "communication-gifs"));
+
+    private static bool IsRestoredWorkingDirectory(string path)
+        => File.Exists(Path.Combine(path, "SQLite.db")) && Directory.Exists(Path.Combine(path, "communication-gifs")) && !File.Exists(Path.Combine(path, "backup-manifest.json"));
+
+    private static bool IsWithin(string path, string parent)
+    {
+        var relative = Path.GetRelativePath(parent, path);
+        return relative != ".." && !relative.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal) && !Path.IsPathRooted(relative);
+    }
 
     private static bool PathsEqual(string? left, string? right)
     {
@@ -350,4 +405,20 @@ public sealed class SqliteDatabaseWorkspace : ISqliteDatabaseWorkspace
         string WorkspaceRootPath,
         string AutomaticBackupDirectoryPath,
         string ManualCopyDirectoryPath);
+
+    private sealed class FileSystemInfoWrapper
+    {
+        public FileSystemInfoWrapper(string path)
+        {
+            Path = path;
+            IsDirectory = Directory.Exists(path);
+            LastWriteTimeUtc = IsDirectory ? Directory.GetLastWriteTimeUtc(path) : File.GetLastWriteTimeUtc(path);
+            CreationTimeUtc = IsDirectory ? Directory.GetCreationTimeUtc(path) : File.GetCreationTimeUtc(path);
+        }
+
+        public string Path { get; }
+        public bool IsDirectory { get; }
+        public DateTime LastWriteTimeUtc { get; }
+        public DateTime CreationTimeUtc { get; }
+    }
 }

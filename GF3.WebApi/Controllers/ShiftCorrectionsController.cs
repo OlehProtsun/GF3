@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Security.Claims;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using BusinessLogicLayer.Common;
 using DataAccessLayer.Models;
@@ -48,6 +49,11 @@ public sealed class EmployeeShiftCorrectionsController(
         CancellationToken cancellationToken)
     {
         var employeeId = GetRequiredEmployeeId();
+        var removeShift = request.RequestType == "removeShift";
+        if (request.RequestType is not (null or "removeShift"))
+            throw ValidationException.ForField(nameof(request.RequestType), "Invalid shift correction request type.");
+
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
         var schedule = await db.Schedules
             .Include(item => item.Container)
             .Include(item => item.Shop)
@@ -57,7 +63,7 @@ public sealed class EmployeeShiftCorrectionsController(
             .FirstOrDefaultAsync(item =>
                 item.Id == request.ScheduleId &&
                 item.PublicationStatus == SchedulePublicationStatus.Public &&
-                item.Employees.Any(employee => employee.EmployeeId == employeeId),
+                item.Employees.Any(employee => employee.EmployeeId == employeeId && (!removeShift || !employee.Employee.IsDeleted)),
                 cancellationToken)
             .ConfigureAwait(false)
             ?? throw ValidationException.ForField(nameof(request.ScheduleId), "Published schedule was not found for your account.");
@@ -72,14 +78,18 @@ public sealed class EmployeeShiftCorrectionsController(
             throw new ValidationException("Choose either an assigned shift or a day off.");
         }
 
-        var requestedFromTime = ShiftCorrectionRules.NormalizeTime(request.RequestedFromTime, nameof(request.RequestedFromTime));
-        var requestedToTime = ShiftCorrectionRules.NormalizeTime(request.RequestedToTime, nameof(request.RequestedToTime));
-        ShiftCorrectionRules.ValidatePeriod(requestedFromTime, requestedToTime);
+        if (removeShift && (request.DayOfMonth is null || request.RequestedFromTime is not null || request.RequestedToTime is not null))
+            throw ValidationException.ForField(nameof(request.DayOfMonth), "Choose a day with assigned shifts to request the day off.");
+
+        var requestedFromTime = removeShift ? null : ShiftCorrectionRules.NormalizeTime(request.RequestedFromTime, nameof(request.RequestedFromTime));
+        var requestedToTime = removeShift ? null : ShiftCorrectionRules.NormalizeTime(request.RequestedToTime, nameof(request.RequestedToTime));
+        if (!removeShift) ShiftCorrectionRules.ValidatePeriod(requestedFromTime!, requestedToTime!);
         var comment = string.IsNullOrWhiteSpace(request.Comment) ? null : request.Comment.Trim();
         if (comment is { Length: > 1000 })
             throw ValidationException.ForField(nameof(request.Comment), "The comment must be at most 1000 characters.");
 
         ScheduleSlotModel? slot = null;
+        ShiftCorrectionRemovalSnapshot? removal = null;
         int day;
         if (request.ScheduleSlotId is { } slotId)
         {
@@ -94,12 +104,33 @@ public sealed class EmployeeShiftCorrectionsController(
         else
         {
             day = request.DayOfMonth!.Value;
-            await ShiftCorrectionRules.ValidateDayOffAsync(db, schedule, employeeId, day,
-                requestedFromTime, requestedToTime, cancellationToken).ConfigureAwait(false);
+            if (removeShift)
+            {
+                if (day < 1 || day > DateTime.DaysInMonth(schedule.Year, schedule.Month))
+                    throw ValidationException.ForField(nameof(request.DayOfMonth), "Choose a valid day of this month.");
+                removal = ShiftCorrectionRules.CaptureRemoval(schedule, schedule.Slots.Where(item =>
+                    item.EmployeeId == employeeId && item.DayOfMonth == day));
+                if (removal.Shifts.Count == 0)
+                    throw ValidationException.ForField(nameof(request.DayOfMonth), "Choose a day with assigned shifts to request the day off.");
+                if (await ShiftCorrectionRules.HasActiveSwapsAsync(db, removal.Shifts, cancellationToken).ConfigureAwait(false))
+                    throw new ValidationException(ShiftCorrectionRules.ActiveSwapsMessage);
+            }
+            else
+            {
+                await ShiftCorrectionRules.ValidateDayOffAsync(db, schedule, employeeId, day,
+                    requestedFromTime!, requestedToTime!, cancellationToken).ConfigureAwait(false);
+            }
         }
 
-        await ShiftCorrectionRules.ValidateEmployeeOverlapAsync(
-            db, schedule, employeeId, day, slot?.Id, requestedFromTime, requestedToTime, cancellationToken).ConfigureAwait(false);
+        if (await db.ShiftCorrectionRequests.AnyAsync(item =>
+                item.ScheduleId == schedule.Id && item.EmployeeId == employeeId && item.DayOfMonth == day &&
+                item.Status == ShiftCorrectionStatus.Pending &&
+                (removeShift || item.Operation == ShiftCorrectionOperation.RemoveShift), cancellationToken).ConfigureAwait(false))
+            return Conflict(new ProblemDetails { Status = 409, Title = "This day already has a pending correction request." });
+
+        if (!removeShift)
+            await ShiftCorrectionRules.ValidateEmployeeOverlapAsync(
+                db, schedule, employeeId, day, slot?.Id, requestedFromTime!, requestedToTime!, cancellationToken).ConfigureAwait(false);
 
         var hasPendingRequest = slot is not null && await db.ShiftCorrectionRequests
             .AnyAsync(item =>
@@ -125,6 +156,8 @@ public sealed class EmployeeShiftCorrectionsController(
             OriginalToTime = slot?.ToTime,
             RequestedFromTime = requestedFromTime,
             RequestedToTime = requestedToTime,
+            Operation = removeShift ? ShiftCorrectionOperation.RemoveShift : ShiftCorrectionOperation.ChangeTimes,
+            RemovalSnapshotJson = removal is null ? null : JsonSerializer.Serialize(removal),
             Comment = comment,
             Status = ShiftCorrectionStatus.Pending,
             CreatedAtUtc = DateTimeOffset.UtcNow,
@@ -138,10 +171,14 @@ public sealed class EmployeeShiftCorrectionsController(
         {
             return Conflict(new ProblemDetails { Status = 409, Title = "A correction request is already pending." });
         }
+        await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
 
+        var change = removal is null
+            ? $"{(slot is null ? "day off" : $"{slot.FromTime}-{slot.ToTime}")} to {requestedFromTime}-{requestedToTime}"
+            : $"day off requested ({removal.Shifts.Count} assigned shifts)";
         await PostCommitActions.RunAsync(HttpContext, () => workflowLogService.LogAsync(
             User,
-            $"Requested a shift correction in schedule \"{schedule.Name}\" for {schedule.Year}-{schedule.Month:00}-{day:00}: {(slot is null ? "day off" : $"{slot.FromTime}-{slot.ToTime}")} to {requestedFromTime}-{requestedToTime}.",
+            $"Requested a shift correction in schedule \"{schedule.Name}\" for {schedule.Year}-{schedule.Month:00}-{day:00}: {change}.",
             cancellationToken)).ConfigureAwait(false);
         await PostCommitActions.RunAsync(HttpContext, () => realtimeNotifier.NotifyShiftSwapsChangedAsync(
             schedule.ContainerId,
@@ -272,9 +309,34 @@ public sealed class ManagerShiftCorrectionsController(
             ?? throw new KeyNotFoundException($"Shift correction with id {id} was not found.");
         EnsurePending(correction);
 
-        var isDayOff = correction.OriginalFromTime is null && correction.OriginalToTime is null;
-        ScheduleSlotModel slot;
-        if (isDayOff)
+        var removal = ShiftCorrectionRules.ReadRemoval(correction);
+        var isDayOff = removal is null && correction.OriginalFromTime is null && correction.OriginalToTime is null;
+        var requestedFrom = removal is null ? ShiftCorrectionRules.NormalizeTime(correction.RequestedFromTime, nameof(correction.RequestedFromTime)) : null;
+        var requestedTo = removal is null ? ShiftCorrectionRules.NormalizeTime(correction.RequestedToTime, nameof(correction.RequestedToTime)) : null;
+        ScheduleSlotModel? slot = null;
+        if (removal is not null)
+        {
+            var affectedSlots = await db.ScheduleSlots.Where(item => item.ScheduleId == graphId &&
+                item.EmployeeId == correction.EmployeeId && item.DayOfMonth == correction.DayOfMonth)
+                .ToListAsync(cancellationToken).ConfigureAwait(false);
+            var current = ShiftCorrectionRules.CaptureRemoval(correction.Schedule, affectedSlots);
+            if (current.ContainerId != removal.ContainerId || current.Year != removal.Year || current.Month != removal.Month ||
+                removal.Shifts.Count == 0 || !current.Shifts.SequenceEqual(removal.Shifts) ||
+                correction.Schedule.PublicationStatus != SchedulePublicationStatus.Public ||
+                !await db.ScheduleEmployees.AnyAsync(item => item.ScheduleId == graphId &&
+                    item.EmployeeId == correction.EmployeeId && !item.Employee.IsDeleted, cancellationToken).ConfigureAwait(false))
+                return Conflict(new ProblemDetails { Status = 409, Title = "The schedule or request changed. Refresh and try again." });
+
+            if (await ShiftCorrectionRules.HasActiveSwapsAsync(db, removal.Shifts, cancellationToken).ConfigureAwait(false))
+                return Conflict(new ProblemDetails { Status = 409, Title = ShiftCorrectionRules.ActiveSwapsMessage });
+            foreach (var assigned in affectedSlots)
+            {
+                assigned.EmployeeId = null;
+                assigned.Employee = null;
+                assigned.Status = SlotStatus.UNFURNISHED;
+            }
+        }
+        else if (isDayOff)
         {
             if (correction.Schedule.PublicationStatus != SchedulePublicationStatus.Public ||
                 !await db.ScheduleEmployees.AnyAsync(item => item.ScheduleId == graphId &&
@@ -282,13 +344,11 @@ public sealed class ManagerShiftCorrectionsController(
                 throw new ValidationException("Published schedule was not found for this employee.");
 
             await ShiftCorrectionRules.ValidateDayOffAsync(db, correction.Schedule, correction.EmployeeId,
-                correction.DayOfMonth, correction.RequestedFromTime, correction.RequestedToTime,
+                correction.DayOfMonth, requestedFrom!, requestedTo!,
                 cancellationToken, correction.Id).ConfigureAwait(false);
-            ShiftCorrectionRules.ValidatePeriod(
-                ShiftCorrectionRules.NormalizeTime(correction.RequestedFromTime, nameof(correction.RequestedFromTime)),
-                ShiftCorrectionRules.NormalizeTime(correction.RequestedToTime, nameof(correction.RequestedToTime)));
+            ShiftCorrectionRules.ValidatePeriod(requestedFrom!, requestedTo!);
             await ShiftCorrectionRules.ValidateEmployeeOverlapAsync(db, correction.Schedule, correction.EmployeeId,
-                correction.DayOfMonth, null, correction.RequestedFromTime, correction.RequestedToTime,
+                correction.DayOfMonth, null, requestedFrom!, requestedTo!,
                 cancellationToken).ConfigureAwait(false);
             var lastSlotNo = await db.ScheduleSlots.Where(item => item.ScheduleId == graphId &&
                     item.DayOfMonth == correction.DayOfMonth).MaxAsync(item => (int?)item.SlotNo, cancellationToken)
@@ -296,7 +356,7 @@ public sealed class ManagerShiftCorrectionsController(
             slot = new ScheduleSlotModel
             {
                 ScheduleId = graphId, DayOfMonth = correction.DayOfMonth, EmployeeId = correction.EmployeeId,
-                FromTime = correction.RequestedFromTime, ToTime = correction.RequestedToTime,
+                FromTime = requestedFrom!, ToTime = requestedTo!,
                 Status = SlotStatus.ASSIGNED, SlotNo = lastSlotNo + 1,
             };
             db.ScheduleSlots.Add(slot);
@@ -338,8 +398,8 @@ public sealed class ManagerShiftCorrectionsController(
                 .ToListAsync(cancellationToken)
                 .ConfigureAwait(false);
             await ShiftCorrectionRules.ValidateEmployeeOverlapAsync(
-                db, correction.Schedule, correction.EmployeeId, correction.DayOfMonth, slot.Id, correction.RequestedFromTime,
-                correction.RequestedToTime, cancellationToken).ConfigureAwait(false);
+                db, correction.Schedule, correction.EmployeeId, correction.DayOfMonth, slot.Id, requestedFrom!,
+                requestedTo!, cancellationToken).ConfigureAwait(false);
             var collidesWithSlotNumber = otherSlots.Any(item =>
                 item.Id != slot.Id &&
                 item.DayOfMonth == slot.DayOfMonth &&
@@ -357,9 +417,12 @@ public sealed class ManagerShiftCorrectionsController(
             ? await ShiftCorrectionRules.GetSettingColorAsync(db, managerId, cancellationToken).ConfigureAwait(false)
             : ShiftCorrectionRules.NormalizeColor(request.HighlightColor, nameof(request.HighlightColor));
 
-        correction.ScheduleSlotId = slot.Id;
-        slot.FromTime = correction.RequestedFromTime;
-        slot.ToTime = correction.RequestedToTime;
+        if (slot is not null)
+        {
+            correction.ScheduleSlotId = slot.Id;
+            slot.FromTime = requestedFrom!;
+            slot.ToTime = requestedTo!;
+        }
 
         var style = await db.ScheduleCellStyles.SingleOrDefaultAsync(item =>
             item.ScheduleId == graphId &&
@@ -385,9 +448,12 @@ public sealed class ManagerShiftCorrectionsController(
         await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
 
+        var change = removal is null
+            ? $"{correction.OriginalFromTime}-{correction.OriginalToTime} to {requestedFrom}-{requestedTo}"
+            : $"day off ({removal.Shifts.Count} assigned shifts removed)";
         await PostCommitActions.RunAsync(HttpContext, () => workflowLogService.LogAsync(
             User,
-            $"Approved {correction.Employee.FirstName} {correction.Employee.LastName}'s shift correction in schedule \"{correction.Schedule.Name}\" for {correction.Schedule.Year}-{correction.Schedule.Month:00}-{correction.DayOfMonth:00}: {correction.OriginalFromTime}-{correction.OriginalToTime} to {correction.RequestedFromTime}-{correction.RequestedToTime}.",
+            $"Approved {correction.Employee.FirstName} {correction.Employee.LastName}'s shift correction in schedule \"{correction.Schedule.Name}\" for {correction.Schedule.Year}-{correction.Schedule.Month:00}-{correction.DayOfMonth:00}: {change}.",
             cancellationToken)).ConfigureAwait(false);
         await NotifyChangedAsync(correction, "manager-shift-correction-approved", scheduleChanged: true).ConfigureAwait(false);
 
@@ -493,6 +559,8 @@ public sealed class ManagerShiftCorrectionsController(
     }
 }
 
+internal sealed record ShiftCorrectionRemovalSnapshot(int ContainerId, int Year, int Month, IReadOnlyList<ShiftCorrectionOriginalShiftDto> Shifts);
+
 internal static class ShiftCorrectionRules
 {
     internal const string DefaultHighlightColor = "#FDE68A";
@@ -506,30 +574,61 @@ internal static class ShiftCorrectionRules
             .Include(request => request.Employee)
             .Include(request => request.ReviewedByManager);
 
-    internal static ShiftCorrectionRequestDto ToDto(ShiftCorrectionRequestModel model) => new()
+    internal static ShiftCorrectionRemovalSnapshot CaptureRemoval(ScheduleModel schedule, IEnumerable<ScheduleSlotModel> slots)
+        => new(schedule.ContainerId, schedule.Year, schedule.Month, slots.OrderBy(slot => slot.Id)
+            .Select(slot => new ShiftCorrectionOriginalShiftDto(slot.Id, slot.FromTime, slot.ToTime)).ToList());
+
+    internal static ShiftCorrectionRemovalSnapshot? ReadRemoval(ShiftCorrectionRequestModel model)
+        => model.Operation == ShiftCorrectionOperation.RemoveShift
+            ? JsonSerializer.Deserialize<ShiftCorrectionRemovalSnapshot>(model.RemovalSnapshotJson!)
+                ?? throw new InvalidOperationException("Missing shift removal snapshot.")
+            : null;
+
+    internal const string ActiveSwapsMessage = "Resolve the open swap or pending shift approval before requesting or approving this day off.";
+
+    internal static async Task<bool> HasActiveSwapsAsync(AppDbContext db,
+        IReadOnlyList<ShiftCorrectionOriginalShiftDto> shifts, CancellationToken cancellationToken)
     {
-        Id = model.Id,
-        ContainerId = model.Schedule.ContainerId,
-        ScheduleId = model.ScheduleId,
-        ScheduleSlotId = model.ScheduleSlotId,
-        IsDayOffRequest = model.OriginalFromTime is null && model.OriginalToTime is null,
-        ScheduleName = model.Schedule.Name,
-        ShopName = model.Schedule.Shop?.Name ?? string.Empty,
-        Year = model.Schedule.Year,
-        Month = model.Schedule.Month,
-        DayOfMonth = model.DayOfMonth,
-        EmployeeId = model.EmployeeId,
-        EmployeeName = $"{model.Employee.FirstName} {model.Employee.LastName}".Trim(),
-        OriginalFromTime = model.OriginalFromTime,
-        OriginalToTime = model.OriginalToTime,
-        RequestedFromTime = model.RequestedFromTime,
-        RequestedToTime = model.RequestedToTime,
-        Comment = model.Comment,
-        Status = model.Status.ToString().ToLowerInvariant(),
-        CreatedAtUtc = model.CreatedAtUtc,
-        ReviewedAtUtc = model.ReviewedAtUtc,
-        ReviewedByManagerName = model.ReviewedByManager?.DisplayName,
-    };
+        var ids = shifts.Select(shift => shift.SlotId).ToArray();
+        return await db.ShiftSwapRequests.AnyAsync(item => item.Status == ShiftSwapStatus.Open &&
+                ((item.ScheduleSlotId.HasValue && ids.Contains(item.ScheduleSlotId.Value)) ||
+                 (item.ReturnScheduleSlotId.HasValue && ids.Contains(item.ReturnScheduleSlotId.Value))), cancellationToken)
+            || await db.ContractShiftApprovalRequests.AnyAsync(item => item.Status == "pending" &&
+                (ids.Contains(item.ScheduleSlotId) ||
+                 (item.ReturnScheduleSlotId.HasValue && ids.Contains(item.ReturnScheduleSlotId.Value))), cancellationToken);
+    }
+
+    internal static ShiftCorrectionRequestDto ToDto(ShiftCorrectionRequestModel model)
+    {
+        var removal = ReadRemoval(model);
+        var isDayOffRequest = removal is null && model.OriginalFromTime is null && model.OriginalToTime is null;
+        return new()
+        {
+            Id = model.Id,
+            ContainerId = model.Schedule.ContainerId,
+            ScheduleId = model.ScheduleId,
+            ScheduleSlotId = model.ScheduleSlotId,
+            IsDayOffRequest = isDayOffRequest,
+            RequestType = removal is not null ? "removeShift" : isDayOffRequest ? "addShift" : "adjustShift",
+            OriginalShifts = removal?.Shifts ?? [],
+            ScheduleName = model.Schedule.Name,
+            ShopName = model.Schedule.Shop?.Name ?? string.Empty,
+            Year = removal?.Year ?? model.Schedule.Year,
+            Month = removal?.Month ?? model.Schedule.Month,
+            DayOfMonth = model.DayOfMonth,
+            EmployeeId = model.EmployeeId,
+            EmployeeName = $"{model.Employee.FirstName} {model.Employee.LastName}".Trim(),
+            OriginalFromTime = model.OriginalFromTime,
+            OriginalToTime = model.OriginalToTime,
+            RequestedFromTime = model.RequestedFromTime,
+            RequestedToTime = model.RequestedToTime,
+            Comment = model.Comment,
+            Status = model.Status.ToString().ToLowerInvariant(),
+            CreatedAtUtc = model.CreatedAtUtc,
+            ReviewedAtUtc = model.ReviewedAtUtc,
+            ReviewedByManagerName = model.ReviewedByManager?.DisplayName,
+        };
+    }
 
     internal static string NormalizeTime(string? value, string fieldName)
     {

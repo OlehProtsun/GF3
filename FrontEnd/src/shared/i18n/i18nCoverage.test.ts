@@ -5,6 +5,9 @@ import { expect, it } from "vitest";
 import pl from "./pl.json";
 import uk from "./uk.json";
 import serverMessages from "./serverMessages.json";
+import { guideTopics, platformSteps } from "../../pages/employee-install/model/guideContent";
+import { guideInstructions } from "../../pages/employee-install/model/guideInstructions";
+import { shiftSwapScenarios } from "../../pages/employee-install/model/shiftSwapGuide";
 
 const root = resolve("src");
 const catalogs: Record<string, Record<string, string>> = { pl, uk };
@@ -17,6 +20,22 @@ function sourceFiles(directory: string): string[] {
 }
 const placeholders = (value: string) => [...new Set(value.match(/\{\d+\}/g) ?? [])].sort();
 const holidayNames = ["New Year's Day", "Epiphany", "Labour Day", "Constitution Day", "Assumption of Mary", "All Saints' Day", "National Independence Day", "Christmas Eve", "Christmas Day", "Second Day of Christmas", "Easter Sunday", "Easter Monday", "Pentecost", "Corpus Christi"];
+const guideGroups = guideTopics.flatMap(topic => topic.groups);
+const guideSteps = [...Object.values(platformSteps).flat(), ...guideGroups.flatMap(group => group.steps)];
+const guideStepTitles = guideSteps.map(step => step.title);
+const guideVisualLabels = guideSteps.flatMap(step => [step.control ?? step.title,
+  ...(step.extraVisuals ?? []).map(visual => visual.control ?? step.title)]);
+const guideTitles = guideTopics.map(topic => topic.title);
+const guideRowLabels = ["Page Menu", "Share", "GF", "Add", "Open as Web App"];
+const guideTimelineTitles = ["Offered interval", "Only the exact shift", "Allow custom time", "Accepted"];
+const guideTimelineLabels = ["Offered", "Not offered", "Accepted", "Remaining offer", "Allow custom time"];
+const correctionSteps = ["Schedule", "Day", "Shift", "Comment", "Review"];
+const correctionTitles = ["Choose a schedule", "Choose a day", "Adjust shift time", "Add a comment", "Review your request"];
+const guideSuppliedLabels = new Set([
+  "pages/employee-install/ui/GuideVisual.tsx",
+  "pages/employee-install/ui/GuideInterfaceIllustration.tsx",
+  "pages/employee-install/ui/GuideLanguageDialog.tsx",
+]);
 
 // Each mapping is finite application text, reviewed at its declaration/callers.
 // API reasons use translateServerMessage instead, preserving unknown record content.
@@ -24,6 +43,25 @@ const mappings: Record<string, Record<string, readonly string[]>> = {
   "entities/containers/ui/ContainerGraphMatrix.tsx": { "day.holiday.name": holidayNames },
   "pages/employee-availability/ui/EmployeeAvailabilityMatrix.tsx": { "holiday.name": holidayNames },
   "pages/employee-schedule/ui/EmployeeSchedulePage.tsx": { "holiday.name": holidayNames },
+  "pages/employee-schedule/ui/EmployeeScheduleDailyBody.tsx": { "holiday.name": holidayNames },
+  "pages/employee-schedule/ui/EmployeeShiftCorrectionDialog.tsx": {
+    "item.label": correctionSteps, "steps[step].title": correctionTitles, label: ["Start time", "End time"],
+  },
+  "pages/employee-install/ui/EmployeeInstallPage.tsx": {
+    "step.title": guideStepTitles,
+    instruction: guideSteps.flatMap(step => step.instruction ?? guideInstructions[step.visual]?.instruction ?? []),
+    result: guideSteps.flatMap(step => step.result ?? (!step.instruction ? guideInstructions[step.visual]?.result : undefined) ?? []),
+    "scenario.title": shiftSwapScenarios.map(scenario => scenario.title),
+    "scenario.choice": shiftSwapScenarios.map(scenario => scenario.choice),
+    'activeTopic?.title ?? "GF App Guide"': [...guideTitles, "GF App Guide"],
+    "group.title": guideGroups.map(group => group.title), "nextTopic.title": guideTitles, "topic.title": guideTitles,
+    "topic.subtitle": guideTopics.map(topic => topic.subtitle),
+  },
+  "pages/employee-install/ui/GuideInterfaceIllustration.tsx": { title: guideTimelineTitles, label: guideTimelineLabels },
+  "pages/employee-install/ui/GuideLanguageDialog.tsx": { label: ["Polish", "Ukrainian", "English"] },
+  "pages/employee-install/ui/GuideVisual.tsx": {
+    label: [...guideRowLabels, ...guideVisualLabels], "step.title": guideStepTitles, "step.control ?? step.title": guideVisualLabels,
+  },
   "pages/manager-settings/ui/PublicHolidayListDialog.tsx": { "holiday.name": holidayNames },
   "app/layouts/manager-phone-layout/ManagerPhoneLayout.tsx": { label: ["Home", "Containers", "Dispo", "Employees", "More"] },
   "pages/home/ui/HomePage.tsx": { label: ["All Activity", "Swaps", "Vacations", "Corrections", "Requires Approval"] },
@@ -59,6 +97,7 @@ const declarations: Record<string, string> = {
   "entities/containers/ui/ContainerGraphPresetSelect.tsx": "MONTH_LABELS",
   "pages/container-graph-edit/ui/ContainerGraphEditPage.tsx": "GENERATE_AVAILABILITY_GROUP_REQUIRED_MESSAGE",
   "pages/manager-account/ui/ManagerAccountPage.tsx": "PASSWORD_VALIDATION_MESSAGE",
+  "pages/employee-install/ui/GuideLanguageDialog.tsx": "options",
 };
 
 it("covers literal and reviewed finite translation calls in application source", () => {
@@ -70,7 +109,7 @@ it("covers literal and reviewed finite translation calls in application source",
       let values: string[] = [];
       const visitDeclaration = (node: ts.Node) => {
         if (ts.isVariableDeclaration(node) && node.name.getText(source) === declarations[name] && node.initializer) {
-          if (declarations[name] === "tabs" || declarations[name] === "activityTabs" || declarations[name] === "statisticMetrics") {
+          if (["tabs", "activityTabs", "statisticMetrics", "options"].includes(declarations[name])) {
             const labels = (child: ts.Node) => {
               if (ts.isPropertyAssignment(child) && child.name.getText(source) === "label") values.push(...stringLiterals(child.initializer));
               ts.forEachChild(child, labels);
@@ -98,7 +137,7 @@ it("covers literal and reviewed finite translation calls in application source",
         if (!values) failures.push(`${location}: unreviewed dynamic translation ${argument.getText(source)}`);
         else {
           values.forEach(key => checkKey(key, location));
-          if (argument.getText(source) === "label" && !declarations[name]) {
+          if (argument.getText(source) === "label" && !declarations[name] && !guideSuppliedLabels.has(name)) {
             let ancestor: ts.Node | undefined = argument.parent;
             while (ancestor && !(ts.isCallExpression(ancestor) && ts.isPropertyAccessExpression(ancestor.expression) && ancestor.expression.name.text === "map")) ancestor = ancestor.parent;
             if (ancestor && ts.isCallExpression(ancestor) && ts.isPropertyAccessExpression(ancestor.expression)) {
@@ -123,6 +162,19 @@ it("covers literal and reviewed finite translation calls in application source",
     const visit = (node: ts.Node) => {
       if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === "t" && node.arguments[0]) {
         checkArgument(node.arguments[0], `${name}:${source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1}`);
+      }
+      if (name.endsWith("GuideVisual.tsx") && ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === "row") {
+        checkArgument(node.arguments[0], name);
+      }
+      if (name.endsWith("GuideInterfaceIllustration.tsx") && ts.isJsxAttribute(node) && ts.isJsxSelfClosingElement(node.parent.parent) &&
+          node.parent.parent.tagName.getText(source) === "SwapTimeline") {
+        if (node.name.getText(source) === "title" && node.initializer && ts.isStringLiteral(node.initializer)) checkKey(node.initializer.text, name);
+        if (node.name.getText(source) === "parts" && node.initializer && ts.isJsxExpression(node.initializer) &&
+            node.initializer.expression && ts.isArrayLiteralExpression(node.initializer.expression)) {
+          for (const part of node.initializer.expression.elements) {
+            if (ts.isArrayLiteralExpression(part) && part.elements[2] && ts.isStringLiteral(part.elements[2])) checkKey(part.elements[2].text, name);
+          }
+        }
       }
       ts.forEachChild(node, visit);
     };

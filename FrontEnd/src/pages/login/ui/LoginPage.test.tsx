@@ -58,7 +58,7 @@ describe("LoginPage password modes", () => {
     renderPage();
 
     expect(screen.getByRole("textbox", { name: "Username" })).toHaveValue("saved.manager");
-    expect(screen.getByRole("button", { name: "Phone" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "PIN", exact: true })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("button", { name: "Enter password" })).toBeEnabled();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(screen.getByLabelText("Numeric keypad")).not.toBeVisible();
@@ -70,7 +70,8 @@ describe("LoginPage password modes", () => {
 
     await user.type(screen.getByRole("textbox", { name: "Username" }), "manager.two");
     await user.type(screen.getByLabelText("Password"), "12a34b567");
-    await user.click(screen.getByRole("button", { name: "Phone" }));
+    expect(screen.getByLabelText("Password")).toHaveValue("123456");
+    await user.click(screen.getByRole("button", { name: "PIN", exact: true }));
 
     expect(window.localStorage.getItem("gf3.auth.last-username")).toBe("manager.two");
     expect(window.localStorage.getItem("gf3.auth.password-mode")).toBe("phone");
@@ -108,7 +109,7 @@ describe("LoginPage password modes", () => {
   test("requires username before opening and preserves storage", async () => {
     const user = userEvent.setup();
     renderPage();
-    await user.click(screen.getByRole("button", { name: "Phone" }));
+    await user.click(screen.getByRole("button", { name: "PIN", exact: true }));
     const launch = screen.getByRole("button", { name: "Enter password" });
     expect(launch).toBeDisabled();
     await user.type(screen.getByRole("textbox", { name: "Username" }), "manager");

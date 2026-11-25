@@ -38,6 +38,7 @@ type MutationOptions<TData, TVariables> = {
   onSuccess?: (data: TData, variables: TVariables) => void;
   onError?: (error: unknown, variables: TVariables) => void;
   mutationKey?: QueryKey;
+  meta?: Record<string, unknown>;
 };
 
 type QueryClientOptions = {
@@ -73,7 +74,10 @@ export class MutationCache {
 
   constructor(
     config: {
-      onError?: (error: unknown, variables: unknown, context: unknown, mutation: { options: { mutationKey?: QueryKey } }) => void;
+      onError?: (error: unknown, variables: unknown, context: unknown, mutation: {
+        options: { mutationKey?: QueryKey };
+        meta?: Record<string, unknown>;
+      }) => void;
     } = {},
   ) {
     this.config = config;
@@ -464,9 +468,22 @@ export function useQuery<TData>(options: QueryOptions<TData>) {
   }, [bump, client, keyString, options.cancelOnUnmount, options.enabled, retry, staleTime]);
 
   const refetchWithSignal = useCallback((signal: AbortSignal) => {
-    signal.throwIfAborted();
-    return client.fetchQuery(queryKeyRef.current, ({ signal: querySignal }) =>
-      queryFnRef.current({ signal: AbortSignal.any([querySignal, signal]) }), { retry: 0 });
+    if (signal.aborted) return Promise.reject(signal.reason ?? new RequestCanceledError());
+    return client.fetchQuery(queryKeyRef.current, async ({ signal: querySignal }) => {
+      const controller = new AbortController();
+      const abortFromCaller = () => controller.abort(signal.reason);
+      const abortFromQuery = () => controller.abort(querySignal.reason);
+      signal.addEventListener("abort", abortFromCaller);
+      querySignal.addEventListener("abort", abortFromQuery);
+      try {
+        if (querySignal.aborted) abortFromQuery();
+        if (signal.aborted) abortFromCaller();
+        return await queryFnRef.current({ signal: controller.signal });
+      } finally {
+        signal.removeEventListener("abort", abortFromCaller);
+        querySignal.removeEventListener("abort", abortFromQuery);
+      }
+    }, { retry: 0 });
   }, [client]);
 
   return {
@@ -505,7 +522,7 @@ export function useMutation<TData, TVariables>(options: MutationOptions<TData, T
           setError(reason);
           options.onError?.(reason, variables);
           callbacks?.onError?.(reason);
-          client.mutationCache?.config.onError?.(reason, variables, null, { options: { mutationKey: options.mutationKey } });
+          client.mutationCache?.config.onError?.(reason, variables, null, { options: { mutationKey: options.mutationKey }, meta: options.meta });
         })
         .finally(() => { client.changeMutationCount(-1); setIsPending(false); });
     },

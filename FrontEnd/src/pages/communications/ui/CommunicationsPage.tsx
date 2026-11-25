@@ -6,6 +6,9 @@ import {
   useDeleteCommunicationMutation,
   useManagerCommunicationsQuery,
   useUpdateCommunicationMutation,
+  getCommunicationBlocks,
+  type CommunicationDraftBlock,
+  CommunicationPreview,
   type CommunicationMessageDto,
 } from "@entities/communications";
 import { AvailabilityDateTimeField } from "@entities/availability-groups";
@@ -14,13 +17,14 @@ import { ErrorBanner } from "@shared/ui/components/ErrorBanner";
 import { IosButton } from "@shared/ui/components/IosButton";
 import { ConfirmDialog } from "@shared/ui/ConfirmDialog";
 import { pushErrorAlertFromError } from "@shared/ui/feedback/error-alerts/errorAlerts";
-import { NoteIcon, PlusIcon } from "@shared/ui/icons";
+import { EyeIcon, NoteIcon, PlusIcon } from "@shared/ui/icons";
 import { PageHeader } from "@shared/ui/PageHeader";
+import { useAuth } from "@app/providers/AuthProvider";
+import { CommunicationBlockEditor } from "./CommunicationBlockEditor";
 import styles from "./CommunicationsPage.module.css";
 
 type FormState = {
   title: string;
-  body: string;
   visibleFromLocal: string;
   visibleToLocal: string;
 };
@@ -56,7 +60,6 @@ function createInitialForm(): FormState {
   const defaultVisibleTo = new Date(now.getTime() + 24 * 60 * 60 * 1000);
   return {
     title: "",
-    body: "",
     visibleFromLocal: toDateTimeLocalValue(now),
     visibleToLocal: toDateTimeLocalValue(defaultVisibleTo),
   };
@@ -92,7 +95,7 @@ function getDeadlineTone(message: CommunicationMessageDto) {
 }
 
 function getMessageStatusClassName(message: CommunicationMessageDto) {
-  if (getDeadlineTone(message) === "Scheduled") {
+  if (getDeadlineTone(message) === t("Scheduled")) {
     return styles.statusScheduled;
   }
 
@@ -103,7 +106,18 @@ function getMessageStatusClassName(message: CommunicationMessageDto) {
   return getDeadlineTone(message) === t("Due soon") ? styles.statusSoon : styles.statusActive;
 }
 
+function MessageActionIcon({ type }: { type: "edit" | "delete" }) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"
+      strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      {type === "edit" ? <path d="m15 5 4 4M4 20l4-1 12-12-4-4L4 15z" /> :
+        <path d="M4 7h16m-14 0 1 13h10l1-13M9 7V4h6v3m-5 4v5m4-5v5" />}
+    </svg>
+  );
+}
+
 export function CommunicationsPage() {
+  const { session } = useAuth();
   const communicationsQuery = useManagerCommunicationsQuery();
   const createCommunicationMutation = useCreateCommunicationMutation();
   const updateCommunicationMutation = useUpdateCommunicationMutation();
@@ -114,7 +128,12 @@ export function CommunicationsPage() {
   const [inlineSuccess, setInlineSuccess] = useState<string | null>(null);
   const [editingMessageId, setEditingMessageId] = useState<number | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<CommunicationMessageDto | null>(null);
+  const [blocks, setBlocks] = useState<CommunicationDraftBlock[]>(() => [
+    { id: crypto.randomUUID(), type: "text", text: "" },
+  ]);
+  const [preview, setPreview] = useState<CommunicationMessageDto | null | undefined>(undefined);
   const isSaving = createCommunicationMutation.isPending || updateCommunicationMutation.isPending;
+  const text = blocks.flatMap(block => block.type === "text" && block.text?.trim() ? [block.text.trim()] : []).join("\n\n");
 
   const activeCount = useMemo(
     () => messages.filter(message => message.isActive).length,
@@ -130,13 +149,14 @@ export function CommunicationsPage() {
   const resetForm = () => {
     setForm(createInitialForm());
     setEditingMessageId(null);
+    setBlocks([{ id: crypto.randomUUID(), type: "text", text: "" }]);
   };
 
   const beginEdit = (message: CommunicationMessageDto) => {
     setEditingMessageId(message.id);
+    setBlocks(getCommunicationBlocks(message).map(block => message.blocks ? block : { ...block, id: crypto.randomUUID() }));
     setForm({
       title: message.title,
-      body: message.body,
       visibleFromLocal: toDateTimeLocalValue(new Date(message.visibleFromUtc)),
       visibleToLocal: toDateTimeLocalValue(new Date(message.deadlineAtUtc)),
     });
@@ -148,12 +168,18 @@ export function CommunicationsPage() {
     event.preventDefault();
 
     const title = form.title.trim();
-    const body = form.body.trim();
+    const body = text;
     const visibleFromDate = new Date(form.visibleFromLocal);
     const visibleToDate = new Date(form.visibleToLocal);
 
     if (!title || !body) {
       setInlineError(t("Title and message are required."));
+      setInlineSuccess(null);
+      return;
+    }
+
+    if (body.length > 4000) {
+      setInlineError(t("Message is too long."));
       setInlineSuccess(null);
       return;
     }
@@ -182,6 +208,7 @@ export function CommunicationsPage() {
         body,
         visibleFromUtc: visibleFromDate.toISOString(),
         deadlineAtUtc: visibleToDate.toISOString(),
+        blocks: blocks.filter(block => block.type !== "text" || block.text?.trim()),
       };
       const saved = editingMessageId === null
         ? await runMutation(createCommunicationMutation.mutate, payload)
@@ -192,10 +219,12 @@ export function CommunicationsPage() {
       setInlineError(null);
       setInlineSuccess(t("Communication \"{0}\" was {1} and is visible until {2}.", saved.title, successVerb, formatDateTime(saved.deadlineAtUtc)));
     } catch (error) {
-      const message = getErrorMessage(error, t("Could not create communication."));
+      const fallback = blocks.some(block => block.file)
+        ? t("Could not upload the attachment. Please try again.")
+        : t("Could not create communication.");
+      const message = getErrorMessage(error, fallback);
       setInlineError(message);
       setInlineSuccess(null);
-      pushErrorAlertFromError(error, t("Could not create communication."));
     }
   };
 
@@ -241,45 +270,39 @@ export function CommunicationsPage() {
           {inlineSuccess ? <div className={styles.successBanner}>{inlineSuccess}</div> : null}
 
           <form className={styles.form} onSubmit={handleSubmit}>
-            <label className={styles.field}>
-              <span>{t("Title")}</span>
-              <input
-                value={form.title}
-                onChange={updateForm("title")}
-                maxLength={160}
-                placeholder={t("Short announcement title")}
+            <section className={styles.generalInfo} aria-label={t("General information")}>
+              <h2>{t("General information")}</h2>
+              <label className={styles.field}>
+                <span>{t("Title")}</span>
+                <input
+                  value={form.title}
+                  onChange={updateForm("title")}
+                  maxLength={160}
+                  placeholder={t("Short announcement title")}
+                />
+              </label>
+
+              <AvailabilityDateTimeField
+                id="communication-visible-from"
+                label={t("Visible From")}
+                value={form.visibleFromLocal}
+                defaultTime="09:00"
+                onChange={value => setForm(current => ({ ...current, visibleFromLocal: value }))}
               />
-            </label>
 
-            <AvailabilityDateTimeField
-              id="communication-visible-from"
-              label={t("Visible From")}
-              value={form.visibleFromLocal}
-              defaultTime="09:00"
-              onChange={value => setForm(current => ({ ...current, visibleFromLocal: value }))}
-            />
-
-            <AvailabilityDateTimeField
-              id="communication-visible-to"
-              label={t("Visible To")}
-              value={form.visibleToLocal}
-              defaultTime="23:59"
-              onChange={value => setForm(current => ({ ...current, visibleToLocal: value }))}
-            />
-
-            <label className={styles.field}>
-              <span>{t("Message")}</span>
-              <textarea
-                value={form.body}
-                onChange={updateForm("body")}
-                maxLength={4000}
-                rows={8}
-                placeholder={t("Write the update employees need to see when they sign in.")}
+              <AvailabilityDateTimeField
+                id="communication-visible-to"
+                label={t("Visible To")}
+                value={form.visibleToLocal}
+                defaultTime="23:59"
+                onChange={value => setForm(current => ({ ...current, visibleToLocal: value }))}
               />
-            </label>
-
+            </section>
+            <CommunicationBlockEditor blocks={blocks} messageId={editingMessageId ?? undefined} disabled={isSaving}
+              onChange={next => { setBlocks(next); setInlineError(null); setInlineSuccess(null); }}
+              onError={error => { setInlineError(error); setInlineSuccess(null); }} />
             <div className={styles.formFooter}>
-              <span>{form.body.trim().length}/4000</span>
+              <span>{text.length}/4000</span>
               <div className={styles.formActions}>
                 {editingMessageId !== null ? (
                   <IosButton
@@ -290,6 +313,8 @@ export function CommunicationsPage() {
                     disabled={isSaving}
                   />
                 ) : null}
+                <IosButton type="button" label={t("Preview")} variant="secondary" className={styles.previewButton}
+                  icon={<EyeIcon size={15} />} onClick={() => setPreview(null)} disabled={isSaving} />
                 <IosButton
                   type="submit"
                   label={isSaving ? t("Saving...") : editingMessageId === null ? t("Create") : t("Save changes")}
@@ -329,38 +354,64 @@ export function CommunicationsPage() {
             <div className={styles.stateText}>{t("No communications have been created yet.")}</div>
           ) : (
             <div className={styles.messageList}>
-              {messages.map(message => (
-                <article key={message.id} className={styles.messageItem}>
-                  <div className={styles.messageTopLine}>
-                    <h2>{message.title}</h2>
-                    <span className={[styles.statusBadge, getMessageStatusClassName(message)].join(" ")}>
-                      {getDeadlineTone(message)}
-                    </span>
-                  </div>
-                  <p>{message.body}</p>
-                  <div className={styles.messageMeta}>
-                    <span>{t("Visible from")} {formatDateTime(message.visibleFromUtc)}</span>
-                    <span>{t("Visible to")} {formatDateTime(message.deadlineAtUtc)}</span>
-                    <span>{t("Created by")} {message.createdByManagerName}</span>
-                    <span>{formatDateTime(message.createdAtUtc)}</span>
-                  </div>
-                  <div className={styles.messageActions}>
-                    <button type="button" onClick={() => beginEdit(message)} disabled={isSaving}>
-                      {t("Edit")}</button>
-                    <button
-                      type="button"
-                      className={styles.deleteButton}
-                      onClick={() => setDeleteTarget(message)}
-                      disabled={deleteCommunicationMutation.isPending}
-                    >
-                      {t("Delete")}</button>
-                  </div>
-                </article>
-              ))}
+              {messages.map(message => {
+                const content = getCommunicationBlocks(message);
+                const photos = content.filter(block => block.type === "photo").length;
+                const gifs = content.filter(block => block.type === "gif").length;
+                return (
+                  <article key={message.id} className={styles.messageItem}>
+                    <div className={styles.messageTopLine}>
+                      <h2>{message.title}</h2>
+                      <span className={[styles.statusBadge, getMessageStatusClassName(message)].join(" ")}>
+                        {getDeadlineTone(message)}
+                      </span>
+                    </div>
+                    <p className={styles.messageSummary}>{content.filter(block => block.type === "text").map(block => block.text).join(" ")}</p>
+                    {(photos > 0 || gifs > 0) && (
+                      <div className={styles.headerPills}>
+                        {photos > 0 && <span className={styles.countPill}>{photos} {t(photos === 1 ? "Photo" : "Photos")}</span>}
+                        {gifs > 0 && <span className={styles.countPill}>{gifs} {t(gifs === 1 ? "GIF" : "GIFs")}</span>}
+                      </div>
+                    )}
+                    <div className={styles.messageMeta}>
+                      <span>{t("Visible from")} {formatDateTime(message.visibleFromUtc)}</span>
+                      <span>{t("Visible to")} {formatDateTime(message.deadlineAtUtc)}</span>
+                      <span>{t("Created by")} {message.createdByManagerName}</span>
+                      <span>{formatDateTime(message.createdAtUtc)}</span>
+                    </div>
+                    <div className={styles.messageActions}>
+                      <button type="button" onClick={() => setPreview(message)}><EyeIcon size={16} />{t("Preview")}</button>
+                      <button type="button" onClick={() => beginEdit(message)} disabled={isSaving}>
+                        <MessageActionIcon type="edit" />{t("Edit")}</button>
+                      <button
+                        type="button"
+                        className={styles.deleteButton}
+                        onClick={() => setDeleteTarget(message)}
+                        disabled={deleteCommunicationMutation.isPending}
+                      >
+                        <MessageActionIcon type="delete" />{t("Delete")}</button>
+                    </div>
+                  </article>
+                );
+              })}
             </div>
           )}
         </section>
       </div>
+
+      {preview !== undefined && (
+        <CommunicationPreview
+          message={preview ?? {
+            id: editingMessageId ?? undefined,
+            title: form.title.trim(),
+            deadlineAtUtc: form.visibleToLocal,
+            createdByManagerName: messages.find(message => message.id === editingMessageId)?.createdByManagerName
+              ?? session?.displayName ?? "",
+          }}
+          blocks={preview ? getCommunicationBlocks(preview) : blocks}
+          onClose={() => setPreview(undefined)}
+        />
+      )}
 
       <ConfirmDialog
         open={deleteTarget !== null}

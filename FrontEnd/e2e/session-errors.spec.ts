@@ -23,7 +23,7 @@ for (const status of [401, 500]) {
     await page.goto("/profile");
     if (status === 401) {
       await expect(page).toHaveURL(/\/login/);
-      await expect(page.getByRole("button", { name: "Sign in", exact: true })).toBeVisible();
+      await expect(page.getByRole("button", { name: /^(Sign in|Zaloguj się|Увійти)$/ })).toBeVisible();
       expect(await page.evaluate(() => localStorage.getItem("gf3.auth.access-token"))).toBeNull();
     } else {
       await expect(page.getByText("Could not load your profile right now.")).toBeVisible();

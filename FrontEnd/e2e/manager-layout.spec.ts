@@ -1,4 +1,5 @@
-import { expect, test } from "@playwright/test";
+import { expect } from "@playwright/test";
+import { test } from "./fixtures/isolatedBackend";
 import { loginAsManager, loginWithCredentials } from "./helpers";
 
 test.describe("manager sidebar layout", () => {
@@ -53,7 +54,12 @@ test.describe("manager sidebar layout", () => {
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
       expect(await page.locator("main").evaluate(el => parseFloat(getComputedStyle(el).paddingLeft))).toBe(0);
     }
-    await page.getByRole("button", { name: "Open sidebar", exact: true }).click();
+  });
+
+  test("keeps content within the viewport across manager sidebar routes", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await loginAsManager(page);
+    const rail = page.locator("#manager-sidebar-navigation");
     for (const name of ["Employee", "Shop", "Availability", "Urlop", "Container", "Message", "Settings", "Home"]) {
       const link = rail.getByRole("link", { name, exact: true });
       const href = await link.getAttribute("href"); await link.click();
@@ -63,6 +69,11 @@ test.describe("manager sidebar layout", () => {
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
       }
     }
+  });
+
+  test("opens system news and the notepad with the sidebar collapsed", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await loginAsManager(page);
     await page.getByRole("button", { name: "Collapse sidebar", exact: true }).first().click();
     await page.getByRole("button", { name: "Open system news", exact: true }).click();
     await expect(page.getByRole("complementary", { name: "System news", exact: true })).toBeVisible();

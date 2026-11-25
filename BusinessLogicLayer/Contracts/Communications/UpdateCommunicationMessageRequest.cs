@@ -2,6 +2,12 @@ namespace BusinessLogicLayer.Contracts.Communications;
 
 public sealed class UpdateCommunicationMessageRequest
 {
+    public IReadOnlyList<CommunicationContentBlock>? Blocks { get; init; }
+    public CommunicationGifAttachment? Photo { get; set; }
+    public CommunicationGifAttachment? Gif { get; set; }
+    public bool RemovePhoto { get; set; }
+    public bool RemoveGif { get; set; }
+
     public string? Title { get; set; }
 
     public string? Body { get; set; }

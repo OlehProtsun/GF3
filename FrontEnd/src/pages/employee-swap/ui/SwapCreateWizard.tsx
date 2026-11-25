@@ -2,26 +2,29 @@ import { useEffect, useId, useMemo, useRef, useState, type RefObject } from "rea
 import { createPortal } from "react-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import type { EmployeeSchedule } from "@entities/employee-schedule";
-import { useShiftSwapPreviewQuery, useShiftSwapReturnCandidatesQuery, type ShiftSwap, type ShiftSwapEmployee, type SwapWizardRequest } from "@entities/shift-swaps";
+import { useShiftSwapPreviewQuery, useShiftSwapReturnCandidatesQuery, type ShiftSwap, type ShiftSwapEmployee, type ShiftSwapOfferPreview, type SwapWizardRequest } from "@entities/shift-swaps";
 import { queryKeys } from "@shared/api/queryKeys";
 import { getErrorMessage } from "@shared/api/httpClient";
 import { getLocale, translateServerMessage, t } from "@shared/i18n";
-import { ChevronLeftIcon } from "@shared/ui/icons";
+import { CheckIcon, ChevronLeftIcon, ClockIcon } from "@shared/ui/icons";
+import { IosButton } from "@shared/ui/components/IosButton";
 import { SwapSelectionContext } from "./SwapSelectionContext";
 import { ErrorBanner } from "@shared/ui/components/ErrorBanner";
 import { SwapShiftPickerDialog, swapMinutes, swapShiftDate, type SwapShiftSelection } from "./SwapShiftPickerDialog";
 import { SwapRequestTypeDialog } from "./SwapRequestTypeDialog";
 import { SwapScrollRegion } from "./SwapScrollRegion";
 import { useSwapModalEnvironment } from "./useSwapModalEnvironment";
+import { getSwapSlotWindows } from "../model/swapReservedWindows";
 import styles from "./SwapCreateWizard.module.css";
 type Recipient = { mode: "everyone" } | { mode: "specific"; employee: ShiftSwapEmployee; kind: "give" }
   | { mode: "specific"; employee: ShiftSwapEmployee; kind: "exchange"; selection: SwapShiftSelection };
 type View = "wizard" | "source" | "type" | "returnSchedule" | "return";
-export function SwapCreateWizard({ schedules, employees, employeeId, employeeName, swaps, busy, error, onClose, onSubmit, onRequestException, restrictToEightHours = false, requirePickupApproval = false, returnFocusRef }: {
+export function SwapCreateWizard({ schedules, employees, employeeId, employeeName, swaps, busy, error, confirmation, onClose, onSubmit, onRequestException, restrictToEightHours = false, requirePickupApproval = false, returnFocusRef }: {
   schedules: EmployeeSchedule[]; employees: ShiftSwapEmployee[]; employeeId: number; employeeName: string; swaps: ShiftSwap[];
   requirePickupApproval?: boolean;
   restrictToEightHours?: boolean; onRequestException?: (payload: SwapWizardRequest) => void;
   busy: boolean; error?: string | null; onClose: () => void; onSubmit: (payload: SwapWizardRequest) => void;
+  confirmation?: "acceptance" | "manager";
   returnFocusRef?: RefObject<HTMLElement | null>;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -40,7 +43,8 @@ export function SwapCreateWizard({ schedules, employees, employeeId, employeeNam
   const [returnSelection, setReturnSelection] = useState<SwapShiftSelection | null>(null);
   const [search, setSearch] = useState("");
   const [returnScheduleId, setReturnScheduleId] = useState<number | null>(null);
-  const submitGuard = useRef(false);
+  const [submitPreviewError, setSubmitPreviewError] = useState<string | null>(null);
+  const submitGuard = useRef<AbortController | null>(null);
   const client = useQueryClient();
   const back = () => {
     if (busy) return;
@@ -54,8 +58,8 @@ export function SwapCreateWizard({ schedules, employees, employeeId, employeeNam
   useEffect(() => {
     if (bodyRef.current) bodyRef.current.scrollTop = 0;
     dialogRef.current?.querySelector<HTMLElement>("[data-subview-heading]")?.focus({ preventScroll: true });
-  }, [view, step]);
-  useEffect(() => { if (!busy) submitGuard.current = false; }, [busy, error]);
+  }, [view, step, confirmation]);
+  useEffect(() => { if (!busy) submitGuard.current = null; }, [busy, error]);
   useEffect(() => {
     if (view === "wizard" && step === 1 && source) {
       const list = schedulesRef.current;
@@ -81,7 +85,11 @@ export function SwapCreateWizard({ schedules, employees, employeeId, employeeNam
     }
     return { ...base, requestKind: "give", targetEmployeeId: null };
   }, [source, recipient, recipientMode, allowPartialAcceptance, wholeShiftOnly]);
-  const previewQuery = useShiftSwapPreviewQuery(step === 3 && view === "wizard" ? payload : null);
+  const previewQuery = useShiftSwapPreviewQuery(!confirmation && step === 3 && view === "wizard" ? payload : null);
+  useEffect(() => () => {
+    submitGuard.current?.abort();
+    submitGuard.current = null;
+  }, [payload, step, view]);
   const candidatesQuery = useShiftSwapReturnCandidatesQuery((view === "return" || view === "returnSchedule") && source && typeEmployee ? {
     sourceScheduleId: source.shift.scheduleId, sourceSlotId: source.shift.slotId,
     fromTime: source.period.fromTime, toTime: source.period.toTime, targetEmployeeId: typeEmployee.id,
@@ -91,13 +99,14 @@ export function SwapCreateWizard({ schedules, employees, employeeId, employeeNam
   const schedule = schedules.find(item => item.id === sourceScheduleId);
   const ownShifts = schedule?.slots.filter(slot => slot.employeeId === employeeId && slot.status === "ASSIGNED")
     .sort((a, b) => a.dayOfMonth - b.dayOfMonth || a.fromTime.localeCompare(b.fromTime) || a.id - b.id).map(slot => {
-      const reserved = swaps.some(swap => swap.status === "open" && (swap.scheduleSlotId === slot.id || swap.returnScheduleSlotId === slot.id));
+      const { reserved, available } = getSwapSlotWindows(slot, swaps);
+      const durationMinutes = swapMinutes(slot.toTime) - swapMinutes(slot.fromTime);
       return { scheduleId: schedule.id, scheduleName: schedule.name, shopName: schedule.shopName,
         year: schedule.year, month: schedule.month, dayOfMonth: slot.dayOfMonth, slotId: slot.id,
-        fromTime: slot.fromTime, toTime: slot.toTime, durationMinutes: swapMinutes(slot.toTime) - swapMinutes(slot.fromTime),
-        requiresWholeShift: wholeShiftOnly,
-        canSelect: !reserved && (!wholeShiftOnly || swapMinutes(slot.toTime) - swapMinutes(slot.fromTime) === 480),
-        unavailableReason: reserved ? "This shift already has an open swap offer." : wholeShiftOnly && swapMinutes(slot.toTime) - swapMinutes(slot.fromTime) !== 480 ? "Employment contract requires a whole shift of exactly eight hours." : null };
+        fromTime: slot.fromTime, toTime: slot.toTime, durationMinutes,
+        requiresWholeShift: wholeShiftOnly, reservedWindows: reserved, eligibleWindows: available,
+        canSelect: available.length > 0 && (!wholeShiftOnly || (reserved.length === 0 && durationMinutes === 480)),
+        unavailableReason: wholeShiftOnly ? "Employment contract requires a whole shift of exactly eight hours." : null };
     }) ?? [];
   const selectEmployee = (employee: ShiftSwapEmployee) => {
     setTypeEmployee(employee);
@@ -108,31 +117,78 @@ export function SwapCreateWizard({ schedules, employees, employeeId, employeeNam
     setView("type");
   };
   const preview = previewQuery.data;
-  const previewMatches = Boolean(preview && payload && preview.source.scheduleId === payload.scheduleId &&
-    preview.source.slotId === payload.scheduleSlotId && preview.source.fromTime === payload.fromTime && preview.source.toTime === payload.toTime &&
-    (preview.allowPartialAcceptance ?? false) === Boolean(payload.allowPartialAcceptance) &&
-    preview.targetEmployeeId === payload.targetEmployeeId && preview.requestKind === payload.requestKind &&
-    (payload.requestKind === "give" || (preview.return?.slotId === payload.returnScheduleSlotId &&
-      preview.return?.scheduleId === payload.returnScheduleId && preview.return?.fromTime === payload.returnFromTime && preview.return?.toTime === payload.returnToTime)));
+  const matchesPayload = (value: ShiftSwapOfferPreview | undefined) => Boolean(value && payload && value.source.scheduleId === payload.scheduleId &&
+    value.source.slotId === payload.scheduleSlotId && value.source.fromTime === payload.fromTime && value.source.toTime === payload.toTime &&
+    (value.allowPartialAcceptance ?? false) === Boolean(payload.allowPartialAcceptance) &&
+    value.targetEmployeeId === payload.targetEmployeeId && value.requestKind === payload.requestKind &&
+    (payload.requestKind === "give" || (value.return?.slotId === payload.returnScheduleSlotId &&
+      value.return?.scheduleId === payload.returnScheduleId && value.return?.fromTime === payload.returnFromTime && value.return?.toTime === payload.returnToTime)));
+  const previewMatches = matchesPayload(preview);
+  const submit = async (exception: boolean) => {
+    if (busy || confirmation || !payload || submitGuard.current) return;
+    const controller = new AbortController();
+    submitGuard.current = controller;
+    setSubmitPreviewError(null);
+    try {
+      const refreshed = await previewQuery.refetchWithSignal(controller.signal);
+      if (controller.signal.aborted) return;
+      const matches = matchesPayload(refreshed);
+      const invalidPreview = !refreshed.isValid || !matches;
+      if (invalidPreview || Boolean(refreshed.requiresManagerException) !== exception) {
+        if (submitGuard.current === controller) submitGuard.current = null;
+        if (invalidPreview)
+          setSubmitPreviewError(matches && refreshed.unavailableReason
+            ? translateServerMessage(refreshed.unavailableReason) : t("Could not preview this request."));
+        return;
+      }
+      if (exception) onRequestException?.(payload);
+      else onSubmit(payload);
+    } catch (reason) {
+      if (submitGuard.current === controller) submitGuard.current = null;
+      if (!controller.signal.aborted) setSubmitPreviewError(getErrorMessage(reason, t("Could not preview this request.")));
+    }
+  };
   const displayError = error || ((view === "return" || view === "returnSchedule") && candidatesQuery.error ? getErrorMessage(candidatesQuery.error, t("Could not load return shifts.")) : null)
-    || (step === 3 && previewQuery.error ? getErrorMessage(previewQuery.error, t("Could not preview this request.")) : null);
+    || (step === 3 && (submitPreviewError || (previewQuery.error ? getErrorMessage(previewQuery.error, t("Could not preview this request.")) : null)));
   const enterReview = () => {
     if (!payload) return;
+    setSubmitPreviewError(null);
     void client.invalidateQueries({ queryKey: queryKeys.shiftSwaps.preview(payload) });
     setStep(3);
   };
   const isRecipientStep = view === "wizard" && step === 2;
   return createPortal(<dialog id="create-swap-panel" ref={dialogRef} className={`${styles.dialog} ${view === "wizard" ? `${styles.scheduleDialog} ${step === 2 ? styles.recipientDialog : step === 3 ? styles.reviewDialog : ""}` : view === "source" || view === "return" ? styles.pickerDialog : view === "type" ? styles.typeDialog : ""}`} aria-label={t("Create a swap offer")}
     data-recipient-step={isRecipientStep ? "" : undefined}
-    onCancel={event => { event.preventDefault(); if (!busy) { if (view === "wizard") onClose(); else back(); } }}
-    onClick={event => { if (event.target === event.currentTarget && !busy) onClose(); }}>
+    onCancel={event => { event.preventDefault(); if (!busy && !confirmation) { if (view === "wizard") onClose(); else back(); } }}
+    onClick={event => { if (event.target === event.currentTarget && !busy && !confirmation) onClose(); }}>
     <div className={styles.shell}>
       <header className={styles.header}>
-        {view === "wizard" && step > 1 && <button type="button" className={styles.previousStep} disabled={busy} onClick={back} aria-label={t("Back")}>‹</button>}
-        {view === "wizard" && <ol className={styles.steps} aria-label={t("Request progress")}>{(["Schedule", "Recipient", "Review"] as const).map((label, index) =>
-            <li key={label} aria-current={step === index + 1 ? "step" : undefined} data-complete={step > index + 1}>{step === 3 && index < 2 ? <button type="button" disabled={busy} aria-label={index === 0 ? t("Edit schedule") : t("Edit recipient")} onClick={() => setStep(index === 0 ? 1 : 2)}><span>✓</span>{t(label)}</button> : <><span>{step > index + 1 ? "✓" : index + 1}</span>{t(label)}</>}</li>)}</ol>}
-        <button type="button" aria-label={t(view === "wizard" ? "Close" : "Back")} disabled={busy} onClick={() => view !== "wizard" ? back() : onClose()}>{view === "wizard" ? "×" : <ChevronLeftIcon size={22} />}</button></header>
-      <div ref={bodyRef} className={styles.body}>
+        {!confirmation && view === "wizard" && step > 1 && <button type="button" className={styles.previousStep} disabled={busy} onClick={back} aria-label={t("Back")}>‹</button>}
+        {view === "wizard" && <ol className={styles.steps} aria-label={t("Request progress")}>{(["Schedule", "Recipient", "Review"] as const).map((label, index) => {
+          const complete = Boolean(confirmation) || step > index + 1;
+          return <li key={label} aria-current={!confirmation && step === index + 1 ? "step" : undefined} data-complete={complete}>
+            {!confirmation && step === 3 && index < 2
+              ? <button type="button" disabled={busy} aria-label={index === 0 ? t("Edit schedule") : t("Edit recipient")} onClick={() => setStep(index === 0 ? 1 : 2)}><span>✓</span>{t(label)}</button>
+              : <><span>{complete ? "✓" : index + 1}</span>{t(label)}</>}
+          </li>;
+        })}</ol>}
+        {!confirmation && <button type="button" aria-label={t(view === "wizard" ? "Close" : "Back")} disabled={busy} onClick={() => view !== "wizard" ? back() : onClose()}>{view === "wizard" ? "×" : <ChevronLeftIcon size={22} />}</button>}
+      </header>
+      {confirmation ? <>
+        <div className={styles.successScroll}>
+          <div className={styles.success}>
+            <span className={styles.successIcon} aria-hidden="true"><CheckIcon size={28} /></span>
+            <h2 tabIndex={-1} data-subview-heading>{t("Swap request sent successfully!")}</h2>
+            <p>{confirmation === "manager"
+              ? t("Your swap request has been sent to your manager for approval.")
+              : t("Your swap request has been created and is waiting for acceptance.")}</p>
+            <span className={styles.successStatus}><ClockIcon size={14} />{t(confirmation === "manager" ? "Pending manager approval" : "Pending acceptance")}</span>
+          </div>
+        </div>
+        <footer className={styles.successFooter}>
+          <IosButton className={styles.successDone} label={t("Done")} size="compact" onClick={onClose} />
+        </footer>
+      </> : <div ref={bodyRef} className={styles.body}>
         {wholeShiftOnly ? <p>{t("Employment contract requires a whole shift of exactly eight hours.")}</p> : null}
         {displayError && <ErrorBanner dismissible={false}>{displayError}</ErrorBanner>}
         {view === "source" && <SwapShiftPickerDialog wholeShiftOnly={wholeShiftOnly} key={sourceScheduleId} employeeName={employeeName} shifts={ownShifts} selection={source?.shift.scheduleId === sourceScheduleId ? source : null}
@@ -261,15 +317,13 @@ export function SwapCreateWizard({ schedules, employees, employeeId, employeeNam
           <footer className={styles.footer}>
             {step < 3 ? <button type="button" className={styles.primary} disabled={step === 1 ? !source : !payload}
               onClick={() => step === 1 ? setStep(2) : enterReview()}>{t("Continue")}{step < 3 && <span aria-hidden="true" className={styles.arrow}>→</span>}</button>
-              : <button type="button" className={styles.primary} disabled={busy || Boolean(preview?.requiresManagerException) || !payload || !previewMatches || !preview?.isValid || previewQuery.isFetching || Boolean(previewQuery.error)} onClick={() => {
-                if (!payload || submitGuard.current) return; submitGuard.current = true; onSubmit(payload);
-              }}>{busy ? t("Sending...") : t("Send request")}<span className={styles.arrow} aria-hidden="true">→</span></button>}
+              : <button type="button" className={styles.primary} disabled={busy || Boolean(preview?.requiresManagerException) || !payload || !previewMatches || !preview?.isValid || previewQuery.isFetching || Boolean(previewQuery.error)} onClick={() => void submit(false)}>{busy ? t("Sending...") : t("Send request")}<span className={styles.arrow} aria-hidden="true">→</span></button>}
             {step === 3 && preview?.requiresManagerException ? <button type="button" className={styles.primary}
               disabled={busy || !payload || !previewMatches || !preview.isValid || previewQuery.isFetching || !onRequestException}
-              onClick={() => { if (!payload || submitGuard.current) return; submitGuard.current = true; onRequestException?.(payload); }}>{t("Request exception")}</button> : null}
+              onClick={() => void submit(true)}>{busy ? t("Sending...") : t("Request exception")}</button> : null}
           </footer>
         </>}
-      </div>
+      </div>}
     </div>
   </dialog>, document.body);
 }

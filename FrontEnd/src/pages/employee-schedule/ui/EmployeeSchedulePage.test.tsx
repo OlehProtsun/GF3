@@ -20,6 +20,9 @@ vi.mock("@entities/urlop", async importOriginal => ({ ...await importOriginal<ty
 const mocks = vi.hoisted(() => ({
   scheduleQuery: vi.fn(),
   exportPdf: vi.fn(),
+  listPublic: vi.fn(),
+  getPublic: vi.fn(),
+  exportPublicPdf: vi.fn(),
   downloadPdf: vi.fn(),
   matrix: vi.fn(),
   scrollIntoView: vi.fn(),
@@ -31,7 +34,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@entities/employee-schedule/api/employeeScheduleApi", () => ({
-  employeeScheduleApi: { exportPdf: mocks.exportPdf },
+  employeeScheduleApi: { exportPdf: mocks.exportPdf, listPublic: mocks.listPublic, getPublic: mocks.getPublic, exportPublicPdf: mocks.exportPublicPdf },
 }));
 vi.mock("@entities/exports/lib/download", () => ({ downloadExportFile: mocks.downloadPdf }));
 
@@ -52,6 +55,9 @@ vi.mock("@entities/employee-schedule", () => ({
 vi.mock("@entities/shift-corrections", () => ({
   useEmployeeShiftCorrectionsQuery: () => ({ data: [], isLoading: false, isError: false }),
   useCreateShiftCorrectionMutation: () => ({ mutate: vi.fn(), isPending: false, error: null }),
+}));
+vi.mock("@entities/shift-swaps", () => ({
+  useEmployeeShiftSwapsQuery: () => ({ data: [], isLoading: false, isError: false }),
 }));
 
 vi.mock("@entities/employee-ui-state", () => ({
@@ -171,11 +177,13 @@ const schedules: EmployeeSchedule[] = [
 
 function renderPage() {
   window.history.replaceState({}, "", "/schedule");
+  const client = new QueryClient();
 
   return render(
     <BrowserRouter>
       <EmployeeSchedulePage />
     </BrowserRouter>,
+    { wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider> },
   );
 }
 
@@ -189,7 +197,7 @@ function mockReducedMotion(reduced = false) {
   })));
 }
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
 
 beforeEach(() => {
   Object.defineProperties(HTMLDialogElement.prototype, {
@@ -200,6 +208,9 @@ beforeEach(() => {
   window.localStorage.clear();
   mocks.scheduleQuery.mockReset();
   mocks.exportPdf.mockReset();
+  mocks.listPublic.mockReset().mockResolvedValue([]);
+  mocks.getPublic.mockReset();
+  mocks.exportPublicPdf.mockReset();
   mocks.downloadPdf.mockReset();
   Object.defineProperty(navigator, "share", { configurable: true, value: undefined });
   Object.defineProperty(navigator, "canShare", { configurable: true, value: undefined });
@@ -616,6 +627,7 @@ describe("EmployeeSchedulePage", () => {
     });
   });
   test("lets the employee choose the month and year used by Summary", async () => {
+    vi.setSystemTime(new Date("2026-05-15T12:00:00Z"));
     const user = userEvent.setup();
     const periodSchedules: EmployeeSchedule[] = [
       ...schedules,
@@ -724,14 +736,17 @@ describe("schedule selector", () => {
     renderPage();
     await userEvent.click(screen.getByRole("button", { name: "Request a shift correction" }));
     const dialog = screen.getByRole("dialog", { name: "Request a shift change" });
+    await userEvent.click(within(dialog).getByRole("button", { name: /^May Schedule/ }));
+    await userEvent.click(within(dialog).getByRole("button", { name: "Continue" }));
     for (const day of [14, 15]) {
-      await userEvent.click(within(dialog).getAllByRole("tab")[day - 1]);
-      expect(within(dialog).getByText("You already work on this date in another schedule.")).toBeVisible();
-      expect(within(dialog).getByLabelText("New start time")).toBeDisabled();
-      expect(within(dialog).getByRole("button", { name: "Send request" })).toBeDisabled();
+      const row = within(dialog).getByRole("radio", { name: new RegExp(`\\b${day}\\b.*Already working on another schedule`) });
+      expect(row).toBeDisabled();
+      expect(row).toHaveTextContent(day === 14 ? "Related" : "Second May Schedule");
+      expect(within(dialog).getByRole("button", { name: "Continue" })).toBeDisabled();
     }
-    await userEvent.click(within(dialog).getAllByRole("tab")[15]);
-    expect(within(dialog).getByLabelText("New start time")).toBeEnabled();
+    await userEvent.click(within(dialog).getByRole("radio", { name: /\b16\b.*Day off/ }));
+    await userEvent.click(within(dialog).getByRole("button", { name: "Continue" }));
+    expect(within(dialog).getByLabelText("Start time")).toBeEnabled();
   });
 
   test("keeps Adjust independent from schedule selection in both view modes", async () => {
@@ -752,24 +767,49 @@ describe("schedule selector", () => {
     }
   });
   test("selects another schedule and updates matrix and metadata", async () => {
+    vi.setSystemTime(new Date("2026-05-15T12:00:00Z"));
     const user = userEvent.setup();
     const second = { ...schedules[1], month: 10, lastUpdatedAtUtc: "2026-10-04T12:01:00Z" };
     mocks.scheduleQuery.mockReturnValue({ data: [schedules[0], second], isLoading: false });
     renderPage();
     await user.click(screen.getByRole("button", { name: "Select schedule. Current schedule: May Schedule" }));
     const dialog = screen.getByRole("dialog", { name: "Select schedule" });
-    const firstRow = within(dialog).getByRole("button", { name: /^May Schedule.*May 2026/ });
+    const firstRow = within(dialog).getByRole("button", { name: /^May Schedule/ });
+    expect(within(dialog).getByText("May 2026", { exact: true })).toBeVisible();
     expect(screen.getByRole("button", { name: "Export schedule to PDF" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Request a shift correction" })).toBeInTheDocument();
     expect(firstRow).toHaveAttribute("aria-pressed", "true");
     expect(firstRow).toHaveFocus();
     expect(within(dialog).getByText(/Updated 28 Jun 2026/)).toBeVisible();
-    await user.click(within(dialog).getByRole("button", { name: /Second May Schedule.*October 2026/ }));
+    await user.click(within(dialog).getByRole("button", { name: /^Second May Schedule/ }));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     const trigger = screen.getByRole("button", { name: "Select schedule. Current schedule: Second May Schedule" });
     expect(trigger).toHaveTextContent("October 2026");
     expect(trigger).toHaveTextContent(/Updated 04 Oct 2026/);
     expect(mocks.matrix.mock.calls.at(-1)?.[0].graph.id).toBe(2);
+  });
+
+  test("opens a related published preview without replacing the selected own schedule", async () => {
+    const user = userEvent.setup();
+    const preview = { ...schedules[0], id: 77, name: "Related Preview", allowSwap: false };
+    mocks.scheduleQuery.mockReturnValue({ data: [schedules[0]], isLoading: false });
+    mocks.listPublic.mockResolvedValue([preview]);
+    mocks.getPublic.mockResolvedValue(preview);
+    renderPage();
+    const trigger = screen.getByRole("button", { name: "Select schedule. Current schedule: May Schedule" });
+    await user.click(trigger);
+    await user.click(screen.getByRole("button", { name: "View More", exact: true }));
+    await user.click(await screen.findByRole("button", { name: /^Related Preview/ }));
+    const view = screen.getByRole("dialog", { name: "Schedule Preview" });
+    const matrix = await within(view).findByTestId("schedule-matrix");
+    expect(within(matrix).getByText("Related Preview", { exact: true })).toBeVisible();
+    expect(mocks.getPublic).toHaveBeenCalledWith(77, expect.any(AbortSignal));
+    expect(within(view).queryByRole("button", { name: "Request a shift correction" })).toBeNull();
+    await user.click(within(view).getByRole("button", { name: "Close", exact: true }));
+    expect(trigger).toHaveTextContent("May Schedule");
+    const ownMatrix = screen.getByTestId("schedule-matrix");
+    expect(ownMatrix).toHaveTextContent("May Schedule");
+    expect(ownMatrix).not.toHaveTextContent("Related Preview");
   });
 
   test("Escape, close button and overlay dismiss without changing selection", async () => {

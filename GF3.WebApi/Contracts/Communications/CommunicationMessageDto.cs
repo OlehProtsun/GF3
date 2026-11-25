@@ -2,6 +2,10 @@ namespace WebApi.Contracts.Communications;
 
 public sealed class CommunicationMessageDto
 {
+    public IReadOnlyList<BusinessLogicLayer.Contracts.Communications.CommunicationContentBlock>? Blocks { get; init; }
+    public BusinessLogicLayer.Contracts.Communications.CommunicationGifAttachment? Photo { get; set; }
+    public BusinessLogicLayer.Contracts.Communications.CommunicationGifAttachment? Gif { get; set; }
+
     public int Id { get; set; }
 
     public string Title { get; set; } = string.Empty;

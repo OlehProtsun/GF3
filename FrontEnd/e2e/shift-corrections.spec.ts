@@ -1,4 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
+import { dismissEmployeeInstallPrompt } from "./helpers";
+import pl from "../src/shared/i18n/pl.json" with { type: "json" };
+import uk from "../src/shared/i18n/uk.json" with { type: "json" };
 
 const correctionComment = "Zażółć 🌙\nДругий рядок <strong>literal</strong> " + "W".repeat(70);
 const commentLabels = {
@@ -8,7 +11,10 @@ const commentLabels = {
 };
 
 async function correctionFixture(page: Page, language: string, includeScheduleActivity = false) {
-  await page.addInitScript(() => localStorage.setItem("gf3.auth.access-token", "correction-ui-test"));
+  await page.addInitScript(() => {
+    localStorage.setItem("gf3.auth.access-token", "correction-ui-test");
+    sessionStorage.setItem("gf3.pwa.install.dismissed", "1");
+  });
   const graph = { id: 3, containerId: 1, shopId: 4, name: "Schedule", note: "", year: 2026, month: 10,
     publicationStatus: "public", allowSwap: true, peoplePerShift: 1, shift1Time: "15:00 - 22:00", shift2Time: "08:00 - 14:00",
     maxHoursPerEmpMonth: 160, maxConsecutiveDays: 5, maxConsecutiveFull: 3, maxFullPerMonth: 10 };
@@ -79,6 +85,73 @@ async function showScheduleActivity(page: Page) {
   return { trigger, activity: page.getByRole("dialog", { name: "Schedule Activity", exact: true }) };
 }
 
+test("employee requests removal of a workday and manager approves the same request", async ({ page, isMobile }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await correctionFixture(page, "en");
+  await page.addInitScript(() => sessionStorage.setItem("gf3.pwa.install.dismissed", "1"));
+  let manager = false;
+  let posted = false;
+  const originalShifts = [{ slotId: 51, fromTime: "08:00", toTime: "12:00" }, { slotId: 52, fromTime: "15:00", toTime: "19:00" }];
+  const request = { id: 85, containerId: 1, scheduleId: 3, scheduleSlotId: null, requestType: "removeShift", isDayOffRequest: false,
+    originalShifts, employeeId: 2, employeeName: "Fixture Worker", scheduleName: "Schedule", shopName: "Central",
+    year: 2026, month: 10, dayOfMonth: 21, originalFromTime: null, originalToTime: null, requestedFromTime: null, requestedToTime: null,
+    createdAtUtc: "2026-10-20T14:00:00Z", status: "pending", comment: "Fixture reason", reviewedAtUtc: null as string | null };
+  await page.route("**/api/auth/session", route => manager ? route.fallback() : route.fulfill({ json: {
+    role: "employee", employeeId: 2, userName: "fixture-worker", displayName: "Fixture Worker",
+  } }));
+  await page.route("**/api/employee-schedules", route => route.fulfill({ json: [{
+    id: 3, containerId: 1, shopId: 4, name: "Schedule", shopName: "Central", year: 2026, month: 10, publicationStatus: "public",
+    employees: [{ id: 1, employeeId: 2, displayName: "Fixture Worker", displayOrder: 0 }],
+    slots: originalShifts.map((shift, index) => ({ id: shift.slotId, employeeId: 2, slotNo: index + 1, dayOfMonth: 21,
+      fromTime: shift.fromTime, toTime: shift.toTime, status: "ASSIGNED" })),
+  }] }));
+  await page.route("**/api/employee-shift-corrections", route => {
+    if (route.request().method() !== "POST") return route.fulfill({ json: posted ? [request] : [] });
+    expect(route.request().postDataJSON()).toEqual({ scheduleId: 3, requestType: "removeShift", dayOfMonth: 21, comment: "Fixture reason" });
+    posted = true;
+    return route.fulfill({ status: 201, json: request });
+  });
+  await page.route("**/api/containers/1/graphs/3/shift-corrections", route => route.fulfill({ json: posted ? [request] : [] }));
+  await page.route("**/api/containers/1/graphs/3/shift-corrections/85/approve", route => {
+    expect(route.request().method()).toBe("POST");
+    request.status = "approved";
+    request.reviewedAtUtc = new Date().toISOString();
+    return route.fulfill({ json: request });
+  });
+
+  await page.goto("/schedule");
+  await dismissEmployeeInstallPrompt(page);
+  await page.getByRole("button", { name: "Request a shift correction" }).click();
+  const wizard = page.getByRole("dialog", { name: "Request a shift change" });
+  const next = wizard.getByRole("button", { name: "Continue", exact: true });
+  await wizard.getByRole("button", { name: /^Schedule/ }).click();
+  await next.click();
+  await wizard.getByRole("radio", { name: /08:00 – 12:00/ }).click();
+  await next.click();
+  await wizard.getByRole("button", { name: /Request day off/ }).click();
+  await next.click();
+  await wizard.getByRole("textbox", { name: "Comment (optional)" }).fill("Fixture reason");
+  await next.click();
+  await expect(wizard.getByText("Duration change · −8h")).toBeVisible();
+  const sendRequest = wizard.getByRole("button", { name: "Send request" });
+  if (isMobile) await sendRequest.tap();
+  else await sendRequest.click();
+  await expect(wizard.getByText("Pending approval")).toBeVisible();
+
+  manager = true;
+  await page.goto("/container/1/graphs/3/edit");
+  const { activity } = await showScheduleActivity(page);
+  await activity.getByRole("tab", { name: /Shift Corrections/ }).click();
+  const requests = activity.getByRole("list", { name: "Shift correction requests" });
+  await requests.getByRole("listitem").filter({ hasText: "Fixture Worker" }).click();
+  const detail = requests.getByRole("listitem").filter({ hasText: "Fixture reason" });
+  await expect(detail.getByText("Day off requested", { exact: true })).toBeVisible();
+  await detail.getByRole("button", { name: "Approve", exact: true }).click();
+  await expect.poll(() => request.status).toBe("approved");
+  await expect(activity.getByText("Approved", { exact: true }).first()).toBeVisible();
+});
+
 test("Schedule Activity preserves graph panels, live counts and overlay layering", async ({ page }) => {
   test.setTimeout(60_000);
   await page.setViewportSize({ width: 1694, height: 864 });
@@ -147,9 +220,10 @@ test("Schedule Activity preserves graph panels, live counts and overlay layering
   await expect(trigger).toBeFocused();
 });
 
-test("Schedule Activity compares cross-schedule exchanges one schedule at a time", async ({ page }, testInfo) => {
+test("Schedule Activity compares cross-schedule exchanges one schedule at a time", async ({ page, browserName, isMobile }, testInfo) => {
   test.setTimeout(50_000);
   await page.setViewportSize({ width: 1694, height: 864 });
+  const mobileWebKit = browserName === "webkit" && isMobile;
   await correctionFixture(page, "en");
   const snapshot = (employeeId: number, employeeName: string, day: number, period: string) =>
     ({ rows: [
@@ -218,14 +292,19 @@ test("Schedule Activity compares cross-schedule exchanges one schedule at a time
     return tableViewport.scrollWidth > tableViewport.clientWidth &&
       tableViewport.scrollHeight <= tableViewport.clientHeight + 1;
   })).toBe(true);
-  await body.evaluate(element => { element.scrollTop = 0; });
-  await tables.first().getByRole("columnheader", { name: "Bob (F35)" }).hover();
-  await page.mouse.wheel(0, 280);
-  await expect.poll(() => body.evaluate(element => element.scrollTop)).toBeGreaterThan(0);
+  if (!mobileWebKit) {
+    await body.evaluate(element => { element.scrollTop = 0; });
+    await tables.first().getByRole("columnheader", { name: "Bob (F35)" }).hover();
+    await page.mouse.wheel(0, 280);
+    await expect.poll(() => body.evaluate(element => element.scrollTop)).toBeGreaterThan(0);
+  }
   await body.focus();
+  await body.evaluate(element => { element.scrollTop = 0; });
   await page.keyboard.press("End");
   await expect.poll(() => body.evaluate(element => element.scrollTop)).toBeGreaterThan(0);
-  await source.click();
+  await body.evaluate(element => { element.scrollTop = 0; });
+  if (mobileWebKit) await source.press("Enter");
+  else await source.click();
   await expect(tables.nth(1).getByRole("columnheader", { name: "Bob (F27)" })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(dialog).toHaveCount(0);
@@ -325,7 +404,9 @@ for (const language of ["en", "pl", "uk"] as const) {
     expect(await list.evaluate(element => getComputedStyle(element).scrollbarWidth)).toBe("none");
     expect(await list.evaluate(element => getComputedStyle(element).touchAction)).toBe("auto");
     expect(await list.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
-    await list.focus();
+    const color = page.getByRole("button", { name: language === "en" ? "Approved correction highlight color" : language === "pl" ? "Kolor wyróżnienia zatwierdzonej korekty" : "Колір виділення схвалених коригувань", exact: true });
+    await color.focus();
+    await page.keyboard.press("Tab");
     await expect(list).toBeFocused();
     expect(await list.evaluate(element => getComputedStyle(element).outlineStyle)).toBe("solid");
     await page.keyboard.press("End");
@@ -387,12 +468,19 @@ for (const [width, language] of [[320, "en"], [375, "pl"], [390, "uk"]] as const
       await route.fulfill({ json: body });
     });
     await page.goto("/schedule");
+    await dismissEmployeeInstallPrompt(page);
     const adjust = page.getByRole("button", { name: language === "en" ? "Request a shift correction" : language === "pl" ? "Poproś o korektę zmiany" : "Запросити коригування зміни" });
     await adjust.click();
     const dialog = page.getByRole("dialog");
-    const dates = dialog.getByRole("tab");
-    await expect(dates).toHaveCount(31);
-    await expect(dates.nth(11)).toHaveAttribute("aria-selected", "true");
+    const copy = language === "pl" ? pl : language === "uk" ? uk : null;
+    const next = dialog.getByRole("button", { name: copy?.Continue ?? "Continue", exact: true });
+    const chooseSchedule = async () => {
+      await dialog.getByRole("button", { name: /^August / }).click();
+      await next.click();
+    };
+    await chooseSchedule();
+    const dates = dialog.getByRole("radio");
+    await expect(dates).toHaveCount(32);
     await expect(dialog.getByText("08:00 – 12:00", { exact: true })).toBeVisible();
     await expect(dialog.getByText("15:00 – 19:00", { exact: true })).toBeVisible();
     const selectDay = async (index: number) => {
@@ -400,20 +488,25 @@ for (const [width, language] of [[320, "en"], [375, "pl"], [390, "uk"]] as const
       if (isMobile) await dates.nth(index).tap();
       else { await dates.nth(index).focus(); await page.keyboard.press("Enter"); }
     };
+    await expect(dates.nth(14)).toBeDisabled();
+    await expect(dates.nth(14)).toContainText("Other shop");
     await selectDay(13);
-    await expect(dialog.locator('input[type="time"]').first()).toBeDisabled();
-    await selectDay(12);
+    await expect(dates.nth(13)).toBeChecked();
+    await next.click();
     const inputs = dialog.locator('input[type="time"]');
     await expect(inputs).toHaveCount(2);
     await expect(inputs.first()).toHaveValue(""); await expect(inputs.last()).toHaveValue("");
-    const send = dialog.getByRole("button").last();
-    await expect(send).toBeDisabled();
-    await inputs.first().fill("08:15"); await expect(send).toBeDisabled();
-    await inputs.last().fill("16:45"); await expect(send).toBeEnabled();
+    await expect(next).toBeDisabled();
+    await inputs.first().fill("08:15"); await expect(next).toBeDisabled();
+    await inputs.last().fill("16:45"); await expect(next).toBeEnabled();
+    await next.click();
     const comment = dialog.getByRole("textbox", { name: commentLabels[language].input });
     const draft = "  " + correctionComment + "  ";
     await comment.fill(draft);
     await expect(comment).toHaveValue(draft);
+    await next.click();
+    const send = dialog.getByRole("button", { name: copy?.["Send request"] ?? "Send request", exact: true });
+    await expect(dialog.getByText("08:15 – 16:45", { exact: true })).toBeVisible();
     await expect(send).toBeInViewport();
     expect(await dialog.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
     const surface = dialog.locator('div').first();
@@ -422,14 +515,19 @@ for (const [width, language] of [[320, "en"], [375, "pl"], [390, "uk"]] as const
     await send.click();
     if (language === "en") {
       await expect(dialog.getByText("Could not send this test request.")).toBeVisible();
+      await dialog.getByRole("button", { name: "Back", exact: true }).last().click();
       await expect(comment).toHaveValue(draft);
+      await next.click();
       await send.click();
     }
+    await expect(dialog.getByText(copy?.["Pending approval"] ?? "Pending approval", { exact: true })).toBeVisible();
+    await dialog.getByRole("button", { name: copy?.Done ?? "Done", exact: true }).click();
     await expect(dialog).toHaveCount(0);
     expect(submitted).toEqual({ scheduleId: 10, dayOfMonth: 13, requestedFromTime: "08:15", requestedToTime: "16:45", comment: correctionComment });
-    await adjust.click(); await selectDay(12);
-    await expect(comment).toHaveValue("");
-    await expect(dialog.locator('input[type="time"]').first()).toBeDisabled();
-    await expect(dialog.getByRole("button").last()).toBeDisabled();
+    await adjust.click();
+    await chooseSchedule();
+    await expect(dates.nth(13)).toBeDisabled();
+    await expect(dates.nth(13)).toContainText(copy?.["Pending approval"] ?? "Pending approval");
+    await expect(next).toBeDisabled();
   });
 }

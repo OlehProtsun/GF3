@@ -1,4 +1,4 @@
-import { Suspense, lazy } from "react";
+import { Suspense, isValidElement, lazy } from "react";
 import type { ComponentType } from "react";
 import { BrowserRouter, Navigate, useLocation } from "react-router-dom";
 import { EmployeeWorkspaceLayout } from "@app/layouts/employee-workspace-layout";
@@ -7,6 +7,7 @@ import { useAuth } from "@app/providers/AuthProvider";
 import { renderMatched } from "@shared/lib/react-router-dom";
 import { RouteFallback } from "./RouteFallback";
 import { PageTransition } from "./PageTransition";
+import { AppReadySignal } from "./AppReadySignal";
 import { RegulationAcceptanceGate } from "@entities/regulations/ui/RegulationAcceptanceGate";
 
 function lazyPage<TModule>(
@@ -27,6 +28,7 @@ function lazyPage<TModule>(
 }
 
 const HomePage = lazyPage(() => import("@pages/home"), (module) => module.HomePage);
+const EmployeeInstallPage = lazyPage(() => import("@pages/employee-install"), (module) => module.EmployeeInstallPage);
 const ManagerUrlopPage = lazyPage(() => import("@pages/manager-urlop"), module => module.ManagerUrlopPage);
 const ManagerUrlopListPage = lazyPage(() => import("@pages/manager-urlop"), module => module.ManagerUrlopListPage);
 const EmployeeNotificationsPage = lazyPage(
@@ -134,6 +136,7 @@ const managerPhoneRoutes = [
 ] as const;
 
 const employeeRoutes = [
+  { path: "/install", element: <EmployeeInstallPage /> },
   { path: "/profile", element: <EmployeeAccountPage /> },
   { path: "/notifications", element: <EmployeeNotificationsPage /> },
   { path: "/swap", element: <EmployeeSwapPage /> },
@@ -144,7 +147,7 @@ const employeeRoutes = [
 
 import { parseSwapLinkId } from "@pages/employee-swap/model/swapLink";
 
-function RoutedContent() {
+function useRoutedContent() {
   const { pathname, search } = useLocation();
   const { session, status } = useAuth();
   const isPublicAuthRoute = pathname === "/login" || pathname === "/password-recovery";
@@ -194,11 +197,13 @@ function RoutedContent() {
 function RoutedShell() {
   const { pathname } = useLocation();
   const { session, status } = useAuth();
+  const route = useRoutedContent();
   const shouldUseLayout = status === "authenticated" && pathname !== "/login" && pathname !== "/password-recovery";
   const content = (
     <Suspense fallback={<RouteFallback />}>
       <PageTransition pathname={pathname} employeeMotion={shouldUseLayout && session?.role === "employee"}>
-        <RoutedContent />
+        {route}
+        <AppReadySignal redirected={isValidElement(route) && route.type === Navigate} />
       </PageTransition>
     </Suspense>
   );

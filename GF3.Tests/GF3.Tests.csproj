@@ -6,6 +6,7 @@
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
     <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings>
+    <DefaultItemExcludes>$(DefaultItemExcludes);TestResults/**</DefaultItemExcludes>
   </PropertyGroup>
 
   <ItemGroup>
@@ -22,6 +23,8 @@
   <ItemGroup>
     <Using Include="Xunit" />
     <None Include="..\FrontEnd\src\pages\employee-notifications\model\notificationContract.fixture.json" Link="notificationContract.fixture.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\deploy\security\tests\fixtures\reviewed-schema-prefix-contracts.json" Link="reviewed-schema-prefix-contracts.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\deploy\security\tests\fixtures\communication-media-vectors.json" Link="communication-media-vectors.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

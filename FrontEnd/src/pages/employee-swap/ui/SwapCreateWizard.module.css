@@ -27,9 +27,9 @@
 .recipientDialog .body { overflow: clip; }
 .header { position: relative; display: flex; align-items: center; gap: 8px; flex: none; min-height: 52px; padding: 8px 12px 4px; z-index: 5; }
 .header > button:last-child { margin-left: auto; flex: none; }
-.dialog button { font: inherit; color: inherit; cursor: pointer; min-height: 44px; border: 1px solid #e5eaf1; border-radius: 14px; padding: 8px 12px; background: white; }
+.dialog button:where(:not(.successDone)) { font: inherit; color: inherit; cursor: pointer; min-height: 44px; border: 1px solid #e5eaf1; border-radius: 14px; padding: 8px 12px; background: white; }
 .dialog button:disabled { cursor: default; opacity: .5; }
-.dialog button:focus-visible, .dialog input:focus-visible, .dialog summary:focus-visible { outline: 2px solid #2f6df5; outline-offset: -2px; }
+.dialog button:where(:not(.successDone)):focus-visible, .dialog input:focus-visible, .dialog summary:focus-visible { outline: 2px solid #2f6df5; outline-offset: -2px; }
 .header > button { display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border-radius: 50%; background: #f7f9fc; font-size: 26px; color: #59667d; }
 .body h2, .heading { flex-shrink: 0; margin: 0 0 8px; font-size: 22px; line-height: 1.25; font-weight: 700; color: #101a30; outline: none; overflow-wrap: anywhere; }
 .body h3 { font-size: 16px; margin: 0; }
@@ -42,6 +42,38 @@
 .steps [aria-current="step"] > span, .steps [data-complete="true"] > span, .steps li > button > span { background: #2f6df5; color: white; }
 .steps li > button { display: flex; flex-direction: column; align-items: center; gap: 3px; border: 0; padding: 0; background: transparent; font-size: inherit; }
 .steps [data-complete="true"]::after { background: #2f6df5; }
+.successScroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-inline: 16px; }
+.success { display: grid; justify-items: center; gap: 12px; padding: 18px 10px; text-align: center; }
+.successIcon {
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  background: #dcfce7;
+  color: #15803d;
+}
+.success h2 { margin: 0; font-size: 1.15rem; line-height: 1.25; color: #101a30; }
+.success h2:focus { outline: none; }
+.success p { margin: 0; max-width: 34ch; color: #475569; line-height: 1.45; }
+.successStatus {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: #eaf3ff;
+  color: #1d4ed8;
+  font-size: .76rem;
+  font-weight: 750;
+}
+.successFooter {
+  flex: none;
+  padding: 10px 16px max(12px, env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid #e5edf7;
+  background: #fff;
+}
+.successDone { width: 100%; min-height: 46px; padding-block: 0 !important; }
 .cards { display: flex; flex-direction: column; gap: 12px; padding: 2px; }
 .card { flex: none; border: 1px solid #e5eaf1; border-radius: 18px; overflow-wrap: anywhere; }
 .card[data-selected="true"] { border-color: #4c83ff; background: #edf4ff; }

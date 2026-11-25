@@ -1,13 +1,16 @@
 import { expect, test, type Locator } from "@playwright/test";
 
-async function expectWithinViewport(locator: Locator, width: number, height: number) {
+async function expectWithinViewport(locator: Locator, width: number, height: number, context = "surface") {
   await expect(locator).toBeVisible();
   const box = await locator.boundingBox();
   expect(box).not.toBeNull();
   expect(box!.x).toBeGreaterThanOrEqual(0);
   expect(box!.y).toBeGreaterThanOrEqual(0);
   expect(box!.x + box!.width).toBeLessThanOrEqual(width + 1);
-  expect(box!.y + box!.height).toBeLessThanOrEqual(height + 1);
+  await expect.poll(async () => {
+    const current = await locator.boundingBox();
+    return current ? current.y + current.height : Number.POSITIVE_INFINITY;
+  }, { message: `${context} exceeded viewport bottom` }).toBeLessThanOrEqual(height + 1);
 }
 
 for (const size of [{ width: 1280, height: 720 }, { width: 1440, height: 800 }, { width: 1024, height: 600 }, { width: 390, height: 664 }]) {
@@ -30,9 +33,9 @@ for (const size of [{ width: 1280, height: 720 }, { width: 1440, height: 800 }, 
       await page.goto(`/e2e/fixtures/viewport.html?case=${name}`);
       await page.getByRole("button").first().click();
       const popup = page.locator('[class*="dropdownPortal_"], [class*="datePortal_"]');
-      await expectWithinViewport(popup, size.width, size.height);
+      await expectWithinViewport(popup, size.width, size.height, `${name} popup before resize`);
       await page.setViewportSize({ ...size, height: size.height - 100 });
-      await expectWithinViewport(popup, size.width, size.height - 100);
+      await expectWithinViewport(popup, size.width, size.height - 100, `${name} popup after resize`);
       await page.setViewportSize(size);
     }
     expect(errors).toEqual([]);

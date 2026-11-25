@@ -4,7 +4,10 @@ import { expect, test, type Page } from "@playwright/test";
 test.use({ launchOptions: process.platform === "win32" ? { ignoreDefaultArgs: ["--disable-accelerated-compositing"] } : {} });
 
 async function employeeFixture(page: Page, employeeCount = 1) {
-  await page.addInitScript(() => localStorage.setItem("gf3.auth.access-token", "employee-motion-fixture"));
+  await page.addInitScript(() => {
+    localStorage.setItem("gf3.auth.access-token", "employee-motion-fixture");
+    sessionStorage.setItem("gf3.pwa.install.dismissed", "1");
+  });
   await page.route("**/*", async route => {
     const path = new URL(route.request().url()).pathname;
     if (!path.startsWith("/api/")) return route.continue();
@@ -13,9 +16,12 @@ async function employeeFixture(page: Page, employeeCount = 1) {
     else if (path === "/api/account-language") body = { language: "en" };
     else if (path === "/api/employee-profile/me") body = { employeeId: 12, username: "worker", displayName: "Motion Worker", recoveryEmail: "worker@example.com" };
     else if (path === "/api/employee-ui-state") body = { scheduleColumnOrders: {}, readNotificationIds: [], pinnedSwapIds: [] };
+    else if (path === "/api/employee-ui-state/availability-time-presets") body = { presets: null };
+    else if (path === "/api/employee-urlop") body = { shops: [], months: [] };
     else if (path === "/api/employee-availability") body = [5, 6].map(id => ({
       id, name: `Window ${id}`, year: 2026, month: 9, canSubmit: true, isEditLocked: false,
       visibleFromUtc: "2026-09-01T00:00:00Z", visibleToUtc: "2026-10-01T23:59:00Z", slots: [],
+      members: [{ employeeId: 12, firstName: "Motion", lastName: "Worker", displayOrder: 1, slots: [] }],
     }));
     else if (path === "/api/employee-schedules") body = [10, 11].map(id => ({
       id, containerId: 2, containerName: "Team", shopId: 4, shopName: "Central",
@@ -39,9 +45,19 @@ async function employeeFixture(page: Page, employeeCount = 1) {
   });
 }
 
+async function openEmployeePage(page: Page, path: string) {
+  await page.goto(path);
+  await expect(page.locator("[data-employee-nav]").first()).toBeAttached();
+}
+
 async function expectIndicatorAligned(page: Page) {
   const nav = page.locator("[data-employee-nav]").filter({ visible: true });
-  await expect(nav.locator('[aria-current="page"]')).toBeVisible();
+  const active = nav.locator('[aria-current="page"]');
+  await expect(active).toBeVisible();
+  if (await nav.locator("[data-employee-nav-indicator]").count() === 0) {
+    await expect(active.locator("span").first()).toBeVisible();
+    return;
+  }
   await expect.poll(() => nav.evaluate(element => {
     const tab = element.querySelector('[aria-current="page"]')!.getBoundingClientRect();
     const pill = element.querySelector("[data-employee-nav-indicator]")!.getBoundingClientRect();
@@ -51,17 +67,22 @@ async function expectIndicatorAligned(page: Page) {
 
 async function expectMotionSettled(page: Page) {
   await expect.poll(() => page.locator("[data-employee-motion]").evaluateAll(elements =>
-    elements.every(element => !(element as HTMLElement).style.transform && !(element as HTMLElement).style.opacity && element.getAnimations().length === 0),
-  )).toBe(true);
+    (elements as HTMLElement[]).map(element => ({
+      key: element.dataset.motionKey ?? element.dataset.employeeMotion,
+      transform: element.style.transform,
+      opacity: element.style.opacity,
+      running: element.getAnimations().filter(animation => animation.playState === "running").length,
+    })).filter(state => state.transform || state.opacity || state.running),
+  )).toEqual([]);
 }
 
 for (const reducedMotion of ["no-preference", "reduce"] as const) {
-  test(`schedule view toggle pulses blue and preserves focus: ${reducedMotion}`, async ({ page }) => {
+  test(`schedule view toggle marks the active view and preserves focus: ${reducedMotion}`, async ({ page }) => {
     const errors: string[] = [];
     page.on("pageerror", error => errors.push(error.message));
     await page.emulateMedia({ reducedMotion });
     await employeeFixture(page);
-    await page.goto("/schedule");
+    await openEmployeePage(page, "/schedule");
     const matrixToggle = page.getByRole("button", { name: "Show daily schedule view" });
     await expect(matrixToggle).toBeVisible();
     await expectMotionSettled(page);
@@ -72,55 +93,28 @@ for (const reducedMotion of ["no-preference", "reduce"] as const) {
     await expect(dailyToggle).toHaveAttribute("aria-pressed", "true");
     await expect(dailyToggle).toBeFocused();
     await expect(page.getByRole("tablist", { name: "Schedule days" })).toBeVisible();
-    const pulse = await dailyToggle.evaluate(button => {
-      const animation = button.getAnimations().find(animation =>
-        (animation as CSSAnimation).animationName?.includes("schedule-toggle-pulse"),
-      )!;
-      const duration = Number(animation.effect!.getTiming().duration);
-      animation.pause();
-      animation.currentTime = 0;
-      const compressed = new DOMMatrixReadOnly(getComputedStyle(button).transform);
-      animation.currentTime = duration * 0.45;
-      const highlighted = getComputedStyle(button);
-      const expanded = new DOMMatrixReadOnly(highlighted.transform);
-      const result = {
-        duration,
-        compressed: Math.hypot(compressed.m11, compressed.m12),
-        expanded: Math.hypot(expanded.m11, expanded.m12),
-        blue: highlighted.backgroundColor,
-        viewAnimation: getComputedStyle(button.closest("section")!).animationName,
-      };
-      animation.play();
-      return result;
-    });
-    expect(pulse.duration).toBeGreaterThanOrEqual(600);
-    expect(pulse.compressed).toBeLessThan(0.9);
-    expect(pulse.expanded).toBeGreaterThan(1.02);
-    expect(pulse.blue).toMatch(/^rgb\((?:[0-9]|[1-9][0-9]), /);
-    expect(pulse.viewAnimation).toContain("schedule-view-enter");
-    await expect.poll(() => dailyToggle.evaluate(button => button.getAnimations().length)).toBe(0);
-    // Switching again must restart the pulse and keep keyboard activation on the new icon.
+    const stage = page.locator('[data-motion-key$=":daily"]');
+    await expect(stage).toBeVisible();
+    await expect(dailyToggle).toHaveCSS("background-color", "rgba(191, 219, 254, 0.92)");
+    await expect(dailyToggle).toHaveCSS("transition-duration", reducedMotion === "reduce" ? "0s" : "0.16s, 0.16s, 0.16s, 0.16s");
     await page.keyboard.press("Enter");
     await expect(matrixToggle).toHaveAttribute("aria-pressed", "false");
     await expect(matrixToggle).toBeFocused();
     await expect(page.getByRole("tablist", { name: "Schedule days" })).toHaveCount(0);
-    expect(await matrixToggle.evaluate(button => button.getAnimations().some(animation =>
-      (animation as CSSAnimation).animationName?.includes("schedule-toggle-pulse"),
-    ))).toBe(true);
     await page.keyboard.press("Enter");
     await expect(dailyToggle).toBeFocused();
-    await expect.poll(() => dailyToggle.evaluate(button => button.getAnimations().length)).toBe(0);
+    await expect(stage).toBeVisible();
     await expectMotionSettled(page);
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
     expect(errors).toEqual([]);
   });
 
-  test(`schedule enters from above and cards react to repeated clicks: ${reducedMotion}`, async ({ page }) => {
+  test(`schedule entrance and keyboard schedule selection: ${reducedMotion}`, async ({ page }) => {
     const errors: string[] = [];
     page.on("pageerror", error => errors.push(error.message));
     await page.emulateMedia({ reducedMotion });
     await employeeFixture(page, 40);
-    await page.goto("/availability");
+    await openEmployeePage(page, "/availability");
     await expect(page.getByRole("button", { name: /Window 6/ })).toBeVisible();
     await expectMotionSettled(page);
     const nav = page.locator("[data-employee-nav]").filter({ visible: true });
@@ -128,20 +122,28 @@ for (const reducedMotion of ["no-preference", "reduce"] as const) {
       (link as HTMLAnchorElement).click();
       const deadline = performance.now() + 2000;
       const samples: { elapsed: number; time: number; y: number; scale: number; opacity: string }[] = [];
-      let started: number | undefined;
-      await new Promise<void>(resolve => {
-        const sample = () => {
+      const entrance = await new Promise<{ hero: HTMLElement; animation: Animation } | null>(resolve => {
+        const findEntrance = () => {
           const hero = document.querySelector<HTMLElement>('[data-employee-motion="from-top"]');
-          if (hero && getComputedStyle(hero).transform !== "none") {
-            started ??= performance.now();
-            const matrix = new DOMMatrixReadOnly(getComputedStyle(hero).transform);
-            samples.push({ elapsed: performance.now() - started, time: Number(hero.getAnimations()[0]?.currentTime ?? 0), y: matrix.m42, scale: matrix.m11, opacity: getComputedStyle(hero.parentElement!).opacity });
-          }
-          if (performance.now() > deadline || (started !== undefined && performance.now() - started >= 650)) resolve();
-          else setTimeout(sample, 20);
+          const animation = hero?.getAnimations()[0];
+          if (hero && animation) resolve({ hero, animation });
+          else if (performance.now() > deadline) resolve(null);
+          else requestAnimationFrame(findEntrance);
         };
-        setTimeout(sample, 20);
+        requestAnimationFrame(findEntrance);
       });
+      if (!entrance) return samples;
+      const { hero, animation } = entrance;
+      animation.pause();
+      await animation.ready;
+      const duration = Number(animation.effect?.getComputedTiming().duration ?? 0);
+      // Sample the browser's interpolation on its animation timeline even when the runner drops frames.
+      for (let time = 0; time < duration; time += 20) {
+        animation.currentTime = time;
+        const matrix = new DOMMatrixReadOnly(getComputedStyle(hero).transform);
+        samples.push({ elapsed: time, time, y: matrix.m42, scale: matrix.m11, opacity: getComputedStyle(hero.parentElement!).opacity });
+      }
+      animation.finish();
       return samples;
     });
     await test.info().attach("hero-frame-samples", { body: JSON.stringify(entrance), contentType: "application/json" });
@@ -154,95 +156,66 @@ for (const reducedMotion of ["no-preference", "reduce"] as const) {
       if (Math.abs(sample.y - lastChange.y) > 0.01) lastChange = sample;
       else if (sample.y < -1) longestHold = Math.max(longestHold, sample.elapsed - lastChange.elapsed);
     }
-    expect(distinctPositions, "Hero must move continuously, rather than in a few JS-driven steps").toBeGreaterThan(12);
-    expect(longestHold, "Hero position must not freeze during its entrance").toBeLessThan(100);
-    expect(entrance.some(sample => sample.y < -4)).toBe(true);
-    expect(entrance.every(sample => sample.scale === 1 && sample.opacity === "1")).toBe(true);
-    for (let index = 1; index < entrance.length; index++) {
-      expect(entrance[index].y).toBeGreaterThanOrEqual(entrance[index - 1].y);
+    if (reducedMotion === "reduce") {
+      expect(entrance).toEqual([]);
+    } else {
+      expect(distinctPositions, "Hero must move continuously during entry").toBeGreaterThan(12);
+      expect(longestHold, "Hero position must not freeze during its entrance").toBeLessThan(100);
+      expect(entrance.some(sample => sample.y < -4)).toBe(true);
+      expect(entrance.every(sample => sample.scale === 1 && sample.opacity === "1")).toBe(true);
+      for (let index = 1; index < entrance.length; index++) {
+        expect(entrance[index].y).toBeGreaterThanOrEqual(entrance[index - 1].y);
+      }
     }
     await expectMotionSettled(page);
     const hero = page.locator('[data-employee-motion="from-top"]');
-    expect(await hero.evaluate(element => getComputedStyle(element).animationName)).toContain("hero-enter");
+    await expect(hero).toHaveCSS("animation-name", reducedMotion === "reduce" ? "none" : /hero-enter/);
     expect(await hero.evaluate(element => element.getAttribute("style"))).toBeNull();
-    const card = page.getByRole("button", { name: /September backup/ });
-    await expect(card).toBeVisible();
-    expect(await card.evaluate(button => getComputedStyle(button).animationName)).toBe("none");
-    await card.focus();
-    await page.keyboard.press("Enter");
-    await expect(card).toHaveAttribute("aria-pressed", "true");
-    await expect(card).toBeFocused();
-    const clickMotion = await card.evaluate(button => {
-      (button as HTMLButtonElement).click();
-      (button as HTMLButtonElement).click();
-      return {
-        card: button.getAnimations().filter(animation => animation.id === "schedule-card-press").map(animation => animation.effect!.getTiming().duration),
-        badge: button.querySelector('[class*="scheduleCardDate_"]')!.getAnimations().filter(animation => animation.id === "schedule-card-press").length,
-      };
-    });
-    expect(clickMotion.card).toEqual([520]);
-    expect(clickMotion.badge).toBe(1);
-    await expect.poll(() => card.evaluate(button => button.getAnimations().filter(animation => animation.id === "schedule-card-press").length)).toBe(0);
-    await expect(card).toBeFocused();
-    await expect(page.locator('[class*="openScheduleTitleBlock_"]')).toContainText("September backup");
+    const scheduleSelector = page.getByRole("button", { name: /^Select schedule\. Current schedule:/ });
+    const selectorDialog = page.getByRole("dialog", { name: "Select schedule" });
+    for (const name of ["September backup", "September", "September backup"]) {
+      await scheduleSelector.press("Enter");
+      const choice = selectorDialog.getByRole("button").filter({ has: page.getByText(name, { exact: true }) });
+      await choice.press("Enter");
+      await expect(selectorDialog).toHaveCount(0);
+      await expect(scheduleSelector).toHaveAccessibleName(`Select schedule. Current schedule: ${name}`);
+      await expect(scheduleSelector).toBeFocused();
+      await expectMotionSettled(page);
+    }
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
     expect(errors).toEqual([]);
   });
 
-  test(`employee motion remains visible after 200ms: ${reducedMotion}`, async ({ page }) => {
+  test(`availability disclosure and navigation settle after motion: ${reducedMotion}`, async ({ page }) => {
     await page.emulateMedia({ reducedMotion });
     await employeeFixture(page);
-    await page.goto("/availability");
+    await openEmployeePage(page, "/availability");
     const secondWindow = page.getByRole("button", { name: /Window 6/ });
-    await expect(secondWindow).toBeVisible();
-    await expectMotionSettled(page);
-    const samples = await secondWindow.evaluate(async button => {
-      (button as HTMLButtonElement).click();
-      const frames: { elapsed: number; opacity: number; y: number }[] = [];
-      const started = performance.now();
-      await new Promise<void>(resolve => {
-        const sample = () => {
-          const elapsed = performance.now() - started;
-          const editor = document.querySelector<HTMLElement>('[data-employee-motion][data-motion-key="6"]');
-          if (editor?.style.transform) {
-            const style = getComputedStyle(editor);
-            frames.push({ elapsed, opacity: Number(style.opacity), y: new DOMMatrixReadOnly(style.transform).m42 });
-          }
-          if (elapsed >= 450) resolve();
-          else setTimeout(sample, 20);
-        };
-        setTimeout(sample, 20);
-      });
-      return frames;
-    });
-    expect(samples.some(frame => frame.elapsed >= 200 && frame.elapsed <= 350 && frame.opacity < 0.95 && frame.y > 3), JSON.stringify(samples.filter((_, index) => index % 5 === 0))).toBe(true);
-    await expectMotionSettled(page);
-    const listMotion = await page.locator('[data-motion-list] > button').first().evaluate(element => {
-      const style = getComputedStyle(element);
-      return { name: style.animationName, duration: parseFloat(style.animationDuration) };
-    });
-    expect(listMotion.name).toBe("gf3-employee-enter");
-    expect(listMotion.duration).toBeGreaterThanOrEqual(0.6);
+    const editor = page.locator("#employee-availability-content-6");
+    await expect(secondWindow).toHaveAttribute("aria-expanded", "false");
+    await expect(editor).toHaveCSS("opacity", "0");
+    await expect(editor).toHaveCSS("transition-duration", reducedMotion === "reduce" ? "0s" : "0.18s, 0.18s");
+    await secondWindow.press("Enter");
+    await expect(secondWindow).toHaveAttribute("aria-expanded", "true");
+    await expect(editor).not.toHaveAttribute("inert");
+    await expect(editor).toHaveCSS("opacity", "1");
+    await expect(editor.getByText("Team availability", { exact: true })).toBeVisible();
     const nav = page.locator("[data-employee-nav]").filter({ visible: true });
-    const movingIndicator = await nav.locator('a[href="/profile"]').evaluate(async link => {
-      (link as HTMLAnchorElement).click();
-      await new Promise(resolve => setTimeout(resolve, 240));
-      const target = link.getBoundingClientRect();
-      const pill = link.parentElement!.querySelector("[data-employee-nav-indicator]")!.getBoundingClientRect();
-      return Math.abs(target.x - pill.x);
-    });
-    expect(movingIndicator).toBeGreaterThan(3);
+    const profile = nav.locator('a[href="/profile"]');
+    const beforeWidth = (await profile.boundingBox())!.width;
+    await profile.click();
+    await expect(page).toHaveURL(/\/profile$/);
     await expectIndicatorAligned(page);
+    await expect.poll(async () => (await profile.boundingBox())!.width).toBeGreaterThan(beforeWidth);
     await expectMotionSettled(page);
   });
-
   test(`employee navigation follows routes and responsive layout: ${reducedMotion}`, async ({ page }) => {
     test.setTimeout(60_000);
     await page.emulateMedia({ reducedMotion });
     const errors: string[] = [];
     page.on("pageerror", error => errors.push(error.message));
     await employeeFixture(page);
-    await page.goto("/");
+    await openEmployeePage(page, "/");
     const sizes = test.info().project.use.isMobile
       ? [{ width: 320, height: 812 }, { width: 375, height: 812 }, { width: 812, height: 375 }]
       : [320, 768, 1024, 1440].map(width => ({ width, height: 900 }));
@@ -253,7 +226,7 @@ for (const reducedMotion of ["no-preference", "reduce"] as const) {
         await nav.locator(`a[href="${path}"]`).click();
         await expect(page).toHaveURL(new RegExp(`${path === "/" ? "/" : path}$`));
         await expectIndicatorAligned(page);
-        await expect(page.locator("[data-employee-motion]").first()).toBeVisible();
+        await expect(page.locator("[data-employee-content]")).toContainText(/\S/);
         await expectMotionSettled(page);
         await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(size.width);
       }
@@ -284,14 +257,15 @@ for (const reducedMotion of ["no-preference", "reduce"] as const) {
     const errors: string[] = [];
     page.on("pageerror", error => errors.push(error.message));
     await employeeFixture(page);
-    await page.goto("/availability");
+    await openEmployeePage(page, "/availability");
     const secondWindow = page.getByRole("button", { name: /Window 6/ });
     await secondWindow.focus();
     await page.keyboard.press("Enter");
     await expect(secondWindow).toBeFocused();
-    await expect(page.locator('[data-motion-key="6"]')).toContainText("Window 6");
+    await expect(secondWindow).toHaveAttribute("aria-expanded", "true");
+    await expect(page.locator("#employee-availability-content-6").getByText("Team availability", { exact: true })).toBeVisible();
     await expectMotionSettled(page);
-    const day = page.locator('[class*="dayButton_"]').first();
+    const day = page.locator('#employee-availability-content-6 [data-own-availability-cell="1"]');
     await day.click();
     await expect(page.getByRole("dialog")).toBeVisible();
     await page.getByRole("dialog").getByRole("button", { name: "Close", exact: true }).click();
@@ -307,10 +281,13 @@ for (const reducedMotion of ["no-preference", "reduce"] as const) {
     await expectMotionSettled(page);
 
     await page.locator("[data-employee-nav]").filter({ visible: true }).locator('a[href="/swap"]').click();
-    const offer = page.locator('article[data-expanded="false"]').first();
-    await offer.focus();
-    await page.keyboard.press("Enter");
-    await expect(page.locator('article[data-expanded="true"]')).toBeFocused();
+    const offer = page.getByRole("button", { name: "View offer details for September", exact: true });
+    await offer.press("Enter");
+    const details = page.getByRole("dialog", { name: "Offer details", exact: true });
+    await expect(details).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(details).toHaveCount(0);
+    await expect(offer).toBeFocused();
     await expectMotionSettled(page);
     await page.getByRole("button", { name: "Create offer", exact: true }).click();
     const creation = page.getByRole("dialog", { name: "Create a swap offer" });

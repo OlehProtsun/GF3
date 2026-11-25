@@ -200,14 +200,7 @@ public sealed class ShiftSwapExchangeTests
         await Assert.ThrowsAsync<ValidationException>(() => Employee(db, f.Owner).Create(f.Request, default));
         await Assert.ThrowsAsync<ValidationException>(() => Employee(db, f.Target).Create(new()
         { ScheduleId = f.Back.ScheduleId, ScheduleSlotId = f.Back.Id, FromTime = "09:00", ToTime = "16:00" }, default));
-        var duplicate = new ShiftSwapRequestModel { ScheduleId = f.Source.ScheduleId, ScheduleSlotId = second.Id,
-            RequestKind = ShiftSwapRequestKind.Exchange, FromEmployeeId = f.Owner, TargetEmployeeId = f.Target,
-            ReturnScheduleId = f.Back.ScheduleId, ReturnScheduleSlotId = f.Back.Id, ReturnFromTime = "09:00", ReturnToTime = "16:00",
-            OfferedFromTime = "09:00", OfferedToTime = "16:00", Visibility = ShiftSwapVisibility.Private, CreatedAtUtc = DateTimeOffset.UtcNow };
-        db.Add(duplicate);
-        var duplicateError = await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync());
-        Assert.Equal(2067, Assert.IsType<Microsoft.Data.Sqlite.SqliteException>(duplicateError.InnerException).SqliteExtendedErrorCode);
-        db.Entry(duplicate).State = EntityState.Detached;
+        Assert.Equal(created.Id, Assert.Single(await db.ShiftSwapRequests.AsNoTracking().ToListAsync()).Id);
         var privateOffers = Assert.IsAssignableFrom<IEnumerable<ShiftSwapDto>>(Assert.IsType<OkObjectResult>((await Employee(db, 9999).GetVisible(default)).Result).Value);
         Assert.Empty(privateOffers);
         await Assert.ThrowsAsync<ValidationException>(() => Employee(db, 9999).Accept(created.Id, default));
@@ -358,7 +351,10 @@ public sealed class ShiftSwapExchangeTests
         Assert.Equal(2, await upgraded.ScheduleVersions.CountAsync());
         await upgraded.Database.OpenConnectionAsync();
         await using var indexes = upgraded.Database.GetDbConnection().CreateCommand();
-        indexes.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name IN ('ux_shift_swap_open_slot', 'ux_shift_swap_open_return_slot', 'ix_shift_swap_return_schedule_status')";
+        indexes.CommandText = """
+            SELECT COUNT(*) FROM pragma_index_list('shift_swap_request') WHERE "unique" = 0
+            AND name IN ('ix_shift_swap_open_slot', 'ix_shift_swap_open_return_slot', 'ix_shift_swap_return_schedule_status')
+            """;
         Assert.Equal(3L, await indexes.ExecuteScalarAsync());
     }
 

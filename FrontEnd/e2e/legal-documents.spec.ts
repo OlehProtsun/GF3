@@ -43,7 +43,7 @@ test("phone sign-in legal links are reachable in the card", async ({ page }) => 
     localStorage.setItem('gf3.auth.password-mode', 'phone');
   });
   await page.goto('/login');
-  const links = page.getByRole('navigation', { name: 'Legal documents' });
+  const links = page.getByRole('navigation', { name: /^(Legal documents|Dokumenty prawne|Юридичні документи)$/ });
   await expect(links).toBeVisible();
   for (const link of await links.getByRole('link').all()) {
     await link.scrollIntoViewIfNeeded();
@@ -58,7 +58,7 @@ test("legal links can be reached on a short phone screen", async ({ page }) => {
     localStorage.setItem('gf3.auth.password-mode', 'phone');
   });
   await page.goto('/login');
-  const nav = page.getByRole('navigation', { name: 'Legal documents' });
+  const nav = page.getByRole('navigation', { name: /^(Legal documents|Dokumenty prawne|Юридичні документи)$/ });
   await expect(nav).toBeVisible();
   for (const link of await nav.getByRole('link').all()) {
     await link.scrollIntoViewIfNeeded();
@@ -69,7 +69,10 @@ test("legal links can be reached on a short phone screen", async ({ page }) => {
 });
 
 test("employee profile legal links survive collapsed mobile tabs", async ({ page, isMobile }) => {
-  await page.addInitScript(() => localStorage.setItem('gf3.auth.access-token', 'synthetic-legal-ui'));
+  await page.addInitScript(() => {
+    localStorage.setItem('gf3.auth.access-token', 'synthetic-legal-ui');
+    sessionStorage.setItem('gf3.pwa.install.dismissed', '1');
+  });
   await page.route('**/api/**', async route => {
     const path = new URL(route.request().url()).pathname;
     if (!path.startsWith('/api/')) return route.continue();
@@ -81,7 +84,7 @@ test("employee profile legal links survive collapsed mobile tabs", async ({ page
   });
   await page.goto('/profile');
   if (isMobile) await page.getByRole('button', { name: 'Collapse navigation' }).click();
-  const links = page.getByRole('navigation', { name: 'Legal documents' });
+  const links = page.getByRole('navigation', { name: /^(Legal documents|Dokumenty prawne|Юридичні документи)$/ });
   await expect(links).toBeVisible();
   for (const link of await links.getByRole('link').all()) {
     await link.scrollIntoViewIfNeeded();

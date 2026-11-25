@@ -57,7 +57,7 @@ public sealed class EmployeePushControllerTests
         await using var database = await SqliteTestDatabase.CreateAsync();
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = "Testing" });
         builder.Logging.ClearProviders(); builder.Configuration.Sources.Clear();
-        var vapid = WebPush.VapidHelper.GenerateVapidKeys();
+        var vapid = GenerateVapidKeys();
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["ConnectionStrings:Default"] = database.ConnectionString, ["Jwt:SigningKey"] = "synthetic-employee-push-test-signing-key-only",
@@ -104,7 +104,7 @@ public sealed class EmployeePushControllerTests
     {
         Assert.True(new PushOptions().IsValid());
         Assert.False(new PushOptions { Enabled = true }.IsValid());
-        var keys = WebPush.VapidHelper.GenerateVapidKeys();
+        var keys = GenerateVapidKeys();
         Assert.True(new PushOptions { Enabled = true, VapidPublicKey = keys.PublicKey, VapidPrivateKey = keys.PrivateKey, VapidSubject = "mailto:operator@example.com" }.IsValid());
     }
 
@@ -118,6 +118,12 @@ public sealed class EmployeePushControllerTests
     }
 
     internal static string Encode(byte[] bytes) => Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+    internal static (string PublicKey, string PrivateKey) GenerateVapidKeys()
+    {
+        using var key = System.Security.Cryptography.ECDsa.Create(System.Security.Cryptography.ECCurve.NamedCurves.nistP256);
+        var parameters = key.ExportParameters(true);
+        return (Encode([4, .. parameters.Q.X!, .. parameters.Q.Y!]), Encode(parameters.D!));
+    }
     internal static EmployeePushController.SubscriptionRequest Request(string endpoint = "https://fcm.googleapis.com/send/test") =>
         new(endpoint, new(Encode([4, .. new byte[64]]), Encode(new byte[16])));
 

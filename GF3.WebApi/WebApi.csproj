@@ -18,9 +18,11 @@
 	</PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="SkiaSharp" Version="4.157.0" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="4.157.0" GeneratePathProperty="true" />
     <PackageReference Include="PDFsharp" Version="6.2.4" />
     <PackageReference Include="System.Security.Cryptography.Pkcs" Version="8.0.2" />
-    <PackageReference Include="WebPush" Version="1.0.13" />
+    <PackageReference Include="Lib.Net.Http.WebPush" Version="3.3.1" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.9" />
     <PackageReference Include="Microsoft.AspNetCore.SpaProxy" Version="10.0.9" />
     <PackageReference Include="Microsoft.AspNetCore.SpaServices.Extensions" Version="10.0.9" />
@@ -37,10 +39,22 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Update="Resources\Licenses\*.txt">
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      <TargetPath>licenses/%(Filename)%(Extension)</TargetPath>
+    </None>
+    <Content Include="$(PkgSkiaSharp_NativeAssets_Linux_NoDependencies)/LICENSE.txt;$(PkgSkiaSharp_NativeAssets_Linux_NoDependencies)/THIRD-PARTY-NOTICES.txt">
+      <Link>licenses/SkiaSharp/%(Filename)%(Extension)</Link>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
     <None Update="Resources\ExcelTemplate\*.xlsx">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
       <TargetPath>Resources\ExcelTemplate\%(Filename)%(Extension)</TargetPath>
+    </None>
+    <None Update="Resources\Fonts\Carlito-Regular.ttf;Resources\Fonts\Carlito-OFL.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
     </None>
   </ItemGroup>
 

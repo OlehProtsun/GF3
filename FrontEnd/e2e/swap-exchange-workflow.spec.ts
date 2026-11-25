@@ -27,8 +27,11 @@ function offer(payload: Record<string, unknown>) {
     fromEmployeeHoursBefore: 7.5, fromEmployeeHoursAfter: 7.5, allowPartialAcceptance: false, canAcceptFull: true, eligibleClaimWindows: [] as {fromTime:string;toTime:string}[], canAccept: false, canCancel: true, isCreatedByCurrentEmployee: true, isManagerCreated: false, isScheduleLocked: false, acceptanceUnavailableReason: "",
     ...(payload.requestKind === "exchange" ? { returnScheduleName: "F35", returnShopName: "Central", returnYear: 2026, returnMonth: 10, returnDayOfMonth: 3, returnShiftHours: 7.5 } : {}), ...payload };
 }
-async function mockApi(page: Page, actor: number, state: { offers: Offer[]; stale?: boolean; scheduleCount?: number; shiftCount?: number; employeeCount?: number; multipleReturnSchedules?: boolean; previewState?: "loading" | "error" | "invalid" | "stale"; ownerName?: string; targetName?: string; language?: "en" | "pl" | "uk" }) {
-  await page.addInitScript(() => localStorage.setItem("gf3.auth.access-token", "swap-test"));
+async function mockApi(page: Page, actor: number, state: { offers: Offer[]; stale?: boolean; holdReturn?: boolean; scheduleCount?: number; shiftCount?: number; employeeCount?: number; multipleReturnSchedules?: boolean; previewState?: "loading" | "error" | "invalid" | "stale"; ownerName?: string; targetName?: string; language?: "en" | "pl" | "uk" }) {
+  await page.addInitScript(() => {
+    localStorage.setItem("gf3.auth.access-token", "swap-test");
+    sessionStorage.setItem("gf3.pwa.install.dismissed", "1");
+  });
   await page.route("**/*", async route => {
     const path = new URL(route.request().url()).pathname;
     if (!path.startsWith("/api/")) return route.continue();
@@ -40,7 +43,8 @@ async function mockApi(page: Page, actor: number, state: { offers: Offer[]; stal
     else if (path === "/api/employee-ui-state") body = { scheduleColumnOrders: {}, readNotificationIds: [], pinnedSwapIds: [] };
     else if (path === "/api/employee-shift-swaps/return-candidates") {
       const pageNo = Number(new URL(route.request().url()).searchParams.get("page") ?? 1);
-      body = { items: pageNo === 1 ? [returned, { ...returned, slotId: 205, dayOfMonth: 4, fromTime: "09:00", toTime: "16:30", durationMinutes: 450 }, ...Array.from({ length: 29 }, (_, i) => ({ ...returned, slotId: i + 300, canSelect: false, unavailableReason: "Not enough hours." }))]
+      const firstReturn = state.holdReturn ? { ...returned, canSelect: false, eligibleWindows: [], unavailableReason: "This shift already has an open swap offer. Refresh and choose another shift." } : returned;
+      body = { items: pageNo === 1 ? [firstReturn, { ...returned, slotId: 205, dayOfMonth: 4, fromTime: "09:00", toTime: "16:30", durationMinutes: 450 }, ...Array.from({ length: 29 }, (_, i) => ({ ...returned, slotId: i + 300, canSelect: false, unavailableReason: "Not enough hours." }))]
         : [{ ...returned, slotId: 999, dayOfMonth: state.multipleReturnSchedules ? 5 : 31, ...(state.multipleReturnSchedules ? { scheduleId: 30, scheduleName: "F99 — Aleksandra Maria Kowalska-Wiśniewska", month: 11, fromTime: "10:00", toTime: "16:00", durationMinutes: 360, suggestedFromTime: "10:00", suggestedToTime: "16:00", eligibleWindows: [{ fromTime: "10:00", toTime: "16:00" }] } : {}) }], page: pageNo, pageSize: 30, hasMore: pageNo === 1 };
     } else if (path === "/api/employee-shift-swaps/preview") {
       if (state.previewState === "loading") return;
@@ -65,6 +69,45 @@ async function mockApi(page: Page, actor: number, state: { offers: Offer[]; stal
     await route.fulfill({ contentType: "application/json", body: JSON.stringify(body) });
   });
 }
+
+test("swap wizard keeps free windows beside two pending offers and disables a reserved return", async ({ page }) => {
+  const state = { holdReturn: true, offers: [
+    offer({ id: 1, requestKind: "give", fromTime: "09:00", toTime: "11:00" }),
+    offer({ id: 2, requestKind: "give", fromTime: "13:00", toTime: "14:00" }),
+  ] };
+  await mockApi(page, 1, state);
+  await page.goto("/swap");
+  await page.getByRole("button", { name: "Create offer", exact: true }).click();
+  const modal = page.getByRole("dialog", { name: "Create a swap offer" });
+  await modal.getByRole("button", { name: /F27/ }).click();
+  const shift = modal.getByRole("radio");
+  await expect(shift).toContainText("Awaiting confirmation · 09:00–11:00");
+  await expect(shift).toContainText("Awaiting confirmation · 13:00–14:00");
+  await shift.click();
+  await expect(modal.getByRole("button", { name: "Full shift" })).toBeDisabled();
+  await expect(modal.locator('input[type="time"]').first()).toHaveValue("11:00");
+  await modal.getByRole("button", { name: "Confirm shift" }).click();
+  await modal.getByRole("button", { name: "Continue", exact: true }).click();
+  await modal.getByRole("button", { name: "Specific employee", exact: true }).click();
+  await modal.getByRole("button", { name: "Target Worker", exact: true }).click();
+  await modal.getByRole("radio", { name: "Swap shifts", exact: true }).click();
+  await modal.getByRole("button", { name: "Choose their shift", exact: true }).click();
+  await modal.getByRole("button", { name: /F35/ }).click();
+  await expect(modal.getByRole("radio", { name: /03.10.2026.*open swap offer/ })).toBeDisabled();
+  await expect(modal.getByRole("button", { name: "Confirm selection" })).toBeDisabled();
+
+  state.offers = [{ ...state.offers[0], status: "accepted", acceptedByEmployeeId: 2 }, { ...state.offers[1], scheduleSlotId: 101 }];
+  const remaining = schedule(1);
+  remaining.slots = [{ ...remaining.slots[0], id: 101, fromTime: "11:00" }];
+  await page.route("**/api/employee-schedules", route => route.fulfill({ json: [remaining] }));
+  await page.reload();
+  await page.getByRole("button", { name: "Create offer", exact: true }).click();
+  await modal.getByRole("button", { name: /F27/ }).click();
+  await expect(modal.getByRole("radio")).toContainText("Awaiting confirmation · 13:00–14:00");
+  await expect(modal.getByRole("radio")).not.toContainText("Awaiting confirmation · 09:00–11:00");
+  await modal.getByRole("radio").click();
+  await expect(modal.locator('input[type="time"]').first()).toHaveValue("11:00");
+});
 
 for (const [language, label] of [["en", "Partial"], ["pl", "Częściowo"], ["uk", "Частково"]] as const) {
   for (const width of [320, 375]) {
@@ -263,7 +306,11 @@ for (const width of [320, 375, 430]) {
   });
 }
 
-test("custom private Give sends exact payload and cancellation appears in History", async ({ page }) => {
+test("custom private Give submits without newer abort APIs and cancellation appears in History", async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(AbortSignal, "any", { value: undefined, configurable: true });
+    Object.defineProperty(AbortSignal.prototype, "throwIfAborted", { value: undefined, configurable: true });
+  });
   const state: { offers: Offer[] } = { offers: [] };
   await mockApi(page, 1, state); await page.goto("/swap");
   await page.getByRole("button", { name: "Create offer", exact: true }).click();
@@ -279,9 +326,11 @@ test("custom private Give sends exact payload and cancellation appears in Histor
   await page.getByRole("button", { name: "Target Worker", exact: true }).click();
   await page.getByRole("button", { name: "Save selection" }).click();
   await page.getByRole("button", { name: "Continue", exact: true }).click();
-  const sent = page.waitForRequest(r => new URL(r.url()).pathname === "/api/employee-shift-swaps" && r.method() === "POST");
+  const sent = page.waitForRequest(r => new URL(r.url()).pathname === "/api/employee-shift-swaps" && r.method() === "POST", { timeout: 5_000 });
   await page.getByRole("button", { name: "Send request" }).click();
   expect((await sent).postDataJSON()).toEqual({ allowPartialAcceptance: false, requestKind: "give", scheduleId: 10, scheduleSlotId: 100, fromTime: "09:15", toTime: "16:15", targetEmployeeId: 2 });
+  await expect(page.getByRole("heading", { name: "Swap request sent successfully!", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Done", exact: true }).click();
   await page.getByRole("button", { name: "View offer details for F27" }).click();
   await page.getByRole("button", { name: "Cancel offer", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "Offer details" })).toHaveCount(0);
@@ -522,6 +571,7 @@ for (const viewport of [{ width: 320, height: 568 }, { width: 320, height: 640 }
     const scroll = async (region: import("@playwright/test").Locator, action: string) => {
       if (viewport.height < 600) return; // Compact mode intentionally has one outer scroller.
       const frame = region.locator("..");
+      await region.evaluate(el => { el.scrollTop = 0; });
       await expect(frame).toHaveAttribute("data-scroll-top", "false");
       await expect(frame).toHaveAttribute("data-scroll-bottom", "true");
       const before = (await modal.getByRole("button", { name: action, exact: true }).boundingBox())!;
@@ -675,8 +725,11 @@ for (const viewport of [{ width: 320, height: 568 }, { width: 375, height: 667 }
       const dialog = page.locator("dialog:modal");
       expect(await dialog.evaluate(element => element.scrollWidth <= element.clientWidth)).toBeTruthy();
       if (mode === "exchange" && viewport.width === 390) await page.screenshot({ path: test.info().outputPath("exchange-review.png"), fullPage: true });
-      await send.click(); await expect(page.locator("dialog:modal")).toHaveCount(0);
+      await send.click();
+      await expect(page.getByRole("heading", { name: "Swap request sent successfully!", exact: true })).toBeVisible();
       expect(state.offers[0].status).toBe("open");
+      await page.getByRole("button", { name: "Done", exact: true }).click();
+      await expect(page.locator("dialog:modal")).toHaveCount(0);
       await expect(page.locator('[class*="swapBackdrop"] path')).toHaveAttribute("d", silhouette!);
       await page.reload();
       if (mode === "exchange") {
@@ -881,6 +934,7 @@ for (const width of [320, 375, 390, 430, 1280]) {
     expect(state.offers).toHaveLength(0);
     await page.screenshot({ path: test.info().outputPath("review-custom.png") });
     await dialog.getByRole("button", { name: "Send request", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Swap request sent successfully!", exact: true })).toBeVisible();
     expect(state.offers[0]).toMatchObject({ fromTime: "09:15", toTime: "16:30", requestKind: "give" });
   });
 }
@@ -950,6 +1004,8 @@ for (const width of [320, 375, 390, 430]) {
     await modal.getByRole("button", { name: "Continue", exact: true }).click();
     await expect(modal.getByRole("region", { name: "Employee shift (they give)" })).toContainText("5.5h");
     await modal.getByRole("button", { name: "Send request" }).click();
+    await expect(page.getByRole("heading", { name: "Swap request sent successfully!", exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Done", exact: true }).click();
     await expect(modal).toHaveCount(0);
     expect(state.offers[0]).toMatchObject({ requestKind: "exchange", returnScheduleId: 30, returnScheduleSlotId: 999, fromTime: "09:00", toTime: "16:30", returnFromTime: "10:15", returnToTime: "15:45" });
   });

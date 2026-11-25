@@ -254,7 +254,8 @@ public sealed class EmployeePresenceHub : Hub<IEmployeePresenceClient>
             {
                 try
                 {
-                    await _workflowLogService.LogAsync(Context.User!, "Online", CancellationToken.None).ConfigureAwait(false);
+                    var launchMode = Context.GetHttpContext()?.Request.Query["launchMode"].ToString();
+                    await _workflowLogService.LogAsync(Context.User!, "Online", launchMode, CancellationToken.None).ConfigureAwait(false);
                 }
                 catch (Exception ex)
                 {

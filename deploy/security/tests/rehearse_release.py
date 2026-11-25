@@ -43,6 +43,9 @@ def diagnostic_command(*args, cwd=None, timeout=120, capture=True, check=True, d
 
 
 production_command = release.command
+HISTORICAL_PRIOR = "353f8e23dbd3f6c9989e7df2198346b72c700487"
+HISTORICAL_TARGET = "1175c39461e149a7bb35f428babed28279727899"
+HISTORICAL_TARGET_IMAGE = "gf3-web:maintenance-target"
 
 
 def free_port():
@@ -52,60 +55,102 @@ def free_port():
 
 
 def rehearse_migrations(root, snapshot_path):
-    """Use a fresh copy of the synthetic CI database to exercise EF startup in Docker."""
-    added = ("20261114225324_AddShiftCorrectionComment", "20261115135735_RefreshManualShiftOffer")
-    columns = (("shift_correction_request", "comment", "TEXT"),
-               ("shift_swap_request", "refreshed_at_utc", "INTEGER"))
+    """Exercise the exact pinned PROD2-to-candidate migration on a seeded synthetic DB."""
+    repo = HERE.parents[1]
+
+    def git(*args):
+        return release.git(*args, root=repo)
+
+    revision = git("rev-parse", "HEAD").strip()
+    target = maintenance.migration_ids(git, revision)
+    baseline = maintenance.REVIEWED_SCHEMA_PREFIX_CONTRACTS[0]["migrationId"]
+    cutoff = target.index(baseline) + 1
+    before, added = target[:cutoff], target[cutoff:]
+    assert added == maintenance.REVIEWED_RELEASE_MIGRATIONS
+    columns = maintenance.migration_plan(git, maintenance.RELEASE_BASELINE, revision, added)
     image, = release.docker_json("image", "inspect", "gf3-web:ci")
-    with closing(sqlite3.connect(snapshot_path)) as db:
-        target = tuple(row[0] for row in db.execute(
-            'SELECT MigrationId FROM "__EFMigrationsHistory" ORDER BY MigrationId'))
-    assert target[-2:] == added
-    before = target[:-2]
-    fixture = root / "maintenance-fixture.db"
+    source_dir = repo / "GF3.Tests/TestResults/release-baseline"
+    source_db = source_dir / "SQLite.db"
+    source_media = source_dir / maintenance.MEDIA_DIRECTORY
+    assert source_db.is_file() and source_media.is_dir(), "Synthetic pinned PROD2 fixture artifact is missing"
+    with closing(sqlite3.connect(source_db)) as db:
+        maintenance.verify(db, before)
+        assert db.execute("PRAGMA foreign_key_check").fetchall() == []
+        assert db.execute("SELECT COUNT(*) FROM employee").fetchone()[0] >= 2
+        assert db.execute("SELECT COUNT(*) FROM shift_swap_request").fetchone()[0] >= 1
+        assert db.execute("SELECT COUNT(*) FROM shift_correction_request").fetchone()[0] >= 1
+        assert db.execute("SELECT COUNT(*) FROM workflow_log_entry").fetchone()[0] >= 1
+        assert db.execute("SELECT COUNT(*) FROM communication_message").fetchone()[0] >= 1
+        assert dict(db.execute("SELECT name,seq FROM sqlite_sequence")).get("shift_correction_request", 0) >= 9001
     frozen = root / "maintenance-backup.db"
-    maintenance.snapshot(snapshot_path, fixture, target)
-    with closing(sqlite3.connect(fixture)) as db, db:
-        for (table, name, _), migration in zip(columns, added, strict=True):
-            db.execute(f'ALTER TABLE "{table}" DROP COLUMN "{name}"')
-            db.execute('DELETE FROM "__EFMigrationsHistory" WHERE MigrationId=?', (migration,))
-    maintenance.snapshot(fixture, frozen, before, quiesced=True)
+    maintenance.snapshot(source_db, frozen, before, quiesced=True)
+    shutil.copytree(source_media, root / maintenance.MEDIA_DIRECTORY)
+
+    # Exercise protected prefix classification and data-preserving rollback checks from each
+    # independently generated EF state, including the correction AUTOINCREMENT high-water mark.
+    prefix_directory = source_dir / "prefixes"
+    for prefix in range(len(added) + 1):
+        prefix_db = prefix_directory / f"prefix-{prefix}.db"
+        assert prefix_db.is_file(), f"Synthetic EF prefix {prefix} is missing"
+        assert maintenance.verify_no_data_drift(frozen, prefix_db, columns, target) == prefix
+    recovered = root / "maintenance-recovered.db"
+    maintenance.snapshot(frozen, recovered, before)
+    assert maintenance.verify_no_data_drift(frozen, recovered, columns, target) == 0
+
+    dirty = root / "maintenance-dirty.db"
+    shutil.copyfile(source_dir / "prefixes/prefix-1.db", dirty)
+    with closing(sqlite3.connect(dirty)) as db, db:
+        db.execute("UPDATE employee SET first_name = first_name || ' drift' WHERE id = (SELECT MIN(id) FROM employee)")
+    try:
+        maintenance.verify_no_data_drift(frozen, dirty, columns, target)
+    except maintenance.MaintenanceError as error:
+        assert "Database writes may have occurred" in str(error)
+    else:
+        raise AssertionError("Recovery accepted changed legacy employee data")
+    unknown = root / "maintenance-unknown.db"
+    shutil.copyfile(source_db, unknown)
+    with closing(sqlite3.connect(unknown)) as db, db:
+        db.execute("ALTER TABLE employee_account ADD COLUMN unreviewed TEXT")
+    try:
+        maintenance.verify_no_data_drift(frozen, unknown, columns, target)
+    except maintenance.MaintenanceError as error:
+        assert "reviewed schema prefix" in str(error)
+    else:
+        raise AssertionError("Recovery accepted an unknown partial schema")
+
     maintenance.rehearse(release.command, release.docker_json, image["Id"], root, frozen, before, target, columns)
     maintenance.rehearse(release.command, release.docker_json, image["Id"], root, frozen, before, target, columns,
                          verify_modes=True)
-    print("Maintenance rehearsal passed: isolated EF startup, expected schema, integrity and logical row preservation")
+    print("Maintenance rehearsal passed: full seven-migration chain, eight schema prefixes, row preservation, media, and safe rollback")
 
-    # The migration is still pending, but the duplicate DDL causes the candidate to fail.
+    # Make the first new-column migration fail after the swap-index prefix has committed.
+    table, name, affinity = columns.nullable_columns[0]
+    fixture = root / "maintenance-failed-prefix.db"
+    shutil.copyfile(frozen, fixture)
     with closing(sqlite3.connect(fixture)) as db, db:
-        db.execute('ALTER TABLE shift_correction_request ADD COLUMN "comment" TEXT NULL')
+        db.execute(f'ALTER TABLE "{table}" ADD COLUMN "{name}" {affinity} NULL')
     try:
         maintenance.rehearse(release.command, release.docker_json, image["Id"], root, fixture, before, target, columns)
     except maintenance.MaintenanceError as error:
         assert "Candidate stopped before rehearsal health passed" in str(error)
     else:
-        raise AssertionError("Migration SQL failure passed the isolated rehearsal")
+        raise AssertionError("Injected full-chain migration failure passed the isolated rehearsal")
     finally:
         assert not list(root.glob("clone-*"))
-    recovered = root / "maintenance-recovered.db"
-    maintenance.snapshot(frozen, recovered, before)
-    maintenance.verify_migration(frozen, recovered, before, before, ())
-    with closing(sqlite3.connect(snapshot_path)) as db:
-        maintenance.verify(db, target)
-    print("Maintenance rehearsal passed: failed SQL left the source intact and verified recovery copy remained usable")
+    with closing(sqlite3.connect(frozen)) as db:
+        maintenance.verify(db, before)
+    assert maintenance.media_stamp(root / maintenance.MEDIA_DIRECTORY) == maintenance.media_stamp(source_media)
+    print("Maintenance rehearsal passed: injected mid-chain failure stayed isolated; verified baseline and media remained recoverable")
 
 
-def maintenance_scenario(root, previous, candidate, baseline, git_dir, before, sha, scenario, sql, tags):
+def maintenance_scenario(root, previous, candidate, baseline, git_dir, before, sha, scenario, sql, tags, columns, added):
     """Run the real maintenance engine on the runner's disposable Docker volume and nftables."""
     database = release.maintenance_database(baseline[2])
-    added = ("20261114225324_AddShiftCorrectionComment", "20261115135735_RefreshManualShiftOffer")
-    columns = (("shift_correction_request", "comment", "TEXT"),
-               ("shift_swap_request", "refreshed_at_utc", "INTEGER"))
     with closing(sqlite3.connect(database)) as db:
         historical = tuple(row[0] for row in db.execute('SELECT MigrationId FROM "__EFMigrationsHistory" ORDER BY MigrationId'))
-    expected = historical + added
     assert not set(historical).intersection(added)
-    if scenario == "migration-failure":
-        sql('ALTER TABLE shift_correction_request ADD COLUMN "comment" TEXT NULL')
+    expected = historical + added
+    media_before = maintenance.media_stamp(database.parent / maintenance.MEDIA_DIRECTORY)
     data = root / "recovery"
     data.mkdir(mode=0o700)
     journal = maintenance.Journal(release.STATE, data, release.store)
@@ -117,6 +162,7 @@ def maintenance_scenario(root, previous, candidate, baseline, git_dir, before, s
     original_verify = release.verify_web
     final_verify_failed = False
     real_migrate = release.migrate_fenced
+    real_restore = maintenance.restore_database
     assert subprocess.run(["nft", "list", "table", "inet", "gf3_maintenance"], capture_output=True).returncode != 0
 
     def local_command(*args, **kwargs):
@@ -166,22 +212,36 @@ def maintenance_scenario(root, previous, candidate, baseline, git_dir, before, s
         return original_verify(bundle, acme, address)
 
     def simulate_restart(*args):
+        if scenario == "migration-before-start":
+            raise release.ReleaseError("Synthetic failure before the first migration")
         if scenario == "fence-lost":
             # Exercise the same hazards as a reboot without rebooting the GitHub runner:
             # the kernel table disappears and the Docker daemon re-reads restart policies.
             real_command("nft", "delete", "table", "inet", "gf3_maintenance")
             real_command("systemctl", "restart", "docker")
-        return real_migrate(*args)
+        result = real_migrate(*args)
+        if scenario in {"migration-failure", "partial-restore"}:
+            raise release.ReleaseError("Synthetic failure after the migration chain")
+        return result
+
+    def interrupt_restore(database, bundle, metadata, assert_quiet, consume_restore, expected_stamp, record_progress):
+        def progress(value):
+            record_progress(value)
+            if scenario == "partial-restore" and value["stage"] == "database-installed":
+                raise OSError("synthetic interruption before media installation")
+
+        return real_restore(database, bundle, metadata, assert_quiet, consume_restore, expected_stamp, progress)
 
     try:
         with (patch.object(release, "command", local_command), patch.object(release, "git", git),
               patch.object(release, "guard_result", guard_result), patch.object(release, "verify_web", observe_web),
-              patch.object(release, "migrate_fenced", simulate_restart)):
+              patch.object(release, "migrate_fenced", simulate_restart),
+              patch.object(maintenance, "restore_database", interrupt_restore)):
             try:
                 release.maintenance_cutover(maintenance, journal, candidate, previous, before, sha, baseline,
                                             historical, expected, columns)
             except release.ReleaseError as error:
-                if scenario in {"migration-failure", "git-failure", "guard-failure"}:
+                if scenario in {"migration-before-start", "migration-failure", "git-failure", "guard-failure"}:
                     assert "were recovered" in str(error), str(error)
                 elif scenario == "fence-lost":
                     assert journal.read()["phase"] == "RECOVERY_REQUIRED" and not (data / "failed-database").exists()
@@ -189,6 +249,15 @@ def maintenance_scenario(root, previous, candidate, baseline, git_dir, before, s
                     with closing(sqlite3.connect(database)) as db:
                         maintenance.verify(db, historical)
                     print("Maintenance transaction remained offline after losing the fence and restarting Docker")
+                    return
+                elif scenario == "partial-restore":
+                    state = journal.read()
+                    assert state["phase"] == "RECOVERY_REQUIRED" and state["failed_in"] == "RESTORING"
+                    assert state["restore_progress"]["stage"] == "database-installed"
+                    assert (data / "failed-database" / maintenance.MEDIA_DIRECTORY).is_dir()
+                    assert Path(state["restore_progress"]["staged_media"]).is_dir()
+                    assert all(not release.container(name)["State"]["Running"] for name in ("gf3-app", "nginx"))
+                    print("Interrupted database/media restore retained its evidence and stayed offline")
                     return
                 elif scenario == "failure-after-open":
                     assert journal.read()["writes_may_resume"] and not (data / "failed-database").exists()
@@ -198,9 +267,13 @@ def maintenance_scenario(root, previous, candidate, baseline, git_dir, before, s
             else:
                 assert scenario == "success"
         assert release.topology() == baseline
-        recovered = scenario in {"migration-failure", "git-failure", "guard-failure"}
+        recovered = scenario in {"migration-before-start", "migration-failure", "git-failure", "guard-failure"}
         activated = previous if recovered else candidate
         assert release.active_bundle() == activated
+        assert maintenance.media_stamp(database.parent / maintenance.MEDIA_DIRECTORY) == media_before
+        if scenario != "failure-after-open":
+            maintenance.verify_migration(data / "final.db", database, historical,
+                                         historical if recovered else expected, () if recovered else columns)
         with closing(sqlite3.connect(database)) as db:
             maintenance.verify(db, historical if recovered else expected)
             values = [row[0] for row in db.execute("SELECT value FROM rehearsal_marker")]
@@ -215,7 +288,7 @@ def maintenance_scenario(root, previous, candidate, baseline, git_dir, before, s
         subprocess.run(["nft", "delete", "table", "inet", "gf3_maintenance"], capture_output=True)
 
 
-def main(scenario=None):
+def main(scenario=None, historical_pair=False):
     release.command = diagnostic_command
     project = "gf3-rehearsal-" + secrets.token_hex(5)
     network = project + "_gf3-internal"
@@ -249,8 +322,9 @@ def main(scenario=None):
                         "-subj", "/CN=localhost", "-addext", "subjectAltName=DNS:localhost",
                         "-keyout", str(key), "-out", str(cert)], check=True, capture_output=True)
         env_file = deploy / ".env"
+        previous_image = ("gf3-web:maintenance-prior" if historical_pair else HISTORICAL_TARGET_IMAGE) if scenario else "gf3-web:ci"
         env_file.write_text("\n".join([
-            f"GF3_IMAGE={'gf3-web:maintenance-prior' if scenario else 'gf3-web:ci'}", "GF3_SERVER_NAME=localhost",
+            f"GF3_IMAGE={previous_image}", "GF3_SERVER_NAME=localhost",
             "GF3_REQUIRE_EXISTING_DATABASE=false",
             "GF3_BACKUP_BEFORE_MIGRATE=true", f"GF3_DATA_VOLUME={volume}",
             "GF3_ADMIN_DEVELOPER_PASSWORD=disposable-only", "GF3_BOOTSTRAP_MANAGER_PASSWORD=743961",
@@ -345,6 +419,19 @@ def main(scenario=None):
             cidr = next(row["Subnet"] for row in bridge["IPAM"]["Config"] if ":" not in row["Subnet"])
             with env_file.open("a") as output:
                 output.write(f"GF3_TRUSTED_PROXY_CIDR={cidr}\n")
+            if scenario and not historical_pair:
+                fixture = HERE.parents[1] / "GF3.Tests/TestResults/release-baseline"
+                assert (fixture / "SQLite.db").is_file() and (fixture / "communication-gifs").is_dir()
+                release.command("docker", "run", "--rm", "--network", "none", "-v", f"{volume}:/data",
+                                "-v", f"{fixture.as_posix()}:/fixture:ro", "mirror.gcr.io/library/python:3.12-alpine",
+                                "python3", "-c", "import os,shutil; shutil.copyfile('/fixture/SQLite.db','/data/SQLite.db'); "
+                                "shutil.copytree('/fixture/communication-gifs','/data/communication-gifs',dirs_exist_ok=True); "
+                                "os.chown('/data',1654,1654); os.chmod('/data',0o755); "
+                                "os.chown('/data/SQLite.db',1654,1654); os.chmod('/data/SQLite.db',0o600); "
+                                "[(os.chown(os.path.join(r,n),1654,1654),os.chmod(os.path.join(r,n),0o755)) "
+                                "for r,ds,fs in os.walk('/data/communication-gifs') for n in ds]; "
+                                "[(os.chown(os.path.join(r,n),1654,1654),os.chmod(os.path.join(r,n),0o644)) "
+                                "for r,ds,fs in os.walk('/data/communication-gifs') for n in fs]")
             release.command(*base, "up", "-d", "--no-build", "--pull", "never", "--wait", "--wait-timeout", "100")
             baseline = release.topology()
 
@@ -384,13 +471,24 @@ def main(scenario=None):
                 config = release.render(root)
                 release.freeze(config, volume)
                 app_service = config["services"]["gf3-app"]
-                app_service["image"] = "gf3-web:ci"
+                app_service["image"] = HISTORICAL_TARGET_IMAGE if historical_pair else "gf3-web:ci"
                 app_service["environment"]["DatabaseStartup__RequireExistingDatabase"] = "true"
                 release.save_compose(candidate, config)
                 (candidate / "guard-enabled").touch()
+                def repository_git(*args):
+                    return release.git(*args, root=HERE.parents[1])
+
+                revision = repository_git("rev-parse", "HEAD").strip()
+                if historical_pair:
+                    added = ("20261114225324_AddShiftCorrectionComment", "20261115135735_RefreshManualShiftOffer")
+                    plan = maintenance.migration_plan(repository_git, HISTORICAL_PRIOR, HISTORICAL_TARGET, added)
+                else:
+                    assert migration_history[-1][0] == maintenance.REVIEWED_SCHEMA_PREFIX_CONTRACTS[0]["migrationId"]
+                    added = maintenance.REVIEWED_RELEASE_MIGRATIONS
+                    plan = maintenance.migration_plan(repository_git, maintenance.RELEASE_BASELINE, revision, added)
                 with patch.object(release, "verify_web", verify):
                     maintenance_scenario(root, previous, candidate, baseline, git_dir, before, sha,
-                                         scenario, sql, tags)
+                                         scenario, sql, tags, plan, added)
                 return
             # Certbot replaces symlinks under live/. Recreate Nginx so its file bind follows the replacement.
             for name in (cert, key):
@@ -418,7 +516,8 @@ def main(scenario=None):
                                       "WHERE id=?", (employee_id,)).fetchall() == employee_rows
                 assert backup.execute("PRAGMA integrity_check").fetchall() == [("ok",)]
 
-            if os.name != "nt":
+            if (os.environ.get("GITHUB_ACTIONS") == "true"
+                    or (HERE.parents[1] / "GF3.Tests/TestResults/release-baseline/SQLite.db").is_file()):
                 rehearse_migrations(root, previous / "SQLite.db")
 
             template = deploy / "nginx/https-templates/gf3.conf.template"
@@ -604,32 +703,40 @@ def main(scenario=None):
                 release.command("docker", "image", "rm", tag, check=False)
 
 
+def build_rehearsal_image(repo, revision, image):
+    subprocess.run(["git", "fetch", "--no-tags", "--depth=1", "origin", revision], cwd=repo, check=True)
+    with tempfile.TemporaryDirectory(prefix="gf3-rehearsal-source-") as worktree:
+        subprocess.run(["git", "worktree", "add", "--detach", worktree, revision], cwd=repo, check=True)
+        try:
+            subprocess.run(["docker", "build", "-t", image, worktree], check=True)
+        finally:
+            subprocess.run(["git", "worktree", "remove", "--force", worktree], cwd=repo, check=True)
+
+
 if __name__ == "__main__":
     import sys
 
     scenarios = ("success", "migration-failure", "git-failure", "guard-failure", "failure-after-open", "fence-lost")
-    if len(sys.argv) == 2 and sys.argv[1] in scenarios:
+    reviewed_scenarios = (*scenarios, "migration-before-start", "partial-restore")
+    if len(sys.argv) in (2, 3) and sys.argv[1] in reviewed_scenarios:
         assert os.geteuid() == 0 and os.environ.get("GF3_DISPOSABLE_CI_RUNNER") == "true"
         os.umask(0o077)
-        main(sys.argv[1])
+        historical_pair = len(sys.argv) == 3
+        assert not historical_pair or (sys.argv[2] == "historical" and sys.argv[1] in scenarios)
+        main(sys.argv[1], historical_pair)
     else:
         assert len(sys.argv) == 1
         main()
         if os.environ.get("GITHUB_ACTIONS") == "true":
-            # Exercise production primitives with real Docker, kernel fence, Git and SQLite on a
-            # fresh runner. Use a pinned previous application that predates the pending migrations.
             if not shutil.which("nft"):
                 subprocess.run(["sudo", "-n", "apt-get", "update"], check=True)
                 subprocess.run(["sudo", "-n", "apt-get", "install", "-y", "nftables"], check=True)
-            prior = "353f8e23dbd3f6c9989e7df2198346b72c700487"
             repo = HERE.parents[1]
-            subprocess.run(["git", "fetch", "--no-tags", "--depth=1", "origin", prior], cwd=repo, check=True)
-            with tempfile.TemporaryDirectory(prefix="gf3-prior-source-") as worktree:
-                subprocess.run(["git", "worktree", "add", "--detach", worktree, prior], cwd=repo, check=True)
-                try:
-                    subprocess.run(["docker", "build", "-t", "gf3-web:maintenance-prior", worktree], check=True)
-                finally:
-                    subprocess.run(["git", "worktree", "remove", "--force", worktree], cwd=repo, check=True)
-            for case in scenarios:
+            build_rehearsal_image(repo, HISTORICAL_PRIOR, "gf3-web:maintenance-prior")
+            build_rehearsal_image(repo, HISTORICAL_TARGET, HISTORICAL_TARGET_IMAGE)
+            for case in reviewed_scenarios:
                 subprocess.run(["sudo", "-n", "env", "GF3_DISPOSABLE_CI_RUNNER=true",
                                 "/usr/bin/python3", "-u", str(Path(__file__).resolve()), case], check=True)
+            for case in scenarios:
+                subprocess.run(["sudo", "-n", "env", "GF3_DISPOSABLE_CI_RUNNER=true",
+                                "/usr/bin/python3", "-u", str(Path(__file__).resolve()), case, "historical"], check=True)

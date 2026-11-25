@@ -13,4 +13,6 @@ public sealed class WorkflowLogDto
     public string ActorName { get; set; } = string.Empty;
 
     public string Action { get; set; } = string.Empty;
+
+    public string? LaunchMode { get; set; }
 }

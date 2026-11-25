@@ -28,9 +28,10 @@ export const useShiftSwapPreviewQuery = (payload: SwapWizardRequest | null) => u
   queryFn: ({ signal }) => shiftSwapsApi.previewEmployee(payload!, signal),
 });
 
-export const useEmployeeShiftSwapsQuery = () =>
+export const useEmployeeShiftSwapsQuery = (enabled = true) =>
   useQuery({
     queryKey: queryKeys.shiftSwaps.employee(),
+    enabled,
     staleTime: 30_000,
     queryFn: ({ signal }) => shiftSwapsApi.listEmployee(signal),
   });

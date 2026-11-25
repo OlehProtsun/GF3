@@ -248,7 +248,7 @@ export function LoginPage() {
             aria-pressed={passwordMode === mode}
             onClick={() => handlePasswordModeChange(mode)}
           >
-            {mode === "pc" ? "PC" : t("Phone")}
+            {mode === "pc" ? "PC" : "PIN"}
           </button>
         ))}
       </span>

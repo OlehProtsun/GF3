@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using System.Text.Json;
 using DataAccessLayer.Administration;
 using DataAccessLayer.Models;
@@ -15,11 +16,237 @@ namespace GF3.Tests;
 public sealed class DatabaseMigrationStartupTests
 {
     [Fact]
+    public async Task ReviewedReleaseSchemaPrefixes_MatchImmutableContract()
+    {
+        const string baseline = "20261115135735_RefreshManualShiftOffer";
+        string[] prefixes = [
+            baseline,
+            "20261122150944_AllowDisjointOpenSwapIntervals",
+            "20261122151455_TrackEmployeeLaunchModes",
+            "20261122160000_AddWorkflowLogLaunchMode",
+            "20261122173000_AddShiftRemovalCorrections",
+            "20261123120000_AddCommunicationGifAttachment",
+            "20261123130000_AddCommunicationPhotoAttachment",
+            "20261123140000_AddCommunicationContentBlocks"
+        ];
+        var root = CreateTempRoot();
+        var path = Path.Combine(root, "SQLite.db");
+        var contracts = new List<object>();
+        try
+        {
+            await using var db = CreateContext($"Data Source={path}");
+            var migrator = db.GetService<IMigrator>();
+            foreach (var prefix in prefixes)
+            {
+                await migrator.MigrateAsync(prefix);
+                contracts.Add(await ReadReviewedSchemaPrefixAsync(db, prefix));
+            }
+
+            var actual = JsonSerializer.Serialize(contracts, new JsonSerializerOptions { WriteIndented = true, NewLine = "\n" }) + "\n";
+            var exportPath = Environment.GetEnvironmentVariable("GF3_EXPORT_SCHEMA_PREFIX_CONTRACTS");
+            if (!string.IsNullOrWhiteSpace(exportPath))
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(exportPath))!);
+                await File.WriteAllTextAsync(exportPath, actual);
+                return;
+            }
+
+            var expected = await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, "reviewed-schema-prefix-contracts.json"));
+            Assert.Equal(expected.ReplaceLineEndings("\n").Replace("\\r\\n", "\\n"), actual.Replace("\\r\\n", "\\n"));
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ReviewedReleaseTransition_PreservesRepresentativeRowsAndExportsSyntheticBaseline()
+    {
+        const string baseline = "20261115135735_RefreshManualShiftOffer";
+        string[] expectedMigrations = [
+            "20261122150944_AllowDisjointOpenSwapIntervals",
+            "20261122151455_TrackEmployeeLaunchModes",
+            "20261122160000_AddWorkflowLogLaunchMode",
+            "20261122173000_AddShiftRemovalCorrections",
+            "20261123120000_AddCommunicationGifAttachment",
+            "20261123130000_AddCommunicationPhotoAttachment",
+            "20261123140000_AddCommunicationContentBlocks"
+        ];
+        var root = CreateTempRoot();
+        var sourcePath = Path.Combine(root, "SQLite.db");
+        var clonePath = Path.Combine(root, "clone.db");
+        var workspace = new SqliteDatabaseWorkspace(sourcePath);
+        try
+        {
+            var mediaDirectory = Path.Combine(root, "communication-gifs");
+            Directory.CreateDirectory(mediaDirectory);
+            File.WriteAllBytes(Path.Combine(mediaDirectory, $"{Guid.NewGuid():N}.gif"),
+                Convert.FromBase64String("R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs="));
+            int owner;
+            int slotId;
+            await using (var source = CreateContext(workspace.ConnectionString))
+            {
+                await source.GetService<IMigrator>().MigrateAsync(baseline);
+                var seeded = await EmployeePushNotificationSourceTests.Seed(source);
+                owner = seeded.Owner;
+                slotId = seeded.Slot.Id;
+                source.ShiftSwapRequests.Add(EmployeePushNotificationSourceTests.Offer(owner, seeded.Schedule, seeded.Slot));
+                await source.SaveChangesAsync();
+                var created = DateTimeOffset.Parse("2026-11-20T09:00:00Z");
+                await source.Database.ExecuteSqlInterpolatedAsync($"""
+                    INSERT INTO employee_account (employee_id, username, password_hash, password_updated_at_utc, session_version)
+                    VALUES ({owner}, 'legacy-account', 'synthetic-hash', {created}, 1);
+                    """);
+                await source.Database.ExecuteSqlInterpolatedAsync($"""
+                    INSERT INTO workflow_log_entry (occurred_at_utc, actor_role, actor_employee_id, actor_name, action)
+                    VALUES ({created}, 'employee', {owner}, 'Synthetic employee', 'Opened schedule');
+                    """);
+                await source.Database.ExecuteSqlInterpolatedAsync($"""
+                    INSERT INTO shift_correction_request
+                        (schedule_id, employee_id, schedule_slot_id, day_of_month, original_from_time,
+                         original_to_time, requested_from_time, requested_to_time, status, created_at_utc)
+                    VALUES ({seeded.Schedule.Id}, {owner}, {slotId}, 20, '08:00', '16:00',
+                            '08:00', '16:30', 'Pending', {created});
+                    INSERT INTO shift_correction_request
+                        (id, schedule_id, employee_id, schedule_slot_id, day_of_month, original_from_time,
+                         original_to_time, requested_from_time, requested_to_time, status, created_at_utc)
+                    VALUES (9001, {seeded.Schedule.Id}, {owner}, {slotId}, 20, '08:00', '16:00',
+                            '08:00', '16:30', 'Approved', {created});
+                    DELETE FROM shift_correction_request WHERE id = 9001;
+                    """);
+                await source.Database.ExecuteSqlInterpolatedAsync($"""
+                    INSERT INTO communication_message (title, body, deadline_at_utc, created_at_utc, created_by_manager_name)
+                    VALUES ('Legacy message', 'Legacy text survives the release', {created.AddDays(1)}, {created}, 'Synthetic manager');
+                    """);
+            }
+
+            var backup = await workspace.CreateAutomaticBackupAsync(default);
+            var artifact = Environment.GetEnvironmentVariable("GF3_EXPORT_RELEASE_BASELINE_DIRECTORY");
+            if (!string.IsNullOrWhiteSpace(artifact))
+            {
+                var artifactDirectory = Path.GetFullPath(artifact);
+                var prefixes = Path.Combine(artifactDirectory, "prefixes");
+                Directory.CreateDirectory(prefixes);
+                File.Copy(backup.Path, Path.Combine(artifactDirectory, "SQLite.db"), overwrite: true);
+                DirectoryCopy(mediaDirectory, Path.Combine(artifactDirectory, "communication-gifs"));
+                File.Copy(backup.Path, Path.Combine(prefixes, "prefix-0.db"), overwrite: true);
+                var rehearsalPath = Path.Combine(root, "prefix-rehearsal.db");
+                File.Copy(backup.Path, rehearsalPath, overwrite: true);
+                for (var i = 0; i < expectedMigrations.Length; i++)
+                {
+                    await using (var rehearsal = CreateContext($"Data Source={rehearsalPath}"))
+                        await rehearsal.GetService<IMigrator>().MigrateAsync(expectedMigrations[i]);
+                    SqliteConnection.ClearAllPools();
+                    File.Copy(rehearsalPath, Path.Combine(prefixes, $"prefix-{i + 1}.db"), overwrite: true);
+                }
+            }
+            File.Copy(backup.Path, clonePath);
+            var cloneWorkspace = new SqliteDatabaseWorkspace(clonePath);
+            await using (var clone = CreateContext(cloneWorkspace.ConnectionString))
+            {
+                var result = await DatabaseMigrationStartup.ApplyAsync(clone, cloneWorkspace,
+                    requireExistingDatabase: true, backupBeforeMigrate: true, NullLogger.Instance);
+                Assert.Equal(expectedMigrations, result.AppliedMigrations);
+                var correction = await clone.ShiftCorrectionRequests.SingleAsync();
+                Assert.Equal(ShiftCorrectionOperation.ChangeTimes, correction.Operation);
+                Assert.Null(correction.RemovalSnapshotJson);
+                Assert.Equal(("08:00", "16:00", "08:00", "16:30"),
+                    (correction.OriginalFromTime, correction.OriginalToTime,
+                     correction.RequestedFromTime, correction.RequestedToTime));
+                Assert.Equal(owner, (await clone.ShiftSwapRequests.SingleAsync()).FromEmployeeId);
+                var account = await clone.EmployeeAccounts.SingleAsync();
+                Assert.Null(account.LastBrowserLaunchAtUtc);
+                Assert.Null(account.LastPwaLaunchAtUtc);
+                Assert.Null((await clone.WorkflowLogEntries.SingleAsync()).LaunchMode);
+                var message = await clone.Set<CommunicationMessageModel>().SingleAsync();
+                Assert.Null(message.GifAttachmentJson);
+                Assert.Null(message.PhotoAttachmentJson);
+                Assert.Null(message.ContentBlocksJson);
+                Assert.Equal("Legacy text survives the release", message.Body);
+                Assert.Equal("ok", await ReadPragmaAsync(cloneWorkspace.ConnectionString, "PRAGMA integrity_check"));
+                Assert.Null(await ReadPragmaAsync(cloneWorkspace.ConnectionString, "PRAGMA foreign_key_check"));
+            }
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    private static async Task<object> ReadReviewedSchemaPrefixAsync(AppDbContext db, string migrationId)
+    {
+        string[] tables = ["communication_message", "employee_account", "shift_correction_request", "shift_swap_request", "workflow_log_entry"];
+        await db.Database.OpenConnectionAsync();
+        try
+        {
+        var schemaObjects = new List<object?[]>();
+        await using (var command = db.Database.GetDbConnection().CreateCommand())
+        {
+            command.CommandText = "SELECT type, name, tbl_name, sql FROM sqlite_schema WHERE " +
+                string.Join(" OR ", tables.Select((_, i) => $"name = @table{i} OR tbl_name = @table{i}")) +
+                " ORDER BY type, name";
+            for (var i = 0; i < tables.Length; i++)
+            {
+                var parameter = command.CreateParameter();
+                parameter.ParameterName = $"@table{i}";
+                parameter.Value = tables[i];
+                command.Parameters.Add(parameter);
+            }
+            await using var reader = await command.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+                schemaObjects.Add([reader.GetString(0), reader.GetString(1), reader.GetString(2), reader.IsDBNull(3) ? null : reader.GetString(3)]);
+        }
+
+        var tableDetails = new List<object>();
+        foreach (var table in tables)
+        {
+            var columns = await ReadPragmaAsync(db, $"table_xinfo(\"{table}\")");
+            var foreignKeys = await ReadPragmaAsync(db, $"foreign_key_list(\"{table}\")");
+            var indexes = await ReadPragmaAsync(db, $"index_list(\"{table}\")");
+            var indexDetails = new List<object>();
+            foreach (var index in indexes)
+                indexDetails.Add(new { row = index, columns = await ReadPragmaAsync(db, $"index_xinfo(\"{index[1]}\")") });
+            tableDetails.Add(new { table, columns, foreignKeys, indexes = indexDetails });
+        }
+        return new { migrationId, schemaObjects, tables = tableDetails };
+        }
+        finally
+        {
+            await db.Database.CloseConnectionAsync();
+        }
+    }
+
+    private static async Task<List<object?[]>> ReadPragmaAsync(AppDbContext db, string pragma)
+    {
+        var rows = new List<object?[]>();
+        await using var command = db.Database.GetDbConnection().CreateCommand();
+        command.CommandText = $"PRAGMA {pragma}";
+        await using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            var row = new object?[reader.FieldCount];
+            for (var i = 0; i < row.Length; i++) row[i] = reader.IsDBNull(i) ? null : reader.GetValue(i);
+            rows.Add(row);
+        }
+        return rows;
+    }
+
+    [Fact]
     public async Task AdditiveMigrations_OnCopy_PreserveRowsAndLeaveSourceUnmigrated()
     {
         const string prior = "20261101190152_AddDayOffShiftCorrectionRequests";
         const string correction = "20261114225324_AddShiftCorrectionComment";
         const string refresh = "20261115135735_RefreshManualShiftOffer";
+        const string disjointSwaps = "20261122150944_AllowDisjointOpenSwapIntervals";
+        const string launchModes = "20261122151455_TrackEmployeeLaunchModes";
+        const string launchLog = "20261122160000_AddWorkflowLogLaunchMode";
+        const string removal = "20261122173000_AddShiftRemovalCorrections";
+        const string gif = "20261123120000_AddCommunicationGifAttachment";
+        const string photo = "20261123130000_AddCommunicationPhotoAttachment";
+        const string contentBlocks = "20261123140000_AddCommunicationContentBlocks";
         var root = CreateTempRoot();
         var sourcePath = Path.Combine(root, "SQLite.db");
         var clonePath = Path.Combine(root, "clone.db");
@@ -29,21 +256,49 @@ public sealed class DatabaseMigrationStartupTests
             await using (var source = CreateContext(workspace.ConnectionString))
             {
                 await source.GetService<IMigrator>().MigrateAsync(prior);
-                source.Employees.Add(new EmployeeModel { FirstName = "Fixture", LastName = "Employee" });
-                await source.SaveChangesAsync();
+                var (owner, _, schedule, slot) = await EmployeePushNotificationSourceTests.Seed(source);
+                var now = DateTimeOffset.UtcNow;
+                await source.Database.ExecuteSqlInterpolatedAsync($"""
+                    INSERT INTO shift_correction_request
+                        (schedule_id, employee_id, schedule_slot_id, day_of_month, original_from_time, original_to_time,
+                         requested_from_time, requested_to_time, status, created_at_utc)
+                    VALUES ({schedule.Id}, {owner}, {slot.Id}, 1, '08:00', '16:00', '08:00', '16:30', 'Approved', {now});
+                    INSERT INTO communication_message (title, body, deadline_at_utc, created_at_utc, created_by_manager_name)
+                    VALUES ('Fixture message', 'Legacy text', {now.AddDays(1)}, {now}, 'Fixture manager');
+                    """);
             }
             var snapshot = await workspace.CreateAutomaticBackupAsync(default);
+            Assert.Equal("0", await ReadPragmaAsync(workspace.ConnectionString, "PRAGMA wal_checkpoint(TRUNCATE)"));
+            await using var sourceConnection = new SqliteConnection(workspace.ConnectionString);
+            SqliteConnection.ClearPool(sourceConnection);
+            var sourceHash = await HashAsync(sourcePath);
+            var backupHash = await HashAsync(snapshot.Path);
             File.Copy(snapshot.Path, clonePath);
             var cloneWorkspace = new SqliteDatabaseWorkspace(clonePath);
             await using (var clone = CreateContext(cloneWorkspace.ConnectionString))
             {
                 var result = await DatabaseMigrationStartup.ApplyAsync(clone, cloneWorkspace, true, true,
                     NullLogger.Instance);
-                Assert.Equal(new[] { correction, refresh }, result.AppliedMigrations);
-                Assert.Equal("Fixture", (await clone.Employees.SingleAsync()).FirstName);
-                Assert.Empty(await clone.ShiftCorrectionRequests.Select(request => request.Comment).ToListAsync());
+                Assert.Equal(new[] { correction, refresh, disjointSwaps, launchModes, launchLog, removal, gif, photo, contentBlocks },
+                    result.AppliedMigrations);
+                Assert.Equal(new[] { "Owner", "Recipient" }, await clone.Employees.OrderBy(employee => employee.Id).Select(employee => employee.FirstName).ToArrayAsync());
+                var legacy = await clone.ShiftCorrectionRequests.SingleAsync();
+                Assert.Equal(ShiftCorrectionOperation.ChangeTimes, legacy.Operation);
+                Assert.Equal(("08:00", "16:00", "08:00", "16:30"),
+                    (legacy.OriginalFromTime, legacy.OriginalToTime, legacy.RequestedFromTime, legacy.RequestedToTime));
+                Assert.Null(legacy.Comment);
+                Assert.Null(legacy.RemovalSnapshotJson);
                 Assert.Empty(await clone.ShiftSwapRequests.Select(request => request.RefreshedAtUtc).ToListAsync());
-                Assert.Equal("ok", await IntegrityAsync(cloneWorkspace.ConnectionString));
+                Assert.Empty(await clone.EmployeeAccounts.Select(account => new { account.LastBrowserLaunchAtUtc, account.LastPwaLaunchAtUtc }).ToListAsync());
+                Assert.Empty(await clone.Set<WorkflowLogEntryModel>().Select(entry => entry.LaunchMode).ToListAsync());
+                var message = await clone.Set<CommunicationMessageModel>().SingleAsync();
+                Assert.Equal("Legacy text", message.Body);
+                Assert.Null(message.GifAttachmentJson);
+                Assert.Null(message.PhotoAttachmentJson);
+                Assert.Null(message.ContentBlocksJson);
+                Assert.False(clone.Database.HasPendingModelChanges());
+                Assert.Equal("ok", await ReadPragmaAsync(cloneWorkspace.ConnectionString, "PRAGMA integrity_check"));
+                Assert.Null(await ReadPragmaAsync(cloneWorkspace.ConnectionString, "PRAGMA foreign_key_check"));
             }
             SqliteConnection.ClearAllPools();
             var verificationConnection = new SqliteConnectionStringBuilder
@@ -55,15 +310,23 @@ public sealed class DatabaseMigrationStartupTests
             await using (var verification = CreateContext(verificationConnection))
             {
                 Assert.Empty(await verification.Database.GetPendingMigrationsAsync());
-                Assert.Equal("Fixture", (await verification.Employees.SingleAsync()).FirstName);
+                Assert.Equal(2, await verification.Employees.CountAsync());
                 verification.Employees.Add(new EmployeeModel { FirstName = "Unexpected", LastName = "Write" });
                 var error = await Assert.ThrowsAsync<DbUpdateException>(() => verification.SaveChangesAsync());
                 Assert.Equal(8, Assert.IsType<SqliteException>(error.InnerException).SqliteErrorCode);
             }
-            await using var unchanged = CreateContext(workspace.ConnectionString);
+            var immutableSource = new SqliteConnectionStringBuilder
+            {
+                DataSource = new Uri(sourcePath).AbsoluteUri + "?immutable=1",
+                Mode = SqliteOpenMode.ReadOnly,
+                Pooling = false,
+            }.ToString();
+            await using var unchanged = CreateContext(immutableSource);
             Assert.Equal(prior, (await unchanged.Database.GetAppliedMigrationsAsync()).Last());
-            Assert.Equal("Fixture", (await unchanged.Employees.SingleAsync()).FirstName);
-            Assert.Equal("ok", await IntegrityAsync(workspace.ConnectionString));
+            Assert.Equal(2, await unchanged.Employees.CountAsync());
+            Assert.Equal("ok", await ReadPragmaAsync(immutableSource, "PRAGMA integrity_check"));
+            Assert.Equal(sourceHash, await HashAsync(sourcePath));
+            Assert.Equal(backupHash, await HashAsync(snapshot.Path));
         }
         finally
         {
@@ -71,13 +334,66 @@ public sealed class DatabaseMigrationStartupTests
             Directory.Delete(root, recursive: true);
         }
 
-        static async Task<string?> IntegrityAsync(string connectionString)
+        static async Task<string?> ReadPragmaAsync(string connectionString, string pragma)
         {
             await using var connection = new SqliteConnection(connectionString);
             await connection.OpenAsync();
             await using var command = connection.CreateCommand();
-            command.CommandText = "PRAGMA integrity_check";
-            return (string?)await command.ExecuteScalarAsync();
+            command.CommandText = pragma;
+            return (await command.ExecuteScalarAsync())?.ToString();
+        }
+
+        static async Task<byte[]> HashAsync(string path)
+        {
+            await using var file = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            return await SHA256.HashDataAsync(file);
+        }
+    }
+
+    [Fact]
+    public async Task RemovalMigration_EnforcesSnapshotAndTimesOnAnUpgradedDatabase()
+    {
+        await using var database = await GF3.Tests.Infrastructure.SqliteTestDatabase.CreateAsync();
+        await using var db = database.CreateContext();
+        var migrator = db.GetService<IMigrator>();
+        await migrator.MigrateAsync("20261122160000_AddWorkflowLogLaunchMode");
+        var (owner, _, schedule, slot) = await EmployeePushNotificationSourceTests.Seed(db);
+        await migrator.MigrateAsync();
+
+        var removal = Draft("[]", null);
+        removal.RemovalSnapshotJson = JsonSerializer.Serialize(new[] { new { slot.Id, slot.FromTime, slot.ToTime } });
+        db.Add(removal);
+        await db.SaveChangesAsync();
+
+        await Reject(Draft(null, null));
+        await Reject(Draft(removal.RemovalSnapshotJson, "09:00"));
+        var attached = Draft(removal.RemovalSnapshotJson, null);
+        attached.ScheduleSlotId = slot.Id;
+        await Reject(attached);
+        var changedTimes = Draft(removal.RemovalSnapshotJson, "09:00");
+        changedTimes.Operation = ShiftCorrectionOperation.ChangeTimes;
+        changedTimes.RequestedToTime = "14:00";
+        await Reject(changedTimes);
+
+        var persisted = await db.ShiftCorrectionRequests.SingleAsync();
+        Assert.Equal(ShiftCorrectionOperation.RemoveShift, persisted.Operation);
+        Assert.Equal(removal.RemovalSnapshotJson, persisted.RemovalSnapshotJson);
+        Assert.Null(persisted.RequestedFromTime);
+        Assert.Null(persisted.RequestedToTime);
+
+        ShiftCorrectionRequestModel Draft(string? snapshot, string? start) => new()
+        {
+            ScheduleId = schedule.Id, EmployeeId = owner, DayOfMonth = 1,
+            Operation = ShiftCorrectionOperation.RemoveShift, Status = ShiftCorrectionStatus.Approved,
+            RequestedFromTime = start, RemovalSnapshotJson = snapshot, CreatedAtUtc = DateTimeOffset.UtcNow,
+        };
+
+        async Task Reject(ShiftCorrectionRequestModel request)
+        {
+            db.Add(request);
+            var error = await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync());
+            Assert.Equal(275, Assert.IsType<SqliteException>(error.InnerException).SqliteExtendedErrorCode);
+            db.ChangeTracker.Clear();
         }
     }
 
@@ -324,6 +640,15 @@ public sealed class DatabaseMigrationStartupTests
         return new AppDbContext(options);
     }
 
+    private static async Task<string?> ReadPragmaAsync(string connectionString, string pragma)
+    {
+        await using var connection = new SqliteConnection(connectionString);
+        await connection.OpenAsync();
+        await using var command = connection.CreateCommand();
+        command.CommandText = pragma;
+        return (await command.ExecuteScalarAsync())?.ToString();
+    }
+
     private static async Task SeedExistingProductionDataAsync(AppDbContext context)
     {
         var container = new ContainerModel { Name = "Release container" };
@@ -384,5 +709,12 @@ public sealed class DatabaseMigrationStartupTests
         var root = Path.Combine(Path.GetTempPath(), "GF3.Tests", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
         return root;
+    }
+
+    private static void DirectoryCopy(string source, string destination)
+    {
+        Directory.CreateDirectory(destination);
+        foreach (var file in Directory.EnumerateFiles(source))
+            File.Copy(file, Path.Combine(destination, Path.GetFileName(file)), overwrite: true);
     }
 }

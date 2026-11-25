@@ -120,6 +120,7 @@ public sealed class WorkflowLogsController(
         ActorEmployeeId = entry.ActorEmployeeId,
         ActorName = entry.ActorName,
         Action = entry.Action,
+        LaunchMode = entry.LaunchMode,
     };
 
     private static WorkflowLogSettingsDto ToDto(WorkflowLogSettingsModel settings) => new()

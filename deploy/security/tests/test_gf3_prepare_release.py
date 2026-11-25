@@ -353,6 +353,14 @@ class ManagedDeploymentTests(unittest.TestCase):
         self.assert_preparation_failed("lacks a successful result")
         self.engine.assert_not_called()
 
+    def test_playwright_smoke_requires_success_for_the_exact_prod2_sha(self):
+        self.push()
+        for patch in ({"name": "Unrelated browser job"}, {"conclusion": "failure"}, {"head_sha": self.current}):
+            with self.subTest(patch=patch):
+                self.job_overrides = {"Playwright smoke": patch}
+                self.assert_preparation_failed("CI job Playwright smoke lacks a successful result")
+        self.engine.assert_not_called()
+
     def test_missing_ci_and_api_outage(self):
         self.push()
         with patch.object(prepare, "github", return_value={"total_count": 0, "workflow_runs": []}):

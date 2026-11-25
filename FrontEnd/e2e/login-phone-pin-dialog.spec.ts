@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import pl from "../src/shared/i18n/pl.json" with { type: "json" };
 
 test.use({ launchOptions: process.platform === "win32" ? { ignoreDefaultArgs: ["--disable-accelerated-compositing"] } : {} });
 
@@ -34,8 +35,8 @@ async function fixture(page: Page, mode = "phone") {
 
 async function open(page: Page) {
   await expect(page.getByRole("dialog")).toHaveCount(0);
-  await page.getByRole("button", { name: "Enter password", exact: true }).click();
-  const dialog = page.getByRole("dialog", { name: "Enter your 6-digit PIN" });
+  await page.getByRole("button", { name: pl["Enter password"], exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: pl["Enter your 6-digit PIN"] });
   await expect(dialog).toBeVisible();
   await expect(dialog).toHaveCount(1);
   return dialog;
@@ -62,21 +63,21 @@ async function geometry(page: Page) {
 
 test("native modal, stable failed PIN and one successful retry", async ({ page }) => {
   const f = await fixture(page);
-  await expect(page.getByLabel("Numeric keypad")).not.toBeVisible();
+  await expect(page.getByLabel(pl["Numeric keypad"])).not.toBeVisible();
   const dialog = await open(page);
   await expect(dialog).toHaveJSProperty("open", true);
-  await expect(dialog.getByRole("button", { name: "Close" })).toBeFocused();
+  await expect(dialog.getByRole("button", { name: pl.Close })).toBeFocused();
   const before = await geometry(page);
   const box = await dialog.boundingBox();
   expect(box!.x).toBe(0); expect(box!.y).toBe(0);
   expect(box!.width).toBe(page.viewportSize()!.width);
   expect(box!.height).toBe(page.viewportSize()!.height);
   for (const key of before.keys) expect(key.width).toBeGreaterThanOrEqual(76);
-  await page.getByRole("textbox", { name: "Username" }).evaluate(element => (element as HTMLElement).focus());
-  await expect(dialog.getByRole("button", { name: "Close" })).toBeFocused();
+  await page.getByRole("textbox", { name: pl.Username, includeHidden: true }).evaluate(element => (element as HTMLElement).focus());
+  await expect(dialog.getByRole("button", { name: pl.Close })).toBeFocused();
   await enter(page, "123456");
   await expect(dialog.getByRole("alert")).toHaveText("Invalid credentials");
-  await expect(dialog.getByRole("status", { name: "0 of 6 digits entered" })).toBeVisible();
+  await expect(dialog.getByRole("status", { name: "Wprowadzono 0 z 6 cyfr" })).toBeVisible();
   const after = await geometry(page);
   for (let i = 0; i < before.keys.length; i++) {
     expect(Math.abs(before.keys[i].x - after.keys[i].x)).toBeLessThanOrEqual(1);
@@ -86,7 +87,7 @@ test("native modal, stable failed PIN and one successful retry", async ({ page }
   expect(f.attempts).toEqual([{ username: "manager", password: "123456" }]);
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
   await enter(page, "654321");
-  await expect(page.getByRole("heading", { name: "Choose workspace" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: pl["Choose workspace"] })).toBeVisible();
   expect(f.attempts).toEqual([{ username: "manager", password: "123456" }, { username: "manager", password: "654321" }]);
   await expect(page.locator("dialog[open]")).toHaveCount(0);
   expect(f.errors).toEqual([]);
@@ -96,17 +97,17 @@ test("Close, Escape, keyboard delete and reopening clear partial PIN", async ({ 
   const f = await fixture(page);
   let dialog = await open(page);
   await dialog.press("1"); await dialog.press("2"); await dialog.press("Backspace");
-  await expect(dialog.getByRole("status", { name: "1 of 6 digits entered" })).toBeVisible();
+  await expect(dialog.getByRole("status", { name: "Wprowadzono 1 z 6 cyfr" })).toBeVisible();
   await dialog.press("Escape");
-  await expect(page.getByRole("button", { name: "Enter password" })).toBeFocused();
+  await expect(page.getByRole("button", { name: pl["Enter password"] })).toBeFocused();
   dialog = await open(page);
-  await expect(dialog.getByRole("status", { name: "0 of 6 digits entered" })).toBeVisible();
+  await expect(dialog.getByRole("status", { name: "Wprowadzono 0 z 6 cyfr" })).toBeVisible();
   await enter(page, "12");
-  await dialog.getByRole("button", { name: "Close" }).click();
-  await expect(page.getByRole("button", { name: "Enter password" })).toBeFocused();
-  await expect(page.getByRole("textbox", { name: "Username" })).toHaveValue("manager");
+  await dialog.getByRole("button", { name: pl.Close }).click();
+  await expect(page.getByRole("button", { name: pl["Enter password"] })).toBeFocused();
+  await expect(page.getByRole("textbox", { name: pl.Username, includeHidden: true })).toHaveValue("manager");
   await open(page);
-  await expect(page.getByRole("status", { name: "0 of 6 digits entered" })).toBeVisible();
+  await expect(page.getByRole("status", { name: "Wprowadzono 0 z 6 cyfr" })).toBeVisible();
   expect(f.attempts).toEqual([]); expect(f.errors).toEqual([]);
 });
 
@@ -115,13 +116,13 @@ for (const [width, height] of [[320, 568], [375, 667], [390, 844], [430, 850]]) 
     await page.setViewportSize({ width, height });
     const f = await fixture(page);
     const dialog = await open(page);
-    await expect(page.getByLabel("Numeric keypad")).toHaveCSS("grid-template-columns", /\S+ \S+ \S+/);
-    for (const name of ["Close", "1", "9", "0", "Delete last digit"]) {
+    await expect(page.getByLabel(pl["Numeric keypad"])).toHaveCSS("grid-template-columns", /\S+ \S+ \S+/);
+    for (const name of [pl.Close, "1", "9", "0", pl["Delete last digit"]]) {
       const key = dialog.getByRole("button", { name, exact: true });
       await key.scrollIntoViewIfNeeded();
       const box = (await key.boundingBox())!;
-      expect(box.width).toBeGreaterThanOrEqual(name === "Close" ? 44 : 76);
-      expect(box.height).toBeGreaterThanOrEqual(name === "Close" ? 44 : 76);
+      expect(box.width).toBeGreaterThanOrEqual(name === pl.Close ? 44 : 76);
+      expect(box.height).toBeGreaterThanOrEqual(name === pl.Close ? 44 : 76);
       expect(box.x).toBeGreaterThanOrEqual(0); expect(box.x + box.width).toBeLessThanOrEqual(width + 1);
       expect(box.y).toBeGreaterThanOrEqual(0); expect(box.y + box.height).toBeLessThanOrEqual(height + 1);
     }
@@ -133,12 +134,12 @@ for (const [width, height] of [[320, 568], [375, 667], [390, 844], [430, 850]]) 
 
 test("PC manual sign-in remains available", async ({ page }) => {
   const f = await fixture(page, "pc");
-  const password = page.getByLabel("Password", { exact: true });
+  const password = page.getByLabel(pl.Password, { exact: true });
   await expect(password).toHaveAttribute("inputmode", "numeric");
   await expect(page.locator("dialog")).toHaveCount(0);
   await password.fill("654321");
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Choose workspace" })).toBeVisible();
+  await page.getByRole("button", { name: pl["Sign in"], exact: true }).click();
+  await expect(page.getByRole("heading", { name: pl["Choose workspace"] })).toBeVisible();
   expect(f.attempts).toEqual([{ username: "manager", password: "654321" }]);
   expect(f.errors).toEqual([]);
 });

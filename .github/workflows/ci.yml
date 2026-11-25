@@ -34,11 +34,17 @@ jobs:
       - name: Restore backend
         run: dotnet restore GF3.Tests/GF3.Tests.csproj
 
-      - name: Install PDF fonts
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends fonts-crosextra-carlito
-
       - name: Test backend
+        env:
+          GF3_EXPORT_RELEASE_BASELINE_DIRECTORY: ${{ github.workspace }}/GF3.Tests/TestResults/release-baseline
         run: dotnet test GF3.Tests/GF3.Tests.csproj --configuration Release --no-restore --filter "Category!=LocalOnly"
+
+      - name: Upload synthetic PROD2 migration fixture
+        uses: actions/upload-artifact@v4
+        with:
+          name: gf3-reviewed-prod2-baseline
+          path: GF3.Tests/TestResults/release-baseline/**
+          if-no-files-found: error
 
       - name: Test host guard
         run: python3 -m unittest discover -s deploy/security/tests -v
@@ -59,10 +65,48 @@ jobs:
         working-directory: FrontEnd
         run: npm run build
 
+  playwright-smoke:
+    name: Playwright smoke
+    runs-on: ubuntu-24.04
+    needs: verify
+    defaults:
+      run:
+        working-directory: FrontEnd
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: FrontEnd/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium webkit
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Test mocked employee flows
+        run: npm run test:e2e -- --config=playwright.smoke.config.ts
+
+      - name: Upload Playwright results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-smoke-results
+          path: GF3.Tests/TestResults/playwright/**
+
   docker:
     name: Docker image
     runs-on: ubuntu-latest
-    needs: verify
+    needs: [verify, playwright-smoke]
 
     steps:
       - name: Checkout
@@ -70,6 +114,12 @@ jobs:
 
       - name: Build image
         run: docker build -t gf3-web:ci .
+
+      - name: Download synthetic PROD2 migration fixture
+        uses: actions/download-artifact@v4
+        with:
+          name: gf3-reviewed-prod2-baseline
+          path: GF3.Tests/TestResults/release-baseline
 
       - name: Pull stock Nginx image
         run: |

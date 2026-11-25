@@ -5,6 +5,7 @@ export type WorkflowLog = {
   actorEmployeeId?: number | null;
   actorName: string;
   action: string;
+  launchMode?: "pwa" | "browser" | null;
 };
 
 export type WorkflowLogAudience = "all" | "managers" | "employees";

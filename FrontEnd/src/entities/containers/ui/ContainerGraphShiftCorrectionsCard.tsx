@@ -9,6 +9,11 @@ import {
   useShiftCorrectionSettingQuery,
   type ShiftCorrectionRequest,
 } from "@entities/shift-corrections";
+import {
+  formatShiftCorrectionDelta as formatDelta,
+  shiftCorrectionOriginalMinutes,
+  shiftCorrectionTimeMinutes as toMinutes,
+} from "@entities/shift-corrections/model/presentation";
 import { getErrorMessage } from "@shared/api/httpClient";
 import { ErrorBanner } from "@shared/ui/components/ErrorBanner";
 import { IosButton } from "@shared/ui/components/IosButton";
@@ -32,18 +37,10 @@ const createdAtFormatter = dateTimeFormat("en-GB", {
   day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit",
 });
 
-function toMinutes(value: string) {
-  const [hours, minutes] = value.split(":").map(Number);
-  return hours * 60 + minutes;
-}
-
-function formatDelta(minutes: number) {
-  if (minutes === 0) return t("unchanged");
-  const sign = minutes > 0 ? "+" : "−";
-  const absolute = Math.abs(minutes);
-  const hours = Math.floor(absolute / 60);
-  const remainder = absolute % 60;
-  return `${sign}${hours ? t("{0}h", hours) : ""}${hours && remainder ? " " : ""}${remainder ? t("{0}m", remainder) : ""}`;
+function formatOriginalShifts(request: ShiftCorrectionRequest) {
+  if (request.requestType === "removeShift")
+    return request.originalShifts?.map(shift => `${shift.fromTime} – ${shift.toTime}`).join(", ") || "–";
+  return request.isDayOffRequest ? t("Day off") : `${request.originalFromTime} – ${request.originalToTime}`;
 }
 
 function statusLabel(status: ShiftCorrectionRequest["status"]) {
@@ -137,9 +134,13 @@ export function ContainerGraphShiftCorrectionsCard({
   };
 
   const isBusy = !hasPersistedGraph || disabled || approveMutation.isPending || rejectMutation.isPending;
-  const originalDuration = selected && !selected.isDayOffRequest && selected.originalToTime && selected.originalFromTime
+  const removesShift = selected?.requestType === "removeShift";
+  const requestedFrom = selected?.requestedFromTime;
+  const requestedTo = selected?.requestedToTime;
+  const originalDuration = removesShift ? shiftCorrectionOriginalMinutes(selected?.originalShifts ?? [])
+    : selected && !selected.isDayOffRequest && selected.originalToTime && selected.originalFromTime
     ? toMinutes(selected.originalToTime) - toMinutes(selected.originalFromTime) : 0;
-  const requestedDuration = selected ? toMinutes(selected.requestedToTime) - toMinutes(selected.requestedFromTime) : 0;
+  const requestedDuration = !removesShift && requestedFrom && requestedTo ? toMinutes(requestedTo) - toMinutes(requestedFrom) : 0;
   const selectedDetails = selected ? (
     <article key={selected.id} className={styles.details} role="listitem">
       <div className={styles.detailsHeader}>
@@ -153,21 +154,22 @@ export function ContainerGraphShiftCorrectionsCard({
         </div>
       </div>
       <em className={`${styles.status} ${styles[`status${selected.status}`]}`}>{statusIcon(selected.status)}{statusLabel(selected.status)}</em>
+      {removesShift && <strong>{t("Day off requested")}</strong>}
       <dl className={styles.detailGrid}>
         <div><dt><span className={styles.metadataIcon}><ScheduleIcon size={16} /></span>{t("Date")}</dt><dd>{String(selected.dayOfMonth).padStart(2, "0")}.{String(selected.month).padStart(2, "0")}.{selected.year}</dd></div>
         <div><dt><span className={styles.metadataIcon}><GroupIcon size={16} /></span>{t("Schedule")}</dt><dd>{selected.scheduleName} · {selected.shopName}</dd></div>
       </dl>
       <div className={styles.comparison}>
-        <div><span>{t("Current shift")}</span><strong>{selected.isDayOffRequest ? t("Day off") : `${selected.originalFromTime} – ${selected.originalToTime}`}</strong></div>
+        <div><span>{t("Current shift")}</span><strong>{formatOriginalShifts(selected)}</strong></div>
         <span className={styles.comparisonArrow} aria-hidden="true"><ArrowRightIcon size={17} /></span>
-        <div><span>{t("Requested shift")}</span><strong>{selected.requestedFromTime} – {selected.requestedToTime}</strong></div>
+        <div><span>{t("Requested shift")}</span><strong>{!removesShift && requestedFrom && requestedTo ? `${requestedFrom} – ${requestedTo}` : "–"}</strong></div>
       </div>
       <div className={styles.deltaRow}>
-        {!selected.isDayOffRequest && selected.originalFromTime && selected.originalToTime ? <>
-          <span className={selected.requestedFromTime === selected.originalFromTime ? styles.deltaNeutral : styles.deltaStart}><ClockIcon size={15} />{t("Start")} {formatDelta(toMinutes(selected.requestedFromTime) - toMinutes(selected.originalFromTime))}</span>
-          <span className={styles.deltaNeutral}><LockIcon size={15} />{t("End")} {formatDelta(toMinutes(selected.requestedToTime) - toMinutes(selected.originalToTime))}</span>
+        {!removesShift && !selected.isDayOffRequest && selected.originalFromTime && selected.originalToTime && requestedFrom && requestedTo ? <>
+          <span className={requestedFrom === selected.originalFromTime ? styles.deltaNeutral : styles.deltaStart}><ClockIcon size={15} />{t("Start")} {formatDelta(toMinutes(requestedFrom) - toMinutes(selected.originalFromTime))}</span>
+          <span className={styles.deltaNeutral}><LockIcon size={15} />{t("End")} {formatDelta(toMinutes(requestedTo) - toMinutes(selected.originalToTime))}</span>
         </> : null}
-        <strong className={requestedDuration === originalDuration ? styles.deltaNeutral : styles.deltaDuration}><StatisticsIcon size={15} />{t("Duration")} {formatDelta(requestedDuration - originalDuration)}</strong>
+        <strong className={requestedDuration === originalDuration ? styles.deltaNeutral : styles.deltaDuration}><StatisticsIcon size={15} />{t(removesShift ? "Duration change" : "Duration")} {formatDelta(requestedDuration - originalDuration)}</strong>
       </div>
       {selected.comment?.trim() ? (
         <div className={styles.comment}>
@@ -233,7 +235,9 @@ export function ContainerGraphShiftCorrectionsCard({
                   <span className={styles.avatar} aria-hidden="true">{initials(request.employeeName)}</span>
                   <span className={styles.requestCopy}>
                     <strong>{request.employeeName}</strong>
-                    <small>{request.isDayOffRequest
+                    <small>{request.requestType === "removeShift"
+                      ? `${t("Day off requested")} · ${t("Day")} ${request.dayOfMonth} · ${formatOriginalShifts(request)} → –`
+                      : request.isDayOffRequest
                       ? `${String(request.dayOfMonth).padStart(2, "0")}.${String(request.month).padStart(2, "0")}.${request.year} · ${t("Day off")} → ${request.requestedFromTime}–${request.requestedToTime} · ${request.scheduleName} · ${request.shopName}`
                       : `${t("Day")} ${request.dayOfMonth} · ${request.originalFromTime}–${request.originalToTime}`}</small>
                   </span>

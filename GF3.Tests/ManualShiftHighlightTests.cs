@@ -18,6 +18,7 @@ using BusinessLogicLayer.Contracts.Auth;
 using DataAccessLayer.Models;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.FileProviders;
@@ -38,7 +39,7 @@ public sealed class ManualShiftHighlightTests
         await using var setup = database.CreateContext();
         var f = await SeedAsync(setup, new());
         var schedule = await setup.Schedules.SingleAsync(s => s.Id == f.SourceSchedule);
-        schedule.Note = "[[GF3_GRAPH_META:{\"m\":[[7,\"Generated\",{\"10\":\"09:00-17:00\",\"11\":\"09:00-17:00\",\"12\":\"09:00-17:00\"}]],\"g\":[7],\"o\":[1,-7]}]]";
+        schedule.Note = "[[GF3_GRAPH_META:{\"m\":[[7,\"Generated\",{\"10\":\"09:00-17:00\",\"11\":\"09:00-17:00\",\"12\":\"09:00-17:00\",\"13\":\"09:00-17:00\",\"14\":\"09:00-17:00\"}]],\"g\":[7],\"o\":[1,-7]}]]";
         var manager = new ManagerAccountModel { Username = "manual-test-manager", DisplayName = "Manager", PasswordHash = "synthetic-test-hash", Language = "en", PasswordUpdatedAtUtc = DateTimeOffset.UtcNow };
         setup.Add(manager);
         setup.EmployeeAccounts.Add(new EmployeeAccountModel { EmployeeId = f.Target, Username = "manual-test-employee", PasswordHash = "synthetic-test-hash", Language = "en" });
@@ -56,6 +57,11 @@ public sealed class ManualShiftHighlightTests
         await using var app = builder.Build();
         app.UseAuthentication(); app.UseAuthorization(); app.MapControllers();
         app.MapHub<EmployeePresenceHub>(EmployeePresenceHub.RoutePattern);
+        var browserInstance = Guid.NewGuid().ToString("N");
+        app.MapGet("/api/e2e-isolation", (HttpContext context) =>
+            string.Equals(context.Request.Headers["X-GF3-E2E-Instance"], browserInstance, StringComparison.Ordinal)
+                ? Results.Ok(new { databasePath = database.DatabasePath })
+                : Results.NotFound());
         var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../"));
         var frontend = Path.Combine(root, "FrontEnd");
         if (Directory.Exists(Path.Combine(frontend, "dist")))
@@ -99,8 +105,11 @@ public sealed class ManualShiftHighlightTests
         if (Environment.GetEnvironmentVariable("GF3_RUN_LIVE_BROWSER") == "1")
         {
             var start = new ProcessStartInfo("node") { WorkingDirectory = frontend, RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false, CreateNoWindow = true };
-            foreach (var arg in new[] { "node_modules/@playwright/test/cli.js", "test", "e2e/generated-manual-shifts.spec.ts", "--grep", "real backend manual acceptance", "--project=chromium", "--project=webkit-laptop", "--workers=1", "--reporter=line", "--output=../GF3.Tests/TestResults/live-browser" }) start.ArgumentList.Add(arg);
+            foreach (var arg in new[] { "node_modules/@playwright/test/cli.js", "test", "e2e/generated-manual-shifts.spec.ts", "--grep", "real backend manual acceptance", "--workers=1", "--reporter=line", "--output=../GF3.Tests/TestResults/live-browser" }) start.ArgumentList.Add(arg);
+            start.Environment["GF3_E2E_PORT"] = "5194";
             start.Environment["GF3_LIVE_URL"] = app.Urls.Single();
+            start.Environment["GF3_LIVE_INSTANCE"] = browserInstance;
+            start.Environment["GF3_LIVE_DATABASE"] = database.DatabasePath;
             start.Environment["GF3_LIVE_MANAGER_TOKEN"] = managerToken;
             start.Environment["GF3_LIVE_EMPLOYEE_TOKEN"] = employeeToken;
             start.Environment["GF3_LIVE_CONTAINER"] = f.Container.ToString();

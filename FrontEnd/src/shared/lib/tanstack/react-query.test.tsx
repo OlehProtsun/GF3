@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, renderHook, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, test, vi } from "vitest";
 import { ApiError } from "@shared/api/httpClient";
@@ -58,6 +58,7 @@ function MutationHarness({
 }) {
   const mutation = useMutation({
     mutationKey: ["save"],
+    meta: { handlesErrorInline: true },
     mutationFn,
     onSuccess,
     onError,
@@ -86,6 +87,23 @@ function renderWithClient(client: QueryClient, element: React.ReactNode) {
 }
 
 describe("react-query shim", () => {
+  test.each(["caller", "query client"])("forwards explicit refetch cancellation from the %s", async source => {
+    const client = new QueryClient();
+    const caller = new AbortController();
+    const queryKey = ["refetch"];
+    const queryFn = vi.fn(({ signal }: { signal: AbortSignal }) => new Promise<string>((_, reject) => {
+      signal.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")), { once: true });
+    }));
+    const { result } = renderHook(() => useQuery({ queryKey, queryFn, enabled: false }), {
+      wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>,
+    });
+    const canceled = expect(result.current.refetchWithSignal(caller.signal)).rejects.toMatchObject({ name: "AbortError" });
+    await waitFor(() => expect(queryFn).toHaveBeenCalledOnce());
+    if (source === "caller") caller.abort();
+    else client.cancelQuery(queryKey);
+    await canceled;
+  });
+
   test("keeps query errors across equivalent key rerenders and recovers on retry", async () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: 0 } } });
     const queryFn = vi.fn().mockRejectedValueOnce(new Error("server failed")).mockResolvedValue("recovered");
@@ -287,6 +305,6 @@ describe("react-query shim", () => {
     });
     expect(onError).toHaveBeenCalledTimes(1);
     expect(cacheError).toHaveBeenCalledTimes(1);
-    expect(cacheError.mock.calls[0][3]).toEqual({ options: { mutationKey: ["save"] } });
+    expect(cacheError.mock.calls[0][3]).toEqual({ options: { mutationKey: ["save"] }, meta: { handlesErrorInline: true } });
   });
 });

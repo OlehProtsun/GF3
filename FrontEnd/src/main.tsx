@@ -4,6 +4,7 @@ import "./index.css";
 import App from "./App";
 import { LanguageProvider } from "@app/providers/LanguageProvider";
 import { AuthProvider } from "@app/providers/AuthProvider";
+import { EmployeeLaunchReporter } from "@app/providers/EmployeeLaunchReporter";
 import { PresenceProvider } from "@app/providers/PresenceProvider";
 import { QueryProvider } from "@app/providers/QueryProvider";
 import { ErrorAlertsViewport } from "@shared/ui/feedback/error-alerts/ErrorAlertsViewport";
@@ -12,6 +13,7 @@ createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <AuthProvider>
       <QueryProvider>
+        <EmployeeLaunchReporter />
         <LanguageProvider><PresenceProvider>
           <App />
           <ErrorAlertsViewport />

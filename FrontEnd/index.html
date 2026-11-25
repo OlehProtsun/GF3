@@ -5,13 +5,60 @@
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/manifest.json" />
+    <link rel="apple-touch-startup-image" href="/splash/ios-640x1136.png" media="(device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" />
+    <link rel="apple-touch-startup-image" href="/splash/ios-750x1334.png" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" />
+    <link rel="apple-touch-startup-image" href="/splash/ios-1125x2436.png" media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
+    <link rel="apple-touch-startup-image" href="/splash/ios-1170x2532.png" media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
+    <link rel="apple-touch-startup-image" href="/splash/ios-1179x2556.png" media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
+    <link rel="apple-touch-startup-image" href="/splash/ios-1206x2622.png" media="(device-width: 402px) and (device-height: 874px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
+    <link rel="apple-touch-startup-image" href="/splash/ios-828x1792.png" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" />
+    <link rel="apple-touch-startup-image" href="/splash/ios-1242x2688.png" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
+    <link rel="apple-touch-startup-image" href="/splash/ios-1284x2778.png" media="(device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
+    <link rel="apple-touch-startup-image" href="/splash/ios-1290x2796.png" media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
+    <link rel="apple-touch-startup-image" href="/splash/ios-1320x2868.png" media="(device-width: 440px) and (device-height: 956px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
     <meta name="apple-mobile-web-app-title" content="GF" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="theme-color" content="#f3f4f6" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover" />
     <title>GF</title>
+    <script>
+      if (window.matchMedia?.("(display-mode: standalone)")?.matches || navigator.standalone === true) {
+        document.documentElement.classList.add("gf3-pwa-standalone");
+      }
+      window.addEventListener("error", (event) => {
+        if (!(event instanceof ErrorEvent) && !(event.target instanceof HTMLScriptElement)) return;
+        const splash = document.getElementById("gf3-startup-splash");
+        if (!splash || splash.classList.contains("gf3-splash-exiting")) return;
+        splash.remove();
+        const fallback = document.getElementById("gf3-startup-fallback");
+        if (fallback) fallback.hidden = false;
+      }, true);
+    </script>
+    <style>
+      html, body, #root { background-color: #f3f4f6; }
+      body { margin: 0; }
+      #gf3-startup-splash { display: none; }
+      .gf3-pwa-standalone #gf3-startup-splash {
+        position: fixed; inset: 0; z-index: 2147483647; display: grid; place-items: center;
+        background: #f3f4f6; pointer-events: none; opacity: 1; transition: opacity 180ms ease-out;
+      }
+      .gf3-pwa-standalone #gf3-startup-splash.gf3-splash-exiting { opacity: 0; }
+      #gf3-startup-splash img { width: 128px; height: 128px; animation: gf3-startup-in 220ms ease-out both; }
+      #gf3-startup-fallback { padding: 1rem; text-align: center; font: 1rem system-ui, sans-serif; }
+      @keyframes gf3-startup-in {
+        from { opacity: 0; transform: scale(.96); }
+        to { opacity: 1; transform: scale(1); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .gf3-pwa-standalone #gf3-startup-splash { transition: none; }
+        #gf3-startup-splash img { animation: none; }
+      }
+    </style>
   </head>
   <body>
+    <div id="gf3-startup-splash" aria-hidden="true"><img src="/icons/gf-icon-512.png" width="128" height="128" alt="" /></div>
+    <p id="gf3-startup-fallback" hidden role="alert">Nie udało się uruchomić GF. Odśwież stronę.</p>
+    <noscript>Do uruchomienia GF potrzebny jest JavaScript.</noscript>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

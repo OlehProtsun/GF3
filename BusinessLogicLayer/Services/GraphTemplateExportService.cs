@@ -93,6 +93,9 @@ public sealed class GraphTemplateExportService : IGraphTemplateExportService
         return await ExportGraphWorkbookCoreAsync(schedule.ContainerId, graphId, true, true, true, ct).ConfigureAwait(false);
     }
 
+    public Task<(byte[] content, string fileName)> ExportPublishedPreviewToXlsxAsync(int containerId, int graphId, CancellationToken ct = default)
+        => ExportGraphWorkbookCoreAsync(containerId, graphId, true, true, true, ct);
+
     private async Task<(byte[] content, string fileName)> ExportGraphWorkbookCoreAsync(int containerId, int graphId, bool includeStyles, bool includeEmployees, bool onlyPublishedRelatedHints, CancellationToken ct)
     {
         var loadedGraphData = await LoadGraphDataAsync(containerId, graphId, includeStyles, includeEmployees, ct).ConfigureAwait(false);

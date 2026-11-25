@@ -14,7 +14,7 @@ import { AvailabilityDateTimeField } from "@entities/availability-groups";
 import { getErrorMessage } from "@shared/api/httpClient";
 import { ConfirmDialog } from "@shared/ui/ConfirmDialog";
 import { PageHeader } from "@shared/ui/PageHeader";
-import { CloseIcon, InformationIcon, SearchIcon } from "@shared/ui/icons";
+import { CloseIcon, InformationIcon, MonitorIcon, SearchIcon, SmartphoneIcon } from "@shared/ui/icons";
 import {
   formatWorkflowLogTime,
   getRoleLabel,
@@ -300,46 +300,59 @@ export function InformationPage() {
               </label>
 
               <div className={styles.timelineList}>
-                {filteredSelectedDayLogs.map(log => (
-                  <article key={log.id} className={styles.timelineItem}>
-                    <time className={styles.timelineTime} dateTime={log.occurredAtUtc}>
-                      {formatWorkflowLogTime(log.occurredAtUtc)}
-                    </time>
-                    <span className={styles.timelineDot} aria-hidden="true" />
-                    <div className={styles.timelineContent}>
-                      <div className={styles.actorLine}>
-                        <strong>{log.actorName}</strong>
-                        <span
-                          className={[
-                            styles.roleBadge,
-                            log.actorRole.toLowerCase() === "employee" ? styles.roleBadgeEmployee : styles.roleBadgeManager,
-                          ].filter(Boolean).join(" ")}
-                        >
-                          {getRoleLabel(log.actorRole)}
-                        </span>
+                {filteredSelectedDayLogs.map(log => {
+                  const legacyPwaLaunch = log.action === "Opened platform via PWA";
+                  const legacyBrowserLaunch = log.action === "Opened platform via browser";
+                  const launchMode = log.launchMode ?? (legacyPwaLaunch ? "pwa" : legacyBrowserLaunch ? "browser" : null);
+                  const LaunchIcon = launchMode === "pwa" ? SmartphoneIcon : MonitorIcon;
+
+                  return (
+                    <article key={log.id} className={styles.timelineItem}>
+                      <time className={styles.timelineTime} dateTime={log.occurredAtUtc}>
+                        {formatWorkflowLogTime(log.occurredAtUtc)}
+                      </time>
+                      <span className={styles.timelineDot} aria-hidden="true" />
+                      <div className={styles.timelineContent}>
+                        <div className={styles.actorLine}>
+                          <strong>{log.actorName}</strong>
+                          <span
+                            className={[
+                              styles.badge,
+                              log.actorRole.toLowerCase() === "employee" ? styles.roleBadgeEmployee : styles.roleBadgeManager,
+                            ].filter(Boolean).join(" ")}
+                          >
+                            {getRoleLabel(log.actorRole)}
+                          </span>
+                          {launchMode && (
+                            <span className={[styles.badge, launchMode === "pwa" ? styles.launchBadgePwa : styles.launchBadgeBrowser].join(" ")}>
+                              <LaunchIcon size={13} />
+                              {launchMode === "pwa" ? t("PWA") : t("Browser")}
+                            </span>
+                          )}
+                        </div>
+                        <p>{legacyPwaLaunch || legacyBrowserLaunch ? t("Opened platform") : translateServerMessage(log.action)}</p>
                       </div>
-                      <p>{translateServerMessage(log.action)}</p>
-                    </div>
-                    <button
-                      type="button"
-                      className={styles.logDeleteButton}
-                      disabled={deletePending}
-                      aria-label={t("Delete log from {0} at {1}", log.actorName, formatWorkflowLogTime(log.occurredAtUtc))}
-                      onClick={() => {
-                        setActionError(null);
-                        setDeleteIntent({
-                          kind: "entry",
-                          id: log.id,
-                          title: t("Delete log entry"),
-                          message: t("Delete this {0} log from {1}?", getRoleLabel(log.actorRole).toLowerCase(), log.actorName),
-                          confirmText: t("Delete entry"),
-                        });
-                      }}
-                    >
-                      <CloseIcon size={15} />
-                    </button>
-                  </article>
-                ))}
+                      <button
+                        type="button"
+                        className={styles.logDeleteButton}
+                        disabled={deletePending}
+                        aria-label={t("Delete log from {0} at {1}", log.actorName, formatWorkflowLogTime(log.occurredAtUtc))}
+                        onClick={() => {
+                          setActionError(null);
+                          setDeleteIntent({
+                            kind: "entry",
+                            id: log.id,
+                            title: t("Delete log entry"),
+                            message: t("Delete this {0} log from {1}?", getRoleLabel(log.actorRole).toLowerCase(), log.actorName),
+                            confirmText: t("Delete entry"),
+                          });
+                        }}
+                      >
+                        <CloseIcon size={15} />
+                      </button>
+                    </article>
+                  );
+                })}
                 {selectedDay && filteredSelectedDayLogs.length === 0 ? (
                   <div className={styles.emptySearch}>{t("No logs match this search.")}</div>
                 ) : null}
@@ -362,3 +375,4 @@ export function InformationPage() {
     </div>
   );
 }
+
