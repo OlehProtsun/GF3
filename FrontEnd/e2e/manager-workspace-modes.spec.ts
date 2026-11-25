@@ -136,6 +136,7 @@ test("PC container schedule tiles preserve open and MultiOpen selection", async 
 });
 
 test("PC Schedule Profile uses the full matrix width and opens compact schedule information", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await page.setViewportSize({ width: 1440, height: 900 });
   await fixture(page, "pc", "manager", { manualColumn: true, workerCount: 12 });
   await page.goto("/container/1/graphs/3");

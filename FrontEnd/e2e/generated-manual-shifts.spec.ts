@@ -212,6 +212,7 @@ test("adjacent More previews replace each other and fit available viewport space
   ];
   const state = await fixture(page, "en", undefined, false, Object.fromEntries(values.map((raw, index) => [String(index + 1), raw])));
   const originalNote = state.getNote();
+  await page.clock.install();
   await page.setViewportSize({ width: 1280, height: 900 });
   for (const path of ["/container/1/graphs/1", "/container/1/graphs/1/edit"]) {
     await page.goto(path);
@@ -219,12 +220,16 @@ test("adjacent More previews replace each other and fit available viewport space
     const popup = page.getByRole("tooltip");
     await expect(buttons).toHaveCount(4, { timeout: 20_000 });
     await buttons.first().scrollIntoViewIfNeeded();
+    await page.mouse.move(0, 0);
+    await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000));
     for (let index = 0; index < 3; index++) {
       const bounds = await buttons.nth(index).boundingBox();
       expect(bounds).not.toBeNull();
       await page.mouse.move(bounds!.x + bounds!.width / 2, bounds!.y + bounds!.height / 2);
+      await page.clock.runFor(40);
       await expect(popup).toHaveCount(0);
     }
+    await page.clock.resume();
     await buttons.nth(3).hover();
     await expect(popup).toHaveCount(1);
     await expect(popup).toHaveText("18:00 - 22:00");
@@ -345,11 +350,12 @@ test("manager phone keeps compact More visible under automatic width cap", async
   for (const width of [320, 375, 390, 430]) {
     await page.setViewportSize({ width, height: 740 });
     const more = page.getByRole("button", { name: "More: Shifts", exact: true });
+    const openPreview = () => testInfo.project.use.hasTouch ? more.tap() : more.click();
     await expect(more).toBeVisible({ timeout: 20_000 });
     await more.scrollIntoViewIfNeeded();
     await expect(more).toBeVisible();
     expect(await more.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
-    if (testInfo.project.use.hasTouch) await more.tap(); else await more.click();
+    await openPreview();
     const popup = page.getByRole("tooltip");
     await expect(popup).toBeVisible();
     await expect(popup.locator(":scope > div")).toHaveCount(29);
@@ -360,9 +366,9 @@ test("manager phone keeps compact More visible under automatic width cap", async
     await popup.evaluate(el => { el.scrollTop = 200; });
     await expect(popup).toBeVisible();
     await page.keyboard.press("Escape"); await expect(popup).toHaveCount(0);
-    await more.click(); await expect(popup).toBeVisible();
+    await openPreview(); await expect(popup).toBeVisible();
     await page.locator("body").dispatchEvent("pointerdown"); await expect(popup).toHaveCount(0);
-    await more.click(); await expect(popup).toBeVisible();
+    await openPreview(); await expect(popup).toBeVisible();
     await more.locator("xpath=ancestor::table/..").evaluate(el => el.dispatchEvent(new Event("scroll")));
     await expect(popup).toHaveCount(0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);

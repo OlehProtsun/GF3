@@ -38,7 +38,7 @@ test("standalone promo and original app entry remain independent", async ({ page
   expect(observed).toEqual({ errors: [], api: [] });
 });
 
-test("capture contract, scene seeks, boundaries and final hold", async ({ page }) => {
+test("capture contract and scene seeks", async ({ page }) => {
   const observed = watch(page);
   await capture(page);
   await expect(page.locator("[data-promo-controls]")).toHaveCount(0);
@@ -60,8 +60,14 @@ test("capture contract, scene seeks, boundaries and final hold", async ({ page }
       await expect(scene.locator(`[data-promo-real-shot="${spec.id}"]`)).toBeVisible();
       expect(await scene.locator("img").evaluateAll(images => images.every(image => (image as HTMLImageElement).naturalWidth > 0))).toBe(true);
     }
-    expect(await stage.screenshot()).not.toHaveLength(0);
+    expect(await stage.screenshot({ scale: "css" })).not.toHaveLength(0);
   }
+  expect(observed).toEqual({ errors: [], api: [] });
+});
+
+test("capture boundaries and final hold", async ({ page }) => {
+  const observed = watch(page);
+  await capture(page);
   for (const time of [6, 12, 23, 33, 44, 55, 63, 69]) {
     await seek(page, time);
     expect(await page.locator("[data-promo-scene]").evaluateAll(nodes =>
@@ -88,17 +94,17 @@ test("capture pixels do not depend on seek order, also while offline", async ({ 
   const frames = new Map<number, Buffer>();
   for (const time of [49, 3, 28, 49, 28]) {
     await seek(page, time);
-    const frame = await stage.screenshot({ animations: "disabled" });
+    const frame = await stage.screenshot({ animations: "disabled", scale: "css" });
     if (frames.has(time)) expect(frame.equals(frames.get(time)!)).toBe(true);
     frames.set(time, frame);
   }
   for (const time of [28, 49]) {
     await seek(page, time);
-    const original = await stage.screenshot({ animations: "disabled" });
+    const original = await stage.screenshot({ animations: "disabled", scale: "css" });
     await seek(page, 3);
     await seek(page, 49);
     await seek(page, time);
-    expect((await stage.screenshot({ animations: "disabled" })).equals(original)).toBe(true);
+    expect((await stage.screenshot({ animations: "disabled", scale: "css" })).equals(original)).toBe(true);
   }
   await seek(page, 66);
   for (const feature of ["manager", "availability", "schedule", "swap"]) {

@@ -1,6 +1,6 @@
 # GF3 release QA · 2026-11-23
 
-**BLOCKED · MERGE NO-GO · DEPLOY BLOCKED**
+**MERGE/DEPLOY NO-GO**. See the [application candidate validation](#application-candidate-validation) for the current checks and release gates.
 
 ## Baseline
 
@@ -638,3 +638,34 @@ The retained full E2E reports under the local ignored `GF3.Tests/TestResults` di
 The WebKit failures covered Polish notification overflow, schedule entrance sampling, adjacent More previews, reduced motion in the dock, manager navigation on mode changes, and swap scroll restoration. Isolated WebKit passed the More and swap reproductions. The follow-up wraps tab labels at narrow widths, restores phone navigation focus after the inert state updates, and samples the entrance on the browser animation timeline. The mode-change fixture now waits for the holiday response to finish before reload. WebKit previously cancelled that mocked request during document replacement and reported an access-control error. The reload and Back scenario passed twice on each WebKit profile after the change. The affected Chromium and Mobile Chrome scenarios passed 14/14. The updated application image built and passed its notice checks at `sha256:1aa97721a330ad21a082bebcc8334239233f5d9470f21fea2f8686df064a811c`.
 
 A complete clean matrix on one frozen candidate, physical device checks, and owner confirmation of the flagged shipped assets remain merge gates. All six Bash blocks in the operator instructions passed syntax checks. Host commands require operator review and authorization. [Operator instructions](gfctl-prod2-database-maintenance.md)
+
+## Application candidate validation
+
+All three GitHub jobs passed on `18282e94a3669731416a5c49c5c4ff068c08c923`. Build and test reported .NET 1936/1936, Linux host tests 65/65, Vitest 1545 passed with one conditional skip, and lint with zero errors and 21 existing warnings. Playwright smoke passed 12/12. [Candidate CI](https://github.com/OlehProtsun/GF3/actions/runs/45501592143)
+
+The Docker job built the candidate and rehearsed all seven migrations against the eight schema prefixes on disposable Ubuntu. It verified preservation of SQLite rows and media, rollback under the verified write fence, retention of evidence and continued isolation after interrupted restoration, and isolated HTTP/HTTPS ingress. The Linux application integration run passed 33/33 covering backup, restore, schema verification and authenticated media reads. The application image shipped the required browser and server notices. Existing asset rights and physical-device verification still need operator evidence. [License and asset evidence](third-party-licenses.md)
+
+### Full local Playwright on `18282e9`
+
+The four original runs used the same application build, one worker per profile and separate loopback ports. The `plan79-18282e9-<profile>.json` reports and failure artifacts are under `GF3.Tests/TestResults`.
+
+| Profile | Passed | Skipped | Failed |
+| --- | ---: | ---: | ---: |
+| Chromium | 490 | 2 | 0 |
+| Mobile Chrome | 483 | 8 | 1 |
+| WebKit laptop | 488 | 3 | 1 |
+| WebKit iPhone X | 480 | 9 | 3 |
+
+The conditional skips cover the authenticated manual-shift acceptance exercised in its independent opt-in run, desktop-only availability and graph stress cases, the touch-only narrow Save dialog and the Chromium service-worker lifecycle case. All previously reported failures passed in this matrix. It exposed five other failures, listed below with their original full-run outcomes.
+
+- Mobile Chrome could not reopen the manual-shift preview after closing it with Escape. All four traced single-case runs passed.
+- WebKit laptop reopened an availability editor with the previous name after a save containing a CFA transfer. All four traced single-case runs passed with the edited name in the successful save requests.
+- WebKit iPhone X hit the 30-second case limit during the manager sidebar and promo capture scenarios. It also measured a 6.6875 px vertical difference where the schedule profile header requires less than 2 px.
+
+The WebKit laptop confirmation passed the availability case and finished with 487 passed, 3 conditional skips and 2 different failures. Both failures were traced. The graph-save mock missed SignalR pings, causing reconnect queries during the traffic assertion. The corrected mock passed both traced stress runs with no connection timeouts. For the adjacent previews, automation took 451 ms between the first mouse move and the assertion against a 160 ms hover delay. The test now drives that part with the browser clock and uses touch for each activation in the phone scenario. Both preview tests passed on all four profiles (8/8).
+
+The sidebar scenario timed out in all three isolated traces. The same profile, eight route and panel checks now run as separate scenarios within the original limit. Those checks on all four profiles passed (12/12). The schedule profile's static header geometry is measured with reduced motion. That check passed on all four profiles. Promo captures now use the renderer's 1920 × 1080 pixel scale. The WebKit iPhone X trace still exhausted the case limit after the scene captures, so boundary and final-hold checks have been separated from the scene capture checks.
+
+The two resulting promo cases each passed twice on iPhone WebKit. The scene capture and boundary tests retain the original scene samples, screenshot checks, API isolation, timeline boundary assertions and final-hold checks. They use the existing per-case timeout.
+
+The fixture follow-up changes Playwright files and this report. The application bundle used for the original matrix and the follow-up checks had the same build ID, `18282e94a3669731416a5c49c5c4ff068c08c923`. The sorted list of the 179 JavaScript and CSS asset filenames and their content hashes had the same SHA-256 across the checked preview builds, `fb46eb3da1e056bf3c189e94824c028465484917dc36a61cd531c07927655d97`. Keep the original full reports and the targeted evidence separately.

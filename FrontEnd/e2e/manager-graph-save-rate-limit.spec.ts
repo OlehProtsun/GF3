@@ -1,4 +1,5 @@
 import { expect, test, type Page, type WebSocketRoute } from "@playwright/test";
+import { MessageType } from "@microsoft/signalr";
 import { readFileSync } from "node:fs";
 
 type FixtureSlot = { dayOfMonth: number; slotNo: number; fromTime: string; toTime: string; employeeId: number | null; status: number | string };
@@ -67,8 +68,9 @@ async function workspace(page: Page, baseURL: string, loseThirdBatch: boolean,
     socket = connection;
     connection.onMessage(raw => {
       for (const frame of raw.toString().split(separator).filter(Boolean)) {
-        const { protocol, invocationId, arguments: args } = JSON.parse(frame);
+        const { protocol, invocationId, arguments: args, type } = JSON.parse(frame);
         if (protocol) connection.send("{}" + separator);
+        if (type === MessageType.Ping) connection.send(frame + separator);
         if (invocationId !== undefined) {
           const result = (args?.[0] ?? []).map((lock: object) => ({ ...lock, isLocked: true,
             lockedByManagerId: 9, changedAtUtc: "2026-11-09T10:00:00Z" }));
