@@ -1,9 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="591" height="351" viewBox="0 0 591 351" role="img" aria-labelledby="title desc">
-  <title id="title">Confirm the web app installation</title><desc id="desc">A generic installation confirmation with app name, address, and install toggle.</desc>
-  <rect width="591" height="351" fill="#e8ebf0"/><rect x="17" y="12" width="557" height="327" rx="25" fill="#fff" stroke="#d5dae2"/>
-  <text x="295" y="47" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" font-weight="700" fill="#202939">Add to Home Screen</text>
-  <rect x="219" y="67" width="153" height="94" rx="18" fill="#eaf1ff"/><rect x="266" y="87" width="59" height="54" rx="14" fill="#2867d8"/><text x="295" y="121" text-anchor="middle" font-family="Arial,sans-serif" font-size="20" font-weight="700" fill="#fff">GF</text>
-  <text x="295" y="191" text-anchor="middle" font-family="Arial,sans-serif" font-size="17" font-weight="700" fill="#202939">GF</text><text x="295" y="216" text-anchor="middle" font-family="Arial,sans-serif" font-size="12" fill="#667085">app-gf.com</text>
-  <text x="57" y="263" font-family="Arial,sans-serif" font-size="13" fill="#344054">Open as a web app</text><rect x="500" y="244" width="46" height="25" rx="13" fill="#2867d8"/><circle cx="532" cy="256.5" r="9" fill="#fff"/>
-  <path d="M42 290h507" stroke="#eef0f3"/><text x="456" y="321" font-family="Arial,sans-serif" font-size="14" fill="#667085">Cancel</text><text x="528" y="321" font-family="Arial,sans-serif" font-size="14" font-weight="700" fill="#2867d8">Add</text>
-</svg>

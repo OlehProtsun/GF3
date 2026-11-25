@@ -1,28 +1,28 @@
 {
   "ios-open": {
-    "src": "getting-started/ios-browser-address.svg",
+    "src": "getting-started/safari-gf-login.webp",
     "width": 591,
     "height": 469,
     "highlight": [
-      6.1,
-      7.5,
-      87.8,
-      11.3
+      33.8,
+      84.6,
+      33.7,
+      10.7
     ]
   },
   "ios-share": {
-    "src": "getting-started/ios-share-control.svg",
+    "src": "getting-started/safari-share-button.webp",
     "width": 591,
     "height": 166,
     "highlight": [
-      82.5,
-      58,
-      8,
-      29
+      44.8,
+      54.8,
+      10.2,
+      35.5
     ]
   },
   "ios-share-sheet": {
-    "src": "getting-started/ios-share-sheet.svg",
+    "src": "getting-started/safari-share-sheet.webp",
     "width": 591,
     "height": 175,
     "highlight": [
@@ -33,25 +33,25 @@
     ]
   },
   "ios-add": {
-    "src": "getting-started/ios-home-action.svg",
+    "src": "getting-started/safari-share-actions.webp",
     "width": 591,
     "height": 436,
     "highlight": [
-      12,
-      59,
-      80,
-      13
+      5.1,
+      77.3,
+      89.7,
+      16.5
     ]
   },
   "ios-confirm": {
-    "src": "getting-started/ios-install-confirm.svg",
+    "src": "getting-started/safari-home-screen-confirm.webp",
     "width": 591,
     "height": 351,
     "highlight": [
-      82,
-      82,
-      13,
-      12
+      84.9,
+      5.7,
+      12.7,
+      13.1
     ]
   },
   "ios-launch": {
@@ -66,52 +66,52 @@
     ]
   },
   "android-open": {
-    "src": "getting-started/android-browser-address.svg",
+    "src": "getting-started/android-chrome-open.webp",
     "width": 420,
     "height": 381,
     "highlight": [
-      85,
-      7,
-      12,
-      16
+      90.2,
+      3.1,
+      8.3,
+      8.9
     ]
   },
   "android-menu": {
-    "src": "getting-started/android-browser-menu.svg",
+    "src": "getting-started/android-chrome-menu.webp",
     "width": 305,
     "height": 557
   },
   "android-add": {
-    "src": "getting-started/android-home-action.svg",
+    "src": "getting-started/android-add-to-home-screen.webp",
     "width": 304,
     "height": 355,
     "highlight": [
-      8,
-      61,
-      84,
-      13
+      3.6,
+      67.3,
+      92.1,
+      13.8
     ]
   },
   "android-install": {
-    "src": "getting-started/android-install-choice.svg",
+    "src": "getting-started/android-choose-install.webp",
     "width": 420,
     "height": 271,
     "highlight": [
-      7,
-      53,
-      86,
-      20
+      6,
+      32.5,
+      87.9,
+      28
     ]
   },
   "android-confirm": {
-    "src": "getting-started/android-install-confirm.svg",
+    "src": "getting-started/android-confirm-install.webp",
     "width": 426,
     "height": 255,
     "highlight": [
-      83,
-      77,
-      14,
-      13
+      70.7,
+      70.2,
+      19.7,
+      14.9
     ]
   },
   "nav-profile": {

@@ -1,10 +1,10 @@
 # GF3 release QA · 2026-11-23
 
-**MERGE/DEPLOY NO-GO**. See the [application candidate validation](#application-candidate-validation) for the current checks and release gates.
+**Release review.** The Getting Started finding is resolved. The required GitHub CI and applicable release gates govern merge. Deployment requires the separate runbook checks.
 
-**Physical-device QA · 2026-11-25.** The owner reported completing manual testing on physical devices. The only finding was the use of SVG illustrations in place of the ten original screenshots in App Guide → Getting Started. That finding remains open pending confirmation of the legal basis for distributing the recovered screenshots. See the [screenshot review](third-party-licenses.md#getting-started-screenshot-review--2026-11-25).
+**Physical-device QA · 2026-11-25.** The owner reported completing manual testing on physical devices. The only finding was the use of SVG illustrations in place of the ten original screenshots in App Guide → Getting Started. The owner confirmed the right to use all ten originals. The original files, dimensions, proportions, order and highlight coordinates were restored. See the [screenshot review](third-party-licenses.md#getting-started-screenshot-review--2026-11-25).
 
-The existing Guide passed 4/4 focused Vitest tests and 4/4 focused Playwright tests across the four profiles. The production frontend build passed.
+The preceding Guide revision passed 4/4 focused Vitest tests, 4/4 focused Playwright tests across the four profiles and the production frontend build. The restoration uses the required GitHub CI for verification, per the owner’s instruction.
 
 ## Baseline
 

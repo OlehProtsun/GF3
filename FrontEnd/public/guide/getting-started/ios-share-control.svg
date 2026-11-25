@@ -1,8 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="591" height="166" viewBox="0 0 591 166" role="img" aria-labelledby="title desc">
-  <title id="title">Open the share controls</title><desc id="desc">A generic mobile browser toolbar with a highlighted share control.</desc>
-  <rect width="591" height="166" fill="#f2f4f7"/><rect x="13" y="17" width="565" height="132" rx="25" fill="#fff" stroke="#d7dce4"/>
-  <rect x="44" y="36" width="503" height="48" rx="16" fill="#f0f2f6"/><text x="295" y="66" text-anchor="middle" font-family="Arial,sans-serif" font-size="14" fill="#667085">app-gf.com</text>
-  <path d="M82 115h-8v18h22v-18h-8" fill="none" stroke="#536174" stroke-width="3" stroke-linejoin="round"/><path d="M85 130V99m0 0-8 8m8-8 8 8" fill="none" stroke="#536174" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-  <circle cx="295" cy="124" r="3" fill="#8a94a4"/><circle cx="307" cy="124" r="3" fill="#8a94a4"/><circle cx="319" cy="124" r="3" fill="#8a94a4"/>
-  <path d="M492 115h-8v18h22v-18h-8" fill="none" stroke="#2867d8" stroke-width="3" stroke-linejoin="round"/><path d="M489 111l7-9 7 9m-7-9v24" fill="none" stroke="#2867d8" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-</svg>

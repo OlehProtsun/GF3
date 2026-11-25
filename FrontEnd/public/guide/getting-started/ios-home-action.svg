@@ -1,8 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="591" height="436" viewBox="0 0 591 436" role="img" aria-labelledby="title desc">
-  <title id="title">Add the page to the Home Screen</title><desc id="desc">A generic scrollable action list with Add to Home Screen selected.</desc>
-  <rect width="591" height="436" fill="#e8ebf0"/><rect x="17" y="12" width="557" height="412" rx="25" fill="#fff" stroke="#d5dae2"/>
-  <rect x="262" y="25" width="67" height="5" rx="2.5" fill="#d2d6dd"/><text x="295" y="62" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" font-weight="700" fill="#202939">Actions</text>
-  <g font-family="Arial,sans-serif" font-size="14" fill="#344054"><text x="89" y="112">Copy link</text><text x="89" y="169">Find on page</text><text x="89" y="226">Add bookmark</text><text x="89" y="283" font-weight="700" fill="#2867d8">Add to Home Screen</text><text x="89" y="340">Print page</text><text x="89" y="397">More actions</text></g>
-  <g fill="none" stroke="#98a2b3" stroke-width="2"><circle cx="57" cy="107" r="12"/><path d="M50 107h14m-7-7 7 7-7 7"/><rect x="47" y="151" width="20" height="20" rx="4"/><path d="M51 156h12m-12 5h12"/><path d="M50 209l7-6 7 6v19H50z"/><rect x="47" y="264" width="20" height="20" rx="4"/><path d="M57 268v12m-5-6h10"/><rect x="47" y="322" width="20" height="20" rx="4"/><path d="M52 328h10m-10 5h10"/><circle cx="57" cy="379" r="11"/><path d="M51 379h12m-6-6v12"/></g>
-  <path d="M78 137h452M78 194h452M78 251h452M78 308h452M78 365h452" stroke="#eef0f3"/>
-</svg>
