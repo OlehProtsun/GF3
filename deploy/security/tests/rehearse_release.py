@@ -309,7 +309,8 @@ def rehearse_one_bundle(root, previous, staged, baseline, before, target, scenar
     media = database.parent / maintenance.MEDIA_DIRECTORY
     late_media = media / ("f" * 32 + ".gif")
     approval = root / "approved-release.conf"
-    pin, = release.docker_json("image", "inspect", "nginx:stable-alpine")[0]["RepoDigests"][:1]
+    repo_digest = release.docker_json("image", "inspect", "nginx:stable-alpine")[0]["RepoDigests"][0]
+    pin = "nginx@" + repo_digest.rsplit("@", 1)[1]
     release.write(approval, f"APPROVED_SHA={before}\nNGINX_IMAGE={pin}\n".encode())
     release.store(previous / "release.json", {"sha": before})
     tag = f"gf3-app:{root.name}"
