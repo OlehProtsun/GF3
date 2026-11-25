@@ -2,6 +2,10 @@
 
 **MERGE/DEPLOY NO-GO**. See the [application candidate validation](#application-candidate-validation) for the current checks and release gates.
 
+**Physical-device QA · 2026-11-25.** The owner reported completing manual testing on physical devices. The only finding was the use of SVG illustrations in place of the ten original screenshots in App Guide → Getting Started. That finding remains open pending confirmation of the legal basis for distributing the recovered screenshots. See the [screenshot review](third-party-licenses.md#getting-started-screenshot-review--2026-11-25).
+
+The existing Guide passed 4/4 focused Vitest tests and 4/4 focused Playwright tests across the four profiles. The production frontend build passed.
+
 ## Baseline
 
 - Source `dev22.11.2026` at `b99fe90a098d6be68d0cbe33e75265aee972bab2`.
@@ -637,13 +641,13 @@ The retained full E2E reports under the local ignored `GF3.Tests/TestResults` di
 
 The WebKit failures covered Polish notification overflow, schedule entrance sampling, adjacent More previews, reduced motion in the dock, manager navigation on mode changes, and swap scroll restoration. Isolated WebKit passed the More and swap reproductions. The follow-up wraps tab labels at narrow widths, restores phone navigation focus after the inert state updates, and samples the entrance on the browser animation timeline. The mode-change fixture now waits for the holiday response to finish before reload. WebKit previously cancelled that mocked request during document replacement and reported an access-control error. The reload and Back scenario passed twice on each WebKit profile after the change. The affected Chromium and Mobile Chrome scenarios passed 14/14. The updated application image built and passed its notice checks at `sha256:1aa97721a330ad21a082bebcc8334239233f5d9470f21fea2f8686df064a811c`.
 
-A complete clean matrix on one frozen candidate, physical device checks, and owner confirmation of the flagged shipped assets remain merge gates. All six Bash blocks in the operator instructions passed syntax checks. Host commands require operator review and authorization. [Operator instructions](gfctl-prod2-database-maintenance.md)
+This earlier checkpoint listed a clean browser matrix, physical-device checks and flagged asset rights as merge gates. See the dated physical-device result above. All six Bash blocks in the operator instructions passed syntax checks. Host commands require operator review and authorization. [Operator instructions](gfctl-prod2-database-maintenance.md)
 
 ## Application candidate validation
 
 All three GitHub jobs passed on `18282e94a3669731416a5c49c5c4ff068c08c923`. Build and test reported .NET 1936/1936, Linux host tests 65/65, Vitest 1545 passed with one conditional skip, and lint with zero errors and 21 existing warnings. Playwright smoke passed 12/12. [Candidate CI](https://github.com/OlehProtsun/GF3/actions/runs/45501592143)
 
-The Docker job built the candidate and rehearsed all seven migrations against the eight schema prefixes on disposable Ubuntu. It verified preservation of SQLite rows and media, rollback under the verified write fence, retention of evidence and continued isolation after interrupted restoration, and isolated HTTP/HTTPS ingress. The Linux application integration run passed 33/33 covering backup, restore, schema verification and authenticated media reads. The application image shipped the required browser and server notices. Existing asset rights and physical-device verification still need operator evidence. [License and asset evidence](third-party-licenses.md)
+The Docker job built the candidate and rehearsed all seven migrations against the eight schema prefixes on disposable Ubuntu. It verified preservation of SQLite rows and media, rollback under the verified write fence, retention of evidence and continued isolation after interrupted restoration, and isolated HTTP/HTTPS ingress. The Linux application integration run passed 33/33 covering backup, restore, schema verification and authenticated media reads. The application image shipped the required browser and server notices. Existing asset rights still require confirmation. See the dated physical-device result above. [License and asset evidence](third-party-licenses.md)
 
 ### Full local Playwright on `18282e9`
 
