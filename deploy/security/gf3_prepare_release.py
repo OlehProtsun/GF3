@@ -527,20 +527,19 @@ def maintenance_rehearse(target, deploy=False):
         finally:
             release.git("worktree", "remove", "--force", str(source))
         stage("snapshot")
-        snapshot = bundle / "SQLite.db"
-        try:
+        with tempfile.TemporaryDirectory(prefix="rehearsal-", dir=bundle) as directory:
+            rehearsal = Path(directory)
+            snapshot = rehearsal / "SQLite.db"
             with release.lock(DEPLOY_LOCK):
                 release.require(state() == reviewed, "Maintenance review changed during build")
                 release.maintenance_tool(target, Path(__file__).absolute())
                 source_database = release.maintenance_database(baseline[2])
                 tool.snapshot(source_database, snapshot, before_ids)
                 tool.copy_media_snapshot(snapshot, source_database.parent / tool.MEDIA_DIRECTORY,
-                                         bundle / tool.MEDIA_DIRECTORY, full=False)
+                                         rehearsal / tool.MEDIA_DIRECTORY, full=False)
             stage("isolated-startup")
             tool.rehearse(release.command, release.docker_json, audit["image"], bundle,
                           snapshot, before_ids, target_ids, columns, verify_modes=deploy or reviewed_transition)
-        finally:
-            snapshot.unlink(missing_ok=True)
         with release.lock(DEPLOY_LOCK):
             release.require(state() == reviewed, "Maintenance review changed during rehearsal")
             release.maintenance_tool(target, Path(__file__).absolute())
