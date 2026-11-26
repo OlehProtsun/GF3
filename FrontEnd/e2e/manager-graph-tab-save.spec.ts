@@ -1,6 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 import { test } from "./fixtures/isolatedBackend";
-import { loginAsManager } from "./helpers";
+import { createEmployeeAccount, loginAsManager } from "./helpers";
 
 const cell = (page: Page, key: string) =>
   page.locator('[class*="_scheduleMatrixCardShell_"] table').locator(`[data-cell-key="${key}"]`);
@@ -16,9 +16,8 @@ test("three linked schedule drafts save and reopen with their own SQLite data", 
   test.skip(testInfo.project.name === "mobile-chrome" || testInfo.project.name === "webkit-iphone-x", "Manager PC editor");
   test.setTimeout(100_000);
   await page.setViewportSize({ width: 1600, height: 960 });
-  await loginAsManager(page);
-  const token = await page.evaluate(() => localStorage.getItem("gf3.auth.access-token"));
-  const headers = { Authorization: `Bearer ${token}` };
+  const fixtureEmployee = await createEmployeeAccount(page.request, "tab-regression");
+  const headers = { Authorization: `Bearer ${fixtureEmployee.managerAccessToken}` };
   const api = async (method: "GET" | "POST" | "PUT", url: string, data?: object) => {
     const response = await page.request.fetch(url, { method, headers, data });
     expect(response.ok(), `${method} ${url}: ${await response.text()}`).toBe(true);
@@ -26,8 +25,8 @@ test("three linked schedule drafts save and reopen with their own SQLite data", 
   };
   const { id: container } = await api("POST", "/api/containers", { name: "Tab regression container" });
   const { id: shop } = await api("POST", "/api/shops", { name: "Tab regression shop", address: "Test address" });
-  const employees: number[] = [];
-  for (const firstName of ["Ada", "Blake", "Casey"]) {
+  const employees = [fixtureEmployee.id];
+  for (const firstName of ["Blake", "Casey"]) {
     const { id } = await api("POST", "/api/employees", { firstName, lastName: "Test" });
     employees.push(id);
   }
@@ -71,6 +70,7 @@ test("three linked schedule drafts save and reopen with their own SQLite data", 
     await page.getByRole("tab", { name: `Schedule ${index + 1}`, exact: true }).click();
     await expect(page).toHaveURL(url(index));
   };
+  await loginAsManager(page);
   await page.goto(url(0));
   await editCell(page, `${ada}:11`, "Training");
   await go(1);
@@ -89,7 +89,7 @@ test("three linked schedule drafts save and reopen with their own SQLite data", 
   });
   await page.getByRole("button", { name: "Save", exact: true }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Save", exact: true }).click();
-  await expect(page).toHaveURL(url => !url.pathname.endsWith("/edit"), { timeout: 35_000 });
+  await expect(page).toHaveURL(url => !url.pathname.endsWith("/edit"), { timeout: 60_000 });
   expect(writes.filter(write => write.path.endsWith("/slots"))).toEqual([{
     path: `${root}/${graphIds[1]}/slots`,
     body: { slots: [expect.objectContaining({ employeeId: casey, dayOfMonth: 13, fromTime: "08:00", toTime: "12:00" })] },

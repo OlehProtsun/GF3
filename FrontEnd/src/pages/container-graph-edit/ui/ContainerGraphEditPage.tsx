@@ -72,6 +72,7 @@ import {
   rgbHexToArgb,
   resolveGraphSession,
   sanitizeGraphCellMap,
+  validateGraphCellMap,
   serializeGraphNoteCellStyles,
   serializeGraphNoteTextCells,
   sortGraphItemsByDisplayOrder,
@@ -2940,6 +2941,10 @@ function ContainerGraphEditSession() {
           const message = t("The current schedule could not be read. Your edits are still here.");
           setSaveOutcome(id, { status: "pending", message });
           throw new Error(message);
+        }
+        if (kind === "workspace" && Object.keys(validateGraphCellMap(draft.cellMap, employeeIds, Number(year), Number(month))).length) {
+          if (id === graphId) handleValidate();
+          throw new Error(t("Check highlighted fields before continuing."));
         }
         return kind === "unchanged" && !saveGuardByIdRef.current[id]?.needsStyleVersion && !saveGuardByIdRef.current[id]?.checkpoint ? [] : [{ draft, kind }];
       });

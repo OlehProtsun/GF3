@@ -638,6 +638,19 @@ test("an inactive draft that would erase an unedited shift blocks the entire sav
   expect(m.editor!.form.name).toBe("Valid active changes");
 });
 
+test("an invalid time range in an inactive draft blocks the entire save", async () => {
+  const view = open();
+  renamed("Valid active changes");
+  view.select(36);
+  act(() => m.editor!.onCellChange(2, 3, "10:00 - 10:00"));
+  view.select(34);
+  save();
+  expect((await failure()).getByText("Check highlighted fields before continuing.")).toBeVisible();
+  expectNoWorkspaceWrites();
+  expect(defaults.updateGraph).not.toHaveBeenCalled();
+  expect(defaults.commitGraphVersion).not.toHaveBeenCalled();
+});
+
 test("unmount cancels a waiting preflight without leaving the traffic gate active", async () => {
   const view = open();
   paint("text", "#abcdef", ["1:1"]);
