@@ -61,7 +61,10 @@ vi.mock("@entities/containers", async importOriginal => {
   return { ...actual, ...overrides,
     useContainerByIdQuery: () => query(mocks.container), useContainerGraphsQuery: () => query(mocks.graphs),
     useGraphByIdQuery: () => query(mocks.graphs.find(graph => graph.id === Number(mocks.params.graphId))),
-    useGraphEmployeesQuery: () => query(mocks.savedEmployees.get(Number(mocks.params.graphId)) ?? mocks.graphEmployees),
+    useGraphEmployeesQuery: () => {
+      const id = Number(mocks.params.graphId);
+      return query(mocks.savedEmployees.get(id) ?? mocks.graphEmployees.map(row => ({ ...row, scheduleId: id })));
+    },
     useGraphSlotsQuery: () => query(mocks.savedSlots.get(Number(mocks.params.graphId)) ?? mocks.slots),
     useGraphCellStylesQuery: () => query(mocks.styles),
     useGenerateGraphPreviewMutation: () => ({ mutate: mocks.generate, isPending: false }),
@@ -335,11 +338,15 @@ test("priority follows employee IDs through unsaved preview, undo, open graphs a
   expect(mocks.save.mock.calls.at(-1)![0].employeeAssignments[0].isPriority).toBe(true);
 });
 
-test("removing an availability member drops the flag instead of transferring it", () => {
+test("availability refresh preserves the saved roster, and choosing a different group applies its members", () => {
   const view = render(<ContainerGraphEditPage />);
   act(() => mocks.editor!.onEmployeePriorityChange(1, true));
   mocks.members = [{ id: 2, employeeId: 2, displayOrder: 0 }];
   view.rerender(<ContainerGraphEditPage />);
+  expect(mocks.editor!.graphEmployeeRows).toEqual([{ id: 1, employeeId: 1, minHoursMonth: "", isPriority: true }]);
+  mocks.groups.push({ id: 2, name: "Other", year: 2026, month: 2 });
+  view.rerender(<ContainerGraphEditPage />);
+  act(() => mocks.editor!.onFieldChange("availabilityGroupId")("2"));
   expect(mocks.editor!.graphEmployeeRows).toEqual([{ id: null, employeeId: 2, minHoursMonth: "", isPriority: false }]);
 });
 
