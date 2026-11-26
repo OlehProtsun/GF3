@@ -51,6 +51,7 @@ type RequestOptions = {
   body?: unknown;
   headers?: HeadersInit;
   signal?: AbortSignal;
+  keepalive?: boolean;
   query?: Record<string, QueryValue>;
   responseType?: ResponseType;
 };
@@ -333,6 +334,7 @@ async function executeRequest(path: string, options: RequestOptions = {}) {
       method,
       headers,
       signal: options.signal,
+      keepalive: options.keepalive,
       body: requestBody,
     });
   } catch (error) {

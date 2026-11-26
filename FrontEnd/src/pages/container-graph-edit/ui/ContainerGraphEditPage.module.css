@@ -224,3 +224,14 @@
   height: 8px;
   accent-color: #2563eb;
 }
+
+:global([data-compact-docked-workspace]) .headerActionCluster {
+  width: 100%;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+
+:global([data-compact-docked-workspace]) .sessionSection {
+  flex: 1 1 300px;
+  max-width: 100%;
+}

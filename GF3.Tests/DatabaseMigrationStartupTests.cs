@@ -15,6 +15,8 @@ namespace GF3.Tests;
 
 public sealed class DatabaseMigrationStartupTests
 {
+    private const string ExpandManagerNotepad = "20261126170000_ExpandManagerNotepad";
+
     [Fact]
     public async Task ReviewedReleaseSchemaPrefixes_MatchImmutableContract()
     {
@@ -148,7 +150,7 @@ public sealed class DatabaseMigrationStartupTests
             {
                 var result = await DatabaseMigrationStartup.ApplyAsync(clone, cloneWorkspace,
                     requireExistingDatabase: true, backupBeforeMigrate: true, NullLogger.Instance);
-                Assert.Equal(expectedMigrations, result.AppliedMigrations);
+                Assert.Equal(expectedMigrations.Append(ExpandManagerNotepad), result.AppliedMigrations);
                 var correction = await clone.ShiftCorrectionRequests.SingleAsync();
                 Assert.Equal(ShiftCorrectionOperation.ChangeTimes, correction.Operation);
                 Assert.Null(correction.RemovalSnapshotJson);
@@ -279,7 +281,7 @@ public sealed class DatabaseMigrationStartupTests
             {
                 var result = await DatabaseMigrationStartup.ApplyAsync(clone, cloneWorkspace, true, true,
                     NullLogger.Instance);
-                Assert.Equal(new[] { correction, refresh, disjointSwaps, launchModes, launchLog, removal, gif, photo, contentBlocks },
+                Assert.Equal(new[] { correction, refresh, disjointSwaps, launchModes, launchLog, removal, gif, photo, contentBlocks, ExpandManagerNotepad },
                     result.AppliedMigrations);
                 Assert.Equal(new[] { "Owner", "Recipient" }, await clone.Employees.OrderBy(employee => employee.Id).Select(employee => employee.FirstName).ToArrayAsync());
                 var legacy = await clone.ShiftCorrectionRequests.SingleAsync();

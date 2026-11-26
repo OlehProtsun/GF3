@@ -414,6 +414,10 @@ export function PresenceProvider({ children }: PropsWithChildren) {
   });
 
   const applyManagerDataChanged = useEffectEvent((update: ManagerDataChangedUpdate) => {
+    if (update.resourceType === "manager-notepad") {
+      invalidateRealtimeQuery(queryClient, queryKeys.managerNotepad.current());
+      return;
+    }
     if (update.resourceType === "employee-launches") {
       invalidateRealtimeQuery(queryClient, queryKeys.employeeLaunches.list());
       return;
@@ -738,6 +742,7 @@ export function PresenceProvider({ children }: PropsWithChildren) {
     }
     if (!managerPhoneMode) connection.onreconnected(() => {
       if (isDisposed) return;
+      if (session?.role === "manager") invalidateRealtimeQuery(queryClient, queryKeys.managerNotepad.current());
       invalidateRealtimeBaselineQueries(queryClient);
       refreshPresenceLists();
       setConnectionTick(tick => tick + 1);

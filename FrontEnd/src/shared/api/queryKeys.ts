@@ -33,6 +33,9 @@ export const queryKeys = {
   },
   managerNotepad: {
     current: () => ["managerNotepad", "current"] as const,
+    shareTargets: () => ["managerNotepad", "shareTargets"] as const,
+    draftRecovery: () => ["managerNotepad", "draftRecovery"] as const,
+    versions: (noteId: number) => ["managerNotepad", "versions", noteId] as const,
   },
   managerGraphFillColorBinds: {
     current: () => ["managerGraphFillColorBinds", "current"] as const,

@@ -1341,3 +1341,19 @@
 .priorityDescription { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
 .matrixActionError { margin-bottom: 6px; }
 .matrixActionErrorShell { flex-direction: column; }
+
+:global([data-compact-docked-workspace]) .workspaceLayout .sidebarColumn:not(.sidebarColumnCollapsed) {
+  flex-basis: clamp(216px, 34%, 320px);
+  width: clamp(216px, 34%, 320px);
+  max-width: 100%;
+  padding-inline: 4px;
+}
+
+:global([data-compact-docked-workspace]) .mainStack,
+:global([data-compact-docked-workspace]) .matrixWorkspace {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+:global([data-compact-docked-workspace]) .mainBlock {
+  padding-inline-end: 2px;
+}

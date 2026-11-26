@@ -1,3 +1,4 @@
+import { t } from "@shared/i18n";
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAvailabilityGroupsQuery } from "@entities/availability-groups";
@@ -10,7 +11,7 @@ export function ManagerPhoneAvailabilityPage() {
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const groups = useAvailabilityGroupsQuery(query, location.key);
-  return <ManagerPhonePage query={query} onQueryChange={setQuery} queries={[groups]} queryKeys={[queryKeys.availabilityGroups.all]}>
+  return <ManagerPhonePage title={t("Dispo")} backTo="/" query={query} onQueryChange={setQuery} queries={[groups]} queryKeys={[queryKeys.availabilityGroups.all]}>
     <AvailabilityGroupListCard groups={groups.data ?? []} isLoading={false} searchQuery={query} onClearSearch={() => setQuery("")} onOpenGroup={id => navigate(`/availability/${id}`)} />
   </ManagerPhonePage>;
 }

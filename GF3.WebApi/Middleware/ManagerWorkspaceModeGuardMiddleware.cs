@@ -16,7 +16,7 @@ public sealed class ManagerWorkspaceModeGuardMiddleware(RequestDelegate next)
             context.User.Identity?.IsAuthenticated != true || !context.User.IsInRole(AuthRoles.Manager) ||
             mode == ManagerWorkspaceModes.Pc || IsExempt(request) ||
             (mode == ManagerWorkspaceModes.Phone && (HttpMethods.IsGet(request.Method) || HttpMethods.IsHead(request.Method) ||
-                HttpMethods.IsOptions(request.Method) || IsPhonePresenceTransport(request))))
+                HttpMethods.IsOptions(request.Method) || IsPhonePresenceTransport(request) || IsPhoneNoteWrite(request))))
         {
             await next(context).ConfigureAwait(false);
             return;
@@ -29,6 +29,31 @@ public sealed class ManagerWorkspaceModeGuardMiddleware(RequestDelegate next)
         context.Response.StatusCode = StatusCodes.Status403Forbidden;
         await context.Response.WriteAsJsonAsync(problem, options: null, contentType: "application/problem+json",
             cancellationToken: context.RequestAborted).ConfigureAwait(false);
+    }
+
+    private static bool IsPhoneNoteWrite(HttpRequest request)
+    {
+        var segments = request.Path.Value?.TrimEnd('/').Split('/');
+        if (segments is not { Length: >= 4 } || segments[0].Length != 0 ||
+            !segments[1].Equals("api", StringComparison.OrdinalIgnoreCase) ||
+            !segments[2].Equals("manager-notepad", StringComparison.OrdinalIgnoreCase) ||
+            !segments[3].Equals("notes", StringComparison.OrdinalIgnoreCase)) return false;
+
+        var method = request.Method;
+        if (segments.Length == 4) return HttpMethods.IsPost(method);
+        if (!int.TryParse(segments[4], NumberStyles.None, CultureInfo.InvariantCulture, out var noteId) || noteId <= 0)
+            return false;
+
+        return segments.Length switch
+        {
+            5 => HttpMethods.IsPut(method) || HttpMethods.IsDelete(method),
+            6 when segments[5].Equals("metadata", StringComparison.OrdinalIgnoreCase) => HttpMethods.IsPatch(method),
+            6 when segments[5].Equals("edit-session", StringComparison.OrdinalIgnoreCase) =>
+                HttpMethods.IsPost(method) || HttpMethods.IsPut(method) || HttpMethods.IsDelete(method),
+            7 when segments[5].Equals("restore", StringComparison.OrdinalIgnoreCase) => HttpMethods.IsPost(method) &&
+                long.TryParse(segments[6], NumberStyles.None, CultureInfo.InvariantCulture, out var versionId) && versionId > 0,
+            _ => false,
+        };
     }
 
     private static bool IsPhonePresenceTransport(HttpRequest request)

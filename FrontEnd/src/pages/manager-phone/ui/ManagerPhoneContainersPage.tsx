@@ -1,3 +1,4 @@
+import { t } from "@shared/i18n";
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ContainerListCard, matchesContainerSearch, useContainersListQuery } from "@entities/containers";
@@ -10,7 +11,7 @@ export function ManagerPhoneContainersPage() {
   const [query, setQuery] = useState("");
   const containers = useContainersListQuery(location.key);
   const data = (containers.data ?? []).filter(item => matchesContainerSearch(item, query)).sort((a, b) => b.id - a.id);
-  return <ManagerPhonePage query={query} onQueryChange={setQuery} queries={[containers]} queryKeys={[queryKeys.containers.list()]}>
+  return <ManagerPhonePage title={t("Containers")} backTo="/" query={query} onQueryChange={setQuery} queries={[containers]} queryKeys={[queryKeys.containers.list()]}>
     <ContainerListCard containers={data} isLoading={false} searchQuery={query} onClearSearch={() => setQuery("")} onContainerOpen={id => navigate(`/container/${id}`)} onGraphOpen={(containerId, graphId) => navigate(`/container/${containerId}/graphs/${graphId}`)} />
   </ManagerPhonePage>;
 }

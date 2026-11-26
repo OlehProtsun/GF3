@@ -1,10 +1,23 @@
 .layout { --shell-max-width: 430px; --manager-phone-top-inset: calc(10px + env(safe-area-inset-top, 0px)); min-height: 100vh; min-height: 100dvh; background: var(--app-page-background, #f3f4f6); color: var(--text-primary, #0f172a); }
 /* Keep the document as the sticky scroll container. */
 :global(body):has(.layout) { overflow-x: visible; overflow-x: clip; }
+.layout[data-notepad-open] :is(.nav, .openButton) { visibility: hidden; }
 .shell { box-sizing: border-box; width: min(100%, var(--shell-max-width)); min-width: 0; margin: 0 auto; padding: var(--manager-phone-top-inset) clamp(14px, 3.6vw, 28px) calc(110px + env(safe-area-inset-bottom, 0px)); }
 .content { min-width: 0; padding: 0; margin: 0; overflow-wrap: anywhere; }
 .content > * { min-width: 0; max-width: 100%; }
 .shellCollapsed { padding-bottom: calc(66px + env(safe-area-inset-bottom, 0px)); }
+.shellHome {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+  padding-bottom: var(--home-dock-space, calc(110px + env(safe-area-inset-bottom, 0px)));
+}
+.shellHome.shellCollapsed { padding-bottom: var(--home-dock-space, calc(66px + env(safe-area-inset-bottom, 0px))); }
+.shellHome > .content { display: flex; flex: 1; min-height: 0; }
+@media (max-height: 360px) {
+  .shellHome { height: auto; min-height: 100dvh; }
+}
 .nav {
   composes: mobileTabs from "../employee-workspace-layout/EmployeeWorkspaceLayout.module.css";
 }

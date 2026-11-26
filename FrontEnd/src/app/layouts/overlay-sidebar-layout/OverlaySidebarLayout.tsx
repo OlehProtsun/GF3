@@ -1,6 +1,6 @@
 import { t } from "@shared/i18n";
 import { useLanguageRevision } from "@shared/i18n/useLanguageRevision";
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "@app/providers/AuthProvider";
@@ -59,6 +59,33 @@ export function OverlaySidebarLayout({ children }: OverlaySidebarLayoutProps) {
   const { pathname } = useLocation();
   const isManager = session?.role === "manager";
   const isSystemManager = isManager && session?.isSystemManager === true;
+  const workspaceRef = useRef<HTMLDivElement>(null);
+  const mainRef = useRef<HTMLElement>(null);
+
+  useLayoutEffect(() => {
+    const main = mainRef.current;
+    const workspace = workspaceRef.current;
+    if (!isManager || !main || !workspace) return;
+
+    // Page headers are fixed to the viewport; align them to the actual grid column.
+    const update = () => {
+      const bounds = main.getBoundingClientRect();
+      const docked = getComputedStyle(workspace).display === "grid";
+      const rightGap = Math.max(0, document.documentElement.clientWidth - bounds.right);
+      main.style.setProperty("--workspace-right-gap", `${rightGap}px`);
+      main.toggleAttribute("data-compact-docked-workspace", docked && bounds.width <= 960);
+    };
+    const observer = new ResizeObserver(update);
+    observer.observe(main);
+    observer.observe(workspace);
+    update();
+    return () => {
+      observer.disconnect();
+      main.style.removeProperty("--workspace-right-gap");
+      main.removeAttribute("data-compact-docked-workspace");
+    };
+  }, [isManager]);
+
   const accountPath = isManager ? "/manager-profile" : "/profile";
   const isContainerWideContent = pathname === "/container";
   const isUrlopListContent = pathname === "/urlop";
@@ -185,14 +212,17 @@ export function OverlaySidebarLayout({ children }: OverlaySidebarLayoutProps) {
           </button>
         </div>
       </aside></>}
-      <main className={contentClassName}>
-        <div className="container">{children}</div>
-        {pathname === accountPath && <nav className={styles.legalLinks} aria-label={t("Legal documents")}>
-            <a href="/legal/index.html">{t("Legal documents")}</a>
-            <a href="/legal/regulamin.html">{t("Terms")}</a>
-            <a href="/legal/polityka-prywatnosci.html">{t("Privacy policy")}</a>
-          </nav>}
-      </main>
+      <div className={styles.workspace} ref={workspaceRef}>
+        <main ref={mainRef} className={contentClassName}>
+          <div className="container">{children}</div>
+          {pathname === accountPath && <nav className={styles.legalLinks} aria-label={t("Legal documents")}>
+              <a href="/legal/index.html">{t("Legal documents")}</a>
+              <a href="/legal/regulamin.html">{t("Terms")}</a>
+              <a href="/legal/polityka-prywatnosci.html">{t("Privacy policy")}</a>
+            </nav>}
+        </main>
+        {isManager && <div className={styles.managerTopControls}><ManagerSystemNews /><ManagerNotepad /></div>}
+      </div>
 
       <div
         className={`${styles.backdrop} ${
@@ -202,7 +232,6 @@ export function OverlaySidebarLayout({ children }: OverlaySidebarLayoutProps) {
         aria-hidden="true"
       />
 
-      {isManager ? <div className={styles.managerTopControls}><ManagerSystemNews /><ManagerNotepad /></div> : null}
 
     </div>
   );

@@ -1119,6 +1119,40 @@ namespace DataAccessLayer.Migrations
                     b.ToTable("manager_graph_text_color_bind");
                 });
 
+            modelBuilder.Entity("DataAccessLayer.Models.ManagerNoteFolderModel", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<int>("ManagerAccountId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("manager_account_id");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("name")
+                        .UseCollation("NOCASE");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("updated_at_utc");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ManagerAccountId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("manager_note_folder");
+                });
+
             modelBuilder.Entity("DataAccessLayer.Models.ManagerNoteModel", b =>
                 {
                     b.Property<int>("Id")
@@ -1142,9 +1176,52 @@ namespace DataAccessLayer.Migrations
                         .HasColumnType("TEXT")
                         .HasColumnName("created_at_utc");
 
+                    b.Property<int?>("FolderId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("folder_id");
+
+                    b.Property<bool>("IsLocked")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_locked");
+
+                    b.Property<bool>("IsPinned")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_pinned");
+
+                    b.Property<long?>("EditExpiresAtMs")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("edit_expires_at_ms");
+
+                    b.Property<int?>("EditManagerId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("edit_manager_id");
+
+                    b.Property<Guid?>("EditSessionId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("edit_session_id");
+
+                    b.Property<long?>("EditStartedAtMs")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("edit_started_at_ms");
+
+                    b.Property<int?>("LastEditedByManagerId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("last_edited_by_manager_id");
+
                     b.Property<int>("ManagerAccountId")
                         .HasColumnType("INTEGER")
                         .HasColumnName("manager_account_id");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(1L)
+                        .HasColumnName("revision");
 
                     b.Property<string>("Title")
                         .IsRequired()
@@ -1156,12 +1233,141 @@ namespace DataAccessLayer.Migrations
                         .HasColumnType("TEXT")
                         .HasColumnName("updated_at_utc");
 
+                    b.Property<string>("Visibility")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(7)
+                        .HasColumnType("TEXT")
+                        .HasDefaultValue("private")
+                        .HasColumnName("visibility");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("FolderId");
 
                     b.HasIndex("ManagerAccountId", "UpdatedAtUtc")
                         .HasDatabaseName("ix_manager_note_manager_updated");
 
+                    b.HasIndex("Visibility", "UpdatedAtUtc")
+                        .HasDatabaseName("ix_manager_note_visibility_updated");
+
+                    b.HasIndex("ManagerAccountId", "IsPinned", "UpdatedAtUtc")
+                        .HasDatabaseName("ix_manager_note_manager_pinned_updated");
+
                     b.ToTable("manager_note");
+                });
+
+            modelBuilder.Entity("DataAccessLayer.Models.ManagerNoteShareModel", b =>
+                {
+                    b.Property<int>("NoteId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("note_id");
+
+                    b.Property<int>("ManagerAccountId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("manager_account_id");
+
+                    b.HasKey("NoteId", "ManagerAccountId");
+
+                    b.HasIndex("ManagerAccountId");
+
+                    b.ToTable("manager_note_share");
+                });
+
+            modelBuilder.Entity("DataAccessLayer.Models.ManagerNoteTagLinkModel", b =>
+                {
+                    b.Property<int>("NoteId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("note_id");
+
+                    b.Property<int>("TagId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("tag_id");
+
+                    b.HasKey("NoteId", "TagId");
+
+                    b.HasIndex("TagId");
+
+                    b.ToTable("manager_note_tag_link");
+                });
+
+            modelBuilder.Entity("DataAccessLayer.Models.ManagerNoteTagModel", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<int>("ManagerAccountId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("manager_account_id");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("name")
+                        .UseCollation("NOCASE");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ManagerAccountId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("manager_note_tag");
+                });
+
+            modelBuilder.Entity("DataAccessLayer.Models.ManagerNoteVersionModel", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Color")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("color");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasMaxLength(20000)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("content");
+
+                    b.Property<int>("NoteId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("note_id");
+
+                    b.Property<long>("Revision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("revision");
+
+                    b.Property<DateTimeOffset>("SavedAtUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("saved_at_utc");
+
+                    b.Property<int>("SavedByManagerId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("saved_by_manager_id");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("title");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("NoteId", "Revision")
+                        .IsUnique();
+
+                    b.ToTable("manager_note_version");
                 });
 
             modelBuilder.Entity("DataAccessLayer.Models.ManagerNotepadStateModel", b =>
@@ -2910,8 +3116,22 @@ namespace DataAccessLayer.Migrations
                     b.Navigation("ManagerAccount");
                 });
 
+            modelBuilder.Entity("DataAccessLayer.Models.ManagerNoteFolderModel", b =>
+                {
+                    b.HasOne("DataAccessLayer.Models.ManagerAccountModel", null)
+                        .WithMany()
+                        .HasForeignKey("ManagerAccountId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("DataAccessLayer.Models.ManagerNoteModel", b =>
                 {
+                    b.HasOne("DataAccessLayer.Models.ManagerNoteFolderModel", null)
+                        .WithMany()
+                        .HasForeignKey("FolderId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("DataAccessLayer.Models.ManagerAccountModel", "ManagerAccount")
                         .WithMany()
                         .HasForeignKey("ManagerAccountId")
@@ -2919,6 +3139,54 @@ namespace DataAccessLayer.Migrations
                         .IsRequired();
 
                     b.Navigation("ManagerAccount");
+                });
+
+            modelBuilder.Entity("DataAccessLayer.Models.ManagerNoteShareModel", b =>
+                {
+                    b.HasOne("DataAccessLayer.Models.ManagerAccountModel", null)
+                        .WithMany()
+                        .HasForeignKey("ManagerAccountId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("DataAccessLayer.Models.ManagerNoteModel", null)
+                        .WithMany("Shares")
+                        .HasForeignKey("NoteId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("DataAccessLayer.Models.ManagerNoteTagLinkModel", b =>
+                {
+                    b.HasOne("DataAccessLayer.Models.ManagerNoteModel", null)
+                        .WithMany("TagLinks")
+                        .HasForeignKey("NoteId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("DataAccessLayer.Models.ManagerNoteTagModel", null)
+                        .WithMany()
+                        .HasForeignKey("TagId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("DataAccessLayer.Models.ManagerNoteTagModel", b =>
+                {
+                    b.HasOne("DataAccessLayer.Models.ManagerAccountModel", null)
+                        .WithMany()
+                        .HasForeignKey("ManagerAccountId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("DataAccessLayer.Models.ManagerNoteVersionModel", b =>
+                {
+                    b.HasOne("DataAccessLayer.Models.ManagerNoteModel", null)
+                        .WithMany()
+                        .HasForeignKey("NoteId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("DataAccessLayer.Models.ManagerNotepadStateModel", b =>
@@ -3261,6 +3529,13 @@ namespace DataAccessLayer.Migrations
                     b.Navigation("ScheduleEmployees");
 
                     b.Navigation("ScheduleSlots");
+                });
+
+            modelBuilder.Entity("DataAccessLayer.Models.ManagerNoteModel", b =>
+                {
+                    b.Navigation("Shares");
+
+                    b.Navigation("TagLinks");
                 });
 
             modelBuilder.Entity("DataAccessLayer.Models.RegulationDocumentModel", b =>

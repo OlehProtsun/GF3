@@ -13,13 +13,12 @@ import { CardSection } from "@shared/ui/sections/CardSection";
 import { PageHeader } from "@shared/ui/PageHeader";
 import { AvailabilityIcon, CheckIcon, ChevronLeftIcon, ChevronRightIcon, ClockIcon, ExternalLinkIcon, GroupIcon, NoteIcon, RequestReviewIcon, ScheduleDetailsIcon, ScheduleIcon, ShopIcon, StatisticsIcon, SwapOffersIcon, WarnIcon } from "@shared/ui/icons";
 import { managerHomeActivityApi, type HomeActivityTab } from "../api/managerHomeActivityApi";
-import { formatHomeDate, getHomeActivityPresentation, getHomeActivityRoute, getHomeApprovalTarget, getWarsawShiftStatus, moveSelectedDay, parseHomeDay, warsawToday, type HomeApprovalTarget } from "./homeActivity";
-import { loadHomeDashboard } from "./homeDashboard";
+import { formatHomeDate, getHomeActivityPresentation, getHomeActivityRoute, getHomeApprovalTarget, moveSelectedDay, parseHomeDay, warsawToday, type HomeApprovalTarget } from "./homeActivity";
+import { getHomeDashboardQuery, getHomeEmployeeInitials, getHomeScheduleRows, getHomeShiftStatusLabel } from "./homeSchedule";
 import { HomeApprovalDialog } from "./HomeApprovalDialog";
 import { useHomeActivityQuery } from "./useHomeActivityQuery";
 import styles from "./HomePage.module.css";
 
-const shiftStatusOrder = { in_progress: 0, completed: 1, upcoming: 2 };
 const activityTabs = [
   { value: "all", label: "All Activity", Icon: StatisticsIcon },
   { value: "swaps", label: "Swaps", Icon: SwapOffersIcon },
@@ -88,12 +87,8 @@ function ManagerPcHomePage() {
     window.addEventListener("focus", refresh); document.addEventListener("visibilitychange", refresh);
     return () => { window.removeEventListener("focus", refresh); document.removeEventListener("visibilitychange", refresh); };
   }, [queryClient, selectedDay, year, month, tab]);
-  const home = useQuery({ queryKey: queryKeys.home.dashboard(selectedDay), staleTime: 30_000, queryFn: ({ signal }) => loadHomeDashboard(selectedDay, signal) });
-  const filteredRows = (home.data?.todayRows ?? []).filter(row => selectedShop === null || row.shopId === selectedShop);
-  const employeeCount = selectedShop === null ? home.data?.todayActiveEmployeesCount : new Set(filteredRows.map(row => row.employeeId)).size;
-  const todayRows = filteredRows
-    .map(row => ({ row, status: getWarsawShiftStatus(selectedDay, row.fromTime, row.toTime, now) }))
-    .sort((left, right) => shiftStatusOrder[left.status] - shiftStatusOrder[right.status]);
+  const home = useQuery(getHomeDashboardQuery(selectedDay));
+  const { employeeCount, todayRows } = getHomeScheduleRows(home.data, selectedDay, selectedShop, now);
   const activity = useHomeActivityQuery(year, month, tab);
   const counts = activity.data?.pages[0] ??
     queryClient.getQueryState<NonNullable<typeof activity.data>>([...queryKeys.home.activity(), year, month, "all"]).data?.pages[0];
@@ -222,9 +217,9 @@ function ManagerPcHomePage() {
       <div className={styles.tableScroll} tabIndex={0} role="region" aria-label={t("Scheduled employees")} aria-busy={home.isLoading}>
         <table className={styles.table}><thead><tr>{[t("Employee"), t("Shift"), t("Shop"), t("Hours"), t("Status")].map(label => <th key={label} scope="col">{label}</th>)}</tr></thead>
           <tbody>{todayRows.map(({ row, status }) => {
-            const label = status === "upcoming" ? t("Upcoming") : status === "in_progress" ? t("In Progress") : t("Completed");
+            const label = getHomeShiftStatusLabel(status);
             const to = `/container/${row.containerId}/graphs/${row.graphId}`;
-            const initials = row.employee.split(/\s+/).filter(Boolean).slice(0, 2).map(part => Array.from(part)[0]).join("").toUpperCase();
+            const initials = getHomeEmployeeInitials(row.employee);
             return <tr key={row.id}>
               <td><Link to={to} className={styles.employeeLink} aria-label={t("Open schedule for {0}: {1}, {2}, {3}", row.employee, row.shift, row.shop, row.dateLabel)}><span className={styles.initials} data-tone={row.employeeId % 3} aria-hidden="true">{initials}</span><strong title={row.employee}>{row.employee}</strong></Link></td>
               <td><Link to={to} tabIndex={-1}><ClockIcon size={15} />{row.shift}</Link></td>

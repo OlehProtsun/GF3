@@ -7,7 +7,7 @@ import styles from "./ManagerPhonePage.module.css";
 
 export function ManagerPhoneMorePage() {
   const { session, logout } = useAuth();
-  return <ManagerPhonePage>
+  return <ManagerPhonePage title={t("More")} backTo="/">
     <section className={`${styles.card} ${styles.account}`}><h2>{session?.displayName}</h2><p>@{session?.userName} · {t("Manager")}</p><p>{t("Read only")}</p></section>
     <ManagerWorkspaceModeSwitch targetMode="pc" />
     <button className={styles.logout} onClick={() => void logout()}><LogoutIcon size={18} />{t("Log out")}</button>

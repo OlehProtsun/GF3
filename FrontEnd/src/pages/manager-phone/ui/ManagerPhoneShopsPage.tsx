@@ -1,3 +1,4 @@
+import { t } from "@shared/i18n";
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useShopsQuery } from "@entities/shops/model/queries";
@@ -10,7 +11,7 @@ export function ManagerPhoneShopsPage() {
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const shops = useShopsQuery(query, location.key);
-  return <ManagerPhonePage backTo="/more" query={query} onQueryChange={setQuery} queries={[shops]} queryKeys={[queryKeys.shops.all]}>
+  return <ManagerPhonePage title={t("Shops")} backTo="/more" query={query} onQueryChange={setQuery} queries={[shops]} queryKeys={[queryKeys.shops.all]}>
     <ShopListCard shops={shops.data ?? []} isLoading={false} searchQuery={query} onClearSearch={() => setQuery("")} onShopOpen={id => navigate(`/shop/${id}`)} />
   </ManagerPhonePage>;
 }
