@@ -6,6 +6,7 @@ export function useDropdownPosition(
   dropdownRef: RefObject<HTMLElement | null>,
   placement: "up" | "down" = "down",
   preferredWidth?: number,
+  alignment: "start" | "end" = "start",
 ) {
   const [style, setStyle] = useState<CSSProperties>({});
 
@@ -35,7 +36,7 @@ export function useDropdownPosition(
       setStyle({
         width,
         maxHeight,
-        left: Math.max(leftEdge, Math.min(trigger.left, rightEdge - width)),
+        left: Math.max(leftEdge, Math.min(alignment === "end" ? trigger.right - width : trigger.left, rightEdge - width)),
         top: Math.max(topEdge, Math.min(up ? trigger.top - gap - height : trigger.bottom + gap, bottomEdge - height)),
       });
     };
@@ -64,7 +65,7 @@ export function useDropdownPosition(
       viewport?.removeEventListener("resize", scheduleUpdate);
       viewport?.removeEventListener("scroll", update);
     };
-  }, [open, triggerRef, dropdownRef, placement, preferredWidth]);
+  }, [open, triggerRef, dropdownRef, placement, preferredWidth, alignment]);
 
   return style;
 }

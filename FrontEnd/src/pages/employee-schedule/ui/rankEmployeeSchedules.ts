@@ -1,7 +1,9 @@
 import type { EmployeeSchedule } from "@entities/employee-schedule";
 import { parseFlexibleTimeSegment } from "@shared/lib/timeRange";
 
-function countAssignedShifts(schedule: EmployeeSchedule, employeeId: number) {
+type RankableSchedule = Pick<EmployeeSchedule, "id" | "name" | "year" | "month" | "slots">;
+
+function countAssignedShifts(schedule: RankableSchedule, employeeId: number) {
   const shifts = new Set<string>();
   for (const slot of schedule.slots) {
     if (slot.employeeId !== employeeId || slot.status !== "ASSIGNED") continue;
@@ -12,7 +14,7 @@ function countAssignedShifts(schedule: EmployeeSchedule, employeeId: number) {
   return shifts.size;
 }
 
-export function rankEmployeeSchedules(schedules: readonly EmployeeSchedule[], employeeId: number, currentMonth: string) {
+export function rankEmployeeSchedules<T extends RankableSchedule>(schedules: readonly T[], employeeId: number, currentMonth: string) {
   const currentPeriod = Number(currentMonth.replace("-", ""));
   return schedules.map(schedule => ({
     schedule,

@@ -512,8 +512,8 @@ for (const language of ["en", "pl", "uk"]) {
       ]);
       await expect(page).toHaveURL(/\/container\/1\/graphs\/1$/, { timeout: 20_000 });
       await page.goto("/container/1/graphs/1/edit");
+      await expect(page.getByRole("textbox", { name: "Manual column 1 header" })).toHaveValue("do obstawienia", { timeout: 20_000 });
       await openManualActivity(page);
-      await expect(card.getByText("do obstawienia", { exact: true })).toBeVisible();
       await expect(rows).toHaveCount(0);
       await card.getByRole("button", { name: /Offered \(2\)/ }).click();
       await card.getByRole("button", { name: "Cancel shift on 01 Feb", exact: true }).first().click();

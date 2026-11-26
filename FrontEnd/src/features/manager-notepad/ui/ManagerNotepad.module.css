@@ -1,10 +1,10 @@
 .openTab {
   position: fixed;
   top: env(safe-area-inset-top);
-  right: calc(14px + env(safe-area-inset-right));
+  right: var(--manager-controls-right, calc(18px + env(safe-area-inset-right)));
   z-index: 1350;
-  width: 36px;
-  min-width: 36px;
+  width: var(--manager-notepad-tab-width, 62px);
+  min-width: var(--manager-notepad-tab-width, 62px);
   height: 32px;
   display: inline-flex;
   align-items: center;

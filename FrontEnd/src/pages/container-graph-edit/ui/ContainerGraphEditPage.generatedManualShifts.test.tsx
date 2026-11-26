@@ -316,6 +316,59 @@ test("persisted manual demand requires cancellation before destructive edits", (
   act(()=>mocks.editor!.onDeleteManualColumn(7));expect(columns()).toHaveLength(1);
 });
 
+test("deleting a draft manual column clears its offer, selection and styles and Undo restores them", () => {
+  mocks.graphs[0].note = buildGraphNoteContent("", [{ id: 7, label: "Demand", cells: { "1": "09:00-13:00" } }],
+    [1, -7], [{ employeeId: -7, dayOfMonth: 1, backgroundColorArgb: 456, textColorArgb: null }]);
+  render(<ContainerGraphEditPage />);
+  act(() => mocks.editor!.onPublishManualShift({ manualColumnId: 7, dayOfMonth: 1, fromTime: "09:00", toTime: "13:00", allowPartialAcceptance: false }));
+  act(() => mocks.editor!.onSelectedCellKeysChange(["-7:1", "1:1"]));
+  expect(mocks.editor!.pendingManualShiftPublishes).toHaveLength(1);
+  act(() => mocks.editor!.onDeleteManualColumn(7));
+  expect(columns()).toEqual([]);
+  expect(mocks.editor!.pendingManualShiftPublishes).toEqual([]);
+  expect(mocks.editor!.selectedCellKeys).toEqual(["1:1"]);
+  expect(mocks.editor!.styleMap["-7:1"]).toBeUndefined();
+  act(() => mocks.editor!.onUndo());
+  expect(columns().map(column => column.columnId)).toEqual([7]);
+  expect(mocks.editor!.pendingManualShiftPublishes).toHaveLength(1);
+  expect(mocks.editor!.styleMap["-7:1"].backgroundColorArgb).toBe(456);
+  expect(mocks.save).not.toHaveBeenCalled();
+});
+
+test.each([false, true])("inserts at ordinary edges, preserves tabs, and saves column order (generated=%s)", async generated => {
+  if (generated) mocks.graphs[0].note = buildGraphNoteContent("Fixture", [
+    { id: 4, label: "Auto", cells: { "1": "08:00 - 12:00" }, source: "generated-unfilled" },
+  ]);
+  const view = render(<ContainerGraphEditPage />);
+  const prefix = generated ? [-4] : [];
+  act(() => mocks.editor!.onAddManualColumn("start"));
+  const left = generated ? 5 : 1;
+  act(() => mocks.editor!.onAddManualColumn("end"));
+  const right = left + 1;
+  const expected = [...prefix, -left, 1, -right];
+  const order = () => mocks.editor!.scheduleColumns.map(column => column.employeeId);
+  expect(order()).toEqual(expected);
+  act(() => mocks.editor!.onUndo());
+  expect(order()).toEqual(expected.slice(0, -1));
+  act(() => mocks.editor!.onAddManualColumn("end"));
+  expect(order()).toEqual(expected);
+  act(() => mocks.editor!.onManualColumnLabelChange(left, "Left"));
+  act(() => mocks.editor!.onCellChange(-left, 2, "09:00 - 13:00"));
+  fireEvent.click(screen.getByRole("tab", { name: "Graph two" }));
+  mocks.params = { containerId: "1", graphId: "2" }; view.rerender(<ContainerGraphEditPage />);
+  expect(columns()).toEqual([]);
+  fireEvent.click(screen.getByRole("tab", { name: "Graph one" }));
+  mocks.params = { containerId: "1", graphId: "1" }; view.rerender(<ContainerGraphEditPage />);
+  expect(order()).toEqual(expected);
+  expect(mocks.save).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByText("Save editor"));
+  fireEvent.click(screen.getByText("Confirm save"));
+  await waitFor(() => expect(mocks.commit).toHaveBeenCalled());
+  const stored = parseGraphNoteContent(mocks.save.mock.calls[0][0].payload.note);
+  expect(stored.columnOrder).toEqual(expected);
+  expect(stored.manualColumns.find(column => column.id === left)).toMatchObject({ label: "Left", cells: { "2": "09:00 - 13:00" } });
+});
+
 test("priority follows employee IDs through unsaved preview, undo, open graphs and save", async () => {
   const view = render(<ContainerGraphEditPage />);
   expect(mocks.editor!.graphEmployeeRows[0].isPriority).toBe(false);

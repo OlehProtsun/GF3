@@ -1339,3 +1339,5 @@
 .priorityToggle input:focus-visible + .priorityCircle { outline:3px solid #93b4ff; outline-offset:3px; }
 .priorityToggle:has(input:disabled) { opacity:.5; cursor:default; }
 .priorityDescription { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+.matrixActionError { margin-bottom: 6px; }
+.matrixActionErrorShell { flex-direction: column; }

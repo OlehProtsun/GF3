@@ -308,6 +308,68 @@ test("pinned generated headers cannot be dragged or receive a column drop", () =
   expect(onColumnMove).not.toHaveBeenCalled();
 });
 
+test("manager controls pass anchors and preserve native drag, resize and inline header editing", async () => {
+  const user = userEvent.setup();
+  const action = vi.fn(), rename = vi.fn(), move = vi.fn();
+  const columns = [-7, 1, 2].map(employeeId => ({ employeeId, kind: employeeId < 0 ? "manual" as const : "employee" as const,
+    manualColumnId: employeeId < 0 ? -employeeId : null, graphEmployeeId: null,
+    label: employeeId < 0 ? "Auto coverage" : `Worker ${employeeId}`, minHoursMonth: null, totalMinutes: 0, totalText: "" }));
+  render(<ContainerGraphMatrix graph={{ year: 2026, month: 1 }} columns={columns} cellMap={{}}
+    pinnedColumnIds={new Set([-7])} onColumnMove={move} onColumnHeaderAction={action} onColumnLabelChange={rename} />);
+  const source = screen.getByRole("columnheader", { name: "Worker 1", exact: true });
+  const target = screen.getByRole("columnheader", { name: "Worker 2", exact: true });
+  const anchor = within(source).getByRole("button", { name: "Actions for Worker 1" });
+  fireEvent.pointerDown(anchor);
+  fireEvent.dragStart(source, { dataTransfer: { setData: vi.fn() } });
+  fireEvent.drop(target);
+  fireEvent.dragEnd(source);
+  fireEvent.click(anchor, { detail: 1 });
+  expect(move).toHaveBeenCalledExactlyOnceWith(1, 2);
+  expect(action).not.toHaveBeenCalled();
+  fireEvent.pointerDown(anchor);
+  fireEvent.click(anchor, { detail: 1 });
+  expect(action).toHaveBeenLastCalledWith(columns[1], anchor);
+  anchor.focus();
+  await user.keyboard("{Enter}");
+  expect(action).toHaveBeenCalledTimes(2);
+  const resize = source.querySelector(`.${styles.columnResizeHandle}`)!;
+  fireEvent.mouseDown(resize, { clientX: 100 });
+  fireEvent.mouseMove(window, { clientX: 125 });
+  fireEvent.mouseUp(window);
+  expect(action).toHaveBeenCalledTimes(2);
+  const manual = screen.getByRole("columnheader", { name: "Auto coverage" });
+  const input = within(manual).getByRole("textbox", { name: "Manual column 7 header" });
+  fireEvent.change(input, { target: { value: "Edited name" } });
+  expect(rename).toHaveBeenCalledExactlyOnceWith(7, "Edited name");
+  expect(action).toHaveBeenCalledTimes(2);
+  const manualAction = within(manual).getByRole("button", { name: "Actions for manual column Auto coverage" });
+  await user.click(manualAction);
+  expect(action).toHaveBeenLastCalledWith(columns[0], manualAction);
+  expect(manual).toHaveAttribute("draggable", "false");
+});
+
+test("plus controls work with an empty matrix and manager actions stay out of read-only views", () => {
+  const add = vi.fn(), action = vi.fn(), customize = vi.fn();
+  const props = { graph: { year: 2026, month: 1 }, columns: [], cellMap: {}, onAddManualColumn: add, onColumnHeaderAction: action };
+  const { rerender } = render(<ContainerGraphMatrix {...props} />);
+  const left = () => screen.getByRole("button", { name: "Add manual column on the left" });
+  const right = () => screen.getByRole("button", { name: "Add manual column on the right" });
+  fireEvent.click(left());
+  fireEvent.click(right());
+  expect(add.mock.calls).toEqual([["start"], ["end"]]);
+  const employee = { employeeId: 1, kind: "employee" as const, manualColumnId: null, graphEmployeeId: 1,
+    label: "Ada", minHoursMonth: null, totalMinutes: 0, totalText: "" };
+  rerender(<ContainerGraphMatrix {...props} columns={[employee]} columnActionsDisabled />);
+  expect(left()).toBeDisabled();
+  expect(right()).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Actions for Ada" })).toBeDisabled();
+  rerender(<ContainerGraphMatrix {...props} readOnly columns={[employee]} onColumnHeaderClick={customize} />);
+  expect(screen.queryByRole("button", { name: /Add manual column|Actions for Ada/ })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Customize columns from Ada" }));
+  expect(customize).toHaveBeenCalledExactlyOnceWith(employee);
+  expect(action).not.toHaveBeenCalled();
+});
+
 describe("public holiday dates", () => {
   test.each([1, 5])("marks named dates in month %s without changing explicit styles or selection", month => {
     const { container } = render(<ContainerGraphMatrix graph={{ year: 2026, month }}

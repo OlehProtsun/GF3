@@ -38,6 +38,8 @@ import { useGraphShiftCorrectionsQuery } from "@entities/shift-corrections";
 import { useGraphContractApprovalsQuery } from "@entities/shift-swap-approvals";
 import { getErrorMessage } from "@shared/api/httpClient";
 import { ErrorBanner } from "@shared/ui/components/ErrorBanner";
+import { ActionMenu } from "@shared/ui/components/ActionMenu";
+import { ConfirmDialog } from "@shared/ui/ConfirmDialog";
 import { IosButton } from "@shared/ui/components/IosButton";
 import { SearchableSelect, type SearchableSelectOption } from "@shared/ui/components/SearchableSelect";
 import {
@@ -45,6 +47,7 @@ import {
   BindIcon,
   ClearFormatAllIcon,
   ClearFormatIcon,
+  ChevronRightIcon,
   CloseIcon,
   EmployeeIcon,
   EyeIcon,
@@ -52,6 +55,7 @@ import {
   SaveIcon,
   ScheduleDetailsIcon,
   SwapHistoryIcon,
+  TrashIcon,
 } from "@shared/ui/icons";
 import { CardSection } from "@shared/ui/sections/CardSection";
 import { ContainerGraphColorDialog } from "./ContainerGraphColorDialog";
@@ -187,7 +191,7 @@ type ContainerGraphEditorProps = {
   onAddBind: () => void;
   onDeleteBind: () => void;
   onManualColumnLabelChange: (columnId: number, value: string) => void;
-  onAddManualColumn: () => void;
+  onAddManualColumn: (position?: "start" | "end") => void;
   onDeleteManualColumn: (columnId: number) => void;
   onPublishManualShift: (input: ManualColumnShiftPublicationInput) => void;
   onCancelManualShift: (shiftId: number) => void;
@@ -468,6 +472,25 @@ export function ContainerGraphEditor({
     return window.matchMedia(DESKTOP_MEDIA_QUERY).matches;
   });
   const graphContainerId = graph?.containerId ?? null;
+  const [columnMenu, setColumnMenu] = useState<{ columnId: number; anchor: HTMLElement; graphKey: string } | null>(null);
+  const columnMenuGraphKey = `${graphContainerId}:${graph?.id ?? "draft"}`;
+  const [manualDeleteTarget, setManualDeleteTarget] = useState<{ id: number; graphKey: string } | null>(null);
+  const menuColumn = columnMenu && columnMenu.graphKey === columnMenuGraphKey && !isSaving && !isGenerating
+    ? scheduleColumns.find(column => column.employeeId === columnMenu.columnId) : undefined;
+  if (columnMenu && !menuColumn) setColumnMenu(null);
+  const pinnedColumnIds = new Set(manualColumns.filter(column => column.source === "generated-unfilled").map(column => -column.columnId));
+  const employeeMenu = menuColumn?.kind === "employee";
+  const detailedColumnMenu = employeeMenu;
+  const menuColumnLabel = menuColumn?.label.trim() || (detailedColumnMenu ? t("Manual column") : t("Manual column {0}", menuColumn?.manualColumnId));
+  const menuHeading = detailedColumnMenu ? {
+    title: menuColumnLabel,
+    description: t("Employee actions"),
+    avatar: (menuColumnLabel.match(/\p{L}+/gu) ?? []).slice(0, 2)
+      .map(part => Array.from(part)[0]).join("").toLocaleUpperCase() || "?",
+  } : undefined;
+  const pendingManualDelete = manualDeleteTarget?.graphKey === columnMenuGraphKey && scheduleColumns.some(column =>
+    column.manualColumnId === manualDeleteTarget.id && !pinnedColumnIds.has(column.employeeId)) ? manualDeleteTarget : null;
+  if (manualDeleteTarget && !pendingManualDelete) setManualDeleteTarget(null);
   const persistedGraphId = graph && Number.isInteger(graph.id) && graph.id > 0 ? graph.id : null;
   const correctionsQuery = useGraphShiftCorrectionsQuery(graphContainerId, persistedGraphId);
   const contractQuery = useGraphContractApprovalsQuery(graphContainerId, persistedGraphId);
@@ -741,8 +764,6 @@ export function ContainerGraphEditor({
         publishError={manualShiftPublishError}
         publishedShifts={openManagerManualShifts}
         pendingPublishedShifts={pendingManualShiftPublishes}
-        onAddColumn={onAddManualColumn}
-        onDeleteColumn={onDeleteManualColumn}
         onPublishShift={onPublishManualShift}
         onCancelPublishedShift={onCancelManualShift}
         onRefreshPublishedShift={onRefreshManualShift}
@@ -1011,10 +1032,12 @@ export function ContainerGraphEditor({
                 className={joinClassNames(
                   styles.matrixCardShell,
                   styles.scheduleMatrixCardShell,
+                  Boolean(manualShiftPublishError) && styles.matrixActionErrorShell,
                   compactSize && styles.matrixCardShellCompact,
                 )}
                 style={scheduleMatrixCardShellStyle}
               >
+                {manualShiftPublishError && <ErrorBanner className={styles.matrixActionError}>{manualShiftPublishError}</ErrorBanner>}
                 <ContainerGraphMatrix
                   className={joinClassNames(
                     styles.matrixCard,
@@ -1041,7 +1064,19 @@ export function ContainerGraphEditor({
                   styleMap={styleMap}
                   dayConflictMap={dayConflictMap}
                   onColumnMove={onColumnMove}
-                  pinnedColumnIds={new Set(manualColumns.filter(column => column.source === "generated-unfilled").map(column => -column.columnId))}
+                  onColumnHeaderAction={(column, anchor) => {
+                    if (column.kind === "manual" && column.manualColumnId !== null && !pinnedColumnIds.has(column.employeeId)) {
+                      setColumnMenu(null);
+                      setManualDeleteTarget({ id: column.manualColumnId, graphKey: columnMenuGraphKey });
+                      return;
+                    }
+                    setColumnMenu(current => current?.anchor === anchor
+                      ? null : { columnId: column.employeeId, anchor, graphKey: columnMenuGraphKey });
+                  }}
+                  openColumnMenuId={menuColumn?.employeeId}
+                  onAddManualColumn={onAddManualColumn}
+                  columnActionsDisabled={isSaving || isGenerating}
+                  pinnedColumnIds={pinnedColumnIds}
                   onColumnLabelChange={onManualColumnLabelChange}
                   selectedCellKeys={selectedCellKeys}
                   bindValueByKey={bindValueByKey}
@@ -1184,6 +1219,28 @@ export function ContainerGraphEditor({
           </div>
         }
       />
+      {menuColumn && <ActionMenu open anchor={columnMenu?.anchor ?? null}
+        label={t("Actions for {0}", menuColumnLabel)} heading={menuHeading}
+        width={employeeMenu ? 335 : undefined}
+        onClose={() => setColumnMenu(null)} items={[menuColumn.kind === "employee" ? {
+          id: "remove-employee", label: t("Remove from schedule"), description: t("Only from this schedule"), destructive: true,
+          icon: <TrashIcon size={18} />, trailingIcon: <ChevronRightIcon size={15} />,
+          onSelect: () => onRemoveEmployee(menuColumn.employeeId),
+        } : {
+          id: "delete-column", label: t("Delete manual column"), destructive: true,
+          onSelect: () => { if (menuColumn.manualColumnId !== null) onDeleteManualColumn(menuColumn.manualColumnId); },
+        }]} />}
+      {pendingManualDelete && <ConfirmDialog open
+        title={t("Delete manual column?")}
+        message={t("Are you sure you want to remove this manual column from the schedule?")}
+        confirmText={t("Delete column")} icon={<TrashIcon size={20} />}
+        confirmDisabled={isSaving || isGenerating}
+        onCancel={() => setManualDeleteTarget(null)}
+        onConfirm={() => {
+          if (isSaving || isGenerating) return;
+          setManualDeleteTarget(null);
+          onDeleteManualColumn(pendingManualDelete.id);
+        }} />}
       <ContainerGraphScheduleActivityDialog open={isScheduleActivityOpen} onClose={() => setIsScheduleActivityOpen(false)}
         summary={activitySummary} swapPanel={swapPanel} manualPanel={manualPanel} correctionsPanel={correctionsPanel} />
 

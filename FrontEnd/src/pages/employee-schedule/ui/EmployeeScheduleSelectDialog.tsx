@@ -43,7 +43,7 @@ function ScheduleSelectSheet({ schedules, selectedScheduleId, onSelect, onClose 
   const restoreScroll = useRef<number | null>(null);
   const publicScroll = useRef(0);
   const selectionScroll = useRef(0);
-  const [view, setView] = useState<ScheduleView>("select");
+  const [view, setView] = useState<ScheduleView>(schedules.length === 0 ? "public" : "select");
   const [previewScheduleId, setPreviewScheduleId] = useState<number | null>(null);
   const { data: publicSchedules, isError: publicError } = useQuery({
     queryKey: queryKeys.employeeSchedules.publicList(),
@@ -151,7 +151,7 @@ function ScheduleSelectSheet({ schedules, selectedScheduleId, onSelect, onClose 
       <div className={styles.sheet} ref={dialogRef}>
         <span className={styles.handle} aria-hidden="true" />
         <header className={view === "select" ? styles.header : styles.browserHeader}>
-          {view !== "select" && (
+          {(view === "preview" || (view === "public" && schedules.length > 0)) && (
             <button type="button" className={styles.close} aria-label={t("Back")} onClick={() => {
               if (view === "preview") {
                 setPreviewScheduleId(null);
@@ -209,7 +209,7 @@ function ScheduleSelectSheet({ schedules, selectedScheduleId, onSelect, onClose 
           {view === "public" && (
             publicError ? <p className={styles.message} role="alert">{t("Could not load public schedules.")}</p>
               : publicSchedules === undefined ? <p className={styles.message} role="status">{t("Loading schedules...")}</p>
-              : publicSchedules.length === 0 ? <p className={styles.message}>{t("No other public schedules available")}</p>
+              : publicSchedules.length === 0 ? <p className={styles.message}>{t("No published schedules")}</p>
               : publicSchedules.map(schedule => (
                 <button type="button" key={schedule.id} className={styles.row} onClick={() => {
                   publicScroll.current = listRef.current?.scrollTop ?? 0;

@@ -109,6 +109,25 @@ public sealed class RealtimeMiddlewareAndGenericCoverageTests
     }
 
     [Fact]
+    public async Task PhoneManagerPublishesPresenceWithoutJoiningPcGroupsOrOwningLocks()
+    {
+        var user = CreateUser(AuthRoles.Manager, managerId: 3);
+        var identity = Assert.IsType<ClaimsIdentity>(user.Identity);
+        identity.AddClaim(new Claim(ManagerWorkspaceModes.ClaimType, ManagerWorkspaceModes.Phone));
+        identity.AddClaim(new Claim(AuthPolicies.SystemManagerClaim, "true"));
+        var groups = new RecordingGroupManager();
+        var notifier = new RecordingRealtimeNotifier();
+        var hub = CreateHub(user, new RecordingPresenceClient(), groups, notifier: notifier);
+        await hub.OnConnectedAsync();
+        Assert.Empty(groups.AddedGroups);
+        Assert.Single(notifier.ManagerDataChanges);
+        await Assert.ThrowsAsync<HubException>(() => hub.SetManagerEditLocks([ManagerEditLockTargets.Schedule(1, 2)]));
+        await hub.OnDisconnectedAsync(null);
+        Assert.Equal(2, notifier.ManagerDataChanges.Count);
+        Assert.Empty(notifier.ManagerEditLockChanges);
+    }
+
+    [Fact]
     public async Task RealtimeNotifier_MapsEveryNotificationToHubClientMessages()
     {
         var client = new RecordingPresenceClient();

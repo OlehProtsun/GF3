@@ -1,9 +1,74 @@
 import { writeFile } from "node:fs/promises";
 import { expect, test, type Page, type Locator, type TestInfo } from "@playwright/test";
 import pl from "../src/shared/i18n/pl.json" with { type: "json" };
+import { test as isolatedTest } from "./fixtures/isolatedBackend";
+import { createEmployeeAccount, loginAsManager } from "./helpers";
 
 const pcChoice = `PC ${pl["Full access"]}`;
 const phoneChoice = `${pl.Phone} ${pl["Read only"]}`;
+
+isolatedTest("system manager sees employee and phone presence until the last manager tab closes", async ({ page, browser, isolatedBackend }) => {
+  isolatedTest.setTimeout(100_000);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const employee = await createEmployeeAccount(page.request, "presence");
+  const headers = { Authorization: "Bearer " + employee.managerAccessToken };
+  const profileResponse = await page.request.get("/api/employees/" + employee.id, { headers });
+  expect(profileResponse.ok()).toBe(true);
+  const profile = await profileResponse.json();
+  const employeeName = profile.firstName + " " + profile.lastName;
+  const managerUser = { userName: "presence-manager", displayName: "Phone Presence Manager", password: "824681" };
+  const create = await page.request.post("/api/manager-profile/managers", { headers, data: managerUser });
+  expect(create.ok(), await create.text()).toBe(true);
+  const tokenFor = async (username: string, password: string, mode?: "phone" | "pc") => {
+    const login = await page.request.post("/api/auth/login", { data: { username, password } });
+    expect(login.ok()).toBe(true);
+    const initial = await login.json();
+    if (!mode) return initial.accessToken as string;
+    const exchange = await page.request.post("/api/auth/manager-mode", {
+      headers: { Authorization: "Bearer " + initial.accessToken }, data: { mode },
+    });
+    expect(exchange.ok()).toBe(true);
+    return (await exchange.json()).accessToken as string;
+  };
+  const open = async (token: string, viewport = { width: 1440, height: 900 }) => {
+    const context = await browser.newContext({ baseURL: isolatedBackend.url, viewport });
+    await context.addInitScript(value => {
+      localStorage.setItem("gf3.auth.access-token", value);
+      sessionStorage.setItem("gf3.pwa.install.dismissed", "1");
+    }, token);
+    const tab = await context.newPage();
+    await tab.goto("/");
+    return context;
+  };
+
+  await loginAsManager(page);
+  await page.goto("/information");
+  const online = page.getByRole("region", { name: "Online users" });
+  await expect(online.getByRole("row", { name: "Manager Manager Online", exact: true })).toBeVisible();
+  const phoneToken = await tokenFor(managerUser.userName, managerUser.password, "phone");
+  const phone = await open(phoneToken, { width: 390, height: 844 });
+  const worker = await open(await tokenFor(employee.username, employee.password));
+  const remote = online.getByRole("row").filter({ hasText: managerUser.displayName });
+  try {
+    await expect(remote).toContainText("Online", { timeout: 15_000 });
+    await expect(online.getByRole("row").filter({ hasText: employeeName })).toContainText("Online", { timeout: 15_000 });
+    const write = await page.request.post("/api/containers", { headers: { Authorization: "Bearer " + phoneToken }, data: { name: "Forbidden phone write" } });
+    expect(write.status()).toBe(403);
+    const pc = await open(await tokenFor(managerUser.userName, managerUser.password, "pc"));
+    try {
+      await expect(pc.pages()[0].getByRole("heading", { name: /^(Home|Strona główna)$/ })).toBeVisible();
+      await pc.close();
+      await expect(remote).toContainText("Online");
+      await phone.close();
+      await expect(remote).toHaveCount(0, { timeout: 15_000 });
+    } finally {
+      if (pc.pages().length) await pc.close();
+    }
+  } finally {
+    if (phone.pages().length) await phone.close();
+    await worker.close();
+  }
+});
 
 test.use({ timezoneId: "Europe/Warsaw", launchOptions: process.platform === "win32" ? { ignoreDefaultArgs: ["--disable-accelerated-compositing"] } : {} });
 
@@ -36,6 +101,7 @@ async function fixture(page: Page, initialMode: "choose" | "pc" | "phone" | "gue
     if (path === "/api/regulations/9/accept") { pending = false; return json({ id: 1 }); }
     if (path === "/api/regulations/pending") return json(pending ? [{ id: 9, title: "Required rules", version: "1", message: "Read these rules", pdfFileName: "rules.pdf" }] : []);
     if (path === "/api/regulations/9/pdf") return route.fulfill({ contentType: "application/pdf", body: "%PDF-1.7 test" });
+    if (path === "/api/realtime/presence/negotiate" && method === "POST" && (mode === "pc" || mode === "phone")) return json({ status: 503 }, 503);
     if (mode === "phone" && !["GET", "HEAD", "OPTIONS"].includes(method)) { unsafe.push(path); return json({ code: "manager_phone_read_only" }, 403); }
     if (mode === "choose" && !path.startsWith("/api/regulations/")) return json({ code: "manager_workspace_mode_required" }, 403);
     let data: unknown = [];

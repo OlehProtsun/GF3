@@ -251,7 +251,7 @@ export function EmployeeScheduleDailyBody({
           {historicalWorkers.map(([id, status]) => (
             <article key={id} className={styles.dailyScheduleWorker} data-schedule-status={getScheduleStatusTone(status)}>
               <span>{status.label || t("Employee #{0}", id)}</span>
-              <strong>{t(status.correctionPending ? "Day off" : "No current shift")}</strong>
+              <strong>{t(status.correctionPending || status.correctionApproved ? "Day off" : "No current shift")}</strong>
               <span className={styles.dailyScheduleStatusBadges}><ScheduleShiftBadges status={status} /></span>
             </article>
           ))}

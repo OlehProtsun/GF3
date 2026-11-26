@@ -2,8 +2,8 @@ import { dateTimeFormat, t } from "@shared/i18n";
 import { useEffect, useId, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import { useSwapModalEnvironment } from "@pages/employee-swap/ui/useSwapModalEnvironment";
-import type { EmployeeSchedule, EmployeeScheduleSlot } from "@entities/employee-schedule";
-import type { CreateShiftCorrectionInput, ShiftCorrectionRequest } from "@entities/shift-corrections";
+import type { EmployeeScheduleSlot } from "@entities/employee-schedule";
+import type { CreateShiftCorrectionInput, ShiftCorrectionRequest, ShiftCorrectionSchedule } from "@entities/shift-corrections";
 import { formatShiftCorrectionDelta, shiftCorrectionOriginalMinutes } from "@entities/shift-corrections/model/presentation";
 import type { ShiftSwap } from "@entities/shift-swaps/model/types";
 import { formatScheduleLastUpdate } from "@shared/lib/scheduleLastUpdate";
@@ -15,7 +15,10 @@ import styles from "./EmployeeShiftCorrectionDialog.module.css";
 
 type EmployeeShiftCorrectionDialogProps = {
   open: boolean;
-  schedules: EmployeeSchedule[];
+  schedules: ShiftCorrectionSchedule[];
+  isLoadingSchedules: boolean;
+  schedulesErrorMessage?: string | null;
+  onRetrySchedules: () => void;
   employeeId: number | null;
   existingRequests: ShiftCorrectionRequest[];
   activeSwaps: readonly Pick<ShiftSwap, "status" | "scheduleSlotId" | "returnScheduleSlotId">[];
@@ -56,7 +59,8 @@ export function EmployeeShiftCorrectionDialog({ open, ...props }: EmployeeShiftC
 }
 
 function ShiftCorrectionWizard({
-  schedules, employeeId, existingRequests, activeSwaps, isSending, submitted, errorMessage, onCancel, onSubmit,
+  schedules, isLoadingSchedules, schedulesErrorMessage, onRetrySchedules, employeeId, existingRequests, activeSwaps,
+  isSending, submitted, errorMessage, onCancel, onSubmit,
 }: Omit<EmployeeShiftCorrectionDialogProps, "open">) {
   const stepTitleId = useId();
   const commentId = useId();
@@ -67,6 +71,7 @@ function ShiftCorrectionWizard({
   const stepTitleRef = useRef<HTMLHeadingElement>(null);
   const [step, setStep] = useState(0);
   const [scheduleId, setScheduleId] = useState<number | null>(null);
+  const [scheduleUnavailable, setScheduleUnavailable] = useState(false);
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [slotId, setSlotId] = useState<number | null>(null);
   const [requestedFrom, setRequestedFrom] = useState("");
@@ -86,6 +91,14 @@ function ShiftCorrectionWizard({
 
   const publishedSchedules = schedules.filter(item => item.publicationStatus === "public");
   const schedule = publishedSchedules.find(item => item.id === scheduleId);
+  const schedulesReady = !isLoadingSchedules && !schedulesErrorMessage;
+  if (scheduleId !== null && !schedule && schedulesReady && !isSending && !submitted) {
+    setScheduleId(null);
+    setSelectedDay(null);
+    resetShift();
+    setStep(0);
+    setScheduleUnavailable(true);
+  }
   const monthSchedules = schedule ? publishedSchedules.filter(item =>
     item.year === schedule.year && item.month === schedule.month) : [];
   const daysInMonth = schedule ? new Date(Date.UTC(schedule.year, schedule.month, 0)).getUTCDate() : 0;
@@ -93,7 +106,7 @@ function ShiftCorrectionWizard({
   const pendingForMonth = pendingRequests.filter(request => request.year === schedule?.year && request.month === schedule?.month);
 
   function getDayDetails(day: number | null) {
-    const ownSlotsOnDay = (item: EmployeeSchedule) => item.slots.filter(slot =>
+    const ownSlotsOnDay = (item: ShiftCorrectionSchedule) => item.slots.filter(slot =>
       employeeId !== null && slot.employeeId === employeeId && slot.dayOfMonth === day);
     const slots = schedule ? ownSlotsOnDay(schedule).sort((a, b) =>
       a.fromTime.localeCompare(b.fromTime) || a.toTime.localeCompare(b.toTime) || a.id - b.id) : [];
@@ -104,10 +117,6 @@ function ShiftCorrectionWizard({
         const assigned = ownSlotsOnDay(other);
         if (assigned.length) conflictsBySchedule.set(other.id, other.name);
         otherSlots.push(...assigned);
-      }
-      for (const assignment of other.relatedScheduleAssignments ?? []) {
-        if (assignment.employeeId === employeeId && assignment.dayOfMonth === day && assignment.scheduleId !== scheduleId)
-          conflictsBySchedule.set(assignment.scheduleId, assignment.scheduleName);
       }
     }
     const conflictNames = [...new Set([...conflictsBySchedule].map(([id, name]) => name.trim() || t("Schedule #{0}", id)))]
@@ -165,7 +174,7 @@ function ShiftCorrectionWizard({
     ? t("Resolve the open swap or pending shift approval before requesting or approving this day off.")
     : t("This day already has a pending correction request.");
   const canSubmit = canChooseDay && (requestDayOff ? canRemoveShifts : validPeriod && !unchanged && !overlaps);
-  const canContinue = step === 0 ? Boolean(schedule && employeeId !== null) : step === 1 ? canChooseDay : canSubmit;
+  const canContinue = schedulesReady && (step === 0 ? Boolean(schedule && employeeId !== null) : step === 1 ? canChooseDay : canSubmit);
   const monthLabel = schedule ? periodFormatter.format(new Date(Date.UTC(schedule.year, schedule.month - 1, 1))) : "";
   const dateLabel = schedule && selectedDay !== null
     ? dateFormatter.format(new Date(Date.UTC(schedule.year, schedule.month - 1, selectedDay))) : "";
@@ -182,6 +191,7 @@ function ShiftCorrectionWizard({
 
   function chooseSchedule(id: number) {
     if (id === scheduleId) return;
+    setScheduleUnavailable(false);
     setScheduleId(id);
     setSelectedDay(null);
     resetShift();
@@ -264,8 +274,15 @@ function ShiftCorrectionWizard({
           </div> : <>
           <h3 id={stepTitleId} tabIndex={-1} ref={stepTitleRef}>{t(steps[step].title)}</h3>
 
+          {isLoadingSchedules && <p role="status" className={styles.hint}>{t("Loading correction schedules...")}</p>}
+          {schedulesErrorMessage && <div className={styles.schedulesError}>
+            <p role="alert" className={styles.validation}>{schedulesErrorMessage}</p>
+            <IosButton label={t("Retry")} variant="secondary" size="compact" disabled={isLoadingSchedules} onClick={onRetrySchedules} />
+          </div>}
+
           {step === 0 && <div className={styles.choices} role="group" aria-labelledby={stepTitleId}>
-            {publishedSchedules.length === 0 && <p className={styles.hint}>{t("No published schedules")}</p>}
+            {scheduleUnavailable && <p role="status" className={styles.validation}>{t("The selected schedule is no longer available for correction.")}</p>}
+            {schedulesReady && publishedSchedules.length === 0 && <p className={styles.hint}>{t("No published schedules")}</p>}
             {publishedSchedules.map(item => {
               const selected = item.id === scheduleId;
               const updated = formatScheduleLastUpdate(item.lastUpdatedAtUtc);

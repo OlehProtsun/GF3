@@ -18,6 +18,25 @@ export function setSelectedMonth(selectedDay: string, yyyyMm: string) {
   return `${yyyyMm}-${String(Math.min(day, end.getUTCDate())).padStart(2, "0")}`;
 }
 const positiveId = (value: number | null | undefined): value is number => Number.isSafeInteger(value) && value! > 0;
+
+export type HomeApprovalTarget = {
+  kind: "correction" | "contract";
+  containerId: number;
+  graphId: number;
+  requestId: number;
+};
+
+export function getHomeApprovalTarget(item: ManagerHomeActivityItem): HomeApprovalTarget | null {
+  const { containerId, graphId, requestId } = item;
+  if (!item.requiresApproval || item.status !== "pending" || item.targetType !== "graph" ||
+    !positiveId(containerId) || !positiveId(graphId) || !positiveId(requestId)) return null;
+
+  if (item.kind === "correction_requested" || item.kind === "day_off_requested") {
+    return { kind: "correction", containerId, graphId, requestId };
+  }
+  return item.kind === "approval_requested" ? { kind: "contract", containerId, graphId, requestId } : null;
+}
+
 export function getHomeActivityRoute(item: ManagerHomeActivityItem): string | null {
   switch (item.kind) {
     case "swap_created":

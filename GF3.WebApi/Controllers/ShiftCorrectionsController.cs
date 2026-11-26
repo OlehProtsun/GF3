@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Data.Sqlite;
 using WebApi.Auth;
+using WebApi.Contracts.EmployeeSchedules;
 using WebApi.Contracts.ShiftCorrections;
 using WebApi.Realtime;
 using WebApi.Services;
@@ -42,6 +43,48 @@ public sealed class EmployeeShiftCorrectionsController(
         return Ok(requests.Select(ShiftCorrectionRules.ToDto).ToList());
     }
 
+    [HttpGet("schedules")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    public async Task<ActionResult<IReadOnlyList<ShiftCorrectionScheduleDto>>> GetSchedules(
+        [FromServices] IScheduleLastUpdateService scheduleLastUpdateService, CancellationToken cancellationToken)
+    {
+        var employeeId = GetRequiredEmployeeId();
+        if (!await db.Employees.AnyAsync(employee => employee.Id == employeeId && !employee.IsDeleted, cancellationToken))
+            return Forbid();
+
+        var schedules = await db.Schedules.AsNoTracking()
+            .Where(schedule => schedule.PublicationStatus == SchedulePublicationStatus.Public)
+            .OrderByDescending(schedule => schedule.Year).ThenByDescending(schedule => schedule.Month)
+            .ThenBy(schedule => schedule.Name).ThenBy(schedule => schedule.Id)
+            .Select(schedule => new
+            {
+                schedule.Id, schedule.Name, schedule.Year, schedule.Month, schedule.PublishedAtUtc,
+                Slots = schedule.Slots.Where(slot => slot.EmployeeId == employeeId)
+                    .OrderBy(slot => slot.DayOfMonth).ThenBy(slot => slot.SlotNo)
+                    .Select(slot => new EmployeeScheduleSlotDto
+                    {
+                        Id = slot.Id,
+                        EmployeeId = slot.EmployeeId,
+                        DayOfMonth = slot.DayOfMonth,
+                        SlotNo = slot.SlotNo,
+                        FromTime = slot.FromTime,
+                        ToTime = slot.ToTime,
+                        Status = slot.Status.ToString(),
+                    }).ToList(),
+            }).ToListAsync(cancellationToken);
+        var updates = await scheduleLastUpdateService.GetLastUpdatesAsync(schedules.Select(schedule => schedule.Id), cancellationToken);
+
+        return Ok(schedules.Select(schedule => new ShiftCorrectionScheduleDto
+        {
+            Id = schedule.Id,
+            Name = schedule.Name,
+            Year = schedule.Year,
+            Month = schedule.Month,
+            LastUpdatedAtUtc = updates.TryGetValue(schedule.Id, out var updated) ? updated : schedule.PublishedAtUtc,
+            Slots = schedule.Slots,
+        }).ToList());
+    }
+
     [HttpPost]
     [ProducesResponseType(typeof(ShiftCorrectionRequestDto), StatusCodes.Status201Created)]
     public async Task<ActionResult<ShiftCorrectionRequestDto>> Create(
@@ -54,16 +97,17 @@ public sealed class EmployeeShiftCorrectionsController(
             throw ValidationException.ForField(nameof(request.RequestType), "Invalid shift correction request type.");
 
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+        if (!await db.Employees.AnyAsync(item => item.Id == employeeId && !item.IsDeleted, cancellationToken).ConfigureAwait(false))
+            throw ValidationException.ForField(nameof(request.ScheduleId), "Published schedule was not found for your account.");
         var schedule = await db.Schedules
             .Include(item => item.Container)
             .Include(item => item.Shop)
-            .Include(item => item.Employees)
-                .ThenInclude(item => item.Employee)
             .Include(item => item.Slots)
             .FirstOrDefaultAsync(item =>
                 item.Id == request.ScheduleId &&
                 item.PublicationStatus == SchedulePublicationStatus.Public &&
-                item.Employees.Any(employee => employee.EmployeeId == employeeId && (!removeShift || !employee.Employee.IsDeleted)),
+                ((!removeShift && request.ScheduleSlotId == null) ||
+                    item.Employees.Any(employee => employee.EmployeeId == employeeId)),
                 cancellationToken)
             .ConfigureAwait(false)
             ?? throw ValidationException.ForField(nameof(request.ScheduleId), "Published schedule was not found for your account.");
@@ -270,6 +314,17 @@ public sealed class ManagerShiftCorrectionsController(
         return Ok(requests.Select(ShiftCorrectionRules.ToDto).ToList());
     }
 
+    [HttpGet("{id:int}")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    public async Task<ActionResult<ShiftCorrectionRequestDto>> GetGraphRequest(
+        int containerId, int graphId, int id, CancellationToken cancellationToken)
+    {
+        var correction = await ShiftCorrectionRules.BuildRequestQuery(db).AsNoTracking()
+            .SingleOrDefaultAsync(item => item.Id == id && item.ScheduleId == graphId &&
+                item.Schedule.ContainerId == containerId, cancellationToken);
+        return correction is null ? NotFound() : Ok(ShiftCorrectionRules.ToDto(correction));
+    }
+
     [HttpPost("{id:int}/approve")]
     [ProducesResponseType(typeof(ShiftCorrectionRequestDto), StatusCodes.Status200OK)]
     public async Task<ActionResult<ShiftCorrectionRequestDto>> Approve(
@@ -339,8 +394,8 @@ public sealed class ManagerShiftCorrectionsController(
         else if (isDayOff)
         {
             if (correction.Schedule.PublicationStatus != SchedulePublicationStatus.Public ||
-                !await db.ScheduleEmployees.AnyAsync(item => item.ScheduleId == graphId &&
-                    item.EmployeeId == correction.EmployeeId, cancellationToken).ConfigureAwait(false))
+                !await db.Employees.AnyAsync(item => item.Id == correction.EmployeeId && !item.IsDeleted,
+                    cancellationToken).ConfigureAwait(false))
                 throw new ValidationException("Published schedule was not found for this employee.");
 
             await ShiftCorrectionRules.ValidateDayOffAsync(db, correction.Schedule, correction.EmployeeId,
@@ -350,6 +405,9 @@ public sealed class ManagerShiftCorrectionsController(
             await ShiftCorrectionRules.ValidateEmployeeOverlapAsync(db, correction.Schedule, correction.EmployeeId,
                 correction.DayOfMonth, null, requestedFrom!, requestedTo!,
                 cancellationToken).ConfigureAwait(false);
+            await db.Entry(correction.Schedule).Collection(schedule => schedule.Employees)
+                .LoadAsync(cancellationToken).ConfigureAwait(false);
+            ScheduleEmployeeEnrollment.Ensure(correction.Schedule, correction.EmployeeId);
             var lastSlotNo = await db.ScheduleSlots.Where(item => item.ScheduleId == graphId &&
                     item.DayOfMonth == correction.DayOfMonth).MaxAsync(item => (int?)item.SlotNo, cancellationToken)
                 .ConfigureAwait(false) ?? 0;
@@ -364,6 +422,9 @@ public sealed class ManagerShiftCorrectionsController(
         }
         else
         {
+            if (!await db.ScheduleEmployees.AnyAsync(item => item.ScheduleId == graphId &&
+                    item.EmployeeId == correction.EmployeeId, cancellationToken).ConfigureAwait(false))
+                throw new ValidationException("Published schedule was not found for this employee.");
             var originalSlot = await db.ScheduleSlots
                 .SingleOrDefaultAsync(item => item.Id == correction.ScheduleSlotId && item.ScheduleId == graphId, cancellationToken)
                 .ConfigureAwait(false);
@@ -708,6 +769,7 @@ internal static class ShiftCorrectionRules
            error is DbUpdateException { InnerException: SqliteException { SqliteErrorCode: 5 or 6 } } ||
            error is DbUpdateException { InnerException: SqliteException { SqliteExtendedErrorCode: 2067 } sqlite } &&
            (sqlite.Message.Contains("schedule_slot.", StringComparison.Ordinal) ||
+            sqlite.Message.Contains("schedule_employee.", StringComparison.Ordinal) ||
             sqlite.Message.Contains("schedule_cell_style.", StringComparison.Ordinal) ||
             sqlite.Message.Contains("manager_shift_correction_setting.", StringComparison.Ordinal) ||
             sqlite.Message.Contains("shift_correction_request.", StringComparison.Ordinal));

@@ -368,7 +368,7 @@ public sealed class ShiftSwapExecutionService(
                 residualOffers.Add(residualOffer);
             }
 
-            EnsureScheduleEmployee(swap.Schedule, employeeId);
+            ScheduleEmployeeEnrollment.Ensure(swap.Schedule, employeeId);
             await HighlightAcceptedSwapCellsAsync(swap, employeeId, cancellationToken).ConfigureAwait(false);
             await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
@@ -896,8 +896,8 @@ public sealed class ShiftSwapExecutionService(
             var backUniverse = back.Schedule.Slots.Concat(sourceRemainders.Where(s => s.ScheduleId == back.ScheduleId)).Distinct().ToList();
             var returnRemainders = ShiftSwapExchangeRules.ApplyExchangeTransferToSlot(back, employeeId, ownerId, returnPeriod, backUniverse);
             foreach (var remainder in returnRemainders) db.ScheduleSlots.Add(remainder);
-            EnsureScheduleEmployee(source.Schedule, employeeId);
-            EnsureScheduleEmployee(back.Schedule, ownerId);
+            ScheduleEmployeeEnrollment.Ensure(source.Schedule, employeeId);
+            ScheduleEmployeeEnrollment.Ensure(back.Schedule, ownerId);
             await HighlightAcceptedSwapCellsAsync(swap, employeeId, ct);
             if (back.ScheduleId != source.ScheduleId || back.DayOfMonth != source.DayOfMonth)
                 await HighlightAcceptedSwapCellsAsync(new ShiftSwapRequestModel
@@ -1052,24 +1052,6 @@ public sealed class ShiftSwapExecutionService(
         int year,
         int month)
         => slots.Where(slot => slot.Schedule.Year == year && slot.Schedule.Month == month).ToList();
-
-    private static void EnsureScheduleEmployee(ScheduleModel schedule, int employeeId)
-    {
-        if (schedule.Employees.Any(employee => employee.EmployeeId == employeeId))
-        {
-            return;
-        }
-
-        var nextDisplayOrder = schedule.Employees.Count == 0
-            ? 0
-            : schedule.Employees.Max(employee => employee.DisplayOrder) + 1;
-        schedule.Employees.Add(new ScheduleEmployeeModel
-        {
-            ScheduleId = schedule.Id,
-            EmployeeId = employeeId,
-            DisplayOrder = nextDisplayOrder,
-        });
-    }
 
     private static void EnsureValidSwapDate(ScheduleSlotModel slot)
     {

@@ -2,6 +2,7 @@ using System.Security.Claims;
 using BusinessLogicLayer.Contracts.Enums;
 using BusinessLogicLayer.Contracts.Models;
 using BusinessLogicLayer.Services.Abstractions;
+using BusinessLogicLayer.Services.Export;
 using DataAccessLayer.Models.DataBaseContext;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -9,6 +10,7 @@ using Microsoft.EntityFrameworkCore;
 using WebApi.Auth;
 using WebApi.Contracts.EmployeeSchedules;
 using WebApi.Services;
+using StoredCorrectionStatus = DataAccessLayer.Models.Enums.ShiftCorrectionStatus;
 using StoredSchedule = DataAccessLayer.Models.ScheduleModel;
 using StoredPublicationStatus = DataAccessLayer.Models.Enums.SchedulePublicationStatus;
 
@@ -90,6 +92,7 @@ public sealed class EmployeeSchedulesController(
             .SingleOrDefaultAsync(cancellationToken);
         if (schedule is null) return NotFound();
 
+        schedule.Note = GraphNoteSqlExportBuilder.BuildPublicPreviewNote(schedule.Note);
         var previewSchedule = new ScheduleModel
         {
             Id = schedule.Id,
@@ -114,22 +117,15 @@ public sealed class EmployeeSchedulesController(
         return Ok(schedule);
     }
 
-    // A published assignment grants related schedule visibility for its container and period.
-    // Shops represented by the other published schedules in that scope need no separate assignment.
     internal static IQueryable<StoredSchedule> GetBrowsableSchedules(AppDbContext db, int employeeId)
         => db.Schedules.AsNoTracking().Where(schedule =>
             schedule.PublicationStatus == StoredPublicationStatus.Public &&
-            !schedule.Employees.Any(employee => employee.EmployeeId == employeeId) &&
-            db.Schedules.Any(assigned =>
-                assigned.PublicationStatus == StoredPublicationStatus.Public &&
-                assigned.ContainerId == schedule.ContainerId &&
-                assigned.Year == schedule.Year &&
-                assigned.Month == schedule.Month &&
-                assigned.Employees.Any(employee => employee.EmployeeId == employeeId && !employee.Employee.IsDeleted)));
+            db.Employees.Any(employee => employee.Id == employeeId && !employee.IsDeleted));
 
     [HttpGet]
     [ProducesResponseType(typeof(IEnumerable<EmployeeScheduleDto>), StatusCodes.Status200OK)]
-    public async Task<ActionResult<IEnumerable<EmployeeScheduleDto>>> GetVisible(CancellationToken cancellationToken)
+    public async Task<ActionResult<IEnumerable<EmployeeScheduleDto>>> GetVisible(
+        [FromServices] AppDbContext db, CancellationToken cancellationToken)
     {
         var employeeId = GetRequiredEmployeeId();
         var schedules = await containerService
@@ -144,10 +140,24 @@ public sealed class EmployeeSchedulesController(
         var relatedPublishedSchedules = await GetRelatedPublishedSchedulesAsync(schedules, cancellationToken)
             .ConfigureAwait(false);
 
+        var scheduleIds = schedules.Select(schedule => schedule.Id).ToArray();
+        var approvedDays = scheduleIds.Length == 0
+            ? null
+            : (await db.ShiftCorrectionRequests.AsNoTracking()
+                .Where(request => request.EmployeeId == employeeId && request.Status == StoredCorrectionStatus.Approved &&
+                    scheduleIds.Contains(request.ScheduleId))
+                .Select(request => new { request.ScheduleId, request.DayOfMonth })
+                .Distinct()
+                .ToListAsync(cancellationToken).ConfigureAwait(false))
+                .ToLookup(request => request.ScheduleId, request => request.DayOfMonth);
+
         return Ok(schedules.Select(schedule => ToApiDto(
             schedule,
             lastUpdates.GetValueOrDefault(schedule.Id),
-            relatedPublishedSchedules)));
+            relatedPublishedSchedules,
+            approvedDays?[schedule.Id]
+                .Where(day => day > 0 && day <= DateTime.DaysInMonth(schedule.Year, schedule.Month))
+                .Order().ToArray() ?? [])));
     }
 
     private async Task<IReadOnlyList<ScheduleModel>> GetRelatedPublishedSchedulesAsync(
@@ -209,7 +219,8 @@ public sealed class EmployeeSchedulesController(
     private static EmployeeScheduleDto ToApiDto(
         ScheduleModel model,
         DateTimeOffset? lastUpdatedAtUtc,
-        IReadOnlyCollection<ScheduleModel> relatedPublishedSchedules)
+        IReadOnlyCollection<ScheduleModel> relatedPublishedSchedules,
+        IReadOnlyList<int> approvedCorrectionDays)
     {
         var displayOrderByEmployeeId = model.Employees
             .GroupBy(employee => employee.EmployeeId)
@@ -230,6 +241,7 @@ public sealed class EmployeeSchedulesController(
             AllowSwap = model.AllowSwap,
             LastUpdatedAtUtc = lastUpdatedAtUtc,
             PublishedAtUtc = model.PublishedAtUtc,
+            ApprovedCorrectionDays = approvedCorrectionDays,
             Employees = model.Employees
                 .OrderBy(employee => employee.DisplayOrder)
                 .ThenBy(employee => employee.Employee?.FirstName)

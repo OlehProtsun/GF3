@@ -376,3 +376,9 @@
 @container (max-height: 250px) {
   .commentInput { max-height: max(44px, calc(100cqh - 132px)); }
 }
+.schedulesError {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}

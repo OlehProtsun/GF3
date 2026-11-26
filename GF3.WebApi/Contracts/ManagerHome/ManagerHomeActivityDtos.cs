@@ -5,6 +5,7 @@ public sealed record ManagerNavBadgesDto(int TotalPending, int GraphPending, int
 public sealed record ManagerHomeActivityItemDto
 {
     public required string Id { get; init; }
+    public int? RequestId { get; init; }
     public required string Kind { get; init; }
     public required DateTimeOffset OccurredAtUtc { get; init; }
     public required string EmployeeName { get; init; }

@@ -1,16 +1,11 @@
 .card { box-sizing: border-box; }
 .layout { min-width: 0; }
-.badge, .autoBadge { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; min-width: 24px; padding: 3px 7px; box-sizing: border-box; border-radius: 999px; background: #f0f3f9; color: #586b88; font-size: 11px; line-height: 1.4; font-weight: 500; }
-.autoBadge { padding-inline: 8px; }
+.badge { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; min-width: 24px; padding: 3px 7px; box-sizing: border-box; border-radius: 999px; background: #f0f3f9; color: #586b88; font-size: 11px; line-height: 1.4; font-weight: 500; }
 .muted { margin: 0; color: #73819b; font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
 .panel { composes: panel from "./ContainerGraphActivity.module.css"; display: flex; flex-direction: column; gap: 10px; }
 .heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; font-size: 13px; font-weight: 650; color: #182236; }
 .heading > span { display: inline-flex; align-items: center; gap: 7px; min-width: 0; }
-.card .addButton { min-height: 40px; height: 40px; padding: 7px 10px !important; border: 1px solid #cdddfd; border-radius: 999px; background: #fff; color: #2563eb; font-size: 12px; box-shadow: 0 2px 6px rgba(30, 55, 85, .04); }
-.card .addButton:hover:not(:disabled) { background: #f4f8ff; border-color: #93b4f7; }
 .list { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-.column { display: flex; align-items: center; gap: 6px; min-width: 0; min-height: 44px; padding: 0 3px 0 10px; box-sizing: border-box; border: 1px solid #e8edf5; border-radius: 22px; background: #fafcff; }
-.columnName { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: #243147; }
 .quietButton { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; min-width: 40px; min-height: 42px; padding: 6px; border: 0; border-radius: 999px; background: transparent; color: #64748b; font: inherit; font-size: 12px; cursor: pointer; }
 .quietButton:hover:not(:disabled) { background: #f1f5fa; color: #334155; }
 .shiftList {
@@ -69,7 +64,6 @@
 .layout button:disabled { opacity: .5; cursor: default; }
 @media (max-width: 430px) {
   .shiftList { max-height: clamp(170px, 38dvh, 300px); }
-  .column { gap: 4px; }
   .offer { flex-wrap: wrap; }
 }
 @media (prefers-reduced-motion: reduce) {

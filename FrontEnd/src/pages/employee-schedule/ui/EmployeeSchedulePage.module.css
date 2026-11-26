@@ -230,6 +230,8 @@
 .dailyScheduleWorker[data-schedule-status="open"] { --schedule-status-fill: #eff6ff; --schedule-status-border: #bfdbfe; }
 .openScheduleMatrix td[data-cell-adornment-tone="accepted"],
 .dailyScheduleWorker[data-schedule-status="accepted"] { --schedule-status-fill: #ecfdf3; --schedule-status-border: #b7e4c7; }
+.openScheduleMatrix td[data-cell-adornment-tone="corrected"],
+.dailyScheduleWorker[data-schedule-status="corrected"] { --schedule-status-fill: #f7fee7; --schedule-status-border: #d9f99d; }
 .dailyScheduleWorker[data-schedule-status] {
   grid-template-columns: minmax(0, 1fr) auto;
   column-gap: 8px;

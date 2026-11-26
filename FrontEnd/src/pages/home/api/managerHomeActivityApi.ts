@@ -4,6 +4,7 @@ export type HomeActivityCategory = "swaps" | "vacations" | "corrections" | "avai
 export type HomeActivityTab = "all" | HomeActivityCategory | "approvals";
 export type HomeActivityKind = "swap_created" | "swap_accepted" | "swap_cancelled" | "correction_requested" | "correction_reviewed" | "day_off_requested" | "day_off_reviewed" | "approval_requested" | "approval_reviewed" | "urlop_requested" | "urlop_reviewed" | "urlop_manager_created" | "availability_updated";
 export type ManagerHomeActivityItem = {
+  requestId?: number | null;
   id: string; kind: HomeActivityKind; occurredAtUtc: string; employeeName: string; status: string; requiresApproval: boolean;
   targetType: "graph" | "availability" | "urlop";
   counterpartyName?: string | null; scheduleName?: string | null; shopName?: string | null;

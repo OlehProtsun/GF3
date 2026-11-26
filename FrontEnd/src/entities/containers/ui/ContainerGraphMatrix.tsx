@@ -31,7 +31,7 @@ import {
   buildMatrixAutoColumnWidths,
   MATRIX_COLUMN_MIN_WIDTH_PX,
 } from "@entities/containers/model/matrixLayout";
-import { ScheduleIcon } from "@shared/ui/icons";
+import { PlusIcon, ScheduleIcon, TrashIcon } from "@shared/ui/icons";
 import { CardSection } from "@shared/ui/sections/CardSection";
 import styles from "./ContainerGraphMatrix.module.css";
 
@@ -92,6 +92,10 @@ type ContainerGraphMatrixProps = {
   normalizeCellValue?: (employeeId: number, value: string) => string;
   onSelectedCellKeysChange?: (keys: string[]) => void;
   onColumnHeaderClick?: (column: GraphMatrixColumn) => void;
+  onColumnHeaderAction?: (column: GraphMatrixColumn, anchor: HTMLElement) => void;
+  openColumnMenuId?: number;
+  onAddManualColumn?: (position: "start" | "end") => void;
+  columnActionsDisabled?: boolean;
   onColumnMove?: (employeeId: number, targetEmployeeId: number) => void;
   pinnedColumnIds?: ReadonlySet<number>;
   onColumnLabelChange?: (columnId: number, value: string) => void;
@@ -869,6 +873,10 @@ export function ContainerGraphMatrix({
   normalizeCellValue,
   onSelectedCellKeysChange,
   onColumnHeaderClick,
+  onColumnHeaderAction,
+  openColumnMenuId,
+  onAddManualColumn,
+  columnActionsDisabled = false,
   onColumnMove,
   pinnedColumnIds,
   onColumnLabelChange,
@@ -890,6 +898,8 @@ export function ContainerGraphMatrix({
   const [editingSelectionBehavior, setEditingSelectionBehavior] = useState<MatrixEditorSelectionBehavior>("select-all");
   const [draftSelectedCellKeys, setDraftSelectedCellKeys] = useState<string[] | null>(null);
   const [draggedEmployeeId, setDraggedEmployeeId] = useState<number | null>(null);
+  const headerPointerDraggedRef = useRef(false);
+  const headerControlPointerRef = useRef(false);
   const [dropTargetEmployeeId, setDropTargetEmployeeId] = useState<number | null>(null);
   const [columnWidthOverrides, setColumnWidthOverrides] = useState<Record<number, number>>({});
   const [resizingEmployeeId, setResizingEmployeeId] = useState<number | null>(null);
@@ -1700,10 +1710,15 @@ export function ContainerGraphMatrix({
   };
 
   const handleHeaderDragStart = (event: DragEvent<HTMLTableCellElement>, employeeId: number) => {
-    if (!canReorderColumns || activeResizeSessionRef.current !== null || !reorderableColumnIds.has(employeeId)) {
+    if (headerControlPointerRef.current || activeResizeSessionRef.current !== null) {
+      event.preventDefault();
+      return;
+    }
+    if (!canReorderColumns || !reorderableColumnIds.has(employeeId)) {
       return;
     }
 
+    headerPointerDraggedRef.current = true;
     setDraggedEmployeeId(employeeId);
     setDropTargetEmployeeId(employeeId);
     event.dataTransfer.effectAllowed = "move";
@@ -1761,6 +1776,11 @@ export function ContainerGraphMatrix({
     setDropTargetEmployeeId(null);
   };
 
+  const handleColumnHeaderAction = (event: MouseEvent<HTMLButtonElement>, column: GraphMatrixColumn) => {
+    if (columnActionsDisabled || (event.detail > 0 && headerPointerDraggedRef.current)) return;
+    onColumnHeaderAction?.(column, event.currentTarget);
+  };
+
   const handleColumnResizeStart = (event: MouseEvent<HTMLSpanElement>, employeeId: number) => {
     if (!allowColumnResize) {
       return;
@@ -1768,6 +1788,7 @@ export function ContainerGraphMatrix({
 
     event.preventDefault();
     event.stopPropagation();
+    headerPointerDraggedRef.current = true;
 
     const currentWidth = columnWidthOverrides[employeeId];
     const fallbackWidth = Math.max(
@@ -1794,6 +1815,16 @@ export function ContainerGraphMatrix({
     }) as CSSProperties;
   };
 
+  const canAddManualColumns = !readOnly && Boolean(onAddManualColumn);
+  const firstUnpinnedColumn = canAddManualColumns ? columns.findIndex(column => !pinnedColumnIds?.has(column.employeeId)) : 0;
+  const leftAddHeaderIndex = (firstUnpinnedColumn === -1 ? columns.length : firstUnpinnedColumn) - 1;
+  const addColumnButton = (position: "start" | "end") => {
+    const label = t(position === "start" ? "Add manual column on the left" : "Add manual column on the right");
+    return <button type="button" className={styles.addColumnButton} data-side={position} data-matrix-header-control=""
+      aria-label={label} title={label} disabled={columnActionsDisabled}
+      onClick={() => onAddManualColumn?.(position)}><PlusIcon size={16} /></button>;
+  };
+
   return (
     <CardSection
       className={cardClassName}
@@ -1812,7 +1843,10 @@ export function ContainerGraphMatrix({
         {hasToolbar ? <div className={styles.toolbar}>{toolbar}</div> : null}
 
         {isEmpty ? (
-          <div className={styles.emptyState}>{resolvedEmptyMessage}</div>
+          <div className={joinClassNames(styles.emptyState, canAddManualColumns && styles.emptyEditableState)}>
+            {canAddManualColumns && <div className={styles.emptyHeader}><span>{t("Day")}</span>{addColumnButton("start")}{addColumnButton("end")}</div>}
+            <span>{resolvedEmptyMessage}</span>
+          </div>
         ) : (
           <div className={joinClassNames(styles.tableShell, useCompactShell && styles.tableShellCompact, mobileReadOnlyViewport && styles.tableShellPhoneViewport)}>
             <div className={joinClassNames(styles.tableScroll, useCompactShell && styles.tableScrollCompact, mobileReadOnlyViewport && styles.tableScrollPhoneViewport)}
@@ -1820,6 +1854,7 @@ export function ContainerGraphMatrix({
               role={mobileReadOnlyViewport ? "region" : undefined}
               tabIndex={mobileReadOnlyViewport ? 0 : undefined}
               aria-label={mobileReadOnlyViewport ? (typeof title === "string" ? title : t("Schedule Matrix")) : undefined}>
+              <div className={canAddManualColumns ? styles.tableFrameWithActions : styles.tableFrame} style={tableStyle}>
               <table
                 className={joinClassNames(
                   styles.table,
@@ -1828,7 +1863,6 @@ export function ContainerGraphMatrix({
                   regularCellText && styles.regularCellText,
                   !stretchColumns && styles.tableFixedColumns,
                 )}
-                style={tableStyle}
                 onMouseDown={handleTableMouseDown}
                 onMouseMove={handleTableMouseMove}
                 onDoubleClick={handleTableDoubleClick}
@@ -1847,13 +1881,34 @@ export function ContainerGraphMatrix({
                 </colgroup>
                 <thead>
                   <tr>
-                    <th className={styles.dayHeader}>{t("Day")}</th>
-                    {columns.map(column => {
+                    <th className={joinClassNames(styles.dayHeader, canAddManualColumns && leftAddHeaderIndex === -1 && styles.cornerActionHeader)}>
+                      {t("Day")}
+                      {canAddManualColumns && leftAddHeaderIndex === -1 && addColumnButton("start")}
+                    </th>
+                    {columns.map((column, columnIndex) => {
+                      const hasManagerAction = !readOnly && Boolean(onColumnHeaderAction);
+                      const hasLeftAdd = canAddManualColumns && columnIndex === leftAddHeaderIndex;
+                      const hasRightAdd = canAddManualColumns && columnIndex === columns.length - 1;
                       const isEditableManualColumn =
                         !readOnly &&
                         column.kind === "manual" &&
                         column.manualColumnId !== null &&
                         typeof onColumnLabelChange === "function";
+                      const isOrdinaryManual = hasManagerAction && isEditableManualColumn && !pinnedColumnIds?.has(column.employeeId);
+                      const isMenuOpen = hasManagerAction && openColumnMenuId === column.employeeId;
+                      const headerLabel = column.kind === "manual"
+                        ? column.label.trim() || (isOrdinaryManual ? t("Manual column") : t("Manual column {0}", column.manualColumnId))
+                        : column.label;
+                      const manualAction = hasManagerAction && column.kind === "manual" && (
+                        <button type="button" className={isOrdinaryManual ? styles.manualDeleteButton : styles.manualHeaderAction}
+                          data-matrix-header-control="" aria-haspopup={isOrdinaryManual ? "dialog" : "menu"}
+                          aria-expanded={isOrdinaryManual ? undefined : isMenuOpen}
+                          aria-label={isOrdinaryManual ? t("Delete manual column") : t("Actions for manual column {0}", headerLabel)}
+                          title={isOrdinaryManual ? t("Delete manual column") : undefined} disabled={columnActionsDisabled}
+                          onClick={event => handleColumnHeaderAction(event, column)}>
+                          {isOrdinaryManual ? <TrashIcon size={15} /> : <span aria-hidden="true">⋯</span>}
+                        </button>
+                      );
                       const isReorderableColumn = canReorderColumns && reorderableColumnIds.has(column.employeeId);
                       const isDragSource = draggedEmployeeId === column.employeeId;
                       const isDropTarget =
@@ -1866,12 +1921,21 @@ export function ContainerGraphMatrix({
                           key={column.employeeId}
                           className={joinClassNames(
                             styles.valueHeader,
+                            (hasLeftAdd || hasRightAdd) && styles.cornerActionHeader,
+                            isOrdinaryManual && styles.ordinaryManualHeader,
+                            isMenuOpen && column.kind === "employee" && styles.openActionHeader,
                             isReorderableColumn && styles.draggableHeader,
                             isDragSource && styles.draggingHeader,
                             isDropTarget && styles.dropTargetHeader,
                             resizingEmployeeId === column.employeeId && styles.resizingHeader,
                           )}
                           style={getColumnStyle(column.employeeId)}
+                          aria-label={hasManagerAction ? headerLabel : undefined}
+                          onPointerDown={hasManagerAction || canAddManualColumns ? event => {
+                            headerPointerDraggedRef.current = false;
+                            headerControlPointerRef.current = event.target instanceof Element &&
+                              Boolean(event.target.closest("[data-matrix-header-control]"));
+                          } : undefined}
                           draggable={isReorderableColumn}
                           onDragStart={isReorderableColumn ? event => handleHeaderDragStart(event, column.employeeId) : undefined}
                           onDragEnter={isReorderableColumn ? () => handleHeaderDragEnter(column.employeeId) : undefined}
@@ -1881,19 +1945,29 @@ export function ContainerGraphMatrix({
                           title={isReorderableColumn ? column.label : undefined}
                         >
                           {isEditableManualColumn ? (
-                            <div className={joinClassNames(styles.headerCell, styles.manualHeaderCell)}>
-                              <input
-                                className={styles.manualHeaderInput}
-                                value={column.label}
-                                placeholder={t("Manual column")}
-                                aria-label={t("Manual column {0} header", column.manualColumnId)}
-                                draggable={false}
-                                onChange={event => onColumnLabelChange(column.manualColumnId as number, event.target.value)}
-                              />
+                            <div className={joinClassNames(styles.headerCell, styles.manualHeaderCell, hasManagerAction && styles.managerManualHeaderCell,
+                              isOrdinaryManual && styles.ordinaryManualHeaderCell)}>
+                              <div className={styles.manualHeaderName} data-matrix-header-control="">
+                                <input
+                                  className={styles.manualHeaderInput}
+                                  value={column.label}
+                                  placeholder={t("Manual column")}
+                                  aria-label={t("Manual column {0} header", column.manualColumnId)}
+                                  draggable={false}
+                                  onChange={event => onColumnLabelChange(column.manualColumnId as number, event.target.value)}
+                                />
+                              </div>
+                              {manualAction}
                             </div>
                           ) : (
                             <div className={styles.headerCell}>
-                              {onColumnHeaderClick && column.kind === "employee" ? (
+                              {hasManagerAction && column.kind === "employee" ? (
+                                <button type="button" className={styles.headerLabelButton} aria-haspopup="menu"
+                                  aria-label={t("Actions for {0}", column.label)} aria-expanded={isMenuOpen} disabled={columnActionsDisabled}
+                                  onClick={event => handleColumnHeaderAction(event, column)}>
+                                  {column.label}
+                                </button>
+                              ) : onColumnHeaderClick && column.kind === "employee" ? (
                                 <button
                                   type="button"
                                   className={styles.headerLabelButton}
@@ -1905,10 +1979,13 @@ export function ContainerGraphMatrix({
                               ) : (
                                 <span className={styles.headerLabel}>{column.label}</span>
                               )}
+                              {manualAction}
                               {showColumnTotals && column.totalText ? <span className={styles.headerMeta}>{column.totalText}</span> : null}
                             </div>
                           )}
 
+                          {hasLeftAdd && !hasRightAdd && addColumnButton("start")}
+                          {hasRightAdd && addColumnButton("end")}
                           {allowColumnResize ? (
                             <span
                               className={joinClassNames(
@@ -2008,6 +2085,7 @@ export function ContainerGraphMatrix({
                   ))}
                 </tbody>
               </table>
+              </div>
             </div>
           </div>
         )}

@@ -14,6 +14,7 @@ type ConfirmDialogProps = {
   confirmText?: string;
   cancelText?: string;
   footerSlot?: ReactNode;
+  icon?: ReactNode;
   confirmDisabled?: boolean;
   cancelDisabled?: boolean;
 };
@@ -28,6 +29,7 @@ export function ConfirmDialog({
   confirmText = t("Confirm"),
   cancelText = t("Cancel"),
   footerSlot,
+  icon,
   confirmDisabled = false,
   cancelDisabled = false,
 }: ConfirmDialogProps) {
@@ -80,7 +82,7 @@ export function ConfirmDialog({
       >
         <div className={styles.hero}>
           <div className={styles.iconShell} aria-hidden="true">
-            {isConfirmVariant ? <CheckIcon size={22} /> : <WarnIcon size={22} />}
+            {icon ?? (isConfirmVariant ? <CheckIcon size={22} /> : <WarnIcon size={22} />)}
           </div>
 
           <div className={styles.copy}>

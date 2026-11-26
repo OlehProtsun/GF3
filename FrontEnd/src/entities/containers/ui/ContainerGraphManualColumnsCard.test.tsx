@@ -7,7 +7,7 @@ import { ContainerGraphManualColumnsCard } from "./ContainerGraphManualColumnsCa
 
 beforeEach(() => setLanguage("en"));
 const employees = [{ id: 2, firstName: "Ada", lastName: "Lovelace", hasLoginAccount: true, isOnline: false }];
-const base = { highlightColor: "#BAE6FD", highlightSettingDisabled: false, onOpenHighlightColorPicker: vi.fn(), columns: [], employees, year: 2026, month: 2, onAddColumn: vi.fn(), onDeleteColumn: vi.fn(), onPublishShift: vi.fn() };
+const base = { highlightColor: "#BAE6FD", highlightSettingDisabled: false, onOpenHighlightColorPicker: vi.fn(), columns: [], employees, year: 2026, month: 2, onPublishShift: vi.fn() };
 const column = { columnId: 4, label: "Do obsadzenia", cells: { "1": "08:00 - 12:00", "3": "Notes", "31": "08:00 - 12:00" } };
 const offer = { id: 20, manualColumnId: 4, dayOfMonth: 1, year: 2026, month: 2, fromTime: "08:00:00", toTime: "12:00:00", status: "open", isManagerCreated: true, visibility: "public", manualOfferRefreshStatus: "available" } as ShiftSwap;
 const pending = { allowPartialAcceptance: false, clientId: "pending-1", manualColumnId: 4, dayOfMonth: 2, fromTime: "08:00", toTime: "12:00" };
@@ -23,16 +23,14 @@ describe("manual shifts card", () => {
     view.rerender(<ContainerGraphManualColumnsCard {...base} highlightSettingDisabled onOpenHighlightColorPicker={open} />);
     expect(swatch).toBeDisabled();
   });
-  test("empty, add, delete and provenance uses source rather than name", () => {
-    const onAddColumn = vi.fn(); const onDeleteColumn = vi.fn();
-    const { rerender } = render(<ContainerGraphManualColumnsCard {...base} onAddColumn={onAddColumn} />);
-    expect(screen.getByText("No manual columns yet.")).toBeVisible();
+  test("shows offer controls without column management", () => {
+    const { rerender } = render(<ContainerGraphManualColumnsCard {...base} />);
+    expect(screen.getByText("No available shifts. Enter a time range in the matrix.")).toBeVisible();
     expect(screen.getByRole("button", { name: "Publish shift" })).toBeDisabled();
-    fireEvent.click(screen.getByRole("button", { name: "Add" })); expect(onAddColumn).toHaveBeenCalledOnce();
-    rerender(<ContainerGraphManualColumnsCard {...base} columns={[column, { ...column, columnId: 5, source: "generated-unfilled" }]} onDeleteColumn={onDeleteColumn} />);
-    expect(screen.getAllByText("Auto")).toHaveLength(1);
-    fireEvent.click(screen.getAllByRole("button", { name: "Delete Do obsadzenia" })[0]);
-    expect(onDeleteColumn).toHaveBeenCalledWith(4);
+    rerender(<ContainerGraphManualColumnsCard {...base} columns={[column, { ...column, columnId: 5, source: "generated-unfilled" }]} />);
+    expect(within(screen.getByRole("region", { name: "Available shifts" })).getAllByRole("button")).toHaveLength(2);
+    expect(screen.queryByRole("region", { name: "Columns" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^(Add|Delete )/ })).toBeNull();
   });
   test("renders every shift chronologically and preserves selection when scrolling", () => {
     const onPublishShift = vi.fn();

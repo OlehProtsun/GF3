@@ -49,6 +49,11 @@ public sealed class ShiftCorrectionControllerTests
         var manager = ManagerController(reviewContext, fixture);
         var mine = await employee.GetMine(default);
         var graph = await manager.GetGraphRequests(fixture.ContainerId, fixture.ScheduleId, default);
+        var exact = await manager.GetGraphRequest(fixture.ContainerId, fixture.ScheduleId, created.Id, default);
+        Assert.Equal(comment, Assert.IsType<ShiftCorrectionRequestDto>(Assert.IsType<OkObjectResult>(exact.Result).Value).Comment);
+        Assert.IsType<NotFoundResult>((await manager.GetGraphRequest(fixture.ContainerId + 1, fixture.ScheduleId, created.Id, default)).Result);
+        Assert.IsType<NotFoundResult>((await manager.GetGraphRequest(fixture.ContainerId, fixture.ScheduleId + 1, created.Id, default)).Result);
+        Assert.IsType<NotFoundResult>((await manager.GetGraphRequest(fixture.ContainerId, fixture.ScheduleId, created.Id + 1, default)).Result);
         Assert.Equal(comment, Assert.Single(Assert.IsAssignableFrom<IEnumerable<ShiftCorrectionRequestDto>>(
             Assert.IsType<OkObjectResult>(mine.Result).Value)).Comment);
         Assert.Equal(comment, Assert.Single(Assert.IsAssignableFrom<IEnumerable<ShiftCorrectionRequestDto>>(
@@ -126,6 +131,17 @@ public sealed class ShiftCorrectionControllerTests
         Assert.Equal(HttpStatusCode.Created, valid.StatusCode);
         var created = await valid.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal(JsonValueKind.Null, created.GetProperty("comment").ValueKind);
+        var id = created.GetProperty("id").GetInt32();
+        var route = $"/api/containers/1/graphs/{slot.ScheduleId}/shift-corrections/{id}";
+        Assert.Equal(HttpStatusCode.Forbidden, (await host.Client.GetAsync(route)).StatusCode);
+        host.Bearer(null);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await host.Client.GetAsync(route)).StatusCode);
+        await host.Login("manager");
+        await host.Exchange("pc");
+        using var detail = await host.Client.GetAsync(route);
+        Assert.Equal(HttpStatusCode.OK, detail.StatusCode);
+        Assert.True(detail.Headers.CacheControl?.NoStore);
+        Assert.Equal(HttpStatusCode.NotFound, (await host.Client.GetAsync($"{route}0")).StatusCode);
     }
 
     [Fact]
@@ -201,7 +217,7 @@ public sealed class ShiftCorrectionControllerTests
     [InlineData("equal")]
     [InlineData("reverse")]
     [InlineData("private")]
-    [InlineData("not-enrolled")]
+    [InlineData("deleted")]
     [InlineData("locked")]
     [InlineData("own-workday")]
     [InlineData("foreign-workday")]
@@ -214,7 +230,7 @@ public sealed class ShiftCorrectionControllerTests
         var schedule = await db.Schedules.SingleAsync();
         var locks = new ManagerEditLockService();
         if (scenario == "private") schedule.PublicationStatus = SchedulePublicationStatus.Private;
-        if (scenario == "not-enrolled") db.ScheduleEmployees.Remove(await db.ScheduleEmployees.SingleAsync());
+        if (scenario == "deleted") (await db.Employees.SingleAsync()).IsDeleted = true;
         if (scenario == "foreign-workday")
         {
             var container = TestDataFactory.CreateDalContainer("Other");
@@ -244,17 +260,31 @@ public sealed class ShiftCorrectionControllerTests
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task DayOff_ReviewPreservesOriginAndOnlyApprovalCreatesAssignedSlot(bool reject)
+    [InlineData(false, "enrolled")]
+    [InlineData(true, "enrolled")]
+    [InlineData(false, "never-enrolled")]
+    [InlineData(true, "never-enrolled")]
+    [InlineData(false, "removed-after-submission")]
+    public async Task DayOff_ReviewPreservesOriginAndOnlyApprovalCreatesAssignedSlot(bool reject, string membership)
     {
         await using var database = await SqliteTestDatabase.CreateAsync();
         await using var db = database.CreateContext();
         var fixture = await SeedAsync(db);
+        var assignment = await db.ScheduleEmployees.SingleAsync();
+        assignment.DisplayOrder = 7;
+        if (membership == "never-enrolled") db.Remove(assignment);
         db.Add(TestDataFactory.CreateDalSlot(fixture.ScheduleId, 13, 7, null, "08:00", "16:00"));
         await db.SaveChangesAsync();
         var created = await CreateDayOffAsync(db, fixture);
-        var manager = ManagerController(db, fixture);
+        Assert.Equal(3, await db.ScheduleSlots.CountAsync());
+        Assert.Equal(membership == "never-enrolled" ? 0 : 1, await db.ScheduleEmployees.CountAsync());
+        if (membership == "removed-after-submission")
+        {
+            db.Remove(assignment);
+            await db.SaveChangesAsync();
+        }
+        await using var reviewDb = database.CreateContext();
+        var manager = ManagerController(reviewDb, fixture);
         var result = reject ? await manager.Reject(fixture.ContainerId, fixture.ScheduleId, created.Id, default)
             : await manager.Approve(fixture.ContainerId, fixture.ScheduleId, created.Id,
                 new ApproveShiftCorrectionRequest { HighlightColor = "#DBEAFE" }, default);
@@ -264,6 +294,14 @@ public sealed class ShiftCorrectionControllerTests
         Assert.NotNull(dto.ReviewedAtUtc); Assert.Equal("Ada Manager", dto.ReviewedByManagerName);
         var stored = await db.ShiftCorrectionRequests.AsNoTracking().SingleAsync();
         Assert.Equal(fixture.ManagerId, stored.ReviewedByManagerId);
+        var roster = await db.ScheduleEmployees.AsNoTracking().ToListAsync();
+        if (reject && membership == "never-enrolled") Assert.Empty(roster);
+        else
+        {
+            var member = Assert.Single(roster);
+            Assert.Equal(fixture.EmployeeId, member.EmployeeId);
+            Assert.Equal(membership == "enrolled" ? 7 : 0, member.DisplayOrder);
+        }
         if (reject)
         {
             Assert.Null(dto.ScheduleSlotId); Assert.Equal(3, await db.ScheduleSlots.CountAsync());
@@ -287,7 +325,7 @@ public sealed class ShiftCorrectionControllerTests
     [InlineData("own-assignment")]
     [InlineData("foreign-assignment")]
     [InlineData("private")]
-    [InlineData("removed")]
+    [InlineData("deleted")]
     [InlineData("invalid-day")]
     public async Task DayOff_ApprovalRevalidatesState_AndRollsBackAllWrites(string scenario)
     {
@@ -302,7 +340,7 @@ public sealed class ShiftCorrectionControllerTests
             (await db.ScheduleSlots.SingleAsync(slot => slot.ScheduleId != fixture.ScheduleId)).DayOfMonth = 13;
         }
         if (scenario == "private") (await db.Schedules.SingleAsync()).PublicationStatus = SchedulePublicationStatus.Private;
-        if (scenario == "removed") db.ScheduleEmployees.Remove(await db.ScheduleEmployees.SingleAsync());
+        if (scenario == "deleted") (await db.Employees.SingleAsync()).IsDeleted = true;
         if (scenario == "invalid-day")
         {
             (await db.ShiftCorrectionRequests.SingleAsync()).DayOfMonth = 31;
@@ -319,11 +357,40 @@ public sealed class ShiftCorrectionControllerTests
     }
 
     [Fact]
+    public async Task DayOff_FinalSaveFailureRollsBackMembershipAndIntermediateSlot()
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        await using var db = database.CreateContext();
+        var fixture = await SeedAsync(db);
+        db.Remove(await db.ScheduleEmployees.SingleAsync());
+        await db.SaveChangesAsync();
+        var created = await CreateDayOffAsync(db, fixture);
+        await db.Database.ExecuteSqlRawAsync("""
+            CREATE TRIGGER reject_correction_save BEFORE UPDATE ON shift_correction_request
+            WHEN NEW.status = 'Approved' BEGIN SELECT RAISE(ABORT, 'test final correction save failure'); END
+            """);
+
+        await using var review = database.CreateContext();
+        await Assert.ThrowsAsync<DbUpdateException>(() => ManagerController(review, fixture)
+            .Approve(fixture.ContainerId, fixture.ScheduleId, created.Id, new(), default));
+
+        Assert.Empty(await db.ScheduleEmployees.ToListAsync());
+        Assert.Equal(2, await db.ScheduleSlots.CountAsync());
+        Assert.Single(await db.ScheduleCellStyles.ToListAsync());
+        Assert.Empty(await db.ManagerShiftCorrectionSettings.ToListAsync());
+        var pending = await db.ShiftCorrectionRequests.AsNoTracking().SingleAsync();
+        Assert.Equal(ShiftCorrectionStatus.Pending, pending.Status);
+        Assert.Null(pending.ScheduleSlotId);
+    }
+
+    [Fact]
     public async Task DayOff_ConcurrentSubmissionsAndReviewsProduceOneRequestAndOneSlot()
     {
         await using var database = await SqliteTestDatabase.CreateAsync();
         await using var seed = database.CreateContext();
         var fixture = await SeedAsync(seed);
+        seed.Remove(await seed.ScheduleEmployees.SingleAsync());
+        await seed.SaveChangesAsync();
         var ready = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         async Task<bool> Submit()
         {
@@ -364,6 +431,7 @@ public sealed class ShiftCorrectionControllerTests
         }
         var approvals = await Task.WhenAll(Task.Run(() => Approve(fixture.ManagerId)), Task.Run(() => Approve(secondManager.Id)));
         Assert.Single(approvals, success => success);
+        Assert.Equal(fixture.EmployeeId, (await seed.ScheduleEmployees.SingleAsync()).EmployeeId);
         Assert.Equal(3, await seed.ScheduleSlots.CountAsync());
         Assert.Single(await seed.ScheduleSlots.Where(slot => slot.DayOfMonth == 13).ToListAsync());
         Assert.Single(await seed.ScheduleCellStyles.Where(style => style.DayOfMonth == 13).ToListAsync());

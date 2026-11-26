@@ -304,6 +304,8 @@ public sealed class WebApiEmployeeSurfaceTests
     [Fact]
     public async Task EmployeeSchedulesController_MapsPublishedGraphsAndRejectsMissingEmployeeClaim()
     {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        await using var db = database.CreateContext();
         var service = new RecordingContainerService
         {
             PublishedGraphs =
@@ -399,11 +401,11 @@ public sealed class WebApiEmployeeSurfaceTests
         var controller = new EmployeeSchedulesController(service, new StubScheduleLastUpdateService(lastUpdatedAtUtc));
         SetEmployeeUser(controller, 12);
 
-        var result = await controller.GetVisible(CancellationToken.None);
+        var result = await controller.GetVisible(db, CancellationToken.None);
         var missingClaimController = new EmployeeSchedulesController(service);
         SetUser(missingClaimController, CreatePrincipal(new Claim(ClaimTypes.Name, "worker")));
         var missingClaimException = await Assert.ThrowsAsync<BadHttpRequestException>(() =>
-            missingClaimController.GetVisible(CancellationToken.None));
+            missingClaimController.GetVisible(db, CancellationToken.None));
 
         var dto = Assert.Single(Assert.IsAssignableFrom<IEnumerable<EmployeeScheduleDto>>(
             Assert.IsType<OkObjectResult>(result.Result).Value));

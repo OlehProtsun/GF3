@@ -20,7 +20,7 @@ import {
 } from "@entities/manager-notepad";
 import { getErrorMessage } from "@shared/api/httpClient";
 import { ConfirmDialog } from "@shared/ui/ConfirmDialog";
-import { ArrowIcon, CloseIcon, NoteIcon, PinIcon, PlusIcon, SaveIcon, SearchIcon } from "@shared/ui/icons";
+import { ArrowIcon, BookOpenIcon, CloseIcon, NoteIcon, PinIcon, PlusIcon, SaveIcon, SearchIcon } from "@shared/ui/icons";
 import styles from "./ManagerNotepad.module.css";
 
 const MIN_HEIGHT = 320;
@@ -409,7 +409,7 @@ export function ManagerNotepad() {
         title={t("Open notepad")}
         onClick={handleToggleExpanded}
       >
-        <NoteIcon size={17} />
+        <BookOpenIcon size={19} />
       </button>
 
       <aside

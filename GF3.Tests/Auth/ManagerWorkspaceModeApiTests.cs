@@ -8,6 +8,19 @@ namespace GF3.Tests;
 public sealed class ManagerWorkspaceModeApiTests
 {
     [Fact]
+    public async Task PhoneCanNegotiatePresenceWithoutGainingBusinessWriteAccess()
+    {
+        await using var host = await ManagerWorkspaceTestHost.CreateAsync();
+        const string negotiate = "/api/realtime/presence/negotiate?negotiateVersion=1";
+        Assert.Equal(HttpStatusCode.Unauthorized, (await host.Client.PostAsync(negotiate, null)).StatusCode);
+        await host.Login("manager");
+        Assert.Equal(HttpStatusCode.Forbidden, (await host.Client.PostAsync(negotiate, null)).StatusCode);
+        await host.Exchange("phone");
+        Assert.Equal(HttpStatusCode.OK, (await host.Client.PostAsync(negotiate, null)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await host.Client.PostAsync("/api/guard-write", null)).StatusCode);
+    }
+
+    [Fact]
     public async Task LoginExchangeRefreshAndNewLoginPreserveIdentity()
     {
         await using var host = await ManagerWorkspaceTestHost.CreateAsync();

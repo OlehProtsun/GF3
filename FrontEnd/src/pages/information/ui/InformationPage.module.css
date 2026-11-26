@@ -619,3 +619,10 @@
     display: none;
   }
 }
+.onlinePanel h2 { margin: 0; font-size: 1rem; }
+.onlineTableWrapper { max-height: 240px; overflow: auto; }
+.onlineTable { width: 100%; border-collapse: collapse; text-align: start; font-size: .85rem; }
+.onlineTable th, .onlineTable td { padding: 6px 10px; border-bottom: 1px solid #e8edf5; text-align: start; }
+.onlineTable td:first-child { width: 60%; overflow-wrap: anywhere; }
+.onlineTable th { position: sticky; top: 0; background: #fff; }
+.onlineError { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; color: #b91c1c; }

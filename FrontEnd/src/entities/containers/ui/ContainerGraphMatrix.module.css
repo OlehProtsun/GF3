@@ -119,6 +119,10 @@
   scrollbar-gutter: auto;
 }
 
+.tableScroll:not(.tableScrollCompact):has(> .tableFrameWithActions) {
+  scrollbar-gutter: stable;
+}
+
 .tableScroll::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -126,6 +130,14 @@
 
 .tableScrollCompact::-webkit-scrollbar {
   height: 6px;
+}
+
+.tableFrame { display: contents; }
+.tableFrameWithActions {
+  --matrix-add-gutter: 20px;
+  box-sizing: border-box;
+  min-width: calc(var(--matrix-table-min-width) + var(--matrix-add-gutter));
+  padding-inline-end: var(--matrix-add-gutter);
 }
 
 .tableScroll::-webkit-scrollbar-thumb {
@@ -248,6 +260,64 @@
   gap: 0;
 }
 
+.managerManualHeaderCell { display: flex; align-items: center; gap: 3px; }
+
+.addColumnButton, .manualHeaderAction {
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid #dbe3ed;
+  border-radius: 7px;
+  background: #fff;
+  color: #315883;
+  cursor: pointer;
+}
+
+.manualHeaderAction { width: 22px; height: 22px; font-size: 17px; line-height: 1; }
+.manualHeaderAction:not(:disabled):hover { background: #eff6ff; }
+.addColumnButton:disabled, .manualHeaderAction:disabled, .headerLabelButton:disabled { opacity: .55; cursor: default; }
+
+.addColumnButton {
+  width: 30px;
+  height: 30px;
+  border: 1px solid #c6dbfb;
+  border-radius: 50%;
+  background: #fff;
+  color: #1d4ed8;
+  box-shadow: 0 2px 5px rgb(37 99 235 / 13%);
+  transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease;
+}
+
+.table .addColumnButton { position: absolute; top: 50%; right: -16px; transform: translateY(-50%); z-index: 4; }
+.table thead th.cornerActionHeader { z-index: 6; }
+.table thead th.dayHeader.cornerActionHeader { z-index: 8; }
+.cornerActionHeader .columnResizeHandle { top: 16px; height: calc(100% - 16px); }
+.table thead th.openActionHeader { background: #eaf3ff; }
+.addColumnButton:not(:disabled):hover { background: #2563eb; border-color: #2563eb; color: #fff; }
+.addColumnButton:focus-visible, .manualDeleteButton:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+.emptyEditableState { grid-template-rows: auto minmax(0, 1fr); padding: 0; overflow: hidden; }
+.emptyHeader {
+  display: flex;
+  align-items: center;
+  justify-self: stretch;
+  gap: 12px;
+  min-height: 42px;
+  padding-inline: 12px;
+  border-bottom: 1px solid #e1e8f2;
+  background: #f5f5f5;
+  color: #111827;
+  font-weight: 800;
+}
+.emptyEditableState > span { padding: 12px; }
+
+.manualHeaderName { flex: 1; min-width: 0; }
 .manualHeaderInput {
   width: 100%;
   min-width: 0;
@@ -281,6 +351,46 @@
     0 0 0 3px rgba(37, 99, 235, 0.12),
     0 12px 24px rgba(15, 23, 42, 0.05);
 }
+
+.table thead th.ordinaryManualHeader { padding-block: 4px; padding-inline-end: 12px; }
+.ordinaryManualHeaderCell {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 5px;
+  border-radius: 13px;
+  background: #fff;
+  box-shadow: inset 0 0 0 1px #d8e1ed;
+}
+.ordinaryManualHeader .manualHeaderInput {
+  min-height: 26px;
+  padding-inline: 2px;
+  border-color: transparent;
+  border-radius: 5px;
+  background: transparent;
+  box-shadow: none;
+  text-align: start;
+  font-weight: 650;
+  user-select: text;
+  cursor: text;
+}
+.ordinaryManualHeader .manualHeaderInput:not(:focus) { text-overflow: ellipsis; }
+.ordinaryManualHeader .manualHeaderInput:hover:not(:focus) { background: #f1f6fc; }
+.ordinaryManualHeader .manualHeaderInput:focus { border-color: #93c5fd; }
+.manualDeleteButton {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 22px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: #b91c1c;
+  cursor: pointer;
+}
+.manualDeleteButton:hover:not(:disabled) { background: #fff0f2; }
+.manualDeleteButton:disabled { opacity: .55; cursor: default; }
 
 .headerMeta {
   color: rgba(17, 24, 39, 0.56);
@@ -487,6 +597,7 @@
 .matrixCell[data-cell-adornment-count] { --cell-adornment-space: 24px; }
 .matrixCell[data-cell-adornment-count="2"] { --cell-adornment-space: 34px; }
 .matrixCell[data-cell-adornment-count="3"] { --cell-adornment-space: 49px; }
+.matrixCell[data-cell-adornment-count="4"] { --cell-adornment-space: 64px; }
 .matrixCell[data-cell-adornment-count] .readonlyValue {
   padding-inline: 2px var(--cell-adornment-space);
   white-space: normal;
@@ -506,7 +617,7 @@
   gap: 1px;
 }
 
-.matrixCell:is([data-cell-adornment-count="2"], [data-cell-adornment-count="3"]) .readOnlyAdornment {
+.matrixCell:is([data-cell-adornment-count="2"], [data-cell-adornment-count="3"], [data-cell-adornment-count="4"]) .readOnlyAdornment {
   --schedule-status-badge-size: 14px;
 }
 

@@ -57,6 +57,15 @@ public sealed class ContractShiftApprovalService(AppDbContext db, ShiftSwapExecu
             .OrderBy(x => x.Status == "pending" ? 0 : 1).ThenByDescending(x => x.Id).ToListAsync(ct), ct);
     }
 
+    public async Task<ContractShiftApprovalDto> GetGraphRequestAsync(int containerId, int graphId, int id, CancellationToken ct = default)
+    {
+        await EnsureGraphAsync(containerId, graphId, ct);
+        var approval = await db.ContractShiftApprovalRequests.AsNoTracking()
+            .SingleOrDefaultAsync(x => x.Id == id && x.ScheduleId == graphId, ct)
+            ?? throw new KeyNotFoundException("The approval request was not found in this graph.");
+        return (await MapAsync([approval], ct)).Single();
+    }
+
     public async Task<ContractShiftApprovalDto> ApproveAsync(int managerId, int containerId, int graphId, int id,
         HttpContext context, CancellationToken ct = default)
     {

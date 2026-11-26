@@ -6,6 +6,13 @@
   --sidebar-w: 86px;
 }
 
+.managerTopControls {
+  display: contents;
+  --manager-controls-right: calc(18px + env(safe-area-inset-right));
+  --manager-notepad-tab-width: 62px;
+  --manager-controls-gap: 8px;
+}
+
 .sidebar {
   position: fixed;
   top: calc(var(--inset) + env(safe-area-inset-top));

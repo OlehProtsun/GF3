@@ -80,13 +80,14 @@ public sealed class EmployeePublicSchedulesTests
             employee is int id ? [new Claim("employee_id", id.ToString())] : [], "test")) },
     };
 
-    internal static async Task<(int Owner, int Container, int Preview, int OtherPreview, int[] Hidden)> Seed(AppDbContext db)
+    internal static async Task<(int Owner, int Container, int Preview, int OtherPreview, int[] Hidden)> Seed(
+        AppDbContext db, string shopName = "Central Shop")
     {
         var owner = TestDataFactory.CreateDalEmployee("Owner", "Fixture");
         var colleague = TestDataFactory.CreateDalEmployee("Colleague", "Fixture");
         var container = TestDataFactory.CreateDalContainer("Shared container");
         var unrelated = TestDataFactory.CreateDalContainer("Unrelated container");
-        var shop = TestDataFactory.CreateDalShop();
+        var shop = TestDataFactory.CreateDalShop(shopName);
         db.AddRange(owner, colleague, container, unrelated, shop);
         await db.SaveChangesAsync();
         var own = Graph("Own", container.Id, owner.Id);

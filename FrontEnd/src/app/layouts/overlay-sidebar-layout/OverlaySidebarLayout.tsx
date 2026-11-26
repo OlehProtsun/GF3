@@ -202,7 +202,7 @@ export function OverlaySidebarLayout({ children }: OverlaySidebarLayoutProps) {
         aria-hidden="true"
       />
 
-      {isManager ? <><ManagerSystemNews /><ManagerNotepad /></> : null}
+      {isManager ? <div className={styles.managerTopControls}><ManagerSystemNews /><ManagerNotepad /></div> : null}
 
     </div>
   );

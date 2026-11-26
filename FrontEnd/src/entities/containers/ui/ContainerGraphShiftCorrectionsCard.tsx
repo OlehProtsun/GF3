@@ -1,6 +1,8 @@
 import { dateTimeFormat, t } from "@shared/i18n";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { containersApi } from "@entities/containers/api/containersApi";
+import { formatHoursMinutes } from "@entities/containers/model/statistics";
 import {
   useApproveShiftCorrectionMutation,
   useGraphShiftCorrectionsQuery,
@@ -14,7 +16,8 @@ import {
   shiftCorrectionOriginalMinutes,
   shiftCorrectionTimeMinutes as toMinutes,
 } from "@entities/shift-corrections/model/presentation";
-import { getErrorMessage } from "@shared/api/httpClient";
+import { ApiError, getErrorMessage } from "@shared/api/httpClient";
+import { queryKeys } from "@shared/api/queryKeys";
 import { ErrorBanner } from "@shared/ui/components/ErrorBanner";
 import { IosButton } from "@shared/ui/components/IosButton";
 import { ArrowRightIcon, CheckIcon, ChevronRightIcon, ClockIcon, CloseIcon, GroupIcon, LockIcon, ScheduleDetailsIcon, ScheduleIcon, StatisticsIcon } from "@shared/ui/icons";
@@ -31,6 +34,10 @@ type ContainerGraphShiftCorrectionsCardProps = {
   onApproved: () => void;
   children?: ReactNode;
   onPendingCountChange?: (count: number) => void;
+  reviewRequestId?: number;
+  onReviewBusyChange?: (busy: boolean) => void;
+  onReviewTypeChange?: (type: string) => void;
+  reviewScheduleLink?: ReactNode;
 };
 
 const createdAtFormatter = dateTimeFormat("en-GB", {
@@ -66,12 +73,18 @@ export function ContainerGraphShiftCorrectionsCard({
   disabled,
   onApproved,
   onPendingCountChange,
+  reviewRequestId,
+  onReviewBusyChange,
+  onReviewTypeChange,
+  reviewScheduleLink,
   children,
 }: ContainerGraphShiftCorrectionsCardProps) {
   const hasPersistedGraph = Number.isInteger(containerId) && containerId !== null && containerId > 0
     && Number.isInteger(graphId) && graphId !== null && graphId > 0;
-  const requestsQuery = useGraphShiftCorrectionsQuery(containerId, graphId);
-  const settingQuery = useShiftCorrectionSettingQuery(hasPersistedGraph);
+  const focused = reviewRequestId !== undefined;
+  const requestsQuery = useGraphShiftCorrectionsQuery(containerId, graphId, reviewRequestId);
+  const settingQuery = useShiftCorrectionSettingQuery(hasPersistedGraph && !focused);
+  const client = useQueryClient();
   const saveSettingMutation = useSaveShiftCorrectionSettingMutation();
   const approveMutation = useApproveShiftCorrectionMutation();
   const rejectMutation = useRejectShiftCorrectionMutation();
@@ -79,14 +92,24 @@ export function ContainerGraphShiftCorrectionsCard({
   const [highlightColor, setHighlightColor] = useState("#FDE68A");
   const [isColorDialogOpen, setIsColorDialogOpen] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [isVersionSaving, setIsVersionSaving] = useState(false);
+  const reviewInFlight = useRef(false);
 
   const requests = useMemo(() => [...(requestsQuery.data ?? [])].sort((left, right) => {
     if (left.status === "pending" && right.status !== "pending") return -1;
     if (left.status !== "pending" && right.status === "pending") return 1;
     return Date.parse(right.createdAtUtc) - Date.parse(left.createdAtUtc);
   }), [requestsQuery.data]);
-  const selected = requests.find(request => request.id === selectedId) ?? null;
+  const notFound = requestsQuery.error instanceof ApiError && requestsQuery.error.status === 404;
+  const selected = focused && notFound ? null : requests.find(request => request.id === (reviewRequestId ?? selectedId)) ?? null;
+  const reviewType = selected?.requestType === "removeShift" ? t("Day off requested")
+    : selected?.requestType === "addShift" || selected?.isDayOffRequest ? t("Add shift")
+    : t("Schedule correction");
   const pendingCount = requests.filter(request => request.status === "pending").length;
+  const exactKey = queryKeys.shiftSwaps.graphCorrectionById(containerId ?? 0, graphId ?? 0, reviewRequestId ?? 0);
+  const isReading = focused && (requestsQuery.isLoading || requestsQuery.isFetching);
+  const isBusy = !hasPersistedGraph || disabled || approveMutation.isPending || rejectMutation.isPending || isVersionSaving ||
+    (focused && (isReading || requestsQuery.isError));
 
   useEffect(() => {
     if (settingQuery.data?.highlightColor) setHighlightColor(settingQuery.data.highlightColor);
@@ -100,6 +123,10 @@ export function ContainerGraphShiftCorrectionsCard({
     onPendingCountChange?.(pendingCount);
   }, [onPendingCountChange, pendingCount]);
 
+  useEffect(() => {
+    if (focused) onReviewTypeChange?.(reviewType);
+  }, [focused, onReviewTypeChange, reviewType]);
+
   const handleColorChange = (value: string) => {
     if (!hasPersistedGraph) return;
     setHighlightColor(value);
@@ -110,89 +137,140 @@ export function ContainerGraphShiftCorrectionsCard({
     });
   };
 
+  function finishReview() {
+    reviewInFlight.current = false;
+    onReviewBusyChange?.(false);
+  }
+
+  function handleReviewError(error: unknown, message: string) {
+    setActionError(getErrorMessage(error, message));
+    if (focused) {
+      client.invalidateQueries({ queryKey: exactKey });
+      client.invalidateQueries({ queryKey: queryKeys.home.activity() });
+      client.invalidateQueries({ queryKey: queryKeys.home.navBadges() });
+    }
+    finishReview();
+  }
+
   const handleApprove = () => {
-    if (!selected || !hasPersistedGraph || containerId === null || graphId === null) return;
+    if (selected?.status !== "pending" || isBusy || hasUnsavedChanges || reviewInFlight.current || containerId === null || graphId === null) return;
     setActionError(null);
-    approveMutation.mutate({ containerId, graphId, id: selected.id, highlightColor }, {
+    reviewInFlight.current = true;
+    onReviewBusyChange?.(true);
+    approveMutation.mutate({ containerId, graphId, id: selected.id, ...(focused ? {} : { highlightColor }) }, {
       onSuccess: () => {
         setSelectedId(current => current === selected.id ? null : current);
+        setIsVersionSaving(true);
         void containersApi.commitGraphVersion(containerId, graphId)
           .then(onApproved)
-          .catch(error => setActionError(getErrorMessage(error, t("The correction was applied, but its schedule version could not be recorded."))));
+          .catch(() => setActionError(t("The correction was applied, but its schedule version could not be recorded.")))
+          .finally(() => { setIsVersionSaving(false); finishReview(); });
       },
-      onError: error => setActionError(getErrorMessage(error, t("Could not approve this correction."))),
+      onError: error => handleReviewError(error, t("Could not approve this correction.")),
     });
   };
 
   const handleReject = () => {
-    if (!selected || !hasPersistedGraph || containerId === null || graphId === null) return;
+    if (selected?.status !== "pending" || isBusy || reviewInFlight.current || containerId === null || graphId === null) return;
     setActionError(null);
+    reviewInFlight.current = true;
+    onReviewBusyChange?.(true);
     rejectMutation.mutate({ containerId, graphId, id: selected.id }, {
-      onSuccess: () => setSelectedId(current => current === selected.id ? null : current),
-      onError: error => setActionError(getErrorMessage(error, t("Could not reject this correction."))),
+      onSuccess: () => { setSelectedId(current => current === selected.id ? null : current); finishReview(); },
+      onError: error => handleReviewError(error, t("Could not reject this correction.")),
     });
   };
 
-  const isBusy = !hasPersistedGraph || disabled || approveMutation.isPending || rejectMutation.isPending;
   const removesShift = selected?.requestType === "removeShift";
   const requestedFrom = selected?.requestedFromTime;
   const requestedTo = selected?.requestedToTime;
+  const originalShift = selected && !selected.isDayOffRequest && (!focused || selected.requestType !== "addShift")
+    && selected.originalFromTime && selected.originalToTime
+    ? { fromTime: selected.originalFromTime, toTime: selected.originalToTime } : null;
+  const requestedShift = !removesShift && requestedFrom && requestedTo ? { fromTime: requestedFrom, toTime: requestedTo } : null;
   const originalDuration = removesShift ? shiftCorrectionOriginalMinutes(selected?.originalShifts ?? [])
-    : selected && !selected.isDayOffRequest && selected.originalToTime && selected.originalFromTime
-    ? toMinutes(selected.originalToTime) - toMinutes(selected.originalFromTime) : 0;
-  const requestedDuration = !removesShift && requestedFrom && requestedTo ? toMinutes(requestedTo) - toMinutes(requestedFrom) : 0;
+    : !originalShift ? 0 : focused ? shiftCorrectionOriginalMinutes([originalShift])
+      : toMinutes(originalShift.toTime) - toMinutes(originalShift.fromTime);
+  const requestedDuration = !requestedShift ? 0 : focused ? shiftCorrectionOriginalMinutes([requestedShift])
+    : toMinutes(requestedShift.toTime) - toMinutes(requestedShift.fromTime);
+  const durationDelta = requestedDuration - originalDuration;
+  const selectedStatus = selected && <em className={`${styles.status} ${styles[`status${selected.status}`]}`}
+    data-review-pending={focused && selected.status === "pending" ? "" : undefined}>
+    {statusIcon(selected.status)}{focused && selected.status === "pending" ? t("Pending review") : statusLabel(selected.status)}
+  </em>;
   const selectedDetails = selected ? (
-    <article key={selected.id} className={styles.details} role="listitem">
-      <div className={styles.detailsHeader}>
-        <span className={`${styles.avatar} ${styles.selectedAvatar}`} aria-hidden="true">{Array.from(initials(selected.employeeName))[0]}</span>
-        <div className={styles.selectedCopy}><span>{t("Selected request")}</span><strong>{selected.employeeName}</strong>
+    <article key={selected.id} className={styles.details} role="listitem" data-review-part={focused ? "detail" : undefined}>
+      <div className={styles.detailsHeader} data-review-part={focused ? "person" : undefined}>
+        <span className={`${styles.avatar} ${styles.selectedAvatar}`} aria-hidden="true">{focused ? initials(selected.employeeName) : Array.from(initials(selected.employeeName))[0]}</span>
+        <div className={styles.selectedCopy}>{!focused && <span>{t("Selected request")}</span>}<strong>{selected.employeeName}</strong>
           <time dateTime={selected.createdAtUtc}>{createdAtFormatter.format(new Date(selected.createdAtUtc))}</time>
         </div>
-        <div className={styles.detailsHeaderActions}>
+        {focused ? selectedStatus : <div className={styles.detailsHeaderActions}>
           <button type="button" aria-label={t("Collapse request from {0}", selected.employeeName)}
             onClick={() => setSelectedId(null)}><CloseIcon size={14} /></button>
-        </div>
+        </div>}
       </div>
-      <em className={`${styles.status} ${styles[`status${selected.status}`]}`}>{statusIcon(selected.status)}{statusLabel(selected.status)}</em>
-      {removesShift && <strong>{t("Day off requested")}</strong>}
-      <dl className={styles.detailGrid}>
+      {!focused && selectedStatus}
+      {!focused && removesShift && <strong>{t("Day off requested")}</strong>}
+      <dl className={styles.detailGrid} data-review-part={focused ? "metadata" : undefined}>
         <div><dt><span className={styles.metadataIcon}><ScheduleIcon size={16} /></span>{t("Date")}</dt><dd>{String(selected.dayOfMonth).padStart(2, "0")}.{String(selected.month).padStart(2, "0")}.{selected.year}</dd></div>
         <div><dt><span className={styles.metadataIcon}><GroupIcon size={16} /></span>{t("Schedule")}</dt><dd>{selected.scheduleName} · {selected.shopName}</dd></div>
       </dl>
-      <div className={styles.comparison}>
-        <div><span>{t("Current shift")}</span><strong>{formatOriginalShifts(selected)}</strong></div>
+      <div className={styles.comparison} data-review-part={focused ? "comparison" : undefined}>
+        <div><span>{t("Current shift")}</span><strong>{focused && !removesShift && !originalShift && !selected.isDayOffRequest ? "–" : formatOriginalShifts(selected)}</strong>
+          {focused && originalDuration > 0 && <span>{formatHoursMinutes(originalDuration)}</span>}
+        </div>
         <span className={styles.comparisonArrow} aria-hidden="true"><ArrowRightIcon size={17} /></span>
-        <div><span>{t("Requested shift")}</span><strong>{!removesShift && requestedFrom && requestedTo ? `${requestedFrom} – ${requestedTo}` : "–"}</strong></div>
+        <div><span>{t("Requested shift")}</span><strong>{requestedShift ? `${requestedShift.fromTime} – ${requestedShift.toTime}` : "–"}</strong>
+          {focused && requestedDuration > 0 && <span>{formatHoursMinutes(requestedDuration)}</span>}
+          {focused && durationDelta !== 0 && <small className={styles.reviewDelta} aria-label={t("Duration change")}>{formatDelta(durationDelta)}</small>}
+        </div>
       </div>
-      <div className={styles.deltaRow}>
+      {focused ? originalShift && requestedShift && <p className={styles.reviewChangeSummary}>
+        {t("Start")} {formatDelta(toMinutes(requestedShift.fromTime) - toMinutes(originalShift.fromTime))} · {t("End")} {formatDelta(toMinutes(requestedShift.toTime) - toMinutes(originalShift.toTime))}
+      </p> : <div className={styles.deltaRow}>
         {!removesShift && !selected.isDayOffRequest && selected.originalFromTime && selected.originalToTime && requestedFrom && requestedTo ? <>
           <span className={requestedFrom === selected.originalFromTime ? styles.deltaNeutral : styles.deltaStart}><ClockIcon size={15} />{t("Start")} {formatDelta(toMinutes(requestedFrom) - toMinutes(selected.originalFromTime))}</span>
           <span className={styles.deltaNeutral}><LockIcon size={15} />{t("End")} {formatDelta(toMinutes(requestedTo) - toMinutes(selected.originalToTime))}</span>
         </> : null}
         <strong className={requestedDuration === originalDuration ? styles.deltaNeutral : styles.deltaDuration}><StatisticsIcon size={15} />{t(removesShift ? "Duration change" : "Duration")} {formatDelta(requestedDuration - originalDuration)}</strong>
-      </div>
-      {selected.comment?.trim() ? (
-        <div className={styles.comment}>
+      </div>}
+      {focused || selected.comment?.trim() ? (
+        <div className={styles.comment} data-review-part={focused ? "comment" : undefined}>
           <strong>{t("Comment")}</strong>
-          <p>{selected.comment}</p>
+          <p data-empty={!selected.comment?.trim() ? "" : undefined}>{selected.comment?.trim() ? selected.comment : t("No comment provided")}</p>
         </div>
       ) : null}
-      {selected.status === "pending" ? (
-        <>
-          {hasUnsavedChanges ? <p className={styles.saveHint}>{t("Save your current schedule edits before approving.")}</p> : null}
-          <div className={styles.actions}>
+      {selected.status === "pending" && hasUnsavedChanges && <p className={styles.saveHint}>{t("Save your current schedule edits before approving.")}</p>}
+      <div data-review-part={focused ? "footer" : undefined}>
+        {reviewScheduleLink}
+        {selected.status === "pending" ? (
+          <div className={styles.actions} data-review-part={focused ? "decisions" : undefined}>
             <IosButton className={`${activity.action} ${activity.danger}`} label={rejectMutation.isPending ? t("Rejecting...") : t("Reject")} variant="secondary" size="compact"
               icon={<CloseIcon size={15} />} disabled={isBusy} onClick={handleReject} />
             <IosButton className={`${activity.action} ${activity.success}`} label={approveMutation.isPending ? t("Applying...") : t("Approve")} size="compact"
               icon={<CheckIcon size={15} />} disabled={isBusy || hasUnsavedChanges} onClick={handleApprove} />
           </div>
-        </>
-      ) : (
+        ) : (
         <p className={`${styles.reviewed} ${selected.status === "approved" ? activity.success : activity.danger}`}><span className={styles.reviewMark} aria-hidden="true">{selected.status === "approved" ? <CheckIcon size={12} /> : <CloseIcon size={12} />}</span><span>{selected.reviewedByManagerName
           ? t("Reviewed by {0}", selected.reviewedByManagerName) : t("Reviewed")}</span></p>
-      )}
+        )}
+      </div>
     </article>
   ) : null;
+
+  if (focused) return <section className={styles.requestsPanel} data-review-part="panel" aria-label={t("Shift Corrections")}>
+    {actionError && <ErrorBanner dismissible={false}>{actionError}</ErrorBanner>}
+    {isReading && <p className={activity.state} role="status">{t("Loading requests...")}</p>}
+    {notFound || (!isReading && !requestsQuery.isError && !selected)
+      ? <p className={activity.state} role="status">{t("This request is no longer available.")}</p>
+      : requestsQuery.isError && <ErrorBanner dismissible={false}>
+        {getErrorMessage(requestsQuery.error, t("Could not load shift corrections."))}
+        <IosButton label={t("Retry")} variant="secondary" size="compact" onClick={() => client.invalidateQueries({ queryKey: exactKey })} />
+      </ErrorBanner>}
+    {selectedDetails ? <div className={styles.list} data-review-part="list" role="list" aria-label={t("Shift correction requests")}>{selectedDetails}</div>
+      : reviewScheduleLink && <div data-review-part="footer">{reviewScheduleLink}</div>}
+  </section>;
 
   return (
     <CardSection className={activity.card} headerClassName={activity.header}

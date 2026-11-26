@@ -22,12 +22,16 @@ public sealed class ManagerWorkspaceSignalRTests
     [Theory]
     [InlineData("phone")]
     [InlineData("choose")]
-    public async Task RestrictedManagersCannotConnectOrAcquireEitherLock(string mode)
+    public async Task PhoneConnectsForPresenceAndRestrictedModesCannotAcquireEitherLock(string mode)
     {
         var context = Context(mode);
         var groups = new RecordingGroupManager(); var locks = new ManagerEditLockService();
-        var hub = new EmployeePresenceHub(new EmployeePresenceService(), new ManagerPresenceService(), new RecordingEmployeeAccountService(), locks, new RecordingRealtimeNotifier(), new EmployeeOnlineWorkflowLogTests.ThrowingWorkflowLogService(), NullLogger<EmployeePresenceHub>.Instance) { Context = context, Groups = groups };
-        await hub.OnConnectedAsync(); Assert.True(context.Aborted); Assert.Empty(groups.AddedGroups);
+        var presence = new ManagerPresenceService();
+        var hub = new EmployeePresenceHub(new EmployeePresenceService(), presence, new RecordingEmployeeAccountService(), locks, new RecordingRealtimeNotifier(), new EmployeeOnlineWorkflowLogTests.ThrowingWorkflowLogService(), NullLogger<EmployeePresenceHub>.Instance) { Context = context, Groups = groups };
+        await hub.OnConnectedAsync();
+        Assert.Equal(mode == "choose", context.Aborted);
+        Assert.Equal(mode == "phone", presence.IsManagerOnline(1));
+        Assert.Empty(groups.AddedGroups);
         await Assert.ThrowsAsync<HubException>(() => hub.SetManagerEditLocks([ManagerEditLockTargets.Schedule(1, 1)]));
         await Assert.ThrowsAsync<HubException>(() => hub.SetScheduleEditLocks([new ScheduleEditLockTarget(1, 1)]));
         Assert.Empty(locks.ReleaseConnection(context.ConnectionId));

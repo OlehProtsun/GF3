@@ -5,7 +5,7 @@ using System.Text.RegularExpressions;
 
 namespace BusinessLogicLayer.Services.Export;
 
-internal static class GraphNoteSqlExportBuilder
+public static class GraphNoteSqlExportBuilder
 {
     private const string PortableGraphNoteMetaPrefix = "[[GF3_GRAPH_META:";
     private const string PortableGraphNoteMetaSuffix = "]]";
@@ -14,7 +14,7 @@ internal static class GraphNoteSqlExportBuilder
         @"(?:\r?\n\r?\n)?(?:<!--GF3_GRAPH_META:(?<legacyMeta>[\s\S]*?)-->|\[\[GF3_GRAPH_META:(?<portableMeta>[\s\S]*?)\]\])$",
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
-    public static string? BuildPortableNote(string? note, IReadOnlyList<GraphNoteExportTextCell> textCells)
+    internal static string? BuildPortableNote(string? note, IReadOnlyList<GraphNoteExportTextCell> textCells)
     {
         if (!TryExtractMetadata(note, out var visibleNote, out var rawMetadata, out var hasLegacyMetadata))
         {
@@ -35,6 +35,25 @@ internal static class GraphNoteSqlExportBuilder
         metadata.Remove("textCells");
 
         return ComposeNote(visibleNote, metadata);
+    }
+
+    public static string BuildPublicPreviewNote(string? note)
+    {
+        if (!TryExtractMetadata(note, out _, out var rawMetadata, out _))
+            return string.Empty;
+
+        var metadata = TryParseMetadataObject(rawMetadata);
+        if (metadata is null)
+            return string.Empty;
+
+        var preview = new JsonObject();
+        foreach (var key in new[] { "g", "m", "manualColumns", "o", "columnOrder" })
+        {
+            if (metadata[key] is { } value)
+                preview[key] = value.DeepClone();
+        }
+
+        return ComposeNote(string.Empty, preview);
     }
 
     private static JsonObject CreateMetadataWithTextCells(IReadOnlyList<GraphNoteExportTextCell> textCells)

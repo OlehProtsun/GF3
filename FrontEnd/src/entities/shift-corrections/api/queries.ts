@@ -11,12 +11,27 @@ export const useEmployeeShiftCorrectionsQuery = (enabled = true) =>
     queryFn: ({ signal }) => shiftCorrectionsApi.listEmployee(signal),
   });
 
-export const useGraphShiftCorrectionsQuery = (containerId: number | null, graphId: number | null) =>
+export const useEmployeeCorrectionSchedulesQuery = (enabled: boolean) =>
   useQuery({
-    queryKey: queryKeys.shiftSwaps.graphCorrections(containerId ?? 0, graphId ?? 0),
-    enabled: Number.isInteger(containerId) && containerId !== null && containerId > 0 && Number.isInteger(graphId) && graphId !== null && graphId > 0,
-    staleTime: 15_000,
-    queryFn: ({ signal }) => shiftCorrectionsApi.listGraph(containerId as number, graphId as number, signal),
+    queryKey: queryKeys.employeeSchedules.correctionCandidates(),
+    enabled,
+    staleTime: 0,
+    cancelOnUnmount: true,
+    queryFn: ({ signal }) => shiftCorrectionsApi.listSchedules(signal),
+  });
+
+export const useGraphShiftCorrectionsQuery = (containerId: number | null, graphId: number | null, reviewRequestId?: number) =>
+  useQuery({
+    queryKey: reviewRequestId === undefined
+      ? queryKeys.shiftSwaps.graphCorrections(containerId ?? 0, graphId ?? 0)
+      : queryKeys.shiftSwaps.graphCorrectionById(containerId ?? 0, graphId ?? 0, reviewRequestId),
+    enabled: Number.isInteger(containerId) && containerId! > 0 && Number.isInteger(graphId) && graphId! > 0 &&
+      (reviewRequestId === undefined || (Number.isInteger(reviewRequestId) && reviewRequestId > 0)),
+    staleTime: reviewRequestId === undefined ? 15_000 : 0,
+    cancelOnUnmount: reviewRequestId !== undefined,
+    queryFn: async ({ signal }) => reviewRequestId === undefined
+      ? shiftCorrectionsApi.listGraph(containerId!, graphId!, signal)
+      : [await shiftCorrectionsApi.getGraphRequest(containerId!, graphId!, reviewRequestId, signal)],
   });
 
 export const useShiftCorrectionSettingQuery = (enabled = true) =>
@@ -46,13 +61,19 @@ export function useSaveShiftCorrectionSettingMutation() {
 export function useApproveShiftCorrectionMutation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ containerId, graphId, id, highlightColor }: { containerId: number; graphId: number; id: number; highlightColor: string }) =>
+    mutationFn: ({ containerId, graphId, id, highlightColor }: { containerId: number; graphId: number; id: number; highlightColor?: string }) =>
       shiftCorrectionsApi.approve(containerId, graphId, id, highlightColor),
-    onSuccess: (_data, payload) => {
+    onSuccess: (data, payload) => {
+      queryClient.setQueryData(queryKeys.shiftSwaps.graphCorrectionById(payload.containerId, payload.graphId, payload.id), [data]);
       queryClient.invalidateQueries({ queryKey: queryKeys.shiftSwaps.all });
       queryClient.invalidateQueries({ queryKey: queryKeys.employeeSchedules.all });
       queryClient.invalidateQueries({ queryKey: queryKeys.containers.graphSlots(payload.containerId, payload.graphId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.containers.graphCellStyles(payload.containerId, payload.graphId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.containers.graphEmployees(payload.containerId, payload.graphId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.containers.graphs(payload.containerId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.home.activity() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.home.navBadges() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.home.dashboard() });
     },
   });
 }
@@ -62,6 +83,11 @@ export function useRejectShiftCorrectionMutation() {
   return useMutation({
     mutationFn: ({ containerId, graphId, id }: { containerId: number; graphId: number; id: number }) =>
       shiftCorrectionsApi.reject(containerId, graphId, id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.shiftSwaps.all }),
+    onSuccess: (data, payload) => {
+      queryClient.setQueryData(queryKeys.shiftSwaps.graphCorrectionById(payload.containerId, payload.graphId, payload.id), [data]);
+      queryClient.invalidateQueries({ queryKey: queryKeys.shiftSwaps.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.home.activity() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.home.navBadges() });
+    },
   });
 }
