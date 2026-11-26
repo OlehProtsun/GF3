@@ -135,6 +135,7 @@ export const useAvailabilityGroupMembersQuery = (groupId: number | null) =>
   useQuery({
     queryKey: queryKeys.availabilityGroups.members(groupId ?? 0),
     enabled: groupId !== null,
+    cancelOnUnmount: true,
     queryFn: ({ signal }) => availabilityGroupsApi.members(groupId as number, signal),
   });
 
@@ -178,6 +179,7 @@ export const useAvailabilityGroupSlotsQuery = (groupId: number | null) =>
   useQuery({
     queryKey: queryKeys.availabilityGroups.slots(groupId ?? 0),
     enabled: groupId !== null,
+    cancelOnUnmount: true,
     queryFn: ({ signal }) => availabilityGroupsApi.slots(groupId as number, signal),
   });
 

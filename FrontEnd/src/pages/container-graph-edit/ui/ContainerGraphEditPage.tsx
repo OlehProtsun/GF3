@@ -72,6 +72,7 @@ import {
   rgbHexToArgb,
   resolveGraphSession,
   sanitizeGraphCellMap,
+  validateGraphCellMap,
   serializeGraphNoteCellStyles,
   serializeGraphNoteTextCells,
   sortGraphItemsByDisplayOrder,
@@ -140,8 +141,16 @@ type EditableAvailabilityBind = {
 };
 
 type EditableScheduleManualColumn = EditableGraphManualColumn;
+type GraphEditIntent = {
+  removedEmployees: ReadonlySet<number>;
+  editedCells: ReadonlySet<string>;
+  generated: boolean;
+};
+const initialGraphEditIntent: GraphEditIntent = { removedEmployees: new Set(), editedCells: new Set(), generated: false };
+
 type GraphEditorSessionDraft = {
   graphId: number;
+  editIntent: GraphEditIntent;
   form: ContainerGraphFormState;
   graphEmployeeRows: Array<{ id: number | null; employeeId: number; minHoursMonth: string; isPriority: boolean }>;
   selectedSchedulePresetId: number | null;
@@ -198,6 +207,7 @@ type PreflightedGraph = {
 };
 
 type GraphEditorUndoSnapshot = {
+  editIntent: GraphEditIntent;
   form: ContainerGraphFormState;
   graphEmployeeRows: Array<{ id: number | null; employeeId: number; minHoursMonth: string; isPriority: boolean }>;
   selectedSchedulePresetId: number | null;
@@ -636,6 +646,7 @@ function createPersistedGraphDraft(state: PersistedGraphState, employeesById: Ma
   const scheduleColumnOrder = sanitizeScheduleColumnOrder(note.columnOrder, graphEmployeeRows, manualColumns);
   return {
     graphId: graph.id,
+    editIntent: initialGraphEditIntent,
     form: { ...createGraphFormFromGraph(graph), note: note.note },
     graphEmployeeRows,
     selectedSchedulePresetId: null,
@@ -652,6 +663,25 @@ function createPersistedGraphDraft(state: PersistedGraphState, employeesById: Ma
     syncedAvailabilityGroupId: graph.availabilityGroupId ?? null,
     previewAvailabilitySelection: FOLLOW_SCHEDULE_DETAILS_PREVIEW,
   };
+}
+
+function hasUnintendedGraphChanges(draft: GraphEditorSessionDraft, baseline: PersistedGraphState) {
+  const { removedEmployees, editedCells, generated } = draft.editIntent;
+  const currentEmployees = new Set(draft.graphEmployeeRows.map(row => row.employeeId));
+  const unexpectedEmployeeRemoval = baseline.employees.some(row => !currentEmployees.has(row.employeeId) && !removedEmployees.has(row.employeeId));
+  if (unexpectedEmployeeRemoval || generated) return unexpectedEmployeeRemoval;
+
+  const days = getGraphDaysInMonth(Number(draft.form.year), Number(draft.form.month));
+  const periodChanged = baseline.graph.year !== Number(draft.form.year) || baseline.graph.month !== Number(draft.form.month);
+  return Object.entries(buildGraphCellMap(baseline.slots)).some(([key, value]) => {
+    const { employeeId, dayOfMonth } = parseSelectedCellKey(key);
+    if (editedCells.has(key) || (!currentEmployees.has(employeeId) && removedEmployees.has(employeeId)) ||
+      (periodChanged && dayOfMonth > days)) return false;
+
+    const next = parseGraphCellContent(draft.cellMap[key] ?? "");
+    const before = parseGraphCellContent(value);
+    return next.kind !== "intervals" || before.kind !== "intervals" || stableSerialize(next.value) !== stableSerialize(before.value);
+  });
 }
 
 function createEditableEmployeeRows(
@@ -974,7 +1004,17 @@ async function readPersistedGraph(containerId: number, graphId: number, signal?:
     readSaveRequest(readSignal => containersApi.listGraphSlots(containerId, graphId, readSignal), signal, runSaveRequest),
     readSaveRequest(readSignal => containersApi.listGraphCellStyles(containerId, graphId, readSignal), signal, runSaveRequest),
   );
-  return { graph, employees, slots, styles };
+  const state = { graph, employees, slots, styles };
+  if (!isPersistedGraphFor(state, containerId, graphId)) {
+    throw new Error(t("The current schedule could not be read. Your edits are still here."));
+  }
+  return state;
+}
+
+function isPersistedGraphFor(state: PersistedGraphState, containerId: number, graphId: number) {
+  return state.graph?.containerId === containerId && state.graph.id === graphId &&
+    [state.employees, state.slots, state.styles].every(rows =>
+      Array.isArray(rows) && rows.every(row => row.scheduleId === graphId));
 }
 
 const readGraphVersions = (containerId: number, graphId: number, signal: AbortSignal, runSaveRequest?: RunGraphSaveRequest) =>
@@ -1080,6 +1120,11 @@ const PRESET_MANAGED_FIELDS = new Set<keyof ContainerGraphFormState>([
 const GENERATE_AVAILABILITY_GROUP_REQUIRED_MESSAGE = "Select an availability group before generating a schedule.";
 
 export function ContainerGraphEditPage() {
+  const { containerId } = useParams<{ containerId: string }>();
+  return <ContainerGraphEditSession key={containerId} />;
+}
+
+function ContainerGraphEditSession() {
   const language = useLanguageRevision();
   usePageScrollbarHidden();
 
@@ -1103,13 +1148,13 @@ export function ContainerGraphEditPage() {
   const cellStylesQuery = useGraphCellStylesQuery(containerId, graphId);
   const schedulePresetsQuery = useSchedulePresetsQuery(containerId);
   const shiftSwapLogQuery = useGraphShiftSwapLogQuery(containerId, graphId, !isCreate);
-  const availabilityGroupsQuery = useAvailabilityGroupsListQuery(location.key);
+  const availabilityGroupsQuery = useAvailabilityGroupsListQuery();
   const bindsQuery = useAvailabilityBindsListQuery();
   const fillColorBindsQuery = useManagerGraphFillColorBindsQuery();
   const textColorBindsQuery = useManagerGraphTextColorBindsQuery();
   const contractSettingsQuery = useEmploymentContractSettingsQuery();
-  const employeesQuery = useEmployeesListQuery({ refreshKey: location.key });
-  const shopsQuery = useShopsListQuery({ refreshKey: location.key });
+  const employeesQuery = useEmployeesListQuery();
+  const shopsQuery = useShopsListQuery();
   const saveWorkspaceMutation = useSaveGraphWorkspaceMutation();
   const createSchedulePresetMutation = useCreateSchedulePresetMutation();
   const generateMutation = useGenerateGraphPreviewMutation();
@@ -1124,8 +1169,14 @@ export function ContainerGraphEditPage() {
   const cancelManualShiftSwapMutation = useCancelManagerManualShiftSwapMutation();
   const refreshManualShiftSwapMutation = useRefreshManagerManualShiftSwapMutation();
 
+  const [hydratedKey, setHydratedKey] = useState<string | null>(null);
+  const editorKey = graphId === null ? `create:${containerId}` : `${containerId}:${graphId}`;
+  const hasActiveDraft = containerId !== null && hydratedKey === editorKey;
+  const routedGraph = graphQuery.data ?? containerGraphsQuery.data?.find(item => item.id === graphId);
   const [form, setForm] = useState<ContainerGraphFormState>(() => createInitialGraphForm());
-  const urlop = useGraphApprovedUrlopQuery({ shopId: Number(form.shopId), year: Number(form.year) || 2000, month: Number(form.month) || 1 });
+  const urlop = useGraphApprovedUrlopQuery(hasActiveDraft
+    ? { shopId: Number(form.shopId), year: Number(form.year) || 2000, month: Number(form.month) || 1 }
+    : routedGraph);
   const urlopCellKeys = approvedKeys(urlop.data ?? [], Number(form.shopId), Number(form.year), Number(form.month));
   const [formErrors, setFormErrors] = useState<ContainerGraphFormErrors>({});
   const [graphEmployeeRows, setGraphEmployeeRows] = useState<Array<{ id: number | null; employeeId: number; minHoursMonth: string; isPriority: boolean }>>([]);
@@ -1143,7 +1194,6 @@ export function ContainerGraphEditPage() {
   useEffect(() => () => {
     if (refreshSuccessTimeoutRef.current !== null) window.clearTimeout(refreshSuccessTimeoutRef.current);
   }, []);
-  const [hydratedKey, setHydratedKey] = useState<string | null>(null);
   const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(false);
   const [selectedCellKeys, setSelectedCellKeys] = useState<string[]>([]);
   const [previewSelectedCellKeys, setPreviewSelectedCellKeys] = useState<string[]>([]);
@@ -1172,8 +1222,8 @@ export function ContainerGraphEditPage() {
   const [undoDepth, setUndoDepth] = useState(0);
   const optimisticStyleIdRef = useRef(-1);
   const styleRecordsRef = useRef<GraphCellStyle[]>([]);
-  const syncedAvailabilityGroupIdRef = useRef<number | null>(null);
-  const observedAvailabilityMembersByIdRef = useRef(new Map<number, { groupId: number; members: string }>());
+  const editIntentRef = useRef(initialGraphEditIntent);
+  const [syncedAvailabilityGroupId, setSyncedAvailabilityGroupId] = useState<number | null>(null);
   const sessionDraftsRef = useRef<Record<number, GraphEditorSessionDraft>>({});
   const savedGraphSnapshotByIdRef = useRef<Record<number, string>>({});
   const baselinePersistedByIdRef = useRef<Record<number, PersistedGraphState>>({});
@@ -1205,7 +1255,7 @@ export function ContainerGraphEditPage() {
   const generationEditorRef = useRef({ manualColumns, scheduleColumnOrder, pendingManualShiftPublishes, offers: shiftSwapLogQuery.data });
   useLayoutEffect(() => {
     generationSessionRef.current = { containerId, graphId, token: generationSessionRef.current.token + 1 };
-  }, [containerId, graphId, form.availabilityGroupId]);
+  }, [containerId, graphId, form.availabilityGroupId, form.year, form.month, form.shopId]);
   useLayoutEffect(() => {
     generationEditorRef.current = { manualColumns, scheduleColumnOrder, pendingManualShiftPublishes, offers: shiftSwapLogQuery.data };
   }, [manualColumns, scheduleColumnOrder, pendingManualShiftPublishes, shiftSwapLogQuery.data]);
@@ -1225,6 +1275,7 @@ export function ContainerGraphEditPage() {
   );
   const applyGraphDraft = useCallback((draft: GraphEditorSessionDraft) => {
     const restored = cloneGraphEditorSessionDraft(draft);
+    editIntentRef.current = restored.editIntent;
     setForm(restored.form);
     setGraphEmployeeRows(restored.graphEmployeeRows);
     setSelectedSchedulePresetId(restored.selectedSchedulePresetId);
@@ -1237,7 +1288,7 @@ export function ContainerGraphEditPage() {
     setStyleRecords(restored.styleRecords);
     styleRecordsRef.current = restored.styleRecords;
     setAutoAvailabilityStyleSuppressions(restored.autoAvailabilityStyleSuppressions);
-    syncedAvailabilityGroupIdRef.current = restored.syncedAvailabilityGroupId;
+    setSyncedAvailabilityGroupId(restored.syncedAvailabilityGroupId);
     setFillColor(restored.fillColor);
     setTextColor(restored.textColor);
     setPreviewAvailabilitySelection(restored.previewAvailabilitySelection);
@@ -1246,8 +1297,8 @@ export function ContainerGraphEditPage() {
     setSubmitError(undefined);
     setManualShiftPublishError(null);
     resetUndoHistory();
-    setHydratedKey(String(restored.graphId));
-  }, [resetUndoHistory]);
+    setHydratedKey(`${containerId}:${restored.graphId}`);
+  }, [containerId, resetUndoHistory]);
   const captureGraphBaseline = useCallback((state: PersistedGraphState, draft: GraphEditorSessionDraft) => {
     baselinePersistedByIdRef.current[draft.graphId] = structuredClone(state);
     baselineComparisonByIdRef.current[draft.graphId] = compareGraphDraft(cloneGraphEditorSessionDraft(draft));
@@ -1265,19 +1316,18 @@ export function ContainerGraphEditPage() {
     } catch { /* Storage may be disabled. Legacy drafts are never restored. */ }
   }, [isCreate, managerId]);
 
+  const graphReadInProgress = [graphQuery, graphEmployeesQuery, slotsQuery, cellStylesQuery].some(query => query.isFetching);
+  const graphReadFailed = [graphQuery, graphEmployeesQuery, slotsQuery, cellStylesQuery].some(query => query.isError);
   const persistedState = useMemo<PersistedGraphState | null>(() => {
-    if (!graphQuery.data || graphQuery.data.id !== graphId || !graphEmployeesQuery.data || !slotsQuery.data || !cellStylesQuery.data) {
-      return null;
-    }
-    return { graph: graphQuery.data, employees: graphEmployeesQuery.data, slots: slotsQuery.data, styles: cellStylesQuery.data };
-  }, [cellStylesQuery.data, graphEmployeesQuery.data, graphId, graphQuery.data, slotsQuery.data]);
+    if (containerId === null || graphId === null || !graphQuery.data || !graphEmployeesQuery.data ||
+      !slotsQuery.data || !cellStylesQuery.data) return null;
+    const state = { graph: graphQuery.data, employees: graphEmployeesQuery.data, slots: slotsQuery.data, styles: cellStylesQuery.data };
+    return isPersistedGraphFor(state, containerId, graphId) ? state : null;
+  }, [cellStylesQuery.data, containerId, graphEmployeesQuery.data, graphId, graphQuery.data, slotsQuery.data]);
 
   useEffect(() => {
     if (isCreate) {
-      const createKey = `create:${containerId ?? "none"}`;
-      if (hydratedKey === createKey) {
-        return;
-      }
+      if (hasActiveDraft || !shopsQuery.data) return;
 
       setForm(createInitialGraphForm(shopsQuery.data?.[0]?.id ?? null));
       setFormErrors({});
@@ -1295,28 +1345,29 @@ export function ContainerGraphEditPage() {
       setStyleRecords([]);
       setAutoAvailabilityStyleSuppressions({});
       styleRecordsRef.current = [];
-      syncedAvailabilityGroupIdRef.current = null;
+      editIntentRef.current = initialGraphEditIntent;
+      setSyncedAvailabilityGroupId(null);
       setFillColor("#dbeafe");
       setTextColor("#0f172a");
       setPreviewAvailabilitySelection(FOLLOW_SCHEDULE_DETAILS_PREVIEW);
       resetUndoHistory();
-      setHydratedKey(createKey);
+      setHydratedKey(editorKey);
       return;
     }
 
-    if (graphId === null || hydratedKey === String(graphId)) return;
+    if (graphId === null || hasActiveDraft) return;
     const sessionDraft = sessionDraftsRef.current[graphId];
     if (sessionDraft) {
       applyGraphDraft(sessionDraft);
       return;
     }
-    if (persistedState) {
+    if (persistedState && !graphReadInProgress && !graphReadFailed) {
       const draft = createPersistedGraphDraft(persistedState, employeesById);
       captureGraphBaseline(persistedState, draft);
       applyGraphDraft(draft);
     }
   }, [
-    applyGraphDraft, captureGraphBaseline, containerId, employeesById, graphId, hydratedKey,
+    applyGraphDraft, captureGraphBaseline, editorKey, employeesById, graphId, graphReadFailed, graphReadInProgress, hasActiveDraft,
     isCreate, persistedState, resetUndoHistory, shopsQuery.data,
   ]);
 
@@ -1340,17 +1391,19 @@ export function ContainerGraphEditPage() {
   );
 
   useEffect(() => {
-    if (!form.availabilityGroupId || !availabilityGroupsQuery.data) {
+    if (!hasActiveDraft || !form.availabilityGroupId || !availabilityGroupsQuery.data) {
       return;
     }
 
     const availabilityGroupId = Number(form.availabilityGroupId);
-    if (availabilityGroupIdSet.has(availabilityGroupId)) {
+    const baseline = graphId === null ? undefined : baselinePersistedByIdRef.current[graphId]?.graph;
+    if (availabilityGroupIdSet.has(availabilityGroupId) || (baseline?.availabilityGroupId === availabilityGroupId &&
+        baseline.year === Number(form.year) && baseline.month === Number(form.month))) {
       return;
     }
 
     setForm(current => ({ ...current, availabilityGroupId: "" }));
-  }, [availabilityGroupIdSet, availabilityGroupsQuery.data, form.availabilityGroupId]);
+  }, [availabilityGroupIdSet, availabilityGroupsQuery.data, form.availabilityGroupId, form.month, form.year, graphId, hasActiveDraft]);
 
   useEffect(() => {
     if (!bindsQuery.data || hasLocalBindChanges) {
@@ -1369,6 +1422,7 @@ export function ContainerGraphEditPage() {
   }, [bindsQuery.data, hasLocalBindChanges]);
 
   useEffect(() => {
+    if (!hasActiveDraft) return;
     const employeeIds = graphEmployeeRows.map(row => row.employeeId);
     const sanitizedCellMap = sanitizeGraphCellMap(
       cellMap,
@@ -1380,35 +1434,30 @@ export function ContainerGraphEditPage() {
     if (JSON.stringify(sanitizedCellMap) !== JSON.stringify(cellMap)) {
       setCellMap(sanitizedCellMap);
     }
-  }, [cellMap, form.month, form.year, graphEmployeeRows]);
+  }, [cellMap, form.month, form.year, graphEmployeeRows, hasActiveDraft]);
 
   useEffect(() => {
-    if (hydratedKey === null) {
-      return;
-    }
+    if (!hasActiveDraft) return;
 
     const nextStyleRecords = filterGraphEditorStyles(
-      styleRecordsRef.current, graphEmployeeRows, manualColumns,
+      styleRecords, graphEmployeeRows, manualColumns,
       Number(form.year) || new Date().getFullYear(), Number(form.month) || 1,
     );
 
-    if (nextStyleRecords.length === styleRecordsRef.current.length) {
+    if (nextStyleRecords.length === styleRecords.length) {
       return;
     }
 
     syncStyleRecords(nextStyleRecords);
-  }, [form.month, form.year, graphEmployeeRows, hydratedKey, manualColumns]);
+  }, [form.month, form.year, graphEmployeeRows, hasActiveDraft, manualColumns, styleRecords]);
 
   useEffect(() => {
+    if (!hasActiveDraft) return;
     const nextColumnOrder = sanitizeScheduleColumnOrder(scheduleColumnOrder, graphEmployeeRows, manualColumns);
     if (!arraysEqual(nextColumnOrder, scheduleColumnOrder)) {
       setScheduleColumnOrder(nextColumnOrder);
     }
-  }, [graphEmployeeRows, manualColumns, scheduleColumnOrder]);
-
-  useEffect(() => {
-    styleRecordsRef.current = styleRecords;
-  }, [styleRecords]);
+  }, [graphEmployeeRows, hasActiveDraft, manualColumns, scheduleColumnOrder]);
 
   const orderedGraphEmployeeRows = useMemo(
     () => sortGraphEmployeeRowsByColumnOrder(graphEmployeeRows, scheduleColumnOrder),
@@ -1631,19 +1680,17 @@ export function ContainerGraphEditPage() {
       const savedSnapshot = savedGraphSnapshotByIdRef.current[draft.graphId];
       return savedSnapshot ? buildGraphDraftSnapshot(draft) !== savedSnapshot : false;
     });
-  const hasUnsavedScheduleChanges = hydratedKey !== null && Boolean(currentGraphBaselineSnapshot) && (
-    currentGraphSnapshot !== currentGraphBaselineSnapshot ||
-    hasDirtySessionDrafts ||
-    Object.values(saveGuardByIdRef.current).some(guard => guard.blockedBy)
-  );
+  const hasUnsavedScheduleChanges = hasDirtySessionDrafts ||
+    (hasActiveDraft && Boolean(currentGraphBaselineSnapshot) && currentGraphSnapshot !== currentGraphBaselineSnapshot) ||
+    Object.values(saveGuardByIdRef.current).some(guard => guard.blockedBy);
   const hasUnsavedChanges = hasUnsavedScheduleChanges || (
-    hydratedKey !== null &&
+    hasActiveDraft &&
     Boolean(currentGraphBaselineSnapshot) &&
     hasPendingBindDraftChanges(bindRows)
   );
 
   useEffect(() => {
-    if (graphId === null || hydratedKey !== String(graphId) || !persistedState || saveInFlightRef.current ||
+    if (graphId === null || !hasActiveDraft || !persistedState || graphReadInProgress || graphReadFailed || saveInFlightRef.current ||
       saveGuardByIdRef.current[graphId]?.blockedBy ||
       currentGraphSnapshot !== currentGraphBaselineSnapshot) return;
     const baseline = baselinePersistedByIdRef.current[graphId];
@@ -1654,21 +1701,21 @@ export function ContainerGraphEditPage() {
     applyGraphDraft(draft);
   }, [
     applyGraphDraft, captureGraphBaseline, currentGraphBaselineSnapshot, currentGraphSnapshot,
-    employeesById, graphId, hydratedKey, persistedState,
+    employeesById, graphId, graphReadFailed, graphReadInProgress, hasActiveDraft, persistedState,
   ]);
 
-  const relatedGraphs = useMemo(
-    () => (containerGraphsQuery.data ?? []).filter(item =>
-      item.id !== graphId &&
-      item.year === effectiveGraph.year &&
-      item.month === effectiveGraph.month,
-    ),
-    [containerGraphsQuery.data, effectiveGraph.month, effectiveGraph.year, graphId],
-  );
+  const displayedPeriod = hasActiveDraft || graphId === null ? effectiveGraph : routedGraph;
+  const periodGraphs = (containerGraphsQuery.data ?? []).filter(item =>
+    item.year === displayedPeriod?.year && item.month === displayedPeriod?.month);
   const relatedGraphSlotsQuery = useGraphSlotsBatchQuery(
     containerId,
-    relatedGraphs.map(item => item.id),
+    periodGraphs.map(item => item.id),
     containerId !== null,
+  );
+  const relatedGraphs = useMemo(
+    () => (containerGraphsQuery.data ?? []).filter(item =>
+      item.id !== graphId && item.year === effectiveGraph.year && item.month === effectiveGraph.month),
+    [containerGraphsQuery.data, effectiveGraph.month, effectiveGraph.year, graphId],
   );
   const relatedScheduleHintData = useMemo(
     () => buildGraphRelatedScheduleHintData({
@@ -1759,11 +1806,13 @@ export function ContainerGraphEditPage() {
     [draftGraphEmployees, effectiveSlots, employeesById, language],
   );
 
-  const scheduleAvailabilityGroupId = form.availabilityGroupId ? Number(form.availabilityGroupId) : null;
+  const scheduleAvailabilityGroupId = hasActiveDraft
+    ? (form.availabilityGroupId ? Number(form.availabilityGroupId) : null)
+    : routedGraph?.availabilityGroupId ?? null;
   const scheduleAvailabilityMembersQuery = useAvailabilityGroupMembersQuery(scheduleAvailabilityGroupId);
   const scheduleAvailabilitySlotsQuery = useAvailabilityGroupSlotsQuery(scheduleAvailabilityGroupId);
   const previewAvailabilityGroupId =
-    previewAvailabilitySelection === FOLLOW_SCHEDULE_DETAILS_PREVIEW
+    !hasActiveDraft || previewAvailabilitySelection === FOLLOW_SCHEDULE_DETAILS_PREVIEW
       ? scheduleAvailabilityGroupId
       : Number(previewAvailabilitySelection);
   const previewMembersQuery = useAvailabilityGroupMembersQuery(previewAvailabilityGroupId);
@@ -1909,7 +1958,7 @@ export function ContainerGraphEditPage() {
   };
 
   useEffect(() => {
-    if (previewAvailabilitySelection === FOLLOW_SCHEDULE_DETAILS_PREVIEW) {
+    if (!hasActiveDraft || !availabilityGroupsQuery.data || previewAvailabilitySelection === FOLLOW_SCHEDULE_DETAILS_PREVIEW) {
       return;
     }
 
@@ -1919,55 +1968,35 @@ export function ContainerGraphEditPage() {
     }
 
     setPreviewAvailabilitySelection(FOLLOW_SCHEDULE_DETAILS_PREVIEW);
-  }, [availabilityGroupIdSet, previewAvailabilitySelection]);
+  }, [availabilityGroupIdSet, availabilityGroupsQuery.data, hasActiveDraft, previewAvailabilitySelection]);
 
+  const hasPendingAvailabilitySync = hasActiveDraft && scheduleAvailabilityGroupId !== null &&
+    scheduleAvailabilityGroupId !== syncedAvailabilityGroupId;
   useEffect(() => {
-    if (graphId !== null && hydratedKey !== String(graphId)) return;
-    if (!form.availabilityGroupId) {
-      syncedAvailabilityGroupIdRef.current = null;
-      return;
-    }
-
-    if (!scheduleAvailabilityMembersQuery.data) {
-      return;
-    }
-
-    const availabilityGroupId = Number(form.availabilityGroupId);
-    if (!Number.isInteger(availabilityGroupId)) return;
-    const memberIds = new Set(scheduleAvailabilityMembersQuery.data.map(member => member.employeeId));
-    const sameEmployees = graphEmployeeRows.length === memberIds.size && graphEmployeeRows.every(row => memberIds.has(row.employeeId));
-    if (graphId !== null) {
-      const members = [...memberIds].sort((left, right) => left - right).join(",");
-      const previous = observedAvailabilityMembersByIdRef.current.get(graphId);
-      observedAvailabilityMembersByIdRef.current.set(graphId, { groupId: availabilityGroupId, members });
-      if (syncedAvailabilityGroupIdRef.current === availabilityGroupId) {
-        if (sameEmployees || previous?.groupId !== availabilityGroupId || previous.members === members) return;
-        const baseline = baselineComparisonByIdRef.current[graphId];
-        const workspace = buildGraphWorkspaceSnapshot({
-          form, graphEmployeeRows, cellMap, manualColumns, pendingManualShiftPublishes, scheduleColumnOrder,
-          styleRecords: [], autoAvailabilityStyleSuppressions,
-        });
-        if (baseline?.nonStyleFingerprint === workspace) return;
-      }
-    } else if (syncedAvailabilityGroupIdRef.current === availabilityGroupId && sameEmployees) {
-      return;
-    }
-
-    const previewMembers = scheduleAvailabilityMembersQuery.data;
+    if (!hasPendingAvailabilitySync || !scheduleAvailabilityMembersQuery.data || !scheduleAvailabilitySlotsQuery.data ||
+      scheduleAvailabilityMembersQuery.isFetching || scheduleAvailabilityMembersQuery.isError ||
+      scheduleAvailabilitySlotsQuery.isFetching || scheduleAvailabilitySlotsQuery.isError) return;
+    const members = scheduleAvailabilityMembersQuery.data;
+    const selectedIds = new Set(members.map(member => member.employeeId));
+    editIntentRef.current = { ...editIntentRef.current, removedEmployees: new Set([
+      ...editIntentRef.current.removedEmployees,
+      ...graphEmployeeRows.filter(row => !selectedIds.has(row.employeeId)).map(row => row.employeeId),
+    ]) };
     setGraphEmployeeRows(currentRows => {
-      const nextRows = buildEmployeeRowsFromAvailabilityMembers(currentRows, previewMembers);
+      const nextRows = buildEmployeeRowsFromAvailabilityMembers(currentRows, members);
       return graphEmployeeRowsEqual(currentRows, nextRows) ? currentRows : nextRows;
     });
     setSelectedSchedulePresetId(null);
     setSubmitError(undefined);
-    syncedAvailabilityGroupIdRef.current = availabilityGroupId;
+    setSyncedAvailabilityGroupId(scheduleAvailabilityGroupId);
   }, [
-    autoAvailabilityStyleSuppressions, cellMap, form, graphEmployeeRows, graphId, hydratedKey, manualColumns,
-    pendingManualShiftPublishes, scheduleAvailabilityMembersQuery.data, scheduleColumnOrder,
+    graphEmployeeRows, hasPendingAvailabilitySync, scheduleAvailabilityGroupId, scheduleAvailabilityMembersQuery.data,
+    scheduleAvailabilityMembersQuery.isError, scheduleAvailabilityMembersQuery.isFetching, scheduleAvailabilitySlotsQuery.data,
+    scheduleAvailabilitySlotsQuery.isError, scheduleAvailabilitySlotsQuery.isFetching,
   ]);
 
   useEffect(() => {
-    if (autoAvailabilityUnavailableCellKeys.length === 0) {
+    if (!hasActiveDraft || hasPendingAvailabilitySync || autoAvailabilityUnavailableCellKeys.length === 0) {
       return;
     }
 
@@ -1988,6 +2017,8 @@ export function ContainerGraphEditPage() {
     autoAvailabilityUnavailableCellKeys,
     currentAutoAvailabilitySuppressionCellKeySet,
     graphId,
+    hasActiveDraft,
+    hasPendingAvailabilitySync,
   ]);
 
   const essentialLoadQueries = [containerQuery, shopsQuery, employeesQuery, availabilityGroupsQuery, contractSettingsQuery, urlop];
@@ -1998,19 +2029,19 @@ export function ContainerGraphEditPage() {
     ...(previewAvailabilityGroupId && previewAvailabilityGroupId !== scheduleAvailabilityGroupId ? [previewMembersQuery, previewSlotsQuery] : []),
   ];
   const failedLoadQueries = essentialQueries.filter(query => query.isError);
-  const hasLoadedEditor = containerId !== null && (isCreate
-    ? hydratedKey === `create:${containerId}` && essentialLoadQueries.every(query => query.data !== undefined || query === urlop)
-    : graphId !== null && hydratedKey === String(graphId));
-  const isLoading = containerId !== null && !hasLoadedEditor &&
-    (isAvailabilityPolicyLoading || essentialQueries.some(query => query.isLoading));
+  const hasLoadedEditor = hasActiveDraft &&
+    (!isCreate || essentialLoadQueries.every(query => query.data !== undefined || query === urlop));
+  const isReadingEditor = isAvailabilityPolicyLoading || graphReadInProgress || essentialQueries.some(query => query.isLoading);
   const hasLoadError = containerId === null || (!hasLoadedEditor && (
-    hasAvailabilityPolicyError || failedLoadQueries.length > 0 || (!isCreate && !isLoading && !persistedState)
+    hasAvailabilityPolicyError || failedLoadQueries.length > 0 || (!isCreate && !isReadingEditor && !persistedState)
   ));
-  const isPolicyUnavailable = isAvailabilityPolicyLoading || hasAvailabilityPolicyError ||
+  const isLoading = !hasLoadedEditor && !hasLoadError;
+  const isPolicyUnavailable = hasPendingAvailabilitySync || isAvailabilityPolicyLoading || hasAvailabilityPolicyError ||
     (Number(form.shopId) > 0 && urlop.data === undefined) ||
     (Boolean(scheduleAvailabilityGroupId) && (!availabilityGroupsQuery.data || !scheduleAvailabilityMembersQuery.data || !scheduleAvailabilitySlotsQuery.data));
 
   useEffect(() => {
+    if (!hasActiveDraft) return;
     const employeeIdSet = new Set(orderedEmployeeIds);
     const daysInMonth = getGraphDaysInMonth(Number(form.year) || new Date().getFullYear(), Number(form.month) || 1);
 
@@ -2025,7 +2056,7 @@ export function ContainerGraphEditPage() {
         ? currentSelection
         : nextSelection;
     });
-  }, [form.month, form.year, orderedEmployeeIds]);
+  }, [form.month, form.year, hasActiveDraft, orderedEmployeeIds]);
 
   useEffect(() => {
     setPreviewSelectedCellKeys([]);
@@ -2053,6 +2084,7 @@ export function ContainerGraphEditPage() {
     setStyleRecords(nextStyles);
   };
   const createCurrentUndoSnapshot = (): GraphEditorUndoSnapshot => cloneGraphEditorUndoSnapshot({
+    editIntent: editIntentRef.current,
     form,
     graphEmployeeRows,
     selectedSchedulePresetId,
@@ -2063,7 +2095,7 @@ export function ContainerGraphEditPage() {
     scheduleColumnOrder,
     styleRecords: styleRecordsRef.current,
     autoAvailabilityStyleSuppressions,
-    syncedAvailabilityGroupId: syncedAvailabilityGroupIdRef.current,
+    syncedAvailabilityGroupId,
   });
   const captureUndoSnapshot = (coalesceKey: string | null = null) => {
     const capturedAt = Date.now();
@@ -2094,6 +2126,7 @@ export function ContainerGraphEditPage() {
     }
 
     const snapshot = cloneGraphEditorUndoSnapshot(entry.snapshot);
+    editIntentRef.current = snapshot.editIntent;
     undoHistoryRef.current = nextHistory;
     setUndoDepth(nextHistory.length);
     setForm(snapshot.form);
@@ -2106,19 +2139,20 @@ export function ContainerGraphEditPage() {
     setScheduleColumnOrder(snapshot.scheduleColumnOrder);
     syncStyleRecords(snapshot.styleRecords);
     setAutoAvailabilityStyleSuppressions(snapshot.autoAvailabilityStyleSuppressions);
-    syncedAvailabilityGroupIdRef.current = snapshot.syncedAvailabilityGroupId;
+    setSyncedAvailabilityGroupId(snapshot.syncedAvailabilityGroupId);
     setFormErrors({});
     setCellErrors({});
     setSubmitError(undefined);
     setManualShiftPublishError(null);
   };
   const createCurrentGraphDraft = () => {
-    if (graphId === null || hydratedKey !== String(graphId)) {
+    if (graphId === null || !hasActiveDraft) {
       return null;
     }
 
     return cloneGraphEditorSessionDraft({
       graphId,
+      editIntent: editIntentRef.current,
       form,
       graphEmployeeRows,
       selectedSchedulePresetId,
@@ -2132,7 +2166,7 @@ export function ContainerGraphEditPage() {
       autoAvailabilityStyleSuppressions,
       fillColor,
       textColor,
-      syncedAvailabilityGroupId: syncedAvailabilityGroupIdRef.current,
+      syncedAvailabilityGroupId,
       previewAvailabilitySelection,
     });
   };
@@ -2181,8 +2215,8 @@ export function ContainerGraphEditPage() {
       setSelectedSchedulePresetId(null);
     }
 
-    if (field === "availabilityGroupId") {
-      syncedAvailabilityGroupIdRef.current = null;
+    if (field === "availabilityGroupId" && !Object.is(form[field], value)) {
+      setSyncedAvailabilityGroupId(null);
       setPreviewAvailabilitySelection(FOLLOW_SCHEDULE_DETAILS_PREVIEW);
     }
 
@@ -2264,6 +2298,7 @@ export function ContainerGraphEditPage() {
 
     const employeeId = employeeRemoveTargetId;
     captureUndoSnapshot();
+    editIntentRef.current = { ...editIntentRef.current, removedEmployees: new Set([...editIntentRef.current.removedEmployees, employeeId]) };
     setGraphEmployeeRows(current => current.filter(row => row.employeeId !== employeeId));
     setScheduleColumnOrder(current => current.filter(columnId => columnId !== employeeId));
     setCellMap(current => {
@@ -2791,7 +2826,7 @@ export function ContainerGraphEditPage() {
   };
 
   const handleSave = async () => {
-    if (saveInFlightRef.current || generateMutation.isPending || hasLoadError || isLoading || isPolicyUnavailable) return;
+    if (!hasLoadedEditor || saveInFlightRef.current || generateMutation.isPending || hasLoadError || isLoading || isPolicyUnavailable) return;
 
     if (editLockMessage) {
       setSubmitError(editLockMessage);
@@ -2882,11 +2917,35 @@ export function ContainerGraphEditPage() {
         throw new Error(t("Current schedule draft is not ready yet."));
       }
 
-      const dirty = [...new Set(showSessionTabs ? openGraphIds : graphId === null ? [] : [graphId])].flatMap(id => {
+      const dirty = [...new Set([...openGraphIds, ...draftsToSave.keys()])].flatMap(id => {
         const draft = draftsToSave.get(id);
         const baseline = baselineComparisonByIdRef.current[id];
-        if (!draft || !baseline) return [];
+        if (!draft) return [];
+        const persisted = baselinePersistedByIdRef.current[id];
+        const { availabilityGroupId, year, month } = draft.form;
+        const employeeIds = draft.graphEmployeeRows.map(row => row.employeeId);
+        const validatedCells = sanitizeGraphCellMap(draft.cellMap, employeeIds, Number(year), Number(month));
+        const manualIds = new Set(draft.manualColumns.map(column => column.columnId));
+        if (!baseline || !persisted || !isPersistedGraphFor(persisted, containerId, id) ||
+          (availabilityGroupId && Number(availabilityGroupId) !== draft.syncedAvailabilityGroupId) ||
+          employeeIds.length !== new Set(employeeIds).size ||
+          Object.keys(validatedCells).length !== Object.keys(draft.cellMap).length ||
+          draft.styleRecords.some(style => style.scheduleId !== id) ||
+          draft.pendingManualShiftPublishes.some(publication => !manualIds.has(publication.manualColumnId))) {
+          const message = t("Current schedule draft is not ready yet.");
+          setSaveOutcome(id, { status: "pending", message });
+          throw new Error(message);
+        }
         const kind = classifyGraphDraftChange(baseline, compareGraphDraft(draft));
+        if (kind === "workspace" && hasUnintendedGraphChanges(draft, persisted)) {
+          const message = t("The current schedule could not be read. Your edits are still here.");
+          setSaveOutcome(id, { status: "pending", message });
+          throw new Error(message);
+        }
+        if (kind === "workspace" && Object.keys(validateGraphCellMap(draft.cellMap, employeeIds, Number(year), Number(month))).length) {
+          if (id === graphId) handleValidate();
+          throw new Error(t("Check highlighted fields before continuing."));
+        }
         return kind === "unchanged" && !saveGuardByIdRef.current[id]?.needsStyleVersion && !saveGuardByIdRef.current[id]?.checkpoint ? [] : [{ draft, kind }];
       });
       if (!dirty.length) {
@@ -2984,7 +3043,7 @@ export function ContainerGraphEditPage() {
   };
 
   const handleGenerate = async () => {
-    if (!containerId || hasLoadError || isLoading || isPolicyUnavailable) {
+    if (!containerId || !hasLoadedEditor || isPolicyUnavailable) {
       return;
     }
 
@@ -2997,9 +3056,6 @@ export function ContainerGraphEditPage() {
     }
 
     captureUndoSnapshot();
-    if (!graphEmployeeRowsEqual(graphEmployeeRows, generationRows)) {
-      setGraphEmployeeRows(generationRows);
-    }
 
     setSubmitError(undefined);
     const requestedForm = { ...form };
@@ -3036,6 +3092,12 @@ export function ContainerGraphEditPage() {
         return;
       }
       if (generated.slots) {
+        const generatedIds = new Set(generationRows.map(row => row.employeeId));
+        editIntentRef.current = { ...editIntentRef.current, generated: true, removedEmployees: new Set([
+          ...editIntentRef.current.removedEmployees,
+          ...graphEmployeeRows.filter(row => !generatedIds.has(row.employeeId)).map(row => row.employeeId),
+        ]) };
+        if (!graphEmployeeRowsEqual(graphEmployeeRows, generationRows)) setGraphEmployeeRows(generationRows);
         const latest = generationEditorRef.current;
         const reservations = (latest.offers ?? [])
           .filter(shift => shift.isManagerCreated && shift.status === "open" && shift.manualColumnId != null && shift.scheduleId === graphId)
@@ -3459,7 +3521,7 @@ export function ContainerGraphEditPage() {
     });
   };
 
-  const saveDisabled = isLoading || hasLoadError || isPolicyUnavailable || isSaving || generateMutation.isPending;
+  const saveDisabled = !hasLoadedEditor || isLoading || hasLoadError || isPolicyUnavailable || isSaving || generateMutation.isPending;
   const graphLabel = (id: number) =>
     baselinePersistedByIdRef.current[id]?.graph.name ?? sessionGraphs.find(graph => graph.id === id)?.name ?? t("Schedule {0}", id);
 
@@ -3692,6 +3754,7 @@ export function ContainerGraphEditPage() {
           const key = getGraphCellKey(employeeId, dayOfMonth);
           if ((cellMap[key] ?? "") !== value) {
             captureUndoSnapshot(`cell:${key}`);
+            editIntentRef.current = { ...editIntentRef.current, editedCells: new Set([...editIntentRef.current.editedCells, key]) };
           }
 
           setCellMap(current => ({ ...current, [key]: value }));

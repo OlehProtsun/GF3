@@ -1,4 +1,4 @@
-import { render, renderHook, screen, waitFor } from "@testing-library/react";
+import { act, render, renderHook, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, test, vi } from "vitest";
 import { ApiError } from "@shared/api/httpClient";
@@ -87,6 +87,66 @@ function renderWithClient(client: QueryClient, element: React.ReactNode) {
 }
 
 describe("react-query shim", () => {
+  test("every render only exposes the current key's cached data, even while a different key resolves", async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { staleTime: 30_000 } } });
+    client.setQueryData(["graph", 1], "one");
+    let finishSecond!: (data: string) => void;
+    const reads = vi.fn((id: number) => new Promise<string>(resolve => {
+      expect(id).toBe(2);
+      finishSecond = resolve;
+    }));
+    const renders: Array<[number, string | undefined]> = [];
+    const { rerender, result } = renderHook(({ id }) => {
+      const query = useQuery({ queryKey: ["graph", id], queryFn: () => reads(id) });
+      renders.push([id, query.data]);
+      return query;
+    }, {
+      initialProps: { id: 1 },
+      wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>,
+    });
+    rerender({ id: 2 });
+    expect(result.current.isLoading).toBe(true);
+    rerender({ id: 1 });
+    await act(() => finishSecond("two"));
+    rerender({ id: 2 });
+    expect(renders.filter(([id]) => id === 1).every(([, data]) => data === "one")).toBe(true);
+    expect(renders.filter(([id]) => id === 2).map(([, data]) => data)).toContain(undefined);
+    expect(renders.filter(([id]) => id === 2).every(([, data]) => data === undefined || data === "two")).toBe(true);
+    expect(reads).toHaveBeenCalledExactlyOnceWith(2);
+  });
+
+  test("a late response that ignored cancellation cannot replace a new request for the same key", async () => {
+    const client = new QueryClient();
+    const key = ["graph", 1];
+    let finishOld!: (data: string) => void;
+    const old = client.fetchQuery(key, () => new Promise<string>(resolve => { finishOld = resolve; }));
+    const rejected = expect(old).rejects.toMatchObject({ name: "RequestCanceledError" });
+    client.cancelQuery(key);
+    await client.fetchQuery(key, async () => "fresh");
+    finishOld("late");
+    await rejected;
+    expect(client.getQueryState(key).data).toBe("fresh");
+  });
+
+  test("a shared read is canceled only when the last interested observer leaves", async () => {
+    const client = new QueryClient();
+    const key = ["graph", 1];
+    const first = client.observeQuery(key, true);
+    const second = client.observeQuery(key, true);
+    let signal!: AbortSignal;
+    const query = client.fetchQuery(key, context => {
+      signal = context.signal;
+      return new Promise((_, reject) => signal.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError"))));
+    });
+    expect(client.fetchQuery(key, vi.fn())).toBe(query);
+    first();
+    expect(signal.aborted).toBe(false);
+    const rejected = expect(query).rejects.toMatchObject({ name: "AbortError" });
+    second();
+    await rejected;
+    expect(signal.aborted).toBe(true);
+  });
+
   test.each(["caller", "query client"])("forwards explicit refetch cancellation from the %s", async source => {
     const client = new QueryClient();
     const caller = new AbortController();

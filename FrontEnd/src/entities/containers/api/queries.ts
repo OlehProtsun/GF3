@@ -470,6 +470,7 @@ export function useDeleteGraphVersionMutation() {
 }
 
 export const useGraphSlotsBatchQuery = (containerId: number | null, graphIds: number[], enabled = true) => {
+  const client = useQueryClient();
   const normalizedGraphIds = [...new Set(
     graphIds.filter(graphId => Number.isInteger(graphId) && graphId > 0),
   )].sort((left, right) => left - right);
@@ -479,9 +480,26 @@ export const useGraphSlotsBatchQuery = (containerId: number | null, graphIds: nu
     enabled: enabled && containerId !== null && normalizedGraphIds.length > 0,
     cancelOnUnmount: true,
     staleTime: 30_000,
+    retry: 0,
     queryFn: async ({ signal }) => {
-      const slotEntries = await mapInPairs(normalizedGraphIds, async graphId =>
-        [graphId, await containersApi.listGraphSlots(containerId as number, graphId, signal)] as const, signal);
+      const id = containerId as number;
+      const slotEntries = await mapInPairs(normalizedGraphIds, async graphId => {
+        const key = queryKeys.containers.graphSlots(id, graphId);
+        const cached = client.getQueryState<GraphSlot[]>(key);
+        if (cached.data !== undefined && cached.updatedAt !== 0 && Date.now() - cached.updatedAt < 30_000) {
+          return [graphId, cached.data] as const;
+        }
+
+        const release = client.observeQuery(key, true);
+        signal.addEventListener("abort", release, { once: true });
+        try {
+          const slots = await client.fetchQuery(key, ({ signal: slotSignal }) => containersApi.listGraphSlots(id, graphId, slotSignal));
+          return [graphId, slots] as const;
+        } finally {
+          signal.removeEventListener("abort", release);
+          if (!signal.aborted) release();
+        }
+      }, signal);
 
       return slotEntries.reduce<GraphSlotsBatchResult>((accumulator, [graphId, slots]) => {
         accumulator[graphId] = slots;

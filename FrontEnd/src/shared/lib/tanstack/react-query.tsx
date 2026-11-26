@@ -4,6 +4,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -108,13 +109,20 @@ async function runWithRetry<TData>(
 ): Promise<TData> {
   let attempt = 0;
   const generation = getAuthGeneration();
+  const ensureCurrent = () => {
+    if (signal.aborted || getAuthGeneration() !== generation) throw new RequestCanceledError();
+  };
 
   while (true) {
-    if (signal.aborted || getAuthGeneration() !== generation) throw new RequestCanceledError();
+    ensureCurrent();
     try {
-      return await queryFn();
+      const data = await queryFn();
+      ensureCurrent();
+      return data;
     } catch (error) {
-      if (isRequestCanceledError(error) || (!retryDelay && error instanceof ApiError && error.status === 429) || attempt >= retry) {
+      if (isRequestCanceledError(error)) throw error;
+      ensureCurrent();
+      if ((!retryDelay && error instanceof ApiError && error.status === 429) || attempt >= retry) {
         throw error;
       }
 
@@ -140,6 +148,7 @@ export class QueryClient {
   private listeners: Set<(event: QueryEvent) => void> = new Set();
   private bumps: Map<string, number> = new Map();
   private records: Map<string, CacheRecord> = new Map();
+  private observers = new Map<string, number>();
   public readonly defaults;
   public readonly queryCache;
   public readonly mutationCache;
@@ -178,8 +187,18 @@ export class QueryClient {
     };
   }
 
-  trackQuery(queryKey: QueryKey): void {
-    this.ensureRecord(queryKey);
+  observeQuery(queryKey: QueryKey, cancelOnRelease = false): () => void {
+    const key = hashQueryKey(queryKey);
+    this.observers.set(key, (this.observers.get(key) ?? 0) + 1);
+    return () => {
+      const remaining = (this.observers.get(key) ?? 1) - 1;
+      if (remaining) {
+        this.observers.set(key, remaining);
+        return;
+      }
+      this.observers.delete(key);
+      if (cancelOnRelease) this.cancelQuery(queryKey);
+    };
   }
 
   getBump(key: string): number {
@@ -316,8 +335,10 @@ export class QueryClient {
       return;
     }
 
-    record.invalidatedWhileFetching = true;
-    record.controller?.abort();
+    const controller = record.controller;
+    record.promise = undefined;
+    record.controller = undefined;
+    controller?.abort();
   }
 
   clear(): void {
@@ -345,7 +366,7 @@ export function useQueryClient(): QueryClient {
 }
 
 function isStale(updatedAt: number, staleTime: number, hasData: boolean): boolean {
-  if (!hasData) {
+  if (!hasData || updatedAt === 0) {
     return true;
   }
 
@@ -359,117 +380,57 @@ function isStale(updatedAt: number, staleTime: number, hasData: boolean): boolea
 export function useQuery<TData>(options: QueryOptions<TData>) {
   const client = useQueryClient();
   const keyString = useMemo(() => hashQueryKey(options.queryKey), [options.queryKey]);
+  const enabled = options.enabled !== false;
   const staleTime = options.staleTime ?? client.defaults?.queries?.staleTime ?? 0;
   const retry = options.retry ?? client.defaults?.queries?.retry ?? 0;
-  const initialState = client.getQueryState<TData>(options.queryKey);
-  const queryFnRef = useRef(options.queryFn);
-  const queryKeyRef = useRef(options.queryKey);
-  const lastSyncRef = useRef<{ key: string; bump: number } | null>(null);
-  const [data, setData] = useState<TData | undefined>(initialState.data);
-  const [error, setError] = useState<unknown>(null);
-  const [isLoading, setIsLoading] = useState(options.enabled !== false && initialState.data === undefined);
-  const [isFetching, setIsFetching] = useState(false);
-  const [bump, setBump] = useState(client.getBump(keyString));
+  const binding = useMemo(() => ({ client, keyString }), [client, keyString]);
+  const requestRef = useRef({ binding, queryKey: options.queryKey, queryFn: options.queryFn });
+  useLayoutEffect(() => {
+    requestRef.current = { binding, queryKey: options.queryKey, queryFn: options.queryFn };
+  }, [binding, options.queryKey, options.queryFn]);
 
-  useEffect(() => {
-    queryFnRef.current = options.queryFn;
-    queryKeyRef.current = options.queryKey;
-    client.trackQuery(options.queryKey);
-  }, [client, options.queryFn, options.queryKey]);
-
-  useEffect(() => {
-    setBump(client.getBump(keyString));
-    lastSyncRef.current = null;
-  }, [client, keyString]);
-
-  useEffect(() => {
-    return client.subscribe((event) => {
-      if (event.key !== keyString) {
-        return;
-      }
-
-      if (event.type === "invalidate") {
-        setBump(client.getBump(event.key));
-        return;
-      }
-
-      setData(event.data as TData);
-      setError(null);
-      setIsLoading(false);
-      setIsFetching(false);
-    });
-  }, [client, keyString]);
-
-  useEffect(() => {
-    client.trackQuery(queryKeyRef.current);
-
-    const snapshot = client.getQueryState<TData>(queryKeyRef.current);
-    setData(snapshot.data);
-    setError(null);
-    setIsFetching(false);
-
-    if (options.enabled === false) {
-      setIsLoading(false);
-      setIsFetching(false);
-      return;
+  const [status, setStatus] = useState<{ binding: typeof binding; bump: number; fetching: boolean; error: unknown }>();
+  const subscribe = useCallback((notify: () => void) => client.subscribe(event => {
+    if (event.key !== keyString) return;
+    if (event.type === "setData") {
+      setStatus(current => current?.binding === binding && current.error ? { ...current, error: null } : current);
     }
-
-    setIsLoading(snapshot.data === undefined);
-  }, [client, keyString, options.enabled]);
+    notify();
+  }), [binding, client, keyString]);
+  const readData = () => client.getQueryState<TData>(options.queryKey).data;
+  const readBump = () => client.getBump(keyString);
+  const data = useSyncExternalStore(subscribe, readData, readData);
+  const bump = useSyncExternalStore(subscribe, readBump, readBump);
 
   useEffect(() => {
-    if (options.enabled === false) {
-      return;
-    }
+    if (enabled) return client.observeQuery(requestRef.current.queryKey, options.cancelOnUnmount);
+  }, [binding, client, enabled, options.cancelOnUnmount]);
 
-    const snapshot = client.getQueryState<TData>(queryKeyRef.current);
-    const hasData = snapshot.data !== undefined;
-    const wasInvalidated = lastSyncRef.current?.key === keyString && lastSyncRef.current.bump !== bump;
-
-    if (!wasInvalidated && !isStale(snapshot.updatedAt, staleTime, hasData)) {
-      setIsLoading(false);
-      setIsFetching(false);
-      lastSyncRef.current = { key: keyString, bump };
-      return;
-    }
-
+  useEffect(() => {
+    if (!enabled) return;
+    const { queryKey, queryFn } = requestRef.current;
+    const snapshot = client.getQueryState<TData>(queryKey);
+    if (!isStale(snapshot.updatedAt, staleTime, snapshot.data !== undefined)) return;
     let isActive = true;
-    setError(null);
-    setIsFetching(true);
-    setIsLoading(!hasData);
-
-    client
-      .fetchQuery(queryKeyRef.current, queryFnRef.current, { retry })
-      .catch((reason) => {
-        if (!isActive || isRequestCanceledError(reason)) {
-          return;
-        }
-
-        setError(reason);
-        client.queryCache?.config.onError?.(reason, { queryKey: queryKeyRef.current });
-      })
-      .finally(() => {
-        if (!isActive) {
-          return;
-        }
-
-        setIsFetching(false);
-        setIsLoading(false);
-        lastSyncRef.current = { key: keyString, bump };
-      });
-
-    return () => {
-      isActive = false;
-
-      if (options.cancelOnUnmount === true) {
-        client.cancelQuery(queryKeyRef.current);
-      }
-    };
-  }, [bump, client, keyString, options.cancelOnUnmount, options.enabled, retry, staleTime]);
+    setStatus({ binding, bump, fetching: true, error: null });
+    client.fetchQuery(queryKey, queryFn, { retry }).then(
+      () => {
+        if (isActive) setStatus({ binding, bump, fetching: false, error: null });
+      },
+      reason => {
+        if (!isActive) return;
+        const error = isRequestCanceledError(reason) ? null : reason;
+        setStatus({ binding, bump, fetching: false, error });
+        if (error) client.queryCache?.config.onError?.(error, { queryKey });
+      },
+    );
+    return () => { isActive = false; };
+  }, [binding, bump, client, enabled, retry, staleTime]);
 
   const refetchWithSignal = useCallback((signal: AbortSignal) => {
-    if (signal.aborted) return Promise.reject(signal.reason ?? new RequestCanceledError());
-    return client.fetchQuery(queryKeyRef.current, async ({ signal: querySignal }) => {
+    const { binding: currentBinding, queryKey, queryFn } = requestRef.current;
+    if (signal.aborted || binding !== currentBinding) return Promise.reject(signal.reason ?? new RequestCanceledError());
+    return client.fetchQuery(queryKey, async ({ signal: querySignal }) => {
       const controller = new AbortController();
       const abortFromCaller = () => controller.abort(signal.reason);
       const abortFromQuery = () => controller.abort(querySignal.reason);
@@ -478,19 +439,23 @@ export function useQuery<TData>(options: QueryOptions<TData>) {
       try {
         if (querySignal.aborted) abortFromQuery();
         if (signal.aborted) abortFromCaller();
-        return await queryFnRef.current({ signal: controller.signal });
+        const data = await queryFn({ signal: controller.signal });
+        if (controller.signal.aborted) throw controller.signal.reason ?? new RequestCanceledError();
+        return data;
       } finally {
         signal.removeEventListener("abort", abortFromCaller);
         querySignal.removeEventListener("abort", abortFromQuery);
       }
     }, { retry: 0 });
-  }, [client]);
+  }, [binding, client]);
 
+  const currentStatus = enabled && status?.binding === binding && status.bump === bump ? status : undefined;
+  const error = currentStatus?.error ?? null;
   return {
     data,
     error,
-    isLoading,
-    isFetching,
+    isLoading: enabled && data === undefined && (currentStatus?.fetching ?? true),
+    isFetching: currentStatus?.fetching ?? false,
     isError: Boolean(error),
     refetchWithSignal,
   };

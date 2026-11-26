@@ -5,7 +5,7 @@ export const useEmployeeContractApprovalsQuery = () => useQuery({ queryKey: quer
   staleTime: 0, queryFn: ({ signal }) => api.mine(signal) });
 export const useGraphContractApprovalsQuery = (containerId: number | null, graphId: number | null) => useQuery({
   queryKey: queryKeys.shiftSwaps.graphApprovals(containerId ?? 0, graphId ?? 0), enabled: Boolean(containerId && graphId),
-  staleTime: 0, queryFn: ({ signal }) => api.graph(containerId!, graphId!, signal) });
+  staleTime: 30_000, queryFn: ({ signal }) => api.graph(containerId!, graphId!, signal) });
 export function useCreateContractClaimMutation() {
   const client = useQueryClient();
   return useMutation({ mutationFn: api.claim, onSuccess: () => client.invalidateQueries({ queryKey: queryKeys.shiftSwaps.all }) });

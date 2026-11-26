@@ -18,18 +18,21 @@ test.use({ serviceWorkers: "block" });
 
 async function workspace(page: Page, baseURL: string, loseThirdBatch: boolean,
   options: { graphIds?: number[]; roster?: number[]; throttle?: boolean; enforceLimits?: boolean;
-    incident?: IncidentGraph[]; loseCommittedReadback?: boolean } = {}) {
+    incident?: IncidentGraph[]; loseCommittedReadback?: boolean; availabilityRosters?: Record<number, number[]>;
+    unlinked?: boolean; period?: { year: number; month: number } } = {}) {
   const graphIds = options.graphIds ?? ids;
   const roster = options.roster ?? employeeIds;
+  const period = options.period ?? { year: 2026, month: 11 };
   const fixtureEmployees = roster.map(id => ({ id, firstName: "Worker", lastName: String(id) }));
   const origin = new URL(baseURL).origin;
   if (!["127.0.0.1", "localhost", "[::1]"].includes(new URL(origin).hostname)) {
     throw new Error("The mocked workspace requires a loopback frontend.");
   }
   const states = new Map(graphIds.map(id => [id, {
-    graph: { id, containerId: 7, shopId: 1, name: "Graph " + id, year: 2026, month: 11, publicationStatus: "private",
+    graph: { id, containerId: 7, shopId: 1, name: "Graph " + id, ...period, publicationStatus: "private",
       allowSwap: true, peoplePerShift: 1, shift1Time: "08:00 - 12:00", shift2Time: "12:00 - 16:00",
-      maxHoursPerEmpMonth: 160, maxConsecutiveDays: 5, maxConsecutiveFull: 3, maxFullPerMonth: 10, note: "" },
+      maxHoursPerEmpMonth: 160, maxConsecutiveDays: 5, maxConsecutiveFull: 3, maxFullPerMonth: 10, note: "",
+      availabilityGroupId: options.availabilityRosters && !options.unlinked ? id : null },
     styles: new Map<string, Record<string, unknown>>(),
     slots: [{ id: 1, scheduleId: id, employeeId: 1 as number | null, dayOfMonth: 12, slotNo: 1, status: 1, fromTime: "08:00", toTime: "12:00" }],
     versionCount: 0,
@@ -125,6 +128,12 @@ async function workspace(page: Page, baseURL: string, loseThirdBatch: boolean,
     if (path === graphRoot) return json([...states.values()].map(state => state.graph));
     if (path === "/api/shops") return json([{ id: 1, name: "Shop" }]);
     if (path === "/api/employees") return json(fixtureEmployees);
+    if (options.availabilityRosters) {
+      if (path === "/api/availability-groups") return json(graphIds.map(id => ({ id, ...period, name: "Availability " + id })));
+      const availability = path.match(/^\/api\/availability-groups\/(\d+)\/members$/);
+      if (availability) return json((options.availabilityRosters[Number(availability[1])] ?? [])
+        .map((employeeId, displayOrder) => ({ id: employeeId, employeeId, displayOrder, availabilityGroupId: Number(availability[1]) })));
+    }
     if (path === "/api/employment-contract-settings") return json({ automaticWeekdayAvailability: false });
     if (path.endsWith("highlight-setting")) return json({ highlightColor: "#DBEAFE" });
     if (path.includes("notepad")) return json({ notes: [], state: { isExpanded: false, isPinned: false, height: 700 } });
@@ -198,7 +207,7 @@ async function workspace(page: Page, baseURL: string, loseThirdBatch: boolean,
       }
       if (resource === "/slots") return await json(state.slots);
       if (resource === "/cell-styles") return await json([...state.styles.values()]);
-      if (resource === "/employees") return await json((options.incident?.find(graph => graph.graphId === id)?.after.employeeOrder ?? roster)
+      if (resource === "/employees") return await json((options.incident?.find(graph => graph.graphId === id)?.after.employeeOrder ?? options.availabilityRosters?.[id] ?? roster)
         .map((employeeId, displayOrder) => ({ id: employeeId, employeeId, displayOrder, scheduleId: id, isPriority: false })));
       return await json(resource === "" ? state.graph : []);
     } finally {
@@ -265,14 +274,8 @@ async function editFive(page: Page, paintMany: boolean) {
     await page.getByRole("button", { name: /^Fill #/ }).click();
     await day(2).click();
     await page.getByRole("button", { name: /^Text #/ }).click();
-    const writeCell = async (key: string, value: string) => {
-      const cell = scheduleCell(page, key);
-      await cell.getByRole("button").dblclick();
-      await cell.getByRole("textbox").fill(value);
-      await cell.getByRole("textbox").press("Enter");
-    };
-    await writeCell("1:11", "Training");
-    if (index === 0 || index === 4) await writeCell("1:12", "09:00 - 12:00");
+    await editScheduleCell(page, "1:11", "Training");
+    if (index === 0 || index === 4) await editScheduleCell(page, "1:12", "09:00 - 12:00");
   }
 }
 
@@ -287,6 +290,184 @@ async function save(page: Page, beforeConfirm?: () => Promise<void>) {
 function desktopOnly(project: string) {
   test.skip(project === "mobile-chrome" || project === "webkit-iphone-x", "The full matrix stress scenario uses the desktop manager workspace.");
 }
+
+async function editScheduleCell(page: Page, key: string, value: string) {
+  const cell = scheduleCell(page, key);
+  await cell.getByRole("button").dblclick();
+  await cell.getByRole("textbox").fill(value);
+  await cell.getByRole("textbox").press("Enter");
+}
+
+const tabGraphIds = [42, 35, 31];
+const tabRosters = { 42: [1, 2, 3], 35: [2, 4], 31: [3, 5] };
+const tabEditorUrl = (id: number) => `/container/7/graphs/${id}/edit?openGraphIds=${tabGraphIds.join(",")}`;
+const graphTab = (page: Page, id: number) => page.getByRole("tab", { name: "Graph " + id, exact: true });
+const matrixState = (page: Page) => matrix(page).locator("[data-cell-key]").evaluateAll(elements =>
+  elements.map(element => [element.getAttribute("data-cell-key"), element.querySelector("button")?.textContent, element.getAttribute("style")]));
+
+async function openTabFixture(page: Page, baseURL: string, options: { unlinked?: boolean; period?: { year: number; month: number } } = {}) {
+  await page.setViewportSize({ width: 1600, height: 960 });
+  const fixture = await workspace(page, baseURL, false, { graphIds: tabGraphIds, availabilityRosters: tabRosters, throttle: false, ...options });
+  for (const [id, state] of fixture.states) {
+    state.slots = tabRosters[id as keyof typeof tabRosters].map((employeeId, i) => ({
+      id: i + 1, scheduleId: id, employeeId, dayOfMonth: 12, slotNo: i + 1, status: 1,
+      fromTime: "08:00", toTime: "12:00",
+    }));
+  }
+  const go = async (id: number) => {
+    await graphTab(page, id).click();
+    await expect(page).toHaveURL(url => url.pathname.endsWith("/" + id + "/edit"));
+    await expect(matrix(page)).toBeVisible();
+    await expect.poll(fixture.resourceReadsSettled).toBe(true);
+  };
+  return { ...fixture, go };
+}
+
+for (const throttle of [false, true]) test(`editor tab round trips preserve a text draft (429=${throttle})`, async ({ page, baseURL }, testInfo) => {
+  desktopOnly(testInfo.project.name);
+  const fixture = await openTabFixture(page, baseURL!);
+  const employeeReads: number[] = [];
+  if (throttle) await page.route("**/api/containers/7/graphs/35/employees", async route => {
+    employeeReads.push(Date.now());
+    if (employeeReads.length > 1) return route.fallback();
+    await route.fulfill({ status: 429, headers: { "Retry-After": "1" }, json: { title: "Too many requests" } });
+  });
+  const { go } = fixture;
+  await page.goto(tabEditorUrl(42));
+  await expect(scheduleCell(page, "1:12")).toContainText("08:00 - 12:00");
+  const clean = await matrixState(page);
+  await fixture.startRecording();
+  await go(35);
+  await go(42);
+  expect(await matrixState(page)).toEqual(clean);
+  const textCell = scheduleCell(page, "1:11");
+  await editScheduleCell(page, "1:11", "Training");
+  await expect(textCell).toContainText("Training");
+  const dirty = await matrixState(page);
+  await go(35);
+  await go(31);
+  await go(42);
+  const reads = fixture.traffic.filter(row => row.method === "GET");
+  const shared = reads.filter(row => ["/api/employees", "/api/shops", "/api/availability-groups"].includes(row.path));
+  console.log(`tab traffic (429=${throttle}): ${reads.length} GETs; ${shared.length} shared GETs`);
+  expect(await matrixState(page)).toEqual(dirty);
+  expect(shared).toHaveLength(0);
+  if (throttle) {
+    expect(employeeReads).toHaveLength(2);
+    expect(employeeReads[1] - employeeReads[0]).toBeGreaterThanOrEqual(1_000);
+  }
+});
+
+for (const { year, month, today, unlinked } of [
+  { year: 2026, month: 10, today: "2026-11-26" },
+  { year: 2026, month: 11, today: "2026-11-26" },
+  { year: 2026, month: 12, today: "2026-11-26" },
+  { year: 2026, month: 12, today: "2026-12-15" },
+  { year: 2026, month: 12, today: "2027-01-15" },
+  { year: 2027, month: 1, today: "2026-11-26" },
+  { year: 2026, month: 12, today: "2026-11-26", unlinked: true },
+]) test(`editor tab round trips preserve linked rosters for ${year}-${month} on ${today} (unlinked=${Boolean(unlinked)})`, async ({ page, baseURL }, testInfo) => {
+  desktopOnly(testInfo.project.name);
+  await page.clock.setFixedTime(new Date(today + "T12:00:00Z"));
+  const fixture = await openTabFixture(page, baseURL!, { period: { year, month }, unlinked });
+  const original = fixture.states.get(42)!;
+  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const metadata = { m: [[1, "Manual demand", { [lastDay]: "10:00 - 14:00" }]], o: [3, -1, 1, 2], t: [[2, lastDay, "Induction"]] };
+  original.graph.note = "Fixture metadata\n\n[[GF3_GRAPH_META:b64:" + Buffer.from(JSON.stringify(metadata)).toString("base64") + "]]";
+  original.styles.set("1:12", { id: 1, scheduleId: 42, employeeId: 1, dayOfMonth: 12, backgroundColorArgb: -65536 });
+  original.slots.push({ id: 4, scheduleId: 42, employeeId: 3, dayOfMonth: lastDay, slotNo: 1, status: 1, fromTime: "09:00", toTime: "15:00" });
+  await page.goto(tabEditorUrl(42));
+  await expect(scheduleCell(page, `3:${lastDay}`)).toContainText("09:00 - 15:00");
+  await expect(scheduleCell(page, `-1:${lastDay}`)).toContainText("10:00 - 14:00");
+  await expect(scheduleCell(page, `2:${lastDay}`)).toContainText("Induction");
+  await editScheduleCell(page, "1:11", "Training");
+  const before = await matrixState(page);
+  await fixture.go(35);
+  await fixture.go(42);
+  expect(await matrixState(page)).toEqual(before);
+});
+
+for (const failure of ["500", "timeout", "canceled"] as const) test(`editor tab keeps its draft during a ${failure} on another graph`, async ({ page, baseURL }, testInfo) => {
+  desktopOnly(testInfo.project.name);
+  const fixture = await openTabFixture(page, baseURL!);
+  const resource = "**/api/containers/7/graphs/35/employees";
+  let attempts = 0;
+  let release!: () => void;
+  const delayedResponse = new Promise<void>(resolve => { release = resolve; });
+  await page.route(resource, async route => {
+    attempts++;
+    if (failure === "500") return route.fulfill({ status: 500, json: { title: "Server error" } });
+    if (failure === "timeout") return route.abort("timedout");
+    await delayedResponse;
+    await route.fallback().catch(() => {});
+  });
+  await page.goto(tabEditorUrl(42));
+  await expect(scheduleCell(page, "1:12")).toBeVisible();
+  await editScheduleCell(page, "1:11", "Training");
+  const original = await matrixState(page);
+  await fixture.startRecording();
+  await graphTab(page, 35).click();
+  await expect(page.getByRole("button", { name: "Save", exact: true })).toBeDisabled();
+  if (failure !== "canceled") {
+    await expect(page.getByText("Could not load this schedule editor.", { exact: true })).toBeVisible();
+    expect(attempts).toBe(2);
+    await fixture.go(42);
+  } else {
+    await expect.poll(() => attempts).toBe(1);
+    await fixture.go(31);
+    await fixture.go(42);
+    release();
+  }
+  expect(await matrixState(page)).toEqual(original);
+  expect(fixture.traffic.every(row => row.method === "GET" || row.path.endsWith("/presence/negotiate"))).toBe(true);
+});
+
+test("50 switches and realtime refresh preserve text, time and color drafts through one Save", async ({ page, baseURL }, testInfo) => {
+  desktopOnly(testInfo.project.name);
+  test.setTimeout(65_000);
+  const fixture = await openTabFixture(page, baseURL!);
+  await page.goto(tabEditorUrl(42));
+  await expect.poll(fixture.connected).toBe(true);
+  await editScheduleCell(page, "1:11", "Training");
+  const first = await matrixState(page);
+  await fixture.go(35);
+  await editScheduleCell(page, "4:12", "09:00 - 12:00");
+  const second = await matrixState(page);
+  await fixture.go(31);
+  await matrix(page).locator('[data-matrix-target="day"][data-day-of-month="1"]').click();
+  await page.getByRole("button", { name: /^Fill #/ }).click();
+  const third = await matrixState(page);
+  const expected = new Map([[42, first], [35, second], [31, third]]);
+  await fixture.startRecording();
+  for (let index = 0; index < 50; index++) {
+    const id = tabGraphIds[index % tabGraphIds.length];
+    await graphTab(page, id).dispatchEvent("click");
+    await expect(page).toHaveURL(url => url.pathname.endsWith("/" + id + "/edit"));
+    await expect(matrix(page)).toBeVisible();
+  }
+  expect(fixture.traffic.filter(row => !row.path.endsWith("/shift-corrections"))).toHaveLength(0);
+  expect(fixture.traffic.length).toBeLessThanOrEqual(tabGraphIds.length);
+  fixture.burst(35);
+  for (const [id, state] of expected) {
+    if (!page.url().includes(`/graphs/${id}/edit`)) await fixture.go(id);
+    expect(await matrixState(page)).toEqual(state);
+  }
+  await save(page);
+  await expect(page).toHaveURL(url => !url.pathname.endsWith("/edit"), { timeout: 30_000 });
+  expect([...fixture.states.values()].map(state => state.versionCount)).toEqual([1, 1, 1]);
+  expect(fixture.states.get(42)?.slots).toHaveLength(3);
+  expect(fixture.states.get(42)?.graph.note).toContain("GF3_GRAPH_META");
+  expect(fixture.states.get(35)?.slots).toEqual(expect.arrayContaining([
+    expect.objectContaining({ employeeId: 4, fromTime: "09:00", toTime: "12:00" }),
+    expect.objectContaining({ employeeId: 2, fromTime: "08:00", toTime: "12:00" }),
+  ]));
+  expect(fixture.states.get(31)?.styles.size).toBeGreaterThan(0);
+  await page.goto(tabEditorUrl(42));
+  await expect(scheduleCell(page, "1:11")).toContainText("Training");
+  await expect(scheduleCell(page, "2:12")).toContainText("08:00 - 12:00");
+  await fixture.go(35);
+  await expect(scheduleCell(page, "4:12")).toContainText("09:00 - 12:00");
+});
 
 for (const loseCommittedReadback of [false, true]) test(`seven-graph slot normalization incident completes all tabs (retry=${loseCommittedReadback})`, async ({ page, baseURL }, testInfo) => {
   desktopOnly(testInfo.project.name);
