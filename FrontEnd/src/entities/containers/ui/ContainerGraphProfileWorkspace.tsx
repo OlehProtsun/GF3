@@ -26,8 +26,7 @@ import type { Employee } from "@entities/employees/model/types";
 import type { Shop } from "@entities/shops/model/types";
 import { ErrorBanner } from "@shared/ui/components/ErrorBanner";
 import { IosButton } from "@shared/ui/components/IosButton";
-import { InformationIcon, ScheduleDetailsIcon, SearchIcon, StatisticsIcon, NoteIcon, ScheduleIcon, ShopIcon, CheckIcon, EmployeeIcon, ContainerIcon, ChevronRightIcon, CloseIcon, ClockIcon, GroupIcon, AvailabilityIcon } from "@shared/ui/icons";
-import { createIcon } from "@shared/ui/icons/createIcon";
+import { InformationIcon, ScheduleDetailsIcon, SearchIcon, StatisticsIcon, NoteIcon, ScheduleIcon, ShopIcon, CheckIcon, EmployeeIcon, ContainerIcon, ChevronRightIcon, CloseIcon, ClockIcon, GroupIcon, AvailabilityIcon, PencilIcon, TrashIcon } from "@shared/ui/icons";
 import { formatScheduleLastUpdate } from "@shared/lib/scheduleLastUpdate";
 import { CardSection } from "@shared/ui/sections/CardSection";
 import { ContainerGraphMatrix } from "./ContainerGraphMatrix";
@@ -80,8 +79,6 @@ const detailIcons = {
   "max-full": ContainerIcon, availability: ContainerIcon,
 };
 
-const PencilIcon = createIcon("M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25ZM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83Z");
-const TrashIcon = createIcon("M9 3h6l1 2h4v2H4V5h4l1-2ZM6 9h12l-1 11a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1L6 9Zm3 2 .5 8H11v-8H9Zm4 0v8h1.5l.5-8H13Z", { fillRule: "evenodd" });
 
 function getGraphInitials(graph?: Graph | null) {
   const parts = (graph?.name ?? "")

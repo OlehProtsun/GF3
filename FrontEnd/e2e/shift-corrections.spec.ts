@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
-import { dismissEmployeeInstallPrompt } from "./helpers";
+import { createEmployeeAccount, dismissEmployeeInstallPrompt, loginAsManager, loginWithCredentials } from "./helpers";
+import { test as isolatedTest } from "./fixtures/isolatedBackend";
 import pl from "../src/shared/i18n/pl.json" with { type: "json" };
 import uk from "../src/shared/i18n/uk.json" with { type: "json" };
 
@@ -86,6 +87,7 @@ async function showScheduleActivity(page: Page) {
 }
 
 test("employee requests removal of a workday and manager approves the same request", async ({ page, isMobile }) => {
+  test.setTimeout(90_000);
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.emulateMedia({ reducedMotion: "reduce" });
   await correctionFixture(page, "en");
@@ -100,12 +102,15 @@ test("employee requests removal of a workday and manager approves the same reque
   await page.route("**/api/auth/session", route => manager ? route.fallback() : route.fulfill({ json: {
     role: "employee", employeeId: 2, userName: "fixture-worker", displayName: "Fixture Worker",
   } }));
-  await page.route("**/api/employee-schedules", route => route.fulfill({ json: [{
+  const candidate = () => ({
     id: 3, containerId: 1, shopId: 4, name: "Schedule", shopName: "Central", year: 2026, month: 10, publicationStatus: "public",
     employees: [{ id: 1, employeeId: 2, displayName: "Fixture Worker", displayOrder: 0 }],
-    slots: originalShifts.map((shift, index) => ({ id: shift.slotId, employeeId: 2, slotNo: index + 1, dayOfMonth: 21,
+    approvedCorrectionDays: request.status === "approved" ? [21] : [],
+    slots: request.status === "approved" ? [] : originalShifts.map((shift, index) => ({ id: shift.slotId, employeeId: 2, slotNo: index + 1, dayOfMonth: 21,
       fromTime: shift.fromTime, toTime: shift.toTime, status: "ASSIGNED" })),
-  }] }));
+  });
+  await page.route("**/api/employee-schedules", route => route.fulfill({ json: [candidate()] }));
+  await page.route("**/api/employee-shift-corrections/schedules", route => route.fulfill({ json: [candidate()] }));
   await page.route("**/api/employee-shift-corrections", route => {
     if (route.request().method() !== "POST") return route.fulfill({ json: posted ? [request] : [] });
     expect(route.request().postDataJSON()).toEqual({ scheduleId: 3, requestType: "removeShift", dayOfMonth: 21, comment: "Fixture reason" });
@@ -142,7 +147,7 @@ test("employee requests removal of a workday and manager approves the same reque
   manager = true;
   await page.goto("/container/1/graphs/3/edit");
   const { activity } = await showScheduleActivity(page);
-  await activity.getByRole("tab", { name: /Shift Corrections/ }).click();
+  await activity.getByRole("tab", { name: /Shift Corrections/ }).press("Enter");
   const requests = activity.getByRole("list", { name: "Shift correction requests" });
   await requests.getByRole("listitem").filter({ hasText: "Fixture Worker" }).click();
   const detail = requests.getByRole("listitem").filter({ hasText: "Fixture reason" });
@@ -150,6 +155,103 @@ test("employee requests removal of a workday and manager approves the same reque
   await detail.getByRole("button", { name: "Approve", exact: true }).click();
   await expect.poll(() => request.status).toBe("approved");
   await expect(activity.getByText("Approved", { exact: true }).first()).toBeVisible();
+
+  const employeePage = await page.context().newPage();
+  await employeePage.emulateMedia({ reducedMotion: "reduce" });
+  await correctionFixture(employeePage, "en");
+  await employeePage.route("**/api/auth/session", route => route.fulfill({ json: {
+    role: "employee", employeeId: 2, userName: "fixture-worker", displayName: "Fixture Worker",
+  } }));
+  await employeePage.route("**/api/employee-schedules", route => route.fulfill({ json: [candidate()] }));
+  await employeePage.goto("/schedule");
+  const marker = employeePage.getByRole("button", { name: "Correction approved" });
+  await marker.press("Enter");
+  const popup = employeePage.getByRole("status").filter({ hasText: "Your manager approved a correction for this day" });
+  await expect(popup).toBeVisible();
+  await employeePage.keyboard.press("Escape");
+  await employeePage.getByRole("button", { name: "Show daily schedule view" }).press("Enter");
+  await employeePage.getByRole("tab", { name: /\b21, day off/ }).press("Enter");
+  await expect(marker.locator("xpath=ancestor::article")).toContainText("Day off");
+  await marker.press("Enter");
+  await expect(popup).toBeVisible();
+});
+
+isolatedTest("an unenrolled employee joins a public schedule only when Home approves the addition", async ({ page, browser, isolatedBackend, isMobile }) => {
+  isolatedTest.skip(isMobile, "Manager PC review");
+  isolatedTest.setTimeout(90_000);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const worker = await createEmployeeAccount(page.request, "correction-catalog");
+  const headers = { Authorization: "Bearer " + worker.managerAccessToken };
+  const create = async (url: string, data: object) => {
+    const response = await page.request.post(url, { headers, data });
+    expect(response.ok(), url + ": " + await response.text()).toBe(true);
+    return response.json();
+  };
+  const { id: containerId } = await create("/api/containers", { name: "Catalog container" });
+  const { id: shopId } = await create("/api/shops", { name: "Catalog shop", address: "Test address" });
+  const otherManager = { userName: "correction-lock-manager", displayName: "Correction lock manager", password: "824681" };
+  await create("/api/manager-profile/managers", otherManager);
+  const root = "/api/containers/" + containerId + "/graphs";
+  const { id: graphId } = await create(root, {
+    year: 2026, month: 12, name: "Catalog schedule", shopId, publicationStatus: "public", allowSwap: true,
+    peoplePerShift: 1, shift1Time: "08:00 - 12:00", shift2Time: "12:00 - 16:00",
+    maxHoursPerEmpMonth: 160, maxConsecutiveDays: 5, maxConsecutiveFull: 3, maxFullPerMonth: 10,
+  });
+  const roster = async () => (await page.request.get(root + "/" + graphId + "/employees", { headers })).json();
+  const workerContext = await browser.newContext({ baseURL: isolatedBackend.url });
+  try {
+    const employee = await workerContext.newPage();
+    await loginWithCredentials(employee, worker.username, worker.password);
+    await employee.goto("/schedule");
+    await expect(employee.getByText("No published schedules assigned to you")).toBeVisible();
+    await employee.getByRole("button", { name: "Request a shift correction" }).click();
+    const wizard = employee.getByRole("dialog", { name: "Request a shift change" });
+    const next = wizard.getByRole("button", { name: "Continue", exact: true });
+    await wizard.getByRole("button", { name: /^Catalog schedule/ }).click();
+    await next.click();
+    await wizard.getByRole("radio", { name: /^Saturday, 12 December 2026.*Day off/ }).click();
+    await next.click();
+    await wizard.getByLabel("Start time", { exact: true }).fill("08:00");
+    await wizard.getByLabel("End time", { exact: true }).fill("12:00");
+    await next.click();
+    await wizard.getByRole("textbox", { name: "Comment (optional)" }).fill("Catalog approval fixture");
+    await next.click();
+    await wizard.getByRole("button", { name: "Send request" }).click();
+    await expect(wizard.getByText("Pending approval")).toBeVisible();
+    expect(await roster()).toEqual([]);
+    await employee.reload();
+    await expect(employee.getByText("No published schedules assigned to you")).toBeVisible();
+
+    await loginAsManager(page);
+    await page.goto("/");
+    await page.getByRole("tab", { name: /Requires Approval/ }).click();
+    const review = page.getByRole("dialog", { name: "Review request" });
+    const lockingContext = await browser.newContext({ baseURL: isolatedBackend.url, viewport: { width: 1440, height: 900 } });
+    try {
+      const lockingPage = await lockingContext.newPage();
+      await loginWithCredentials(lockingPage, otherManager.userName, otherManager.password);
+      await lockingPage.goto("/container/" + containerId + "/graphs/" + graphId + "/edit");
+      await expect(lockingPage.getByRole("button", { name: "Add manual column on the left" })).toBeVisible({ timeout: 20_000 });
+      await page.getByRole("tabpanel").getByRole("button", { name: /requested a day-off correction/ }).click();
+      await page.getByRole("menuitem", { name: "Fast approve" }).click();
+      await expect(review.getByText("Catalog approval fixture")).toBeVisible();
+      await expect(review.getByText(/currently being edited by Correction lock manager/i)).toBeVisible();
+      await expect(review.getByRole("button", { name: "Approve", exact: true })).toBeDisabled();
+      expect(await roster()).toEqual([]);
+    } finally {
+      await lockingContext.close();
+    }
+    await expect(review.getByRole("button", { name: "Approve", exact: true })).toBeEnabled({ timeout: 15_000 });
+    await review.getByRole("button", { name: "Approve", exact: true }).click();
+    await expect(review.getByText("Approved", { exact: true })).toBeVisible();
+    await expect(page.getByRole("tabpanel").getByText("No outstanding approvals.")).toBeVisible();
+    expect(await roster()).toEqual([expect.objectContaining({ employeeId: worker.id })]);
+    await employee.reload();
+    await expect(employee.getByRole("button", { name: /Current schedule: Catalog schedule/ })).toBeVisible();
+    await expect(employee.getByRole("button", { name: "Correction approved" })).toBeVisible();
+  } finally {
+    await workerContext.close();
+  }
 });
 
 test("Schedule Activity preserves graph panels, live counts and overlay layering", async ({ page }) => {
@@ -273,7 +375,7 @@ test("Schedule Activity compares cross-schedule exchanges one schedule at a time
   const body = dialog.getByRole("region", { name: "Swap comparison" });
   expect(await body.evaluate(element => element.scrollHeight <= element.clientHeight + 1)).toBe(true);
   expect(await tables.first().evaluate(element => {
-    const tableViewport = element.parentElement!;
+    const tableViewport = element.parentElement!.parentElement!;
     return tableViewport.scrollHeight > tableViewport.clientHeight;
   })).toBe(true);
   const desktopShadowSpace = await body.evaluate(element => {
@@ -288,7 +390,7 @@ test("Schedule Activity compares cross-schedule exchanges one schedule at a time
     await expect(tables).toHaveCount(2);
   }
   expect(await tables.first().evaluate(element => {
-    const tableViewport = element.parentElement!;
+    const tableViewport = element.parentElement!.parentElement!;
     return tableViewport.scrollWidth > tableViewport.clientWidth &&
       tableViewport.scrollHeight <= tableViewport.clientHeight + 1;
   })).toBe(true);
@@ -311,19 +413,29 @@ test("Schedule Activity compares cross-schedule exchanges one schedule at a time
   await expect(activity).toBeVisible();
 });
 
-test("Schedule Activity opens for a new graph and allows manual column editing without graph requests", async ({ page }) => {
+test("new graph manual columns are matrix drafts and Schedule Activity keeps offer controls", async ({ page, isMobile }) => {
+  test.skip(isMobile, "Manager PC editor");
   const requests = await correctionFixture(page, "en");
+  const writes: string[] = [];
+  page.on("request", request => {
+    const path = new URL(request.url()).pathname;
+    if (path.includes("/graphs") && request.method() !== "GET") writes.push(path);
+  });
   await page.goto("/container/1/graphs/new");
   const { activity } = await showScheduleActivity(page);
   await expect(activity.getByText("No accepted swaps yet.")).toBeVisible();
   await expect(activity.getByText("No correction requests yet.")).toBeVisible();
   await activity.getByRole("tab", { name: /Manual shifts/ }).click();
-  const columns = activity.getByRole("region", { name: "Columns" });
-  await columns.getByRole("button", { name: "Add", exact: true }).click();
-  await expect(columns.getByRole("button", { name: /^Delete / })).toBeVisible();
-  await columns.getByRole("button", { name: /^Delete / }).click();
-  await expect(columns.getByText("No manual columns yet.")).toBeVisible();
+  await expect(activity.getByRole("region", { name: "Columns" })).toHaveCount(0);
+  await expect(activity.getByRole("button", { name: "Publish shift" })).toBeDisabled();
+  await activity.getByRole("button", { name: "Close", exact: true }).click();
+  await page.getByRole("button", { name: "Add manual column on the left" }).click();
+  const column = page.getByRole("textbox", { name: "Manual column 1 header" });
+  await column.locator("xpath=ancestor::th[1]").getByRole("button", { name: "Delete manual column" }).click();
+  await page.getByRole("dialog", { name: "Delete manual column?" }).getByRole("button", { name: "Delete column" }).click();
+  await expect(column).toHaveCount(0);
   expect(requests).toEqual([]);
+  expect(writes).toEqual([]);
 });
 
 for (const language of ["en", "pl", "uk"] as const) {
@@ -442,14 +554,20 @@ for (const [width, language] of [[320, "en"], [375, "pl"], [390, "uk"]] as const
       else if (path === "/api/account-language") body = { language };
       else if (path === "/api/public-holiday-settings") body = { showPublicHolidays: true };
       else if (path === "/api/employee-ui-state") body = { scheduleColumnOrders: {}, readNotificationIds: [] };
-      else if (path === "/api/employee-schedules") body = [{
+      else if (path === "/api/employee-schedules" || path === "/api/employee-shift-corrections/schedules") {
+        const august = {
         id: 10, containerId: 2, containerName: "Team", shopId: 4, shopName: "Central", name: "August", year: 2026, month: 8,
         publicationStatus: "public", employees: [{ id: 1, employeeId: 12, firstName: "Test", lastName: "Worker", displayOrder: 0 }],
         slots: [
           { id: 100, dayOfMonth: 12, slotNo: 1, employeeId: 12, fromTime: "08:00", toTime: "12:00", status: "ASSIGNED" },
           { id: 101, dayOfMonth: 12, slotNo: 2, employeeId: 12, fromTime: "15:00", toTime: "19:00", status: "ASSIGNED" },
         ], relatedScheduleAssignments: [{ employeeId: 12, dayOfMonth: 14, scheduleId: 11, scheduleName: "Other shop" }],
-      }];
+        };
+        body = path === "/api/employee-schedules" ? [august] : [august, {
+          ...august, id: 11, name: "Other shop", employees: [], relatedScheduleAssignments: [],
+          slots: [{ ...august.slots[0], id: 102, dayOfMonth: 14 }],
+        }];
+      }
       else if (path === "/api/employee-shift-corrections") {
         if (route.request().method() === "POST") {
           const request = route.request().postDataJSON();

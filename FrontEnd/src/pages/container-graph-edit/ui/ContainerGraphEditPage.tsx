@@ -3391,12 +3391,17 @@ function ContainerGraphEditSession() {
     setManualShiftPublishError(null);
   };
 
-  const handleAddManualColumn = () => {
+  const handleAddManualColumn = (position: "start" | "end" = "end") => {
     const nextManualColumn = createDraftScheduleManualColumn(manualColumns);
+    const nextManualColumns = [...manualColumns, nextManualColumn];
+    const manualEmployeeId = buildManualColumnEmployeeId(nextManualColumn.columnId);
+    const currentOrder = sanitizeScheduleColumnOrder(scheduleColumnOrder, graphEmployeeRows, manualColumns);
+    const candidateOrder = position === "start" ? [manualEmployeeId, ...currentOrder] : [...currentOrder, manualEmployeeId];
+    const nextOrder = sanitizeScheduleColumnOrder(candidateOrder, graphEmployeeRows, nextManualColumns);
 
     captureUndoSnapshot();
-    setManualColumns(currentColumns => [...currentColumns, nextManualColumn]);
-    setScheduleColumnOrder(current => [...current, buildManualColumnEmployeeId(nextManualColumn.columnId)]);
+    setManualColumns(sortManualColumnsByColumnOrder(nextManualColumns, nextOrder));
+    setScheduleColumnOrder(nextOrder);
     setSubmitError(undefined);
     setManualShiftPublishError(null);
   };
@@ -3414,6 +3419,9 @@ function ContainerGraphEditSession() {
     setSelectedCellKeys(currentSelection =>
       currentSelection.filter(cellKey => parseSelectedCellKey(cellKey).employeeId !== manualEmployeeId),
     );
+    if (styleRecordsRef.current.some(style => style.employeeId === manualEmployeeId)) {
+      syncStyleRecords(styleRecordsRef.current.filter(style => style.employeeId !== manualEmployeeId));
+    }
     setSubmitError(undefined);
     setManualShiftPublishError(null);
   };

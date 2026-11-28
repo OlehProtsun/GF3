@@ -3,6 +3,8 @@ import { expect, test, vi } from "vitest";
 import type { EmployeeSchedule } from "@entities/employee-schedule";
 import { setLanguage } from "@shared/i18n";
 import { buildDailyScheduleDays, buildDailyScheduleWorkers, EmployeeScheduleDailyBody, parseTimeMinutes } from "./EmployeeScheduleDailyBody";
+import { buildScheduleShiftStatuses } from "./scheduleShiftStatuses";
+import userEvent from "@testing-library/user-event";
 
 const graph = { id: 5, year: 2026, month: 8, slots: [
   { id: 1, slotNo: 1, employeeId: 1, dayOfMonth: 15, fromTime: "00:00", toTime: "23:59", status: "ASSIGNED" },
@@ -25,4 +27,19 @@ test("renders an all-day shift, a related-only worker and a holiday for the sele
   expect(workers).toHaveLength(2);
   expect(workers[0]).toHaveTextContent("All day");
   expect(workers[1]).toHaveTextContent("Other shop");
+});
+
+test("shows an approved day-off correction on the historical own row", async () => {
+  setLanguage("en");
+  const schedule = { ...graph, approvedCorrectionDays: [7] };
+  render(<EmployeeScheduleDailyBody selectedSchedule={schedule} activeDailyScheduleDay={7} activeDailyScheduleDayRef={null}
+    dailyScheduleDays={buildDailyScheduleDays(schedule, 1)} dailyScheduleWorkers={buildDailyScheduleWorkers(schedule, 7, 1, "Fixture")}
+    shiftStatuses={buildScheduleShiftStatuses(schedule, 1, "Fixture", new Set(), []).get(7)} onSelectDay={vi.fn()} />);
+  const row = screen.getByRole("article");
+  expect(row).toHaveTextContent("FixtureDay off");
+  expect(row).toHaveAttribute("data-schedule-status", "corrected");
+  const badge = within(row).getByRole("button", { name: "Correction approved" });
+  expect(badge.querySelector("svg")).toBeInTheDocument();
+  await userEvent.click(badge);
+  expect(screen.getByText("Your manager approved a correction for this day and updated the schedule.")).toBeVisible();
 });

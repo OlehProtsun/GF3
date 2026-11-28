@@ -1,6 +1,8 @@
 import { beforeEach as beforeEnglishTest } from "vitest";
 import { setLanguage as setTestLanguage } from "@shared/i18n";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { render as renderComponent, screen, waitFor, within } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { ReactElement, ReactNode } from "react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { ContainerGraphShiftCorrectionsCard } from "./ContainerGraphShiftCorrectionsCard";
@@ -12,8 +14,8 @@ const mocks = vi.hoisted(() => ({ saveSetting: vi.fn(), approve: vi.fn(), reject
 vi.mock("@entities/containers/api/containersApi", () => ({ containersApi: { commitGraphVersion: mocks.commit } }));
 
 vi.mock("@entities/shift-corrections", () => ({
-  useGraphShiftCorrectionsQuery: (containerId: number | null, graphId: number | null) => {
-    return mocks.graphQuery(containerId, graphId) ?? ({
+  useGraphShiftCorrectionsQuery: (containerId: number | null, graphId: number | null, requestId?: number) => {
+    return (requestId === undefined ? mocks.graphQuery(containerId, graphId) : mocks.graphQuery(containerId, graphId, requestId)) ?? ({
     data: [{
       id: 4, containerId: 2, scheduleId: 9, scheduleSlotId: 21, isDayOffRequest: false, scheduleName: "August", shopName: "Central",
       year: 2026, month: 8, dayOfMonth: 12, employeeId: 7, employeeName: "Oleh Protsun",
@@ -31,6 +33,12 @@ vi.mock("@entities/shift-corrections", () => ({
 
 beforeEach(() => Object.values(mocks).forEach(mock => mock.mockReset()));
 
+function render(element: ReactElement) {
+  const client = new QueryClient();
+  return renderComponent(element, { wrapper: ({ children }: { children: ReactNode }) =>
+    <QueryClientProvider client={client}>{children}</QueryClientProvider> });
+}
+
 describe("ContainerGraphShiftCorrectionsCard", () => {
 
 
@@ -44,6 +52,7 @@ describe("ContainerGraphShiftCorrectionsCard", () => {
     const onApproved = vi.fn();
     mocks.commit.mockResolvedValue(undefined);
     mocks.approve.mockImplementation((_input, options) => options.onSuccess());
+    mocks.reject.mockImplementation((_input, options) => options.onError(new Error("Try again")));
     render(<ContainerGraphShiftCorrectionsCard containerId={2} graphId={9} hasUnsavedChanges={false}
       disabled={false} onApproved={onApproved} />);
     expect(screen.getByRole("listitem")).toHaveTextContent("13.08.2026 · Day off → 08:00–16:00 · August · Central");
@@ -208,6 +217,7 @@ test.each([0, null, -1])("disables correction actions and settings for unsaved g
 });
 
 test("allows approval and rejection for persisted graphs", async () => {
+  mocks.approve.mockImplementation((_input, options) => options.onError(new Error("Try again")));
   const user = userEvent.setup();
   render(<ContainerGraphShiftCorrectionsCard containerId={2} graphId={9}
     hasUnsavedChanges={false} disabled={false} onApproved={() => undefined} />);
@@ -231,6 +241,36 @@ function showHistory(data: typeof historyRequest[]) {
 }
 
 const cardProps = { containerId: 2, graphId: 9, hasUnsavedChanges: false, disabled: false, onApproved: vi.fn() };
+
+test("focused correction waits for fresh details and preserves approved status after version failure", async () => {
+  const busy = vi.fn();
+  const record = { ...historyRequest, comment: "Focused correction details" };
+  mocks.graphQuery.mockReturnValue({ data: [record], isFetching: true, isError: false });
+  let failVersion: (error: Error) => void = () => {};
+  mocks.commit.mockReturnValue(new Promise((_, reject) => { failVersion = reject; }));
+  mocks.approve.mockImplementation((_input, options) => {
+    showHistory([{ ...record, status: "approved" }]);
+    options.onSuccess();
+  });
+  const props = { ...cardProps, reviewRequestId: record.id, onReviewBusyChange: busy };
+  const view = render(<ContainerGraphShiftCorrectionsCard {...props} />);
+  expect(mocks.graphQuery).toHaveBeenLastCalledWith(2, 9, record.id);
+  expect(mocks.settingQuery).toHaveBeenLastCalledWith(false);
+  expect(screen.getByText("Focused correction details")).toBeVisible();
+  expect(screen.queryByRole("button", { name: /Collapse request|highlight color/ })).toBeNull();
+  expect(screen.getByRole("button", { name: "Approve" })).toBeDisabled();
+  showHistory([record, { ...record, id: 100, employeeName: "Other employee" }]);
+  view.rerender(<ContainerGraphShiftCorrectionsCard {...props} />);
+  expect(screen.queryByText("Other employee")).toBeNull();
+  await userEvent.click(screen.getByRole("button", { name: "Approve" }));
+  expect(mocks.approve).toHaveBeenCalledExactlyOnceWith({ containerId: 2, graphId: 9, id: record.id }, expect.anything());
+  expect(busy).toHaveBeenLastCalledWith(true);
+  failVersion(new Error("Disconnected"));
+  expect(await screen.findByText("The correction was applied, but its schedule version could not be recorded.")).toBeVisible();
+  expect(screen.getByText("Approved")).toBeVisible();
+  expect(busy.mock.calls).toEqual([[true], [false]]);
+  expect(screen.queryByRole("button", { name: "Approve" })).toBeNull();
+});
 
 test.each(["approved", "rejected"])("collapses after successful %s and lets the history item expand again", async status => {
   showHistory([{ ...historyRequest }]);

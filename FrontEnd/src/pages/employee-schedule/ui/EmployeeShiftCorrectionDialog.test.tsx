@@ -2,15 +2,14 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import type { ComponentProps } from "react";
-import type { EmployeeSchedule } from "@entities/employee-schedule";
-import type { ShiftCorrectionRequest } from "@entities/shift-corrections";
+import type { ShiftCorrectionRequest, ShiftCorrectionSchedule } from "@entities/shift-corrections";
 import { setLanguage, t } from "@shared/i18n";
 import { EmployeeShiftCorrectionDialog } from "./EmployeeShiftCorrectionDialog";
 
 beforeEach(() => setLanguage("en"));
 
-const schedule: EmployeeSchedule = {
-  id: 9, containerId: 2, containerName: "Main", shopId: 3, shopName: "Central",
+const schedule: ShiftCorrectionSchedule = {
+  id: 9,
   name: "August", year: 2026, month: 8, publicationStatus: "public",
   slots: [
     { id: 21, dayOfMonth: 12, slotNo: 1, employeeId: 7, fromTime: "08:00", toTime: "12:00", status: "ASSIGNED" },
@@ -29,7 +28,7 @@ const pending = (overrides: Partial<ShiftCorrectionRequest> = {}): ShiftCorrecti
 function setup(overrides: Partial<ComponentProps<typeof EmployeeShiftCorrectionDialog>> = {}) {
   const props = {
     open: true, schedules: [schedule], employeeId: 7, existingRequests: [], activeSwaps: [], isSending: false,
-    onCancel: vi.fn(), onSubmit: vi.fn(), ...overrides,
+    isLoadingSchedules: false, onRetrySchedules: vi.fn(), onCancel: vi.fn(), onSubmit: vi.fn(), ...overrides,
   };
   return { ...render(<EmployeeShiftCorrectionDialog {...props} />), props, user: userEvent.setup() };
 }
@@ -57,6 +56,24 @@ async function review(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe("EmployeeShiftCorrectionDialog", () => {
+  test("waits for the catalog and resets a disappearing selection", async () => {
+    const { props, user, rerender } = setup({ isLoadingSchedules: true });
+    expect(screen.getByText("Loading correction schedules...")).toBeVisible();
+    await user.click(screen.getByRole("button", { name: /^August/ }));
+    expect(next()).toBeDisabled();
+    rerender(<EmployeeShiftCorrectionDialog {...props} isLoadingSchedules={false} schedulesErrorMessage="Load failed" />);
+    expect(screen.getByRole("alert")).toHaveTextContent("Load failed");
+    await user.click(screen.getByRole("button", { name: "Retry" }));
+    expect(props.onRetrySchedules).toHaveBeenCalledOnce();
+    rerender(<EmployeeShiftCorrectionDialog {...props} isLoadingSchedules={false} />);
+    await user.click(next());
+    expect(screen.getByRole("heading", { name: "Choose a day" })).toBeVisible();
+    rerender(<EmployeeShiftCorrectionDialog {...props} isLoadingSchedules={false} schedules={[]} />);
+    expect(screen.getByRole("heading", { name: "Choose a schedule" })).toBeVisible();
+    expect(screen.getByText("The selected schedule is no longer available for correction.")).toBeVisible();
+    expect(screen.getByText("No published schedules")).toBeVisible();
+    expect(next()).toBeDisabled();
+  });
   test.each([[2026, 2, 28], [2028, 2, 29], [2026, 4, 30], [2026, 12, 31]])(
     "lists every day for %s-%s (%s days) and presents each split shift for selection", async (year, month, count) => {
       const { user } = setup({ schedules: [{ ...schedule, year, month }] });
@@ -70,7 +87,7 @@ describe("EmployeeShiftCorrectionDialog", () => {
   );
 
   test("requests a day-off shift only after two valid exact times, without a source slot", async () => {
-    const { props, user } = setup();
+    const { props, user } = setup({ schedules: [{ ...schedule, slots: [] }] });
     await chooseSchedule(user);
     const firstDay = dayChoices()[0];
     expect(firstDay).toHaveTextContent("Day off");

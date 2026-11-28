@@ -36,6 +36,7 @@ export type EmployeeSchedule = {
   year: number;
   month: number;
   publicationStatus: "public" | "private";
+  approvedCorrectionDays?: number[];
   allowSwap?: boolean;
   lastUpdatedAtUtc?: string | null;
   publishedAtUtc?: string | null;

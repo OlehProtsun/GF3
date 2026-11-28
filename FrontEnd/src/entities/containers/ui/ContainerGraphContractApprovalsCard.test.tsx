@@ -7,7 +7,7 @@ import { shiftSwapApprovalsApi as api } from "@entities/shift-swap-approvals/api
 import type { ContractShiftApproval } from "@entities/shift-swap-approvals";
 import { ContainerGraphContractApprovalsCard } from "./ContainerGraphContractApprovalsCard";
 import { ContainerGraphScheduleActivityDialog } from "./ContainerGraphScheduleActivityDialog";
-vi.mock("@entities/shift-swap-approvals/api/shiftSwapApprovalsApi", () => ({ shiftSwapApprovalsApi: { graph: vi.fn(), review: vi.fn() } }));
+vi.mock("@entities/shift-swap-approvals/api/shiftSwapApprovalsApi", () => ({ shiftSwapApprovalsApi: { graph: vi.fn(), getGraphRequest: vi.fn(), review: vi.fn() } }));
 const pending: ContractShiftApproval = { id: 1, kind: "claim", status: "pending", employeeId: 2, employeeName: "Ada Worker", fromEmployeeId: 1, fromEmployeeName: "Oleh Owner", toEmployeeId: 2, toEmployeeName: "Ada Worker", scheduleId: 10, scheduleSlotId: 30,
   scheduleName: "October", shopId: 1, shopName: "Central", year: 2026, month: 10, dayOfMonth: 1, fromTime: "09:00", toTime: "17:00", shiftSwapRequestId: 5,
   createdAtUtc: "2026-10-01T00:00:00Z", isStale: false };
@@ -17,6 +17,33 @@ beforeEach(() => { setLanguage("en"); vi.mocked(api.graph).mockReset().mockResol
 }); });
 function mount(unsaved = false, disabled = false) { const approved = vi.fn(), count = vi.fn(); render(<QueryClientProvider client={new QueryClient()}><ContainerGraphContractApprovalsCard
   containerId={1} graphId={10} disabled={disabled} hasUnsavedChanges={unsaved} onApproved={approved} onPendingCountChange={count} /></QueryClientProvider>); return { approved,count }; }
+
+test("focused monthly exception waits for the exact read and reviews without a transfer confirmation", async () => {
+  const record = { ...pending, id: 29, kind: "below_minimum_give" as const };
+  let finishRead: (result: ContractShiftApproval) => void = () => {};
+  vi.mocked(api.getGraphRequest).mockReset().mockReturnValueOnce(new Promise(resolve => { finishRead = resolve; }));
+  vi.mocked(api.review).mockImplementationOnce(async () => {
+    const terminal = { ...record, status: "approved" as const };
+    vi.mocked(api.getGraphRequest).mockResolvedValue(terminal);
+    return terminal;
+  });
+  const callback = vi.fn();
+  const onReviewTypeChange = vi.fn();
+  render(<QueryClientProvider client={new QueryClient()}><ContainerGraphContractApprovalsCard
+    containerId={1} graphId={10} reviewRequestId={29} disabled={false} hasUnsavedChanges={false}
+    onReviewTypeChange={onReviewTypeChange} onApproved={callback} /></QueryClientProvider>);
+  expect(screen.getByRole("status")).toHaveTextContent("Loading");
+  expect(screen.queryByRole("button", { name: "Approve" })).toBeNull();
+  finishRead(record);
+  await waitFor(() => expect(onReviewTypeChange).toHaveBeenLastCalledWith("Monthly minimum exception"));
+  expect(screen.queryByRole("button", { name: /Collapse request/ })).toBeNull();
+  await userEvent.click(screen.getByRole("button", { name: "Approve" }));
+  expect(screen.queryByRole("dialog", { name: "Approve shift transfer?" })).toBeNull();
+  expect(await screen.findByText("Approved", { exact: true })).toBeVisible();
+  expect(api.review).toHaveBeenCalledExactlyOnceWith({ containerId: 1, graphId: 10, id: 29, action: "approve" });
+  expect(api.graph).not.toHaveBeenCalled();
+  expect(callback).not.toHaveBeenCalled();
+});
 test("pending count and approved schedule refresh occur once after explicit confirmation", async () => {
   const {approved,count} = mount(); const user = userEvent.setup(); await user.click(await screen.findByRole("button", {name:/Ada Worker/})); expect(screen.getByText("The offer is reserved while this pickup request awaits manager approval.")).toBeInTheDocument(); expect(count).toHaveBeenLastCalledWith(1);
   await user.click(screen.getByRole("button",{name:"Approve"})); expect(api.review).not.toHaveBeenCalled();

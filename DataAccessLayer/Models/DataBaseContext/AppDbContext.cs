@@ -20,6 +20,11 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, TimeProvider? 
     public DbSet<EmployeeAccountModel> EmployeeAccounts => Set<EmployeeAccountModel>();
     public DbSet<ManagerAccountModel> ManagerAccounts => Set<ManagerAccountModel>();
     public DbSet<ManagerNoteModel> ManagerNotes => Set<ManagerNoteModel>();
+    public DbSet<ManagerNoteFolderModel> ManagerNoteFolders => Set<ManagerNoteFolderModel>();
+    public DbSet<ManagerNoteTagModel> ManagerNoteTags => Set<ManagerNoteTagModel>();
+    public DbSet<ManagerNoteTagLinkModel> ManagerNoteTagLinks => Set<ManagerNoteTagLinkModel>();
+    public DbSet<ManagerNoteShareModel> ManagerNoteShares => Set<ManagerNoteShareModel>();
+    public DbSet<ManagerNoteVersionModel> ManagerNoteVersions => Set<ManagerNoteVersionModel>();
     public DbSet<ManagerNotepadStateModel> ManagerNotepadStates => Set<ManagerNotepadStateModel>();
     public DbSet<ManagerGraphFillColorBindModel> ManagerGraphFillColorBinds => Set<ManagerGraphFillColorBindModel>();
     public DbSet<ManagerGraphTextColorBindModel> ManagerGraphTextColorBinds => Set<ManagerGraphTextColorBindModel>();
@@ -163,6 +168,11 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, TimeProvider? 
         ConfigureEmployeeAccount(modelBuilder);
         ConfigureManagerAccount(modelBuilder);
         ConfigureManagerNote(modelBuilder);
+        ConfigureManagerNoteFolder(modelBuilder);
+        ConfigureManagerNoteTag(modelBuilder);
+        ConfigureManagerNoteTagLink(modelBuilder);
+        ConfigureManagerNoteShare(modelBuilder);
+        ConfigureManagerNoteVersion(modelBuilder);
         ConfigureManagerNotepadState(modelBuilder);
         ConfigureManagerGraphFillColorBind(modelBuilder);
         ConfigureManagerGraphTextColorBind(modelBuilder);
@@ -372,8 +382,78 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, TimeProvider? 
                 .HasForeignKey(note => note.ManagerAccountId)
                 .OnDelete(DeleteBehavior.Cascade);
 
+            entity.Property(note => note.Visibility).IsRequired().HasMaxLength(7).HasDefaultValue("private");
+            entity.Property(note => note.IsPinned).HasDefaultValue(false);
+            entity.Property(note => note.IsLocked).HasDefaultValue(false);
+            entity.Property(note => note.Revision).HasDefaultValue(1L).IsConcurrencyToken();
+            entity.HasOne<ManagerNoteFolderModel>().WithMany()
+                .HasForeignKey(note => note.FolderId).OnDelete(DeleteBehavior.SetNull);
+
             entity.HasIndex(note => new { note.ManagerAccountId, note.UpdatedAtUtc })
                 .HasDatabaseName("ix_manager_note_manager_updated");
+            entity.HasIndex(note => new { note.ManagerAccountId, note.IsPinned, note.UpdatedAtUtc })
+                .HasDatabaseName("ix_manager_note_manager_pinned_updated");
+            entity.HasIndex(note => new { note.Visibility, note.UpdatedAtUtc })
+                .HasDatabaseName("ix_manager_note_visibility_updated");
+        });
+    }
+
+    private static void ConfigureManagerNoteFolder(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<ManagerNoteFolderModel>(entity =>
+        {
+            entity.Property(item => item.Name).IsRequired().HasMaxLength(80).UseCollation("NOCASE");
+            entity.HasOne<ManagerAccountModel>().WithMany()
+                .HasForeignKey(item => item.ManagerAccountId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(item => new { item.ManagerAccountId, item.Name }).IsUnique();
+        });
+    }
+
+    private static void ConfigureManagerNoteTag(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<ManagerNoteTagModel>(entity =>
+        {
+            entity.Property(item => item.Name).IsRequired().HasMaxLength(40).UseCollation("NOCASE");
+            entity.HasOne<ManagerAccountModel>().WithMany()
+                .HasForeignKey(item => item.ManagerAccountId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(item => new { item.ManagerAccountId, item.Name }).IsUnique();
+        });
+    }
+
+    private static void ConfigureManagerNoteTagLink(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<ManagerNoteTagLinkModel>(entity =>
+        {
+            entity.HasKey(link => new { link.NoteId, link.TagId });
+            entity.HasOne<ManagerNoteModel>().WithMany(note => note.TagLinks)
+                .HasForeignKey(link => link.NoteId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<ManagerNoteTagModel>().WithMany()
+                .HasForeignKey(link => link.TagId).OnDelete(DeleteBehavior.Cascade);
+        });
+    }
+
+    private static void ConfigureManagerNoteShare(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<ManagerNoteShareModel>(entity =>
+        {
+            entity.HasKey(share => new { share.NoteId, share.ManagerAccountId });
+            entity.HasOne<ManagerNoteModel>().WithMany(note => note.Shares)
+                .HasForeignKey(share => share.NoteId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<ManagerAccountModel>().WithMany()
+                .HasForeignKey(share => share.ManagerAccountId).OnDelete(DeleteBehavior.Cascade);
+        });
+    }
+
+    private static void ConfigureManagerNoteVersion(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<ManagerNoteVersionModel>(entity =>
+        {
+            entity.Property(version => version.Title).IsRequired().HasMaxLength(160);
+            entity.Property(version => version.Content).IsRequired().HasMaxLength(20_000);
+            entity.Property(version => version.Color).IsRequired().HasMaxLength(16);
+            entity.HasOne<ManagerNoteModel>().WithMany()
+                .HasForeignKey(version => version.NoteId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(version => new { version.NoteId, version.Revision }).IsUnique();
         });
     }
 

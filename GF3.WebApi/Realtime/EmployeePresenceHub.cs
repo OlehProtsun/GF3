@@ -208,15 +208,19 @@ public sealed class EmployeePresenceHub : Hub<IEmployeePresenceClient>
 
         if (string.Equals(Context.User.FindFirstValue(ClaimTypes.Role), AuthRoles.Manager, StringComparison.Ordinal))
         {
-            if (!IsPcMode())
+            var mode = Context.User.FindFirstValue(ManagerWorkspaceModes.ClaimType) ?? ManagerWorkspaceModes.Pc;
+            if (mode is not (ManagerWorkspaceModes.Pc or ManagerWorkspaceModes.Phone))
             {
                 Context.Abort();
                 return;
             }
-            await Groups.AddToGroupAsync(Context.ConnectionId, ManagersGroupName).ConfigureAwait(false);
-            if (Context.User.HasClaim(AuthPolicies.SystemManagerClaim, "true"))
+            if (mode == ManagerWorkspaceModes.Pc)
             {
-                await Groups.AddToGroupAsync(Context.ConnectionId, SystemManagersGroupName).ConfigureAwait(false);
+                await Groups.AddToGroupAsync(Context.ConnectionId, ManagersGroupName).ConfigureAwait(false);
+                if (Context.User.HasClaim(AuthPolicies.SystemManagerClaim, "true"))
+                {
+                    await Groups.AddToGroupAsync(Context.ConnectionId, SystemManagersGroupName).ConfigureAwait(false);
+                }
             }
 
             var managerId = TryGetManagerId(Context.User);

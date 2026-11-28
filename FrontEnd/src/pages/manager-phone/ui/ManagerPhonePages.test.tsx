@@ -5,7 +5,6 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import userEvent from "@testing-library/user-event";
 import { BrowserRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { HomePage } from "@pages/home";
 import { ManagerPhoneHomePage } from "./ManagerPhoneHomePage";
 import { ManagerPhoneAvailabilityPage } from "./ManagerPhoneAvailabilityPage";
 import { ManagerPhoneMorePage } from "./ManagerPhoneMorePage";
@@ -61,6 +60,7 @@ afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 function mount(element: React.ReactNode, path = "/", client = new QueryClient()) { window.history.replaceState({}, "", path); return render(<QueryClientProvider client={client}><BrowserRouter>{element}</BrowserRouter></QueryClientProvider>); }
 test("container lists manager data, supports search and empty state without Add", async () => {
  mount(<ManagerPhoneContainersPage />); await screen.findByText(container.name); expect(screen.queryByRole("button", { name: "Add New" })).not.toBeInTheDocument();
+ fireEvent.click(screen.getByRole("button", { name: "Search", exact: true }));
  fireEvent.change(screen.getByRole("searchbox"), { target: { value: "missing" } }); await screen.findByText("Nothing found");
 });
 test("container detail includes private and public graphs and full manager worker counts", async () => {
@@ -72,7 +72,7 @@ test("container detail includes private and public graphs and full manager worke
  expect(within(schedule).getByText("1 employee")).toBeVisible();
  expect(within(schedule).getByText("8h 0m")).toBeVisible();
  expect(within(screen.getByRole("link", { name: /Public schedule/ })).getByText("Public", { exact: true })).toBeVisible();
- expect(screen.queryByText(container.name)).not.toBeInTheDocument();
+ expect(screen.getByRole("heading", { name: container.name })).toBeVisible();
  expect(screen.queryByText(container.note)).not.toBeInTheDocument();
  expect(screen.getByRole("heading", { name: "Statistics" })).toBeVisible();
  expect(calls.every(call => call.method === "GET")).toBe(true);
@@ -117,12 +117,12 @@ test("loading stays non-interactive and 404 is a not-found state", async () => {
 });
 
 
-test("root wrapper and manager lists omit Back by default", async () => {
+test("root wrapper has no Back link and a manager list returns to Home", async () => {
  const view = mount(<ManagerPhonePage>Home</ManagerPhonePage>);
  expect(screen.queryByRole("link", { name: /Back/ })).not.toBeInTheDocument();
  view.unmount();
  mount(<ManagerPhoneContainersPage />, "/container"); await screen.findByText(container.name);
- expect(screen.queryByRole("link", { name: /Back/ })).not.toBeInTheDocument();
+ expect(screen.getByRole("link", { name: "Back" })).toHaveAttribute("href", "/");
 });
 
 test.each([
@@ -139,11 +139,26 @@ test.each([
 });
 
 
-test("phone Home shows Coming Soon and sends no dashboard requests", () => {
- const view = mount(<ManagerPhoneHomePage />);
- expect(screen.getByRole("heading", { name: "Coming Soon" })).toBeInTheDocument(); expect(view.container.querySelector("a")).toBeNull(); expect(calls).toEqual([]);
- view.unmount(); mount(<HomePage phoneMode />);
- expect(screen.getByRole("heading", { name: "Coming Soon" })).toBeInTheDocument(); expect(calls).toEqual([]);
+test("phone Home shows schedules through the shared read-only dashboard", async () => {
+ mount(<ManagerPhoneHomePage />);
+ fireEvent.change(screen.getByLabelText("Select date"), { target: { value: "2026-04-01" } });
+ expect((await screen.findAllByText("Other Worker")).length).toBeGreaterThan(0);
+ expect(screen.getByRole("button", { name: "Central" })).toBeInTheDocument();
+ expect(screen.queryByRole("button", { name: "Show more" })).not.toBeInTheDocument();
+ expect(calls.every(call => call.method === "GET")).toBe(true);
+});
+
+test("phone Home retries a failed schedule request for the selected date", async () => {
+ mode = "error";
+ mount(<ManagerPhoneHomePage />);
+ fireEvent.change(screen.getByLabelText("Select date"), { target: { value: "2026-04-01" } });
+ const retry = await screen.findByRole("button", { name: "Retry" });
+ mode = "data";
+ fireEvent.click(retry);
+ expect((await screen.findAllByText("Other Worker")).length).toBeGreaterThan(0);
+ expect(screen.getByLabelText("Select date")).toHaveValue("2026-04-01");
+ expect(screen.queryByRole("button", { name: "Retry" })).not.toBeInTheDocument();
+ expect(calls.every(call => call.method === "GET")).toBe(true);
 });
 
 test("Back and controlled search share one toolbar with exact destination and clear", () => {
@@ -151,7 +166,8 @@ test("Back and controlled search share one toolbar with exact destination and cl
  const view = mount(<ManagerPhonePage backTo="/container/17" query="worker" onQueryChange={change} />);
  const back = screen.getByRole("link", { name: "Back" });
  expect(back).toHaveAttribute("href", "/container/17");
- expect(back.parentElement).toContainElement(screen.getByRole("searchbox", { name: "Search" }));
+ fireEvent.click(screen.getByRole("button", { name: "Search", exact: true }));
+ expect(back.closest("header")).toContainElement(screen.getByRole("searchbox", { name: "Search" }));
  fireEvent.change(screen.getByRole("searchbox"), { target: { value: "new" } }); expect(change).toHaveBeenCalledWith("new");
  fireEvent.click(screen.getByRole("button", { name: "Clear Search" })); expect(change).toHaveBeenCalledWith("");
  view.rerender(<QueryClientProvider client={new QueryClient()}><BrowserRouter><ManagerPhonePage query="" onQueryChange={change} /></BrowserRouter></QueryClientProvider>);
@@ -172,6 +188,7 @@ test("containers descend within pinned and unpinned groups without mutating cach
  mount(<ManagerPhoneContainersPage />, "/container", client); await screen.findByText("Container nine");
  const names = () => screen.getAllByText(/^(All manager container|Container nine|Container four|Container seven)$/).map(node => node.textContent);
  expect(names()).toEqual(["Container four", "All manager container", "Container nine", "Container seven"]);
+ fireEvent.click(screen.getByRole("button", { name: "Search", exact: true }));
  fireEvent.change(screen.getByRole("searchbox"), { target: { value: "Container" } }); expect(names()).toEqual(["Container four", "All manager container", "Container nine", "Container seven"]);
  expect(data.map(item => item.id)).toEqual([1, 9, 4, 7]);
  const key = cacheWrites.mock.calls.find(([key]) => key[0] === "containers" && key[1] === "list")![0];
@@ -242,6 +259,7 @@ test("PC availability retains expanded desktop info and management controls", ()
 
 test.each([ManagerPhoneAvailabilityPage, ManagerPhoneEmployeesPage])("lists retain search and clear", async Component => {
  mount(<Component />); await screen.findByText(Component === ManagerPhoneAvailabilityPage ? "Private dispo" : "Other Worker");
+ fireEvent.click(screen.getByRole("button", { name: "Search", exact: true }));
  const input = screen.getByRole("searchbox"); fireEvent.change(input, { target: { value: "missing" } });
  expect(input).toHaveValue("missing"); await screen.findByText("Nothing found"); fireEvent.click(screen.getAllByRole("button", { name: "Clear Search" })[0]); expect(input).toHaveValue("");
 });

@@ -44,6 +44,21 @@ IDENTIFIER = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 HISTORY = "__EFMigrationsHistory"
 LOCK = "__EFMigrationsLock"
 RELEASE_BASELINE = "1175c39461e149a7bb35f428babed28279727899"
+NOTEPAD_RELEASE_BASELINE = "2eedc3618f502c444bd762263e0bb389fdee3526"
+NOTEPAD_RELEASE_MIGRATIONS = (
+    "20261126170000_ExpandManagerNotepad", "20261126180000_AddManagerNoteEditSessions",
+)
+NOTEPAD_RELEASE_BLOBS = {
+    NOTEPAD_RELEASE_MIGRATIONS[0]: "bd8834f57687335fa424f18bac750dfff2bcba9e",
+    NOTEPAD_RELEASE_MIGRATIONS[1]: "dc7c6d4ef1b4020b0b519fb95cf8fcd4e84f7529",
+}
+NOTEPAD_SCHEMA_TABLES = (
+    "manager_note", "manager_note_folder", "manager_note_share", "manager_note_tag", "manager_note_tag_link", "manager_note_version",
+)
+NOTEPAD_NEW_TABLES = NOTEPAD_SCHEMA_TABLES[1:]
+REVIEWED_SCHEMA_TABLES = (
+    "communication_message", "employee_account", "shift_correction_request", "shift_swap_request", "workflow_log_entry",
+)
 REVIEWED_RELEASE_MIGRATIONS = (
     "20261122150944_AllowDisjointOpenSwapIntervals",
     "20261122151455_TrackEmployeeLaunchModes",
@@ -121,6 +136,31 @@ REVIEWED_SCHEMA_PREFIX_CONTRACTS = json.loads(zlib.decompress(base64.b85decode(
 )))
 
 
+NOTEPAD_SCHEMA_PREFIX_CONTRACTS = json.loads(zlib.decompress(base64.b85decode(
+    b"c-rk+TW_065dJHOm$uR#37kvYygAOMvf|(#he)ZC2oXb58XNlnP7_uA?`L4SEU>#^<EBovd1x9l%+BT8*%|M5{ZpNL_kkUG3xDXS"
+    b"M`};&9qM{-Pv6(z$Lc%IU@@Psd~ce_3>JRm`qA-hF?|SCq=wUP?%W>VeRro(s2*KktDf(;Pw>QhvgWpL-@Ae3FCsVpW3_bb$aO%1"
+    b"ehhyOCb(~6WoVq>E9Iu?{To#o8z4r@z-MoZPweS*vGOC!16c%;>5G;fS*vJzqrOvb(X|@ccQdzc4BIxde>}phMS~k(fgi9sHf(5^"
+    b"_!FKe#@JMh%h5;~jExI((udDM<nx(TdH?fdc;26UQO@uerGIIThX$;7jtvtPidkOO7NX=MFPg==O?+jto=-_4g%YzxAbK9SrFe1$"
+    b"tAXbTmV$J8#?F4`J~JGr;|U&qGLkrQfbdS4;8Q%o#sFW`qe=io<N#eKc!VMAgZ{;!e}ZE>0W-IVU?xWU&lEmKRlGp#R&zhu5E^WS"
+    b"80~4URHP$+HJiaN4e+NUhM5d$Es^dal2;IjV_12*hqA1)pYJ1*Q})vXRLLk?>=0G*$r6JYeO&~uckiFM&uJ92nx`tq_v9aAtn>%w"
+    b"aBRf8k0c=Z)WAs!k}8wtAXxl>-&%{312SMQxKU0JCkY^ZJTzcqf^SKx7`|6zdgz}#4EY0y$FJL8hz%C&>tg1(K?yUp@Rc0qs|vr_"
+    b"fx8t=k$t}{J=V<gAGV_G(G5a4g4WWNXk(smhx+^Egu_ou+jq{%LI$j}v>oBWHoUSJ2_(=JA8Fh-`G*-LLe8rOE9yA5e0yF!(F)L|"
+    b"7G4^|e=i#i<tS%apS~hKk;%(qzY<Ja%sRouenZH4>X<$x!h9FRhG)=E{!_P?+8GTdR}?WV&18tNnP9VlE#X4SK|8Dn)bdR4j*_%A"
+    b"kUwCxz<u=6TEQtH?VRE1WqOhd6K~QthzrGQWjA;S*3$ERIAprE%4Id{cg$Xxst`5MudLtanHwkQ&YOAB^Trm}Rq%~2WaV(O%fkuT"
+    b"1@W}&GJ|)5Py3f6Q_(8>r9pCLhmqwvUcB<%a~|??+|u=_n!{D9$AUDb%5LOxZ<c}g2>!l7O5RyyTC<o?0}|szf9pB)Y;=KN=M=};"
+    b"Tt#CfY?oMDjqZ3l?6^YB@7Q?hDV%^~FdmI!XN)m~2LJI1pVMRR9z?QEQ`CMk0aCP+MLx1FL6o%hk}L#QW&(|^YO}(OX1g4+yX!xY"
+    b"!cELgJ}MGYF))9?v8p)QH$xR^vH4v$6H!_3+@;<S9j~U?2ouVhJ$A2vP@`YNNXSciG3%{YN%9GDv+6;uEGi)R_}M;b$$a}l8?lR3"
+    b"@uztZD~9E6^X)2z-OZ3wjIZLUmWdmBJnd323O#L#Mk`zjTHF_%8bbTAO}j(HxPALtB`f=e;bl)Dd5O_{iGi-)qhk0gyQ6AqD)Rvq"
+    b"V;@iEBjOKy^g9~8xDGL=zQ&>z>zQI5{wStC$_X_e^m5T2Qt5B1S&RPWYnvD-8gH_qZL4X@rp&c(fLPz^@GgNWvE1hE56Vo`+kfZR"
+    b"@vf?j%bKCh&g?Zh(-Yo>@a!++ux5ADqI-YOHQ%<YYWmGRr>M3li~Bo#x4Z6rm);Enc{sJ$uy|(KIP>*e+1Q`-B=4O4UUN#)<GfgL"
+    b"-AesZIpyE=b==V{%5wN0lzrE-SJ5J|m1UWpz-sxxu!PQNZTWU)ZUC+7HT{lNlpQG*!i&z`sS`}DM9Wf<-!X4k9#SObYBuTR)+;gV"
+    b"B(HRh&MyU&#Fn>zZbXL)z_D%vps;u_%{!luqI|ov$Bpu?7mRNE4WrwEaCC#NiyptZ6B%Rp=GeRSW3eq}`D_G!wc%r@l$iGD5iy@W"
+    b"WZYhg_Jm<Ly>P>LnNaedB>zeBpCtcD@}DICN%Eg0|4H(n8u?GKe(aAGk`{`%LX4mv3q2(YB0ESEG7ot|?$go>+>k9KsaTSVC8=1F"
+    b"iY2L7l8Pm%Sdxk*saTSVC8=1FiY2L7uZM~SQV{;iM44+X3+|)pY{^%8fEZIIU;Gd;=1s{Slk73c9+T`b$sUvJG07g2>@mq6lk73c"
+    b"9+T`b$sYTg*kiZ<19sRtS^"
+)))
+
+
 @dataclass(frozen=True)
 class ReviewedReleaseTransition:
     before: str
@@ -130,6 +170,9 @@ class ReviewedReleaseTransition:
     nullable_columns: tuple
     schema_prefix_contracts: tuple
     expected_new_values: tuple
+    schema_tables: tuple = REVIEWED_SCHEMA_TABLES
+    empty_new_tables: tuple = ()
+    correction_rebuild_prefix: int | None = 4
 
 
 class MaintenanceError(Exception):
@@ -174,10 +217,16 @@ def classify(git, before, target, ordinary=None):
                         f"Migration rehearsal refuses path {ascii(path)}")
         paths.append(path)
     before_ids, target_ids = migration_ids(git, before), migration_ids(git, target)
-    require(pairs and all(parts == {False, True} for parts in pairs.values())
-            and target_ids == before_ids + tuple(sorted(pairs))
-            and all(migration > before_ids[-1] for migration in pairs),
+    pending = tuple(sorted(pairs))
+    require(pending and target_ids == before_ids + pending and pending[0] > before_ids[-1],
             "Expected complete, append-only EF migration pairs")
+    if set(pending).intersection(NOTEPAD_RELEASE_MIGRATIONS):
+        require(before == NOTEPAD_RELEASE_BASELINE and pending == NOTEPAD_RELEASE_MIGRATIONS
+                and all(parts == {False} for parts in pairs.values()),
+                "Reviewed notepad transition requires exactly the two standalone migrations and pinned PROD2 baseline")
+        notepad_migration_blobs(git, target)
+    else:
+        require(all(parts == {False, True} for parts in pairs.values()), "Expected complete, append-only EF migration pairs")
     return paths, before_ids, target_ids
 
 
@@ -209,23 +258,30 @@ def review_plan(raw, before, target):
 
 
 def bootstrap_paths(git, before, target, raw):
+    exact_review = before == NOTEPAD_RELEASE_BASELINE
     if not raw:
+        require(not exact_review, "Reviewed notepad transition requires a protected tooling review")
         return set()
-    record = json.loads(raw, object_pairs_hook=lambda pairs: _unique_json_pairs(pairs))
+    try:
+        record = json.loads(raw, object_pairs_hook=_unique_json_pairs)
+    except (UnicodeError, ValueError):
+        raise MaintenanceError("Invalid protected tooling review JSON") from None
+    require(isinstance(record, dict), "Invalid protected tooling review JSON")
     if record.get("target") != target:
+        require(not exact_review, "Tool installation review does not match this transition")
         return set()
     require(set(record) in ({"before", "target", "blobs"}, {"before", "target", "blobs", "reviewed_build_inputs"}) and record["before"] == before
             and isinstance(record["blobs"], dict), "Tool installation review does not match this transition")
     blobs = record["blobs"]
     require(set(blobs) <= BOOTSTRAP_PATHS, "Tool installation review contains an unsupported path")
     for path, blob in blobs.items():
-        require(re.fullmatch(r"[0-9a-f]{40}", blob) and git("rev-parse", f"{target}:{path}").strip() == blob,
+        require(isinstance(blob, str) and re.fullmatch(r"[0-9a-f]{40}", blob) and git("rev-parse", f"{target}:{path}").strip() == blob,
                 "Reviewed installation blob differs from the candidate")
     reviewed_paths = set(blobs)
     build_inputs = record.get("reviewed_build_inputs", {})
     require(isinstance(build_inputs, dict) and set(build_inputs) <= REVIEWED_BUILD_INPUTS,
             "Tooling review contains an unsupported build input")
-    if build_inputs:
+    if build_inputs or exact_review:
         diff = git("diff", "--raw", "--no-abbrev", "--no-renames", "--no-ext-diff", "-z", before, target, "--").split("\0")
         actual = {}
         for header, path in zip(diff[:-1:2], diff[1::2], strict=True):
@@ -241,6 +297,14 @@ def bootstrap_paths(git, before, target, raw):
                     and (status == "A" and old_mode == "000000" or status == "M" and old_mode == "100644"),
                     "Reviewed build input differs from the complete Git diff")
             reviewed_paths.add(path)
+        if exact_review:
+            require(reviewed_paths and set(blobs) == actual.keys() & BOOTSTRAP_PATHS
+                    and set(build_inputs) == actual.keys() & REVIEWED_BUILD_INPUTS,
+                    "Protected tooling review must cover exactly the changed tooling and reviewed build inputs")
+            for path, blob in blobs.items():
+                status, old_mode, new_mode, _, new_blob = actual[path]
+                require((status, old_mode, new_mode) in {("M", "100644", "100644"), ("A", "000000", "100644")}
+                        and blob == new_blob, "Reviewed tooling differs from the complete Git diff")
         for path, (status, old_mode, new_mode, _, _) in actual.items():
             critical = path in BOOTSTRAP_PATHS or path.lower().startswith((".github/workflows/", "dataaccesslayer/administration/")) or path.lower().endswith((".csproj", ".props", ".targets", ".sln", ".sh"))
             if critical and path not in reviewed_paths:
@@ -317,8 +381,95 @@ def validate_reviewed_schema_contracts(contracts):
     return True
 
 
+def notepad_migration_blobs(git, target):
+    blobs = []
+    for migration, expected in NOTEPAD_RELEASE_BLOBS.items():
+        actual = git("rev-parse", f"{target}:{MIGRATIONS}/{migration}.cs").strip()
+        require(actual == expected, f"Reviewed notepad migration source blob changed: {migration}")
+        blobs.append((migration, actual, None))
+    return tuple(blobs)
+
+
+def validate_notepad_schema_contracts(contracts):
+    require(tuple(item.get("migrationId") for item in contracts) ==
+            ("20261123140000_AddCommunicationContentBlocks",) + NOTEPAD_RELEASE_MIGRATIONS
+            and all(tuple(table["table"] for table in item["tables"]) == NOTEPAD_SCHEMA_TABLES for item in contracts),
+            "Reviewed notepad schema contracts must contain the exact three ordered prefixes and six tables")
+    initial, expansion, sessions = contracts
+    objects = [{(row[0], row[1]): row for row in item["schemaObjects"]} for item in contracts]
+    note_key = ("table", "manager_note")
+    new_indexes = {
+        "IX_manager_note_folder_id", "ix_manager_note_manager_pinned_updated", "ix_manager_note_visibility_updated",
+        "IX_manager_note_folder_manager_account_id_name", "IX_manager_note_share_manager_account_id",
+        "IX_manager_note_tag_manager_account_id_name", "IX_manager_note_tag_link_tag_id", "IX_manager_note_version_note_id_revision",
+    }
+    new_objects = {("index", name) for name in new_indexes} | {("table", name) for name in NOTEPAD_NEW_TABLES}
+    require(objects[0].keys() == {note_key, ("index", "ix_manager_note_manager_updated")}
+            and all(not table[part] for table in initial["tables"][1:] for part in ("columns", "indexes", "foreignKeys")),
+            "Reviewed notepad baseline contains unexpected schema")
+    for prefix, added in enumerate((new_objects, set()), start=1):
+        old, new = objects[prefix - 1], objects[prefix]
+        require(not (old.keys() - new.keys()) and new.keys() - old.keys() == added
+                and {entry for entry in old if old[entry] != new[entry]} == {note_key},
+                f"Reviewed notepad prefix {prefix} contains an unexpected schema-object change")
+
+    old_note, expanded_note, sessions_note = (item["tables"][0] for item in contracts)
+    expansion_columns = (
+        ("is_locked", "INTEGER", 1, "0"), ("is_pinned", "INTEGER", 1, "0"),
+        ("last_edited_by_manager_id", "INTEGER", 0, None), ("revision", "INTEGER", 1, "1"),
+        ("visibility", "TEXT", 1, "'private'"), ("folder_id", "INTEGER", 0, None),
+    )
+    session_columns = (
+        ("edit_session_id", "TEXT", 0, None), ("edit_manager_id", "INTEGER", 0, None),
+        ("edit_started_at_ms", "INTEGER", 0, None), ("edit_expires_at_ms", "INTEGER", 0, None),
+    )
+    for old, new, columns in ((old_note, expanded_note, expansion_columns), (expanded_note, sessions_note, session_columns)):
+        require(new["columns"] == old["columns"] + [[i, *column, 0, 0]
+                for i, column in enumerate(columns, len(old["columns"]))],
+                "Reviewed notepad prefix has unexpected column defaults or metadata")
+    require(expansion["tables"][1:] == sessions["tables"][1:]
+            and expanded_note["indexes"] == sessions_note["indexes"]
+            and expanded_note["foreignKeys"] == sessions_note["foreignKeys"]
+            and expanded_note["foreignKeys"] == old_note["foreignKeys"] +
+                [[1, 0, "manager_note_folder", "folder_id", "id", "NO ACTION", "SET NULL", "NONE"]],
+            "Reviewed notepad edit sessions changed existing constraints")
+    unique_indexes = {
+        "IX_manager_note_folder_manager_account_id_name", "IX_manager_note_tag_manager_account_id_name",
+        "IX_manager_note_version_note_id_revision", "sqlite_autoindex_manager_note_share_1", "sqlite_autoindex_manager_note_tag_link_1",
+    }
+    actual_unique = {index["row"][1]: index for table in expansion["tables"] for index in table["indexes"] if index["row"][2]}
+    require(actual_unique.keys() == unique_indexes, "Reviewed notepad uniqueness constraints changed")
+    for name in ("IX_manager_note_folder_manager_account_id_name", "IX_manager_note_tag_manager_account_id_name"):
+        require(any(column[2] == "name" and column[4] == "NOCASE" and column[5] for column in actual_unique[name]["columns"]),
+                "Reviewed notepad name index lost its NOCASE collation")
+    for table, columns in (("manager_note_share", ("note_id", "manager_account_id")), ("manager_note_tag_link", ("note_id", "tag_id"))):
+        index = actual_unique[f"sqlite_autoindex_{table}_1"]
+        require(index["row"][3] == "pk" and tuple(column[2] for column in index["columns"] if column[5]) == columns,
+                "Reviewed notepad composite primary key changed")
+    return True
+
+
 def migration_plan(git, before, target, pending):
     pending = tuple(pending)
+    if set(pending) & set(NOTEPAD_RELEASE_MIGRATIONS):
+        require(before == NOTEPAD_RELEASE_BASELINE and pending == NOTEPAD_RELEASE_MIGRATIONS,
+                "Reviewed notepad transition requires the exact pinned PROD2 baseline and complete ordered chain")
+        validate_notepad_schema_contracts(NOTEPAD_SCHEMA_PREFIX_CONTRACTS)
+        nullable = (
+            ("manager_note", "last_edited_by_manager_id", "INTEGER"), ("manager_note", "folder_id", "INTEGER"),
+            ("manager_note", "edit_session_id", "TEXT"), ("manager_note", "edit_manager_id", "INTEGER"),
+            ("manager_note", "edit_started_at_ms", "INTEGER"), ("manager_note", "edit_expires_at_ms", "INTEGER"),
+        )
+        expected_new_values = (
+            (1, "manager_note", "is_locked", 0), (1, "manager_note", "is_pinned", 0),
+            (1, "manager_note", "revision", 1), (1, "manager_note", "visibility", "private"),
+            *((1 if i < 2 else 2, table, column, None) for i, (table, column, _) in enumerate(nullable)),
+        )
+        return ReviewedReleaseTransition(
+            before, target, pending, notepad_migration_blobs(git, target), nullable,
+            tuple(NOTEPAD_SCHEMA_PREFIX_CONTRACTS), expected_new_values, schema_tables=NOTEPAD_SCHEMA_TABLES,
+            empty_new_tables=tuple((1, table) for table in NOTEPAD_NEW_TABLES), correction_rebuild_prefix=None,
+        )
     if set(pending) & set(REVIEWED_RELEASE_MIGRATIONS):
         require(before == RELEASE_BASELINE and pending == REVIEWED_RELEASE_MIGRATIONS,
                 "Reviewed seven-migration transition requires the exact pinned PROD2 baseline and complete ordered chain")
@@ -882,13 +1033,7 @@ def schema(db):
             db.execute("SELECT type, name, sql FROM sqlite_schema WHERE sql IS NOT NULL")}
 
 
-REVIEWED_SCHEMA_TABLES = (
-    "communication_message", "employee_account", "shift_correction_request", "shift_swap_request", "workflow_log_entry",
-)
-
-
-def reviewed_schema_prefix(db, migration_id):
-    tables = REVIEWED_SCHEMA_TABLES
+def reviewed_schema_prefix(db, migration_id, tables=REVIEWED_SCHEMA_TABLES):
     placeholders = ",".join("?" for _ in tables)
     objects = [list(row) for row in db.execute(
         f"SELECT type,name,tbl_name,sql FROM sqlite_schema WHERE sql IS NOT NULL AND (name IN ({placeholders}) OR tbl_name IN ({placeholders})) ORDER BY type,name",
@@ -911,7 +1056,7 @@ def reviewed_schema_prefix(db, migration_id):
 def require_reviewed_schema(db, transition, prefix):
     require(0 <= prefix < len(transition.schema_prefix_contracts), "Invalid reviewed schema prefix")
     contract = transition.schema_prefix_contracts[prefix]
-    actual = reviewed_schema_prefix(db, contract["migrationId"])
+    actual = reviewed_schema_prefix(db, contract["migrationId"], transition.schema_tables)
     normalize = lambda rows: {(row[0], row[1]): (row[0], row[1], row[2], canonical_sql(row[3])) for row in rows}
     expected_objects = normalize(contract["schemaObjects"])
     actual_objects = normalize(actual["schemaObjects"])
@@ -972,8 +1117,8 @@ def canonical_sql(sql):
     return "".join(result).strip()
 
 
-def unaffected_schema(db):
-    tables = set(REVIEWED_SCHEMA_TABLES)
+def unaffected_schema(db, tables=REVIEWED_SCHEMA_TABLES):
+    tables = set(tables)
     return {(kind, name): sql for kind, name, table, sql in db.execute(
         "SELECT type,name,tbl_name,sql FROM sqlite_schema WHERE sql IS NOT NULL")
         if name not in tables and table not in tables and name != LOCK}
@@ -988,6 +1133,10 @@ def verify_reviewed_new_values(db, transition, prefix):
         require(not db.execute(f"SELECT 1 FROM {quoted(table)} WHERE {quoted(column)} IS NOT ? LIMIT 1",
                                (expected,)).fetchone(),
                 f"Reviewed field {table}.{column} has an unexpected value")
+    for introduced, table in transition.empty_new_tables:
+        if introduced <= prefix:
+            require(not db.execute(f"SELECT 1 FROM {quoted(table)} LIMIT 1").fetchone(),
+                    f"Reviewed new table {table} is not empty")
 
 
 def sequence_values(db):
@@ -999,7 +1148,7 @@ def sequence_values(db):
     return values
 
 
-def reviewed_correction_sequence(before, after, prefix):
+def reviewed_correction_sequence(before, after, prefix, correction_rebuild_prefix=4):
     table = "shift_correction_request"
     original, current = sequence_values(before), sequence_values(after)
     previous_high, current_high = original.pop(table, None), current.pop(table, None)
@@ -1008,7 +1157,7 @@ def reviewed_correction_sequence(before, after, prefix):
         # EF copies the existing rows into a fresh AUTOINCREMENT table. Its sequence
         # then reflects the largest copied ID (zero when the INSERT SELECT was empty).
         rebuilt_high, = after.execute("SELECT MAX(0, COALESCE(MAX(id), 0)) FROM shift_correction_request").fetchone()
-        require(prefix >= 4 and current_high == rebuilt_high,
+        require(prefix >= correction_rebuild_prefix and current_high == rebuilt_high,
                 "SQLite sequence state changed outside the reviewed correction rebuild")
     return previous_high, current_high
 
@@ -1057,8 +1206,9 @@ def verify_migration(snapshot_path, clone, before_ids, target_ids, columns):
     transition = columns if isinstance(columns, ReviewedReleaseTransition) else None
     if transition:
         require(len(transition.schema_prefix_contracts) == len(transition.migrations) + 1,
-                "Reviewed release requires all eight immutable schema-prefix contracts")
+                "Reviewed release requires an immutable contract for every schema prefix")
         require(before_ids and transition.schema_prefix_contracts[0]["migrationId"] == before_ids[-1]
+                and target_ids == before_ids + transition.migrations
                 and target_ids[-1] == transition.schema_prefix_contracts[-1]["migrationId"],
                 "Migration history does not match the reviewed schema prefixes")
         columns = transition.nullable_columns
@@ -1076,7 +1226,7 @@ def verify_migration(snapshot_path, clone, before_ids, target_ids, columns):
         if transition:
             require_reviewed_schema(before, transition, 0)
             require_reviewed_schema(after, transition, len(transition.migrations))
-            require(unaffected_schema(before) == unaffected_schema(after),
+            require(unaffected_schema(before, transition.schema_tables) == unaffected_schema(after, transition.schema_tables),
                     "An unaffected SQLite schema object changed during migration")
             verify_reviewed_new_values(after, transition, len(transition.migrations))
             require(not before.execute("PRAGMA foreign_key_check").fetchall()
@@ -1086,7 +1236,7 @@ def verify_migration(snapshot_path, clone, before_ids, target_ids, columns):
             require(expected_schema(before_schema, columns) == after_schema,
                     "SQLite schema differs from the reviewed column additions")
         for kind, table in before_schema:
-            if kind != "table" or table == HISTORY or (transition and table == "sqlite_sequence"):
+            if kind != "table" or table == HISTORY or (transition and table in {LOCK, "sqlite_sequence"}):
                 continue
             fields = before.execute(f"PRAGMA table_xinfo({quoted(table)})").fetchall()
             actual = after.execute(f"PRAGMA table_xinfo({quoted(table)})").fetchall()
@@ -1104,10 +1254,17 @@ def verify_migration(snapshot_path, clone, before_ids, target_ids, columns):
             names = [field[1] for field in fields]
             require(row_digest(before, table, names) == row_digest(after, table, names),
                     "Existing SQLite rows changed during rehearsal")
-        if transition:
-            sequence = reviewed_correction_sequence(before, after, len(transition.migrations))
-    if transition:
+        sequence = (verify_reviewed_sequences(before, after, transition, len(transition.migrations))
+                    if transition else None)
+    if sequence is not None:
         preserve_reviewed_correction_sequence(clone, *sequence)
+
+
+def verify_reviewed_sequences(before, after, transition, prefix):
+    if transition.correction_rebuild_prefix is None:
+        require(sequence_values(before) == sequence_values(after), "SQLite sequence changed during the reviewed migration")
+        return None
+    return reviewed_correction_sequence(before, after, prefix, transition.correction_rebuild_prefix)
 
 
 def verify_no_data_drift(backup, database, columns=(), target_ids=None):
@@ -1123,10 +1280,10 @@ def verify_no_data_drift(backup, database, columns=(), target_ids=None):
         original_history, current_history = tuple(before.execute(query)), tuple(after.execute(query))
         if transition:
             require(len(transition.schema_prefix_contracts) == len(transition.migrations) + 1,
-                    "Reviewed release recovery requires all eight schema-prefix contracts")
+                    "Reviewed release recovery requires an immutable contract for every schema prefix")
             original_ids = tuple(row[0] for row in original_history)
             verify(before, original_ids)
-            require(transition.schema_prefix_contracts[0]["migrationId"] == original_ids[-1],
+            require(original_ids and transition.schema_prefix_contracts[0]["migrationId"] == original_ids[-1],
                     "Recovery backup does not match the reviewed baseline prefix")
             prefix = len(current_history) - len(original_history)
             require(0 <= prefix <= len(transition.migrations),
@@ -1138,7 +1295,7 @@ def verify_no_data_drift(backup, database, columns=(), target_ids=None):
             verify(after, expected_ids)
             require_reviewed_schema(before, transition, 0)
             require_reviewed_schema(after, transition, prefix)
-            require(unaffected_schema(before) == unaffected_schema(after),
+            require(unaffected_schema(before, transition.schema_tables) == unaffected_schema(after, transition.schema_tables),
                     "An unaffected SQLite schema object changed after the recovery checkpoint")
             verify_reviewed_new_values(after, transition, prefix)
             require(not before.execute("PRAGMA foreign_key_check").fetchall()
@@ -1152,7 +1309,7 @@ def verify_no_data_drift(backup, database, columns=(), target_ids=None):
                 require(set(names) <= updated, "A pre-existing SQLite column disappeared before recovery")
                 require(row_digest(before, table, names) == row_digest(after, table, names),
                         "Database writes may have occurred since the final backup")
-            reviewed_correction_sequence(before, after, prefix)
+            verify_reviewed_sequences(before, after, transition, prefix)
             return prefix
         expected_ids = tuple(row[0] for row in original_history) if target_ids is None else target_ids
         require(len(current_history) >= len(original_history) and current_history[:len(original_history)] == original_history

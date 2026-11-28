@@ -7,8 +7,11 @@ import { setLanguage } from "@shared/i18n";
 import { loadHomeDashboard, type HomeDashboardData } from "./homeDashboard";
 import { managerHomeActivityApi, type ManagerHomeActivityItem, type ManagerHomeActivityPage } from "../api/managerHomeActivityApi";
 import { HomePage } from "./HomePage";
+import { shiftCorrectionsApi } from "@entities/shift-corrections";
 vi.mock("./homeDashboard", () => ({ loadHomeDashboard: vi.fn() }));
-vi.mock("../api/managerHomeActivityApi", () => ({ managerHomeActivityApi: { list: vi.fn() } }));
+vi.mock("../api/managerHomeActivityApi", () => ({ managerHomeActivityApi: { list: vi.fn(), navBadges: vi.fn() } }));
+vi.mock("@app/providers/PresenceProvider", () => ({ useManagerEditLocks: () => ({ isCheckingLocks: false, isLockedByOther: false }) }));
+vi.mock("@entities/shift-corrections/api/shiftCorrectionsApi", () => ({ shiftCorrectionsApi: { getGraphRequest: vi.fn(), reject: vi.fn() } }));
 const event: ManagerHomeActivityItem = { id: "swap:1", kind: "swap_created", occurredAtUtc: "2026-11-04T10:00:00Z", employeeName: "Personal name", status: "open", requiresApproval: false, targetType: "graph", containerId: 8, graphId: 20 };
 const row = { id: "r1", employeeId: 99, containerId: 8, graphId: 20, employee: "Personal name", shopId: 1, shop: "Central", dateLabel: "4 November 2026", fromTime: "08:00", toTime: "16:00", shift: "08:00 – 16:00", hoursText: "8h 0m" };
 const dashboard: HomeDashboardData = { todayRows: [row], todayActiveEmployeesCount: 1, hasPartialData: false,
@@ -16,6 +19,7 @@ const dashboard: HomeDashboardData = { todayRows: [row], todayActiveEmployeesCou
 beforeEach(() => {
  vi.resetAllMocks(); setLanguage("en"); window.history.replaceState({}, "", "/");
  vi.mocked(loadHomeDashboard).mockResolvedValue(dashboard);
+ vi.mocked(managerHomeActivityApi.navBadges).mockResolvedValue({ totalPending: 0, graphPending: 0, urlopPending: 0 });
  vi.mocked(managerHomeActivityApi.list).mockResolvedValue({ items: [event], allActivityCount: 1, requiresApprovalCount: 0, hasMore: false, nextOffset: 1 });
 });
 afterEach(() => {
@@ -86,6 +90,53 @@ test("the entire event links by structured owning IDs regardless of labels", asy
  const link = await within(panel).findByRole("link"); expect(link).toHaveAttribute("href", "/container/8/graphs/20");
  fireEvent.click(within(link).getByText("Personal name gave up a shift"));
  await waitFor(() => expect(window.location.pathname).toBe("/container/8/graphs/20"));
+});
+
+test("a pending graph correction uses its explicit request ID and refreshes Home without SignalR", async () => {
+ const pending = { ...event, id: "opaque-event:2000", requestId: 40, kind: "correction_requested" as const,
+  requiresApproval: true, status: "pending" };
+ const request = { id: 40, containerId: 8, scheduleId: 20, scheduleSlotId: 1, isDayOffRequest: false,
+  scheduleName: "Target schedule", shopName: "Central", year: 2026, month: 11, dayOfMonth: 4, employeeId: 99,
+  employeeName: "Personal name", originalFromTime: "08:00", originalToTime: "16:00", requestedFromTime: "09:00",
+  requestedToTime: "16:00", comment: "Review this comment", status: "pending" as const, createdAtUtc: event.occurredAtUtc };
+ const list = vi.mocked(managerHomeActivityApi.list);
+ list.mockResolvedValue({ items: [pending], allActivityCount: 1, requiresApprovalCount: 1, hasMore: false, nextOffset: 1 });
+ vi.mocked(shiftCorrectionsApi.getGraphRequest).mockResolvedValue(request);
+ vi.mocked(shiftCorrectionsApi.reject).mockImplementation(async () => {
+  const terminal = { ...request, status: "rejected" as const };
+  vi.mocked(shiftCorrectionsApi.getGraphRequest).mockResolvedValue(terminal);
+  list.mockResolvedValue({ items: [], allActivityCount: 0, requiresApprovalCount: 0, hasMore: false, nextOffset: 0 });
+  return terminal;
+ });
+ const user = userEvent.setup();
+ mount();
+ const feed = within(screen.getByRole("tabpanel"));
+ await user.click(await feed.findByRole("button", { name: /requested a schedule correction/ }));
+ const menu = within(screen.getByRole("menu", { name: "Request actions" }));
+ expect(menu.getAllByRole("menuitem").map(item => item.getAttribute("aria-label"))).toEqual(["Fast approve", "Go to schedule"]);
+ await user.click(menu.getByRole("menuitem", { name: "Fast approve" }));
+ const dialog = within(screen.getByRole("dialog", { name: "Review request" }));
+ expect(await dialog.findByText("Review this comment")).toBeVisible();
+ expect(shiftCorrectionsApi.getGraphRequest).toHaveBeenCalledWith(8, 20, 40, expect.any(AbortSignal));
+ expect(shiftCorrectionsApi.reject).not.toHaveBeenCalled();
+ await user.click(dialog.getByRole("button", { name: "Reject" }));
+ expect(await dialog.findByText("Rejected", { exact: true })).toBeVisible();
+ expect(shiftCorrectionsApi.reject).toHaveBeenCalledExactlyOnceWith(8, 20, 40);
+ expect(await feed.findByText("No activity recorded in this month.")).toBeVisible();
+ expect(window.location.pathname).toBe("/");
+});
+
+test("Go to schedule uses the existing route and old pending rows remain direct links", async () => {
+ const pending = { ...event, kind: "day_off_requested" as const, requiresApproval: true, status: "pending" };
+ vi.mocked(managerHomeActivityApi.list).mockResolvedValue({ items: [pending, { ...pending, id: "current-event", requestId: 7, employeeName: "Current worker" }],
+  allActivityCount: 2, requiresApprovalCount: 2, hasMore: false, nextOffset: 2 });
+ mount();
+ const feed = within(screen.getByRole("tabpanel"));
+ expect(await feed.findByRole("link", { name: /Personal name requested/ })).toHaveAttribute("href", "/container/8/graphs/20");
+ await userEvent.click(feed.getByRole("button", { name: /Current worker requested/ }));
+ await userEvent.click(screen.getByRole("menuitem", { name: "Go to schedule" }));
+ expect(window.location.pathname).toBe("/container/8/graphs/20/edit");
+ expect(shiftCorrectionsApi.getGraphRequest).not.toHaveBeenCalled();
 });
 test("phone Home preserves its placeholder and starts no data requests", () => {
  mount(true); expect(screen.getByRole("heading", { name: "Coming Soon" })).toBeVisible();

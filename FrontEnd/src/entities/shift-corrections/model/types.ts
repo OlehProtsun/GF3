@@ -1,3 +1,10 @@
+import type { EmployeeSchedule } from "@entities/employee-schedule/model/types";
+
+export type ShiftCorrectionSchedule = Pick<
+  EmployeeSchedule,
+  "id" | "name" | "year" | "month" | "publicationStatus" | "lastUpdatedAtUtc" | "slots"
+>;
+
 export type ShiftCorrectionStatus = "pending" | "approved" | "rejected";
 
 export type ShiftCorrectionRequest = {

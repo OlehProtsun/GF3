@@ -6,7 +6,8 @@ import { queryKeys } from "@shared/api/queryKeys";
 import { setAuthAccessToken } from "@shared/api/httpClient";
 import { beginGraphSaveTraffic, finishGraphSaveTraffic } from "@shared/api/graphSaveTraffic";
 
-const realtime = vi.hoisted(() => ({ handlers: new Map<string, (update: unknown) => void>(), invocations: vi.fn(), reconnected: null as (() => void) | null }));
+const realtime = vi.hoisted(() => ({ handlers: new Map<string, (update: unknown) => void>(), invocations: vi.fn(),
+  start: vi.fn(), stop: vi.fn(), reconnected: null as (() => void) | null }));
 const session = { role: "manager", managerId: 3, employeeId: undefined as number | undefined, userName: "chief", workspaceMode: "pc" };
 vi.mock("@app/providers/AuthProvider", () => ({
   useAuth: () => ({ status: "authenticated", session, logout: vi.fn() }),
@@ -19,20 +20,21 @@ vi.mock("@microsoft/signalr", () => ({
     withAutomaticReconnect() { return this; }
     configureLogging() { return this; }
     build() {
+      realtime.reconnected = null;
       return {
         state: "connected",
         on: (name: string, handler: (update: unknown) => void) => realtime.handlers.set(name, handler),
         off: (name: string) => realtime.handlers.delete(name),
         onreconnected: (handler: () => void) => { realtime.reconnected = handler; },
-        start: async () => {},
-        stop: async () => {},
+        start: async () => { realtime.start(); },
+        stop: async () => { realtime.stop(); },
         invoke: async (_method: string, locks: unknown) => { realtime.invocations(locks); return []; },
       };
     }
   },
 }));
 
-beforeEach(() => { session.role = "manager"; session.employeeId = undefined; session.workspaceMode = "pc"; realtime.handlers.clear(); realtime.invocations.mockClear(); setAuthAccessToken("old-token"); });
+beforeEach(() => { session.role = "manager"; session.employeeId = undefined; session.workspaceMode = "pc"; realtime.handlers.clear(); realtime.invocations.mockClear(); realtime.start.mockClear(); realtime.stop.mockClear(); realtime.reconnected = null; setAuthAccessToken("old-token"); });
 afterEach(() => { cleanup(); vi.useRealTimers(); setAuthAccessToken(null); });
 
 function scheduleBurst(graphId: number, reason = "manager-schedule-style-updated") {
@@ -87,6 +89,36 @@ test("refreshes dock badges for Urlop, non-graph swaps and reconnects", async ()
     invalidate.mockClear(); act(emit);
     expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.home.navBadges() });
   }
+});
+
+test("delivers note invalidation only in PC workspace and detaches handlers on mode exchange", async () => {
+  const client = new QueryClient();
+  const invalidate = vi.spyOn(client, "invalidateQueries");
+  const workspace = () => <QueryClientProvider client={client}><PresenceProvider><span>workspace</span></PresenceProvider></QueryClientProvider>;
+  const view = render(workspace());
+  await waitFor(() => expect(realtime.handlers.has("ManagerDataChanged")).toBe(true));
+  const update = { resourceType: "manager-notepad", reason: "edit-session-started", resourceId: null };
+  const previous = realtime.handlers.get("ManagerDataChanged")!;
+  invalidate.mockClear();
+  act(() => previous(update));
+  expect(invalidate).toHaveBeenCalledExactlyOnceWith({ queryKey: queryKeys.managerNotepad.current() });
+  session.workspaceMode = "phone";
+  setAuthAccessToken("phone-token");
+  view.rerender(workspace());
+  await waitFor(() => expect(realtime.stop).toHaveBeenCalled());
+  expect(realtime.handlers.has("ManagerDataChanged")).toBe(false);
+  expect(realtime.reconnected).toBeNull();
+  invalidate.mockClear();
+  act(() => previous(update));
+  expect(invalidate).not.toHaveBeenCalled();
+  session.role = "employee";
+  session.employeeId = 12;
+  setAuthAccessToken("employee-token");
+  view.rerender(workspace());
+  await waitFor(() => expect(realtime.handlers.has("ManagerDataChanged")).toBe(true));
+  invalidate.mockClear();
+  act(() => realtime.handlers.get("ManagerDataChanged")!(update));
+  expect(invalidate).not.toHaveBeenCalled();
 });
 
 test("defers save-related events and keeps confirmed cache data on gate exit", async () => {
@@ -148,18 +180,39 @@ test("defers own profile realtime refresh until replacement credentials arrive, 
   act(() => realtime.handlers.get("ManagerDataChanged")!(update));
   expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.managerProfile.me() });
 });
-test.each(["phone", "choose"])("manager %s never starts SignalR", mode => {
- session.workspaceMode = mode;
+test("choose mode never starts SignalR", () => {
+ session.workspaceMode = "choose";
  render(<QueryClientProvider client={new QueryClient()}><PresenceProvider><span>workspace</span></PresenceProvider></QueryClientProvider>);
- expect(realtime.handlers.size).toBe(0);
+ expect(realtime.start).not.toHaveBeenCalled();
+});
+test("PC refreshes both presence lists on start and reconnect", async () => {
+  const client = new QueryClient();
+  const invalidate = vi.spyOn(client, "invalidateQueries");
+  render(<QueryClientProvider client={client}><PresenceProvider><span>workspace</span></PresenceProvider></QueryClientProvider>);
+  const lists = () => {
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.employees.all });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.managerProfile.list() });
+  };
+  await waitFor(lists);
+  invalidate.mockClear();
+  act(() => realtime.reconnected?.());
+  lists();
 });
 test("leaving PC releases the connection, phone setters are inert and old lock targets are not republished", async () => {
   function Locks() { const { setManagerEditLocks } = useRealtime(); return <button onClick={() => void setManagerEditLocks([{ resourceType: "employee", resourceId: "2" }])}>lock</button>; }
   const client = new QueryClient();
+  const invalidate = vi.spyOn(client, "invalidateQueries");
   const element = () => <QueryClientProvider client={client}><PresenceProvider><Locks /></PresenceProvider></QueryClientProvider>;
   const view = render(element()); await waitFor(() => expect(realtime.handlers.size).toBeGreaterThan(0));
   fireEvent.click(screen.getByText("lock")); await waitFor(() => expect(realtime.invocations).toHaveBeenCalledWith([{ resourceType: "employee", resourceId: "2" }]));
-  session.workspaceMode = "phone"; view.rerender(element()); await waitFor(() => expect(realtime.handlers.size).toBe(0)); realtime.invocations.mockClear();
+  invalidate.mockClear();
+  session.workspaceMode = "phone"; view.rerender(element());
+  await waitFor(() => expect(realtime.start).toHaveBeenCalledTimes(2));
+  expect(realtime.stop).toHaveBeenCalledOnce();
+  expect([...realtime.handlers.keys()]).toEqual(["SessionRevoked"]);
+  expect(realtime.reconnected).toBeNull();
+  expect(invalidate).not.toHaveBeenCalled();
+  realtime.invocations.mockClear();
   fireEvent.click(screen.getByText("lock")); expect(realtime.invocations).not.toHaveBeenCalled();
   session.workspaceMode = "pc"; view.rerender(element()); await waitFor(() => expect(realtime.invocations).toHaveBeenCalled());
   expect(realtime.invocations.mock.calls.every(([locks]) => locks.length === 0)).toBe(true);

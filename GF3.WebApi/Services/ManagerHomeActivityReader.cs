@@ -82,6 +82,7 @@ public static class ManagerHomeActivityReader
             RemovesShift = Number("RemovesShift") == 1,
             Status = row.Status, RequiresApproval = row.RequiresApproval,
             TargetType = row.TargetType, ContainerId = Number("ContainerId"), GraphId = Number("GraphId"),
+            RequestId = Number("RequestId"),
             AvailabilityGroupId = Number("AvailabilityGroupId"), ShopId = Number("ShopId"), EmployeeId = employeeId,
             ScheduleName = Text("ScheduleName"), ShopName = Text("ShopName"), ShiftDate = shiftDate,
             FromTime = Text("FromTime"), ToTime = Text("ToTime"), ReturnShiftDate = Day("Return"),
@@ -143,7 +144,7 @@ public static class ManagerHomeActivityReader
             JOIN container c ON c.id = s.container_id JOIN shop p ON p.id = s.shop_id WHERE s.id > 0 AND c.id > 0
         ), corrections AS (
             SELECT r.id, r.created_at_utc, r.reviewed_at_utc, lower(r.status) AS status, r.schedule_slot_id,
-                json_object('EmployeeId', r.employee_id, 'EmployeeName', e.first_name || ' ' || e.last_name,
+                json_object('RequestId', r.id, 'EmployeeId', r.employee_id, 'EmployeeName', e.first_name || ' ' || e.last_name,
                     'ContainerId', s.container_id, 'GraphId', s.id, 'ScheduleName', s.name, 'ShopName', p.name,
                     'Year', COALESCE(json_extract(r.removal_snapshot_json, '$.Year'), s.year),
                     'Month', COALESCE(json_extract(r.removal_snapshot_json, '$.Month'), s.month),
@@ -155,7 +156,7 @@ public static class ManagerHomeActivityReader
             LEFT JOIN employee e ON e.id = r.employee_id WHERE s.id > 0 AND c.id > 0
         ), approvals AS (
             SELECT r.id, r.created_at_utc, r.reviewed_at_utc, r.status,
-                json_object('EmployeeId', r.employee_id, 'EmployeeName', e.first_name || ' ' || e.last_name,
+                json_object('RequestId', r.id, 'EmployeeId', r.employee_id, 'EmployeeName', e.first_name || ' ' || e.last_name,
                     'CounterpartyName', t.first_name || ' ' || t.last_name,
                     'ContainerId', s.container_id, 'GraphId', s.id, 'ScheduleName', s.name, 'ShopName', p.name,
                     'Year', s.year, 'Month', s.month, 'Day', r.original_day_of_month, 'FromTime', r.from_time, 'ToTime', r.to_time) AS payload

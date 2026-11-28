@@ -24,7 +24,7 @@ async function fixture(page: Page, role = "employee") {
     else if (path === "/api/employee-ui-state") body = { scheduleColumnOrders: {}, readNotificationIds: [], pinnedSwapIds: [] };
     else if (path.includes("notepad")) body = { notes: [], state: { isExpanded: false, isPinned: false, height: 700 } };
     else if (path === "/api/employee-availability") body = [{ id: 5, name: "Team availability", year: 2026, month: 9, canSubmit: true, isEditLocked: false, visibleFromUtc: "2026-09-01T08:00:00Z", visibleToUtc: "2026-10-01T18:00:00Z", slots: [], members: [{ employeeId: 12, firstName: "Worker", lastName: "Bee", displayOrder: 2, slots: [] }, { employeeId: 13, firstName: "Anna", lastName: "First", displayOrder: 1, slots: [] }] }];
-    else if (path === "/api/employee-schedules") body = [{
+    else if (path === "/api/employee-schedules" || path === "/api/employee-shift-corrections/schedules") body = [{
       id: 10, containerId: 2, containerName: "Team", shopId: 4, shopName: "Central", name: "September", year: 2026, month: 9, publicationStatus: "public", allowSwap: true, publishedAtUtc: new Date().toISOString(),
       employees: [{ id: 1, employeeId: 12, firstName: "Test", lastName: "Worker", displayName: "Test Worker", minHoursMonth: 0, displayOrder: 1 }],
       slots: [{ id: 100, dayOfMonth: 1, slotNo: 1, employeeId: 12, fromTime: "08:00", toTime: "16:00", status: "ASSIGNED" }],
@@ -401,7 +401,7 @@ for (const width of [320, 1440]) {
     await geometry(page, width);
     state = "empty";
     releaseLoading();
-    await expect(page.getByText("No published schedules", { exact: true })).toBeVisible();
+    await expect(page.getByText("No published schedules assigned to you", { exact: true })).toBeVisible();
     await geometry(page, width);
     state = "error";
     await page.reload();

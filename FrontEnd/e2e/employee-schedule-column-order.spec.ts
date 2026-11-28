@@ -84,7 +84,7 @@ test("employee matrix names keep one font size while scrolling and changing phon
   if (textSizeAdjust.supported) expect(textSizeAdjust.value).toBe("100%");
 
   const matrix = matrixCard.locator("table");
-  const scroller = matrix.locator("xpath=..");
+  const scroller = matrix.locator("xpath=../..");
   const dimensions = await scroller.evaluate(element => ({ clientWidth: element.clientWidth, scrollWidth: element.scrollWidth }));
   expect(dimensions.scrollWidth).toBeGreaterThan(dimensions.clientWidth);
   await scroller.evaluate(element => { element.scrollLeft = element.scrollWidth; });
@@ -216,6 +216,7 @@ test("a narrow long list scrolls internally and Escape cancels before closing", 
   await expect(dialog.getByText("Drop here")).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(dialog).toBeVisible();
+  await expect(dialog.getByText("Drop here")).toHaveCount(0);
   await expect(dialog.getByRole("button", { name: "Apply" })).toBeDisabled();
   await expect(list.getByRole("button").first()).toHaveAccessibleName("Reorder Ada Able");
   expect(await list.evaluate(node => ({
@@ -223,11 +224,12 @@ test("a narrow long list scrolls internally and Escape cancels before closing", 
     scrolls: node.scrollHeight > node.clientHeight,
     touchAction: getComputedStyle(node).touchAction,
   }))).toEqual({ fits: true, scrolls: true, touchAction: "auto" });
-  await list.getByRole("button").last().focus();
+  const lastHandle = list.getByRole("button").last();
+  await lastHandle.focus();
   await expect.poll(() => list.evaluate(node => node.scrollTop)).toBeGreaterThan(0);
   await expect(dialog.getByRole("button", { name: "Cancel" })).toBeInViewport();
   await dialog.screenshot({ path: info.outputPath("column-order-narrow.png") });
-  await page.keyboard.press("Escape");
+  await lastHandle.press("Escape");
   await expect(dialog).toHaveCount(0);
   expect(writes).toHaveLength(0);
 });

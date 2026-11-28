@@ -19,6 +19,7 @@ vi.mock("@entities/urlop", async importOriginal => ({ ...await importOriginal<ty
 
 const mocks = vi.hoisted(() => ({
   scheduleQuery: vi.fn(),
+  candidatesQuery: vi.fn(),
   exportPdf: vi.fn(),
   listPublic: vi.fn(),
   getPublic: vi.fn(),
@@ -53,6 +54,7 @@ vi.mock("@entities/employee-schedule", () => ({
 }));
 
 vi.mock("@entities/shift-corrections", () => ({
+  useEmployeeCorrectionSchedulesQuery: (enabled: boolean) => mocks.candidatesQuery(enabled),
   useEmployeeShiftCorrectionsQuery: () => ({ data: [], isLoading: false, isError: false }),
   useCreateShiftCorrectionMutation: () => ({ mutate: vi.fn(), isPending: false, error: null }),
 }));
@@ -207,6 +209,7 @@ beforeEach(() => {
   mockReducedMotion();
   window.localStorage.clear();
   mocks.scheduleQuery.mockReset();
+  mocks.candidatesQuery.mockReset().mockReturnValue({ data: schedules });
   mocks.exportPdf.mockReset();
   mocks.listPublic.mockReset().mockResolvedValue([]);
   mocks.getPublic.mockReset();
@@ -720,18 +723,38 @@ describe("EmployeeSchedulePage", () => {
       </BrowserRouter>,
     );
 
-    expect(screen.getByText("Nothing is public for your account yet.")).toBeInTheDocument();
+    expect(screen.getByText("No published schedules assigned to you")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Go to Availability/i })).toHaveAttribute("href", "/availability");
   });
 });
 
 
 describe("schedule selector", () => {
-  test("blocks day-off requests for own assignments across public schedules and related assignments", async () => {
+  test("opens the correction catalog when the employee has no own schedules", async () => {
+    mocks.scheduleQuery.mockReturnValue({ data: [], isLoading: false });
+    mocks.candidatesQuery.mockReturnValue({ data: [{ ...schedules[0], slots: [] }] });
+    renderPage();
+    expect(mocks.candidatesQuery).toHaveBeenLastCalledWith(false);
+    await userEvent.click(screen.getByRole("button", { name: "Request a shift correction" }));
+    expect(mocks.candidatesQuery).toHaveBeenLastCalledWith(true);
+    const dialog = within(screen.getByRole("dialog", { name: "Request a shift change" }));
+    expect(dialog.getByRole("button", { name: /^May Schedule/ })).toBeVisible();
+    expect(screen.queryByTestId("schedule-matrix")).toBeNull();
+  });
+
+  test("passes historical markers to the matrix independently of correction history", () => {
+    mocks.scheduleQuery.mockReturnValue({ data: [{ ...schedules[0], approvedCorrectionDays: [19] }], isLoading: false });
+    renderPage();
+    expect(mocks.matrix.mock.lastCall?.[0].readOnlyCellAdornments.get("12:19")).toMatchObject({ tone: "corrected", count: 1 });
+  });
+  test("blocks day-off requests for own assignments across all public schedules", async () => {
     const first = { ...schedules[0], relatedScheduleAssignments: [
       { employeeId: 12, dayOfMonth: 14, scheduleId: 3, scheduleName: "Related" },
     ] };
     const second = { ...schedules[1], slots: [{ ...schedules[1].slots[0], dayOfMonth: 15 }] };
+    mocks.candidatesQuery.mockReturnValue({ data: [first, second, {
+      ...second, id: 3, name: "Related", slots: [{ ...second.slots[0], id: 50, dayOfMonth: 14 }],
+    }] });
     mocks.scheduleQuery.mockReturnValue({ data: [first, second], isLoading: false, error: null });
     renderPage();
     await userEvent.click(screen.getByRole("button", { name: "Request a shift correction" }));

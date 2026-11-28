@@ -333,6 +333,7 @@ export function PresenceProvider({ children }: PropsWithChildren) {
   const queryClient = useQueryClient();
   const { status, session, logout } = useAuth();
   const managerPcMode = session?.role === "manager" && (session.workspaceMode ?? "pc") === "pc";
+  const managerPhoneMode = session?.role === "manager" && session.workspaceMode === "phone";
   const connectionRef = useRef<HubConnection | null>(null);
   const [connectionTick, setConnectionTick] = useState(0);
   const [desiredManagerEditLocks, setDesiredManagerEditLocks] = useState<ManagerEditLockTarget[]>([]);
@@ -413,6 +414,10 @@ export function PresenceProvider({ children }: PropsWithChildren) {
   });
 
   const applyManagerDataChanged = useEffectEvent((update: ManagerDataChangedUpdate) => {
+    if (update.resourceType === "manager-notepad") {
+      if (managerPcMode) invalidateRealtimeQuery(queryClient, queryKeys.managerNotepad.current());
+      return;
+    }
     if (update.resourceType === "employee-launches") {
       invalidateRealtimeQuery(queryClient, queryKeys.employeeLaunches.list());
       return;
@@ -694,11 +699,10 @@ export function PresenceProvider({ children }: PropsWithChildren) {
   }), [clearNotifications, managerEditLocks, notifications, setManagerEditLocks, setScheduleEditLocks]);
 
   useEffect(() => {
-    if (status !== "authenticated" || !session || !getAuthAccessToken() || (session.role === "manager" && !managerPcMode)) {
+    if (status !== "authenticated" || !session || !getAuthAccessToken() ||
+      (session.role === "manager" && !managerPcMode && !managerPhoneMode)) {
       return;
     }
-
-    const sessionRole = session.role;
 
     const connection = new HubConnectionBuilder()
       .withUrl(buildApiUrl("realtime/presence", { launchMode: getPwaLaunchMode() }), {
@@ -709,60 +713,47 @@ export function PresenceProvider({ children }: PropsWithChildren) {
       .build();
     connectionRef.current = connection;
 
-    if (sessionRole === "manager") {
+    if (managerPcMode) {
       connection.on(presenceHubMethodName, (update: EmployeePresenceUpdate) => {
         applyPresenceUpdate(update);
       });
 
-      connection.onreconnected(() => {
-        invalidateRealtimeQuery(queryClient, queryKeys.employees.all);
-        setConnectionTick(tick => tick + 1);
-      });
     }
 
-    connection.on(scheduleChangedMethodName, (update: ScheduleChangedUpdate) => {
-      applyScheduleChanged(update);
-    });
-
-    connection.on(managerDataChangedMethodName, (update: ManagerDataChangedUpdate) => {
-      applyManagerDataChanged(update);
-    });
-
-    connection.on(shiftSwapsChangedMethodName, (update: ShiftSwapsChangedUpdate) => {
-      applyShiftSwapsChanged(update);
-    });
-
-    connection.on(workflowLogCreatedMethodName, (entry: WorkflowLog) => {
-      applyWorkflowLogCreated(entry);
-    });
-
-    connection.on(scheduleEditLockChangedMethodName, (update: ScheduleEditLockChangedUpdate) => {
-      applyScheduleEditLockChanged(update);
-    });
-
-    connection.on(managerEditLockChangedMethodName, (update: ManagerEditLockState) => {
-      applyManagerEditLockChanged(update);
-    });
+    if (!managerPhoneMode) {
+      connection.on(scheduleChangedMethodName, applyScheduleChanged);
+      connection.on(managerDataChangedMethodName, applyManagerDataChanged);
+      connection.on(shiftSwapsChangedMethodName, applyShiftSwapsChanged);
+      connection.on(workflowLogCreatedMethodName, applyWorkflowLogCreated);
+      connection.on(scheduleEditLockChangedMethodName, applyScheduleEditLockChanged);
+      connection.on(managerEditLockChangedMethodName, applyManagerEditLockChanged);
+    }
 
     connection.on(sessionRevokedMethodName, (update: EmployeeSessionRevokedUpdate) => {
       applySessionRevoked(update);
     });
 
-    connection.onreconnected(() => {
+    let isDisposed = false;
+    function refreshPresenceLists() {
+      if (managerPcMode) {
+        invalidateRealtimeQuery(queryClient, queryKeys.employees.all);
+        invalidateRealtimeQuery(queryClient, queryKeys.managerProfile.list());
+      }
+    }
+    if (!managerPhoneMode) connection.onreconnected(() => {
+      if (isDisposed) return;
+      if (session?.role === "manager") invalidateRealtimeQuery(queryClient, queryKeys.managerNotepad.current());
       invalidateRealtimeBaselineQueries(queryClient);
+      refreshPresenceLists();
       setConnectionTick(tick => tick + 1);
     });
-
-    let isDisposed = false;
 
     async function startConnection() {
       try {
         await connection.start();
-        if (!isDisposed) {
+        if (!isDisposed && !managerPhoneMode) {
           setConnectionTick(tick => tick + 1);
-        }
-        if (!isDisposed && sessionRole === "manager") {
-          invalidateRealtimeQuery(queryClient, queryKeys.employees.all);
+          refreshPresenceLists();
         }
       } catch (error) {
         if (isDev && !isDisposed) {
@@ -791,6 +782,7 @@ export function PresenceProvider({ children }: PropsWithChildren) {
   }, [
     queryClient,
     managerPcMode,
+    managerPhoneMode,
     status,
     session,
   ]);

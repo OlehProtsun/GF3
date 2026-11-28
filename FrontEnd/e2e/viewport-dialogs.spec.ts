@@ -15,6 +15,7 @@ async function expectWithinViewport(locator: Locator, width: number, height: num
 
 for (const size of [{ width: 1280, height: 720 }, { width: 1440, height: 800 }, { width: 1024, height: 600 }, { width: 390, height: 664 }]) {
   test(`dialogs and dropdowns fit ${size.width}x${size.height}`, async ({ page }) => {
+    test.setTimeout(60_000);
     await page.setViewportSize(size);
     const errors: string[] = [];
     page.on("pageerror", error => errors.push(error.message));

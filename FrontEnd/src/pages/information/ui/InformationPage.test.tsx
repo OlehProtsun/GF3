@@ -7,10 +7,12 @@ import type { WorkflowLog } from "@entities/workflow-logs";
 import { setLanguage } from "@shared/i18n";
 import { InformationPage } from "./InformationPage";
 
-const mocks = vi.hoisted(() => ({ list: vi.fn(), settings: vi.fn() }));
+const mocks = vi.hoisted(() => ({ list: vi.fn(), settings: vi.fn(), employees: vi.fn(), managers: vi.fn() }));
 vi.mock("@entities/workflow-logs/api/workflowLogsApi", () => ({ workflowLogsApi: {
   list: mocks.list, settings: mocks.settings,
 } }));
+vi.mock("@entities/employees/api/employeesApi", () => ({ employeesApi: { list: mocks.employees } }));
+vi.mock("@features/manager-profile/api/managerProfileApi", () => ({ managerProfileApi: { listManagers: mocks.managers } }));
 
 const event: WorkflowLog = {
   id: 1, actorRole: "employee", actorName: "Ada Worker", actorEmployeeId: 1,
@@ -25,6 +27,8 @@ beforeEach(() => {
   setLanguage("en");
   mocks.list.mockReset().mockResolvedValue([event]);
   mocks.settings.mockReset().mockResolvedValue({ isEnabled: true, audience: "all" });
+  mocks.employees.mockReset().mockResolvedValue([]);
+  mocks.managers.mockReset().mockResolvedValue([]);
 });
 
 test("shows browser and PWA launch history in the searchable workflow log", async () => {
@@ -62,4 +66,44 @@ test("a logging settings failure leaves launch history visible", async () => {
   expect(await screen.findByText("Could not load logging settings.")).toBeVisible();
   expect(screen.getByText("Workflow logs", { exact: true })).toBeVisible();
   expect(screen.getByText("PWA", { exact: true })).toBeVisible();
+});
+
+test("keeps presence separate from logs and uses server presence for both roles", async () => {
+  mocks.settings.mockResolvedValue({ isEnabled: false, audience: "all" });
+  mocks.employees.mockResolvedValue([{ id: 1, firstName: "Zoe", lastName: "Worker", isOnline: true },
+    { id: 2, firstName: "Offline", lastName: "Worker", isOnline: false }]);
+  mocks.managers.mockResolvedValue([{ id: 1, displayName: "", userName: "ada", isOnline: true },
+    { id: 2, displayName: "Current offline", isCurrent: true, isOnline: false }]);
+  mount();
+  const section = within(screen.getByRole("region", { name: "Online users" }));
+  const rows = within(await section.findByRole("table")).getAllByRole("row");
+  expect(rows.map(row => row.textContent)).toEqual(["NameRoleStatus", "adaManagerOnline", "Zoe WorkerEmployeeOnline"]);
+  expect(section.getByLabelText("2 online users")).toBeVisible();
+  expect(await screen.findByText("Logging off")).toBeVisible();
+});
+
+test("keeps successful rows while another source loads and reports a failed source with retry", async () => {
+  let failManagers: (reason: Error) => void = () => {};
+  mocks.employees.mockResolvedValue([{ id: 1, firstName: "Ada", lastName: "Online", isOnline: true }]);
+  mocks.managers.mockReturnValueOnce(new Promise((_, reject) => { failManagers = reject; })).mockResolvedValue([]);
+  mount();
+  const section = within(screen.getByRole("region", { name: "Online users" }));
+  expect(await section.findByText("Ada Online")).toBeVisible();
+  expect(section.getByText("Loading online users...")).toBeVisible();
+  expect(section.queryByLabelText(/\d+ online users/)).toBeNull();
+  failManagers(new Error("Manager list failed"));
+  expect(await section.findByRole("alert")).toHaveTextContent("Managers · Manager list failed");
+  expect(section.getByText("Ada Online")).toBeVisible();
+  await userEvent.click(section.getByRole("button", { name: "Retry" }));
+  expect(await section.findByLabelText("1 online users")).toBeVisible();
+  expect(mocks.employees).toHaveBeenCalledOnce();
+});
+
+test("one failed source and one empty source do not imply an empty online population", async () => {
+  mocks.employees.mockRejectedValue(new Error("Employee list failed"));
+  mount();
+  const section = within(screen.getByRole("region", { name: "Online users" }));
+  expect(await section.findByRole("alert")).toHaveTextContent("Employee list failed");
+  expect(section.queryByText("No users online.")).toBeNull();
+  expect(section.queryByLabelText("0 online users")).toBeNull();
 });

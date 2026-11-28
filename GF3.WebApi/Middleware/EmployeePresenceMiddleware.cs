@@ -27,7 +27,11 @@ public sealed class EmployeePresenceMiddleware
     {
         await _next(context).ConfigureAwait(false);
 
-        if (!TryGetTrackedEmployeeId(context.User, out var employeeId))
+        var request = context.Request;
+        var isScheduleDiscovery = HttpMethods.IsGet(request.Method) &&
+            (request.Path.StartsWithSegments("/api/employee-schedules/public", StringComparison.OrdinalIgnoreCase) ||
+             string.Equals(request.Path.Value?.TrimEnd('/'), "/api/employee-shift-corrections/schedules", StringComparison.OrdinalIgnoreCase));
+        if (isScheduleDiscovery || !TryGetTrackedEmployeeId(context.User, out var employeeId))
         {
             return;
         }

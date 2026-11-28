@@ -2,13 +2,13 @@ import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { t } from "@shared/i18n";
 import { useDropdownPosition } from "@shared/lib/useDropdownPosition";
-import { CheckIcon, ClockIcon, SwapOffersIcon } from "@shared/ui/icons";
+import { CheckIcon, ClockIcon, DoubleCheckIcon, SwapOffersIcon } from "@shared/ui/icons";
 import type { ScheduleShiftStatus } from "./scheduleShiftStatuses";
 import styles from "./PendingCorrectionBadge.module.css";
 
 function StatusBadge({ title, tone, icon, children }: {
   title: string;
-  tone: "correction" | "open" | "accepted";
+  tone: "correction" | "open" | "corrected" | "accepted";
   icon: ReactNode;
   children: ReactNode;
 }) {
@@ -62,6 +62,11 @@ export function ScheduleShiftBadges({ status }: { status: ScheduleShiftStatus })
     {status.open.length > 0 && (
       <StatusBadge key="open" title={t("Swap pending")} tone="open" icon={<SwapOffersIcon size={13} />}>
         <p>{t("This shift has been offered for a swap and is waiting for acceptance.")}</p>
+      </StatusBadge>
+    )}
+    {status.correctionApproved && (
+      <StatusBadge title={t("Correction approved")} tone="corrected" icon={<DoubleCheckIcon size={13} />}>
+        <p>{t("Your manager approved a correction for this day and updated the schedule.")}</p>
       </StatusBadge>
     )}
     {status.accepted.length > 0 && (

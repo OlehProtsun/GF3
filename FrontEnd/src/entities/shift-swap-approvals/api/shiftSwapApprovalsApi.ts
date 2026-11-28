@@ -6,6 +6,8 @@ const graph = (containerId: number, graphId: number) => `containers/${containerI
 export const shiftSwapApprovalsApi = {
   mine: (signal?: AbortSignal) => request<ContractShiftApproval[]>(employee, { signal }),
   graph: (containerId: number, graphId: number, signal?: AbortSignal) => request<ContractShiftApproval[]>(graph(containerId, graphId), { signal }),
+  getGraphRequest: (containerId: number, graphId: number, id: number, signal?: AbortSignal) =>
+    request<ContractShiftApproval>(`${graph(containerId, graphId)}/${id}`, { signal }),
   claim: ({ id, fromTime, toTime }: AcceptShiftSwapInput) => request<ContractShiftApproval>(`${employee}/claims`, { method: "POST", body: { shiftSwapRequestId: id, fromTime, toTime } }),
   giveawayException: (body: CreateShiftSwapInput) => request<ContractShiftApproval>(`${employee}/giveaway-exceptions`, { method: "POST", body }),
   cancel: (id: number) => request<ContractShiftApproval>(`${employee}/${id}/cancel`, { method: "POST" }),

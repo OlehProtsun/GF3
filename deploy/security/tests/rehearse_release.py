@@ -52,6 +52,8 @@ production_command = release.command
 HISTORICAL_PRIOR = "353f8e23dbd3f6c9989e7df2198346b72c700487"
 HISTORICAL_TARGET = "1175c39461e149a7bb35f428babed28279727899"
 HISTORICAL_TARGET_IMAGE = "gf3-web:maintenance-target"
+NOTEPAD_BASELINE_IMAGE = "gf3-web:prod2-notepad-baseline"
+CANDIDATE_IMAGE = "gf3-web:ci"
 ONE_BUNDLE_SCENARIOS = ("full-chain", "final-backup-failure", "final-backup-fence-lost")
 
 
@@ -61,21 +63,20 @@ def free_port():
         return listener.getsockname()[1]
 
 
-def rehearse_migrations(root, snapshot_path):
+def rehearse_migrations(root, revision, candidate_image):
     """Exercise the exact pinned PROD2-to-candidate migration on a seeded synthetic DB."""
     repo = HERE.parents[1]
 
     def git(*args):
         return release.git(*args, root=repo)
 
-    revision = git("rev-parse", "HEAD").strip()
     target = maintenance.migration_ids(git, revision)
     baseline = maintenance.REVIEWED_SCHEMA_PREFIX_CONTRACTS[0]["migrationId"]
     cutoff = target.index(baseline) + 1
     before, added = target[:cutoff], target[cutoff:]
     assert added == maintenance.REVIEWED_RELEASE_MIGRATIONS
     columns = maintenance.migration_plan(git, maintenance.RELEASE_BASELINE, revision, added)
-    image, = release.docker_json("image", "inspect", "gf3-web:ci")
+    image, = release.docker_json("image", "inspect", candidate_image)
     source_dir = repo / "GF3.Tests/TestResults/release-baseline"
     source_db = source_dir / "SQLite.db"
     source_media = source_dir / maintenance.MEDIA_DIRECTORY
@@ -150,7 +151,93 @@ def rehearse_migrations(root, snapshot_path):
     print("Maintenance rehearsal passed: injected mid-chain failure stayed isolated; verified baseline and media remained recoverable")
 
 
-def maintenance_scenario(root, previous, candidate, baseline, git_dir, before, sha, scenario, sql, tags, columns, added):
+def rehearse_notepad_migrations(root, candidate_image):
+    repo = HERE.parents[1]
+
+    def git(*args):
+        return release.git(*args, root=repo)
+
+    revision = git("rev-parse", "HEAD").strip()
+    _, before, target = maintenance.classify(
+        git, maintenance.NOTEPAD_RELEASE_BASELINE, revision,
+        lambda path: path in maintenance.BOOTSTRAP_PATHS | maintenance.REVIEWED_BUILD_INPUTS
+        or not prepare.critical_path(path, build_inputs=True),
+    )
+    added = target[len(before):]
+    assert added == maintenance.NOTEPAD_RELEASE_MIGRATIONS
+    columns = maintenance.migration_plan(git, maintenance.NOTEPAD_RELEASE_BASELINE, revision, added)
+    assert columns.migration_blobs == tuple((key, blob, None) for key, blob in maintenance.NOTEPAD_RELEASE_BLOBS.items())
+    image, = release.docker_json("image", "inspect", candidate_image)
+    source_dir = repo / "GF3.Tests/TestResults/release-baseline/notepad"
+    source_db, source_media = source_dir / "SQLite.db", source_dir / maintenance.MEDIA_DIRECTORY
+    assert source_db.is_file() and source_media.is_dir(), "Synthetic notepad baseline artifact is missing"
+    source_stamp = maintenance.digest_file(source_db)
+    media_stamp = maintenance.media_stamp(source_media)
+    assert maintenance.referenced_media(source_db) and len(media_stamp) >= 2
+    with closing(maintenance.open_db(source_db, "ro")) as db:
+        maintenance.verify(db, before)
+        assert not db.execute("PRAGMA foreign_key_check").fetchall()
+        for table in ("employee", "schedule", "schedule_slot", "shift_swap_request", "shift_correction_request", "workflow_log_entry", "communication_message"):
+            assert db.execute(f"SELECT COUNT(*) FROM {maintenance.quoted(table)}").fetchone()[0] >= 1
+        assert db.execute("SELECT COUNT(DISTINCT manager_account_id) FROM manager_note").fetchone()[0] == 2
+        assert db.execute("SELECT COUNT(*) FROM manager_notepad_state WHERE height <> 520").fetchone()[0] >= 1
+        assert maintenance.sequence_values(db)["manager_note"] >= 9001
+    root.mkdir()
+    frozen = root / "notepad-backup.db"
+    maintenance.snapshot(source_db, frozen, before, quiesced=True)
+    backup_stamp = maintenance.digest_file(frozen)
+    shutil.copytree(source_media, root / maintenance.MEDIA_DIRECTORY)
+    prefixes = tuple(source_dir / "prefixes" / f"prefix-{prefix}.db" for prefix in range(3))
+    for prefix, path in enumerate(prefixes):
+        assert path.is_file(), f"Missing synthetic notepad prefix {prefix}"
+        assert maintenance.verify_no_data_drift(frozen, path, columns, target) == prefix
+    maintenance.verify_migration(frozen, prefixes[2], before, target, columns)
+
+    tampered = root / "notepad-tampered.db"
+    for sql in (
+        "UPDATE manager_note SET content = 'drift' WHERE id = 101",
+        "UPDATE manager_note SET edit_started_at_ms = 42 WHERE id = 101",
+        "INSERT INTO manager_note_share SELECT min(id), max(manager_account_id) FROM manager_note",
+        "DROP INDEX IX_manager_note_version_note_id_revision",
+        "UPDATE sqlite_sequence SET seq = seq + 1 WHERE name = 'manager_note'",
+        "DELETE FROM __EFMigrationsHistory WHERE MigrationId LIKE '%EditSessions'",
+    ):
+        shutil.copyfile(prefixes[2], tampered)
+        with closing(sqlite3.connect(tampered)) as db, db:
+            db.execute(sql)
+        for verify in (lambda: maintenance.verify_no_data_drift(frozen, tampered, columns, target),
+                       lambda: maintenance.verify_migration(frozen, tampered, before, target, columns)):
+            try:
+                verify()
+            except maintenance.MaintenanceError:
+                pass
+            else:
+                raise AssertionError("Reviewed notepad verification accepted a changed synthetic database")
+
+    for verify_modes in (False, True):
+        maintenance.rehearse(release.command, release.docker_json, image["Id"], root, frozen, before, target, columns,
+                             verify_modes=verify_modes)
+    failed = root / "notepad-failed-prefix.db"
+    shutil.copyfile(frozen, failed)
+    with closing(sqlite3.connect(failed)) as db, db:
+        db.execute("ALTER TABLE manager_note ADD COLUMN edit_session_id TEXT")
+    failed_stamp = maintenance.digest_file(failed)
+    try:
+        maintenance.rehearse(release.command, release.docker_json, image["Id"], root, failed, before, target, columns)
+    except maintenance.MaintenanceError as error:
+        assert "Candidate stopped before rehearsal health passed" in str(error), str(error)
+    else:
+        raise AssertionError("The injected notepad migration failure unexpectedly passed")
+    assert not list(root.glob("clone-*"))
+    assert maintenance.digest_file(failed) == failed_stamp
+    assert maintenance.digest_file(frozen) == backup_stamp
+    assert maintenance.digest_file(source_db) == source_stamp
+    assert maintenance.media_stamp(root / maintenance.MEDIA_DIRECTORY) == maintenance.media_stamp(source_media) == media_stamp
+    print("Notepad maintenance rehearsal passed: two migrations, three schema prefixes, data/media preservation and isolated failure")
+
+
+def maintenance_scenario(root, previous, candidate, baseline, git_dir, before, sha, scenario, sql, tags, columns, added,
+                         candidate_image):
     """Run the real maintenance engine on the runner's disposable Docker volume and nftables."""
     database = release.maintenance_database(baseline[2])
     database_inode = database.stat().st_ino
@@ -250,7 +337,7 @@ def maintenance_scenario(root, previous, candidate, baseline, git_dir, before, s
               patch.object(maintenance, "restore_database", interrupt_restore)):
             if full_chain:
                 rehearse_one_bundle(root, previous, candidate, baseline, before, sha, scenario,
-                                    historical, expected, columns, tags, sql)
+                                    historical, expected, columns, tags, sql, candidate_image)
                 assert timer == ([True, False] if scenario == "final-backup-fence-lost" else [True, True])
                 return
             try:
@@ -307,7 +394,8 @@ def maintenance_scenario(root, previous, candidate, baseline, git_dir, before, s
         subprocess.run(["nft", "delete", "table", "inet", "gf3_maintenance"], capture_output=True)
 
 
-def rehearse_one_bundle(root, previous, staged, baseline, before, target, scenario, historical, expected, columns, tags, sql):
+def rehearse_one_bundle(root, previous, staged, baseline, before, target, scenario, historical, expected, columns, tags, sql,
+                       candidate_image):
     """Use the real prepare and deploy entry points, with local substitutes for host trust inputs."""
     database = release.maintenance_database(baseline[2])
     media = database.parent / maintenance.MEDIA_DIRECTORY
@@ -320,7 +408,7 @@ def rehearse_one_bundle(root, previous, staged, baseline, before, target, scenar
     tag = f"gf3-app:{root.name}"
     tags.append(tag)
     release.command("docker", "build", "--tag", tag, "--label", f"org.opencontainers.image.revision={target}",
-                    "-", data="FROM gf3-web:ci\n")
+                    "-", data=f"FROM {candidate_image}\n")
     image = release.docker_json("image", "inspect", tag)[0]["Id"]
     config = json.loads((staged / "compose.json").read_text())
     original_git, snapshot, manifest, backend = release.git, release.snapshot, maintenance._write_backup_manifest, release.backend
@@ -447,7 +535,7 @@ def rehearse_one_bundle(root, previous, staged, baseline, before, target, scenar
     print(f"Single-bundle maintenance rehearsal passed on Linux Docker: {scenario}")
 
 
-def main(scenario=None, historical_pair=False):
+def main(scenario=None, historical_pair=False, reviewed_chain=None):
     release.command = diagnostic_command
     project = "gf3-rehearsal-" + secrets.token_hex(5)
     network = project + "_gf3-internal"
@@ -481,7 +569,12 @@ def main(scenario=None, historical_pair=False):
                         "-subj", "/CN=localhost", "-addext", "subjectAltName=DNS:localhost",
                         "-keyout", str(key), "-out", str(cert)], check=True, capture_output=True)
         env_file = deploy / ".env"
-        previous_image = ("gf3-web:maintenance-prior" if historical_pair else HISTORICAL_TARGET_IMAGE) if scenario else "gf3-web:ci"
+        previous_image, candidate_image = {
+            "historical": ("gf3-web:maintenance-prior", HISTORICAL_TARGET_IMAGE),
+            "seven": (HISTORICAL_TARGET_IMAGE, NOTEPAD_BASELINE_IMAGE),
+            "notepad": (NOTEPAD_BASELINE_IMAGE, CANDIDATE_IMAGE),
+            None: (CANDIDATE_IMAGE, CANDIDATE_IMAGE),
+        }["historical" if historical_pair else reviewed_chain]
         env_file.write_text("\n".join([
             f"GF3_IMAGE={previous_image}", "GF3_SERVER_NAME=localhost",
             "GF3_REQUIRE_EXISTING_DATABASE=false",
@@ -584,6 +677,8 @@ def main(scenario=None, historical_pair=False):
                 output.write(f"GF3_TRUSTED_PROXY_CIDR={cidr}\n")
             if scenario and not historical_pair:
                 fixture = HERE.parents[1] / "GF3.Tests/TestResults/release-baseline"
+                if reviewed_chain == "notepad":
+                    fixture /= "notepad"
                 assert (fixture / "SQLite.db").is_file() and (fixture / "communication-gifs").is_dir()
                 release.command("docker", "run", "--rm", "--network", "none", "-v", f"{volume}:/data",
                                 "-v", f"{fixture.as_posix()}:/fixture:ro", "mirror.gcr.io/library/python:3.12-alpine",
@@ -634,7 +729,7 @@ def main(scenario=None, historical_pair=False):
                 config = release.render(root)
                 release.freeze(config, volume)
                 app_service = config["services"]["gf3-app"]
-                app_service["image"] = HISTORICAL_TARGET_IMAGE if historical_pair else "gf3-web:ci"
+                app_service["image"] = candidate_image
                 app_service["environment"]["DatabaseStartup__RequireExistingDatabase"] = "true"
                 release.save_compose(candidate, config)
                 (candidate / "guard-enabled").touch()
@@ -645,13 +740,19 @@ def main(scenario=None, historical_pair=False):
                 if historical_pair:
                     added = ("20261114225324_AddShiftCorrectionComment", "20261115135735_RefreshManualShiftOffer")
                     plan = maintenance.migration_plan(repository_git, HISTORICAL_PRIOR, HISTORICAL_TARGET, added)
-                else:
+                elif reviewed_chain == "seven":
                     assert migration_history[-1][0] == maintenance.REVIEWED_SCHEMA_PREFIX_CONTRACTS[0]["migrationId"]
                     added = maintenance.REVIEWED_RELEASE_MIGRATIONS
-                    plan = maintenance.migration_plan(repository_git, maintenance.RELEASE_BASELINE, revision, added)
+                    plan = maintenance.migration_plan(repository_git, maintenance.RELEASE_BASELINE,
+                                                      maintenance.NOTEPAD_RELEASE_BASELINE, added)
+                else:
+                    assert reviewed_chain == "notepad"
+                    assert migration_history[-1][0] == maintenance.NOTEPAD_SCHEMA_PREFIX_CONTRACTS[0]["migrationId"]
+                    added = maintenance.NOTEPAD_RELEASE_MIGRATIONS
+                    plan = maintenance.migration_plan(repository_git, maintenance.NOTEPAD_RELEASE_BASELINE, revision, added)
                 with patch.object(release, "verify_web", verify):
                     maintenance_scenario(root, previous, candidate, baseline, git_dir, before, sha,
-                                         scenario, sql, tags, plan, added)
+                                         scenario, sql, tags, plan, added, candidate_image)
                 return
             # Certbot replaces symlinks under live/. Recreate Nginx so its file bind follows the replacement.
             for name in (cert, key):
@@ -678,10 +779,6 @@ def main(scenario=None, historical_pair=False):
                 assert backup.execute("SELECT id,contract_type,first_name,last_name,is_deleted FROM employee "
                                       "WHERE id=?", (employee_id,)).fetchall() == employee_rows
                 assert backup.execute("PRAGMA integrity_check").fetchall() == [("ok",)]
-
-            if (os.environ.get("GITHUB_ACTIONS") == "true"
-                    or (HERE.parents[1] / "GF3.Tests/TestResults/release-baseline/SQLite.db").is_file()):
-                rehearse_migrations(root, previous / "SQLite.db")
 
             template = deploy / "nginx/https-templates/gf3.conf.template"
             for scenario in ("nginx-syntax", "https-failure", "activation-failure", "transient-worktree", "success"):
@@ -867,13 +964,44 @@ def main(scenario=None, historical_pair=False):
 
 
 def build_rehearsal_image(repo, revision, image):
-    subprocess.run(["git", "fetch", "--no-tags", "--depth=1", "origin", revision], cwd=repo, check=True)
+    if subprocess.run(["git", "cat-file", "-e", f"{revision}^{{commit}}"], cwd=repo, capture_output=True).returncode:
+        subprocess.run(["git", "fetch", "--no-tags", "origin", revision], cwd=repo, check=True)
     with tempfile.TemporaryDirectory(prefix="gf3-rehearsal-source-") as worktree:
         subprocess.run(["git", "worktree", "add", "--detach", worktree, revision], cwd=repo, check=True)
         try:
-            subprocess.run(["docker", "build", "-t", image, worktree], check=True)
+            subprocess.run(["docker", "build", "-t", image, "--label", f"org.opencontainers.image.revision={revision}", worktree], check=True)
         finally:
             subprocess.run(["git", "worktree", "remove", "--force", worktree], cwd=repo, check=True)
+
+
+def run_full_rehearsal(scenarios, reviewed_scenarios):
+    assert sys.platform == "linux", "Full rehearsal requires a disposable Linux Docker runner"
+    repo = HERE.parents[1]
+    fixtures = repo / "GF3.Tests/TestResults/release-baseline"
+    for source, count in ((fixtures, 8), (fixtures / "notepad", 3)):
+        assert (source / "SQLite.db").is_file() and (source / "communication-gifs").is_dir(), f"Missing fixture {source}"
+        assert all((source / "prefixes" / f"prefix-{i}.db").is_file() for i in range(count)), f"Missing EF prefix in {source}"
+    privileged = ["sudo", "-n"] if os.geteuid() != 0 else []
+    if not shutil.which("nft"):
+        subprocess.run([*privileged, "apt-get", "update"], check=True)
+        subprocess.run([*privileged, "apt-get", "install", "-y", "nftables"], check=True)
+    build_rehearsal_image(repo, HISTORICAL_PRIOR, "gf3-web:maintenance-prior")
+    build_rehearsal_image(repo, HISTORICAL_TARGET, HISTORICAL_TARGET_IMAGE)
+    build_rehearsal_image(repo, maintenance.NOTEPAD_RELEASE_BASELINE, NOTEPAD_BASELINE_IMAGE)
+    release.command = diagnostic_command
+    with tempfile.TemporaryDirectory(prefix="gf3-reviewed-migrations-") as directory:
+        root = Path(directory)
+        historical = root / "seven"
+        historical.mkdir()
+        rehearse_migrations(historical, maintenance.NOTEPAD_RELEASE_BASELINE, NOTEPAD_BASELINE_IMAGE)
+        rehearse_notepad_migrations(root / "notepad", CANDIDATE_IMAGE)
+    main()
+    runner = [*privileged, "env", "GF3_DISPOSABLE_CI_RUNNER=true", "/usr/bin/python3", "-u", str(Path(__file__).resolve())]
+    for chain in ("seven", "notepad"):
+        for case in reviewed_scenarios:
+            subprocess.run([*runner, case, chain], check=True)
+    for case in scenarios:
+        subprocess.run([*runner, case, "historical"], check=True)
 
 
 if __name__ == "__main__":
@@ -882,22 +1010,17 @@ if __name__ == "__main__":
     if len(sys.argv) in (2, 3) and sys.argv[1] in {*scenarios, *reviewed_scenarios}:
         assert os.geteuid() == 0 and os.environ.get("GF3_DISPOSABLE_CI_RUNNER") == "true"
         os.umask(0o077)
-        historical_pair = len(sys.argv) == 3
-        assert not historical_pair or (sys.argv[2] == "historical" and sys.argv[1] in scenarios)
-        main(sys.argv[1], historical_pair)
+        chain = sys.argv[2] if len(sys.argv) == 3 else "seven"
+        assert chain in {"historical", "seven", "notepad"}
+        historical_pair = chain == "historical"
+        assert sys.argv[1] in (scenarios if historical_pair else {*reviewed_scenarios, "success"})
+        main(sys.argv[1], historical_pair, None if historical_pair else chain)
+    elif sys.argv[1:] == ["--full"]:
+        assert os.environ.get("GF3_DISPOSABLE_CI_RUNNER") == "true"
+        run_full_rehearsal(scenarios, reviewed_scenarios)
     else:
         assert len(sys.argv) == 1
-        main()
         if os.environ.get("GITHUB_ACTIONS") == "true":
-            if not shutil.which("nft"):
-                subprocess.run(["sudo", "-n", "apt-get", "update"], check=True)
-                subprocess.run(["sudo", "-n", "apt-get", "install", "-y", "nftables"], check=True)
-            repo = HERE.parents[1]
-            build_rehearsal_image(repo, HISTORICAL_PRIOR, "gf3-web:maintenance-prior")
-            build_rehearsal_image(repo, HISTORICAL_TARGET, HISTORICAL_TARGET_IMAGE)
-            for case in reviewed_scenarios:
-                subprocess.run(["sudo", "-n", "env", "GF3_DISPOSABLE_CI_RUNNER=true",
-                                "/usr/bin/python3", "-u", str(Path(__file__).resolve()), case], check=True)
-            for case in scenarios:
-                subprocess.run(["sudo", "-n", "env", "GF3_DISPOSABLE_CI_RUNNER=true",
-                                "/usr/bin/python3", "-u", str(Path(__file__).resolve()), case, "historical"], check=True)
+            run_full_rehearsal(scenarios, reviewed_scenarios)
+        else:
+            main()

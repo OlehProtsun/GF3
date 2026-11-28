@@ -1,171 +1,282 @@
-import { beforeEach as beforeEnglishTest } from "vitest";
-import { setLanguage as setTestLanguage } from "@shared/i18n";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, test, vi } from "vitest";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { managerNotepadApi, type ManagerNote, type ManagerNotepad as NotepadResponse } from "@entities/manager-notepad";
+import { ApiError, setAuthAccessToken } from "@shared/api/httpClient";
+import { setLanguage } from "@shared/i18n";
 import { ManagerNotepad } from "./ManagerNotepad";
 
-beforeEnglishTest(() => setTestLanguage("en"));
+function note(id: number, overrides: Partial<ManagerNote> = {}): ManagerNote {
+  return {
+    id, ownerManagerId: 1, title: `Note ${id}`, content: "", color: "slate",
+    createdAtUtc: "2026-11-26T10:00:00Z", updatedAtUtc: "2026-11-26T10:00:00Z", visibility: "private",
+    isPinned: false, isLocked: false, folderId: null, tagIds: [], sharedWithManagerIds: [],
+    revision: 1, canEdit: true, canManage: true, ...overrides,
+  };
+}
 
-const mocks = vi.hoisted(() => ({
-  query: vi.fn(),
-  createMutate: vi.fn(),
-  updateMutate: vi.fn(),
-  deleteMutate: vi.fn(),
-  stateMutate: vi.fn(),
-  execCommand: vi.fn(),
-}));
-
-vi.mock("@entities/manager-notepad", () => ({
-  useManagerNotepadQuery: () => mocks.query(),
-  useCreateManagerNoteMutation: () => ({ mutate: mocks.createMutate, isPending: false }),
-  useUpdateManagerNoteMutation: () => ({ mutate: mocks.updateMutate, isPending: false }),
-  useDeleteManagerNoteMutation: () => ({ mutate: mocks.deleteMutate, isPending: false }),
-  useSaveManagerNotepadStateMutation: () => ({ mutate: mocks.stateMutate, isPending: false }),
-}));
+let data: NotepadResponse;
 
 beforeEach(() => {
-  mocks.createMutate.mockReset();
-  mocks.updateMutate.mockReset();
-  mocks.deleteMutate.mockReset();
-  mocks.stateMutate.mockReset();
-  mocks.execCommand.mockReset();
-  Object.defineProperty(document, "execCommand", {
-    configurable: true,
-    value: mocks.execCommand,
+  setLanguage("en");
+  data = { notes: [], folders: [], tags: [], state: { isExpanded: true, isPinned: false, height: 520 } };
+  vi.spyOn(managerNotepadApi, "get").mockImplementation(async () => data);
+  vi.spyOn(managerNotepadApi, "getNote").mockImplementation(async id => {
+    const selected = data.notes.find(item => item.id === id);
+    if (!selected) throw new ApiError({ status: 404, message: "Not found" });
+    return selected;
   });
-  mocks.query.mockReturnValue({
-    data: {
-      notes: [{
-        id: 7,
-        title: "Release checklist",
-        content: "Verify the schedule.",
-        color: "blue",
-        createdAtUtc: "2026-07-20T10:00:00Z",
-        updatedAtUtc: "2026-07-20T11:00:00Z",
-      }],
-      state: { isExpanded: true, isPinned: false, height: 520 },
-    },
-    isLoading: false,
-    error: null,
-  });
+  vi.spyOn(managerNotepadApi, "saveState").mockResolvedValue();
 });
+afterEach(() => vi.restoreAllMocks());
 
-describe("ManagerNotepad", () => {
-  test("opens a note, saves edits, pins and persists a resized height", async () => {
-    const user = userEvent.setup();
-    render(<ManagerNotepad />);
+function mount(client = new QueryClient()) {
+  return render(<QueryClientProvider client={client}><ManagerNotepad /></QueryClientProvider>);
+}
 
-    await user.click(await screen.findByRole("button", { name: /Release checklist/i }));
-    const titleInput = screen.getByRole("textbox", { name: "Note title" });
-    expect(titleInput.parentElement).toContainElement(screen.getByText("Saved"));
-    await user.clear(titleInput);
-    await user.type(titleInput, "Updated checklist");
-    await user.click(screen.getByRole("button", { name: "Save" }));
+const panel = () => screen.findByRole("dialog", { name: "Manager notepad" });
 
-    expect(mocks.updateMutate).toHaveBeenCalledWith(
-      {
-        noteId: 7,
-        payload: {
-          title: "Updated checklist",
-          content: "Verify the schedule.",
-          color: "blue",
-        },
-      },
-      expect.objectContaining({ onSuccess: expect.any(Function), onError: expect.any(Function) }),
-    );
-
-    await user.click(screen.getByRole("button", { name: "Pin notepad" }));
-    expect(mocks.stateMutate).toHaveBeenCalledWith(
-      { isExpanded: true, isPinned: true, height: 520 },
-      expect.objectContaining({ onError: expect.any(Function) }),
-    );
-
-    const resizeHandle = screen.getByRole("separator", { name: "Resize notepad" });
-    fireEvent.pointerDown(resizeHandle, { clientY: 500 });
-    fireEvent.pointerMove(window, { clientY: 620 });
-    fireEvent.pointerUp(window);
-    expect(mocks.stateMutate).toHaveBeenLastCalledWith(
-      { isExpanded: true, isPinned: true, height: 640 },
-      expect.objectContaining({ onError: expect.any(Function) }),
-    );
+describe("manager notepad", () => {
+  it("uses server counts, sections, sort and search", async () => {
+    data.notes = [
+      note(1, { title: "Pinned zebra", isPinned: true }),
+      note(2, { title: "Zeta", content: "<b>Meeting</b>" }),
+      note(3, { title: "Alpha", content: "Meeting", updatedAtUtc: "2026-11-25T10:00:00Z" }),
+      note(4, { title: "Published", visibility: "public" }),
+      note(5, { title: "Shared checklist", visibility: "custom", canEdit: false, canManage: false }),
+    ];
+    mount();
+    const notepad = within(await panel());
+    expect(notepad.getByRole("button", { name: "Private 3" })).toHaveAttribute("aria-pressed", "true");
+    expect(notepad.getByRole("heading", { name: "Pinned" })).toBeVisible();
+    fireEvent.click(notepad.getByRole("button", { name: "Sort notes" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Title — A to Z" }));
+    expect(notepad.getAllByRole("article").map(item => item.querySelector("strong")?.textContent)).toEqual(["Pinned zebra", "Alpha", "Zeta"]);
+    fireEvent.change(notepad.getByRole("textbox", { name: "Search notes" }), { target: { value: "MEETING" } });
+    expect(notepad.getAllByRole("article")).toHaveLength(2);
+    fireEvent.click(notepad.getByRole("button", { name: "Clear note search" }));
+    fireEvent.click(notepad.getByRole("button", { name: "Public 2" }));
+    expect(notepad.getByText("Published")).toBeVisible();
+    expect(notepad.getByText("Shared checklist")).toBeVisible();
+    expect(notepad.queryByText("Pinned zebra")).toBeNull();
   });
 
-  test("an unpinned notepad collapses when the manager clicks outside", async () => {
-    render(<ManagerNotepad />);
-    await screen.findByRole("complementary", { name: "Manager notepad" });
+  it("opens a blank draft without creating a record and keeps manual save", async () => {
+    const create = vi.spyOn(managerNotepadApi, "createNote").mockImplementation(async request => {
+      const created = note(7, request);
+      data = { ...data, notes: [created] };
+      return created;
+    });
+    mount();
+    const notepad = within(await panel());
+    expect(notepad.getByText("No private notes yet.")).toBeVisible();
+    fireEvent.click(notepad.getByRole("button", { name: "New" }));
+    expect(create).not.toHaveBeenCalled();
+    fireEvent.change(notepad.getByRole("textbox", { name: "Note title" }), { target: { value: "New draft" } });
+    fireEvent.click(notepad.getByRole("button", { name: "Save" }));
+    expect(await notepad.findByRole("button", { name: "Saved" })).toBeDisabled();
+    expect(create).toHaveBeenCalledExactlyOnceWith({ title: "New draft", content: "", color: "slate" });
+  });
 
+  it("retains a failed draft when the user keeps editing", async () => {
+    vi.spyOn(managerNotepadApi, "createNote").mockRejectedValue(new Error("Offline"));
+    mount();
+    const notepad = within(await panel());
+    fireEvent.click(notepad.getByRole("button", { name: "New" }));
+    const title = notepad.getByRole("textbox", { name: "Note title" });
+    fireEvent.change(title, { target: { value: "Keep my work" } });
+    fireEvent.click(notepad.getByRole("button", { name: "Notes" }));
+    const prompt = within(await screen.findByRole("dialog", { name: "Discard unsaved changes?" }));
+    fireEvent.click(prompt.getByRole("button", { name: "Keep editing" }));
+    expect(title).toHaveValue("Keep my work");
+    expect(notepad.getByRole("alert")).toHaveTextContent("Offline");
+    expect(notepad.getByRole("button", { name: "Retry" })).toBeVisible();
+  });
+
+  it("shows read-only shared notes and clears them on access refresh", async () => {
+    const shared = note(5, { title: "Shared checklist", visibility: "custom", canEdit: false, canManage: false, content: "<b>Readers</b>" });
+    data.notes = [shared];
+    vi.spyOn(managerNotepadApi, "getNote").mockResolvedValue(shared);
+    mount();
+    const notepad = within(await panel());
+    fireEvent.click(notepad.getByRole("button", { name: "Public 1" }));
+    fireEvent.click(notepad.getByRole("button", { name: /Shared checklist/ }));
+    expect(await notepad.findByRole("textbox", { name: "Note content" })).toHaveAttribute("contenteditable", "false");
+    expect(notepad.queryByRole("button", { name: "Note actions" })).toBeNull();
+    expect(notepad.queryByRole("button", { name: "Save" })).toBeNull();
+    data = { ...data, notes: [] };
+    fireEvent(window, new Event("focus"));
+    expect(await notepad.findByText("This note is no longer available.")).toBeVisible();
+    expect(notepad.queryByText("Readers")).toBeNull();
+  });
+
+  it("saves custom recipient selection and confirms owner deletion", async () => {
+    const current = note(1, { title: "To share" });
+    data.notes = [current];
+    vi.spyOn(managerNotepadApi, "getShareTargets").mockResolvedValue([{ id: 9, displayName: "Recipient" }]);
+    const patch = vi.spyOn(managerNotepadApi, "updateMetadata").mockImplementation(async () => {
+      const updated = { ...current, visibility: "custom" as const, sharedWithManagerIds: [9], revision: 2 };
+      data = { ...data, notes: [updated] };
+      return updated;
+    });
+    const remove = vi.spyOn(managerNotepadApi, "deleteNote").mockImplementation(async () => { data = { ...data, notes: [] }; });
+    mount();
+    const notepad = within(await panel());
+    fireEvent.click(notepad.getByRole("button", { name: /To share/ }));
+    fireEvent.click(await notepad.findByRole("button", { name: "Private" }));
+    const visibility = within(await screen.findByRole("dialog", { name: "Visibility" }));
+    fireEvent.click(visibility.getByRole("button", { name: /^Custom/ }));
+    fireEvent.click(await visibility.findByRole("checkbox", { name: "Recipient" }));
+    fireEvent.click(notepad.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(patch).toHaveBeenCalledWith(1, expect.objectContaining({
+      visibility: "custom", sharedWithManagerIds: [9], expectedRevision: 1,
+    }), undefined));
+    expect(await notepad.findByRole("button", { name: "Saved" })).toBeDisabled();
+    fireEvent.click(await notepad.findByRole("button", { name: "Note actions" }));
+    const actions = within(await screen.findByRole("dialog", { name: "Note actions" }));
+    fireEvent.click(actions.getByRole("button", { name: /^Delete note/ }));
+    const dialog = within(await screen.findByRole("dialog", { name: "Delete note?" }));
+    expect(remove).not.toHaveBeenCalled();
+    fireEvent.click(dialog.getByRole("button", { name: "Delete" }));
+    await waitFor(() => expect(remove).toHaveBeenCalledWith(1, undefined));
+  });
+
+  it("persists title-only edits, panel pinning and pointer resizing", async () => {
+    const original = note(7, { title: "Release checklist", content: "Verify the schedule.", color: "blue" });
+    data.notes = [original];
+    const update = vi.spyOn(managerNotepadApi, "updateNote").mockImplementation(async (_, changes) => {
+      const saved = { ...original, ...changes, revision: 2 };
+      data = { ...data, notes: [saved] };
+      return saved;
+    });
+    mount();
+    const notepad = within(await panel());
+    fireEvent.click(notepad.getByRole("button", { name: /Release checklist/ }));
+    const title = await notepad.findByRole("textbox", { name: "Note title" });
+    expect(notepad.getByRole("button", { name: "Saved" })).toBeDisabled();
+    fireEvent.change(title, { target: { value: "Updated checklist" } });
+    fireEvent.click(notepad.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(update).toHaveBeenCalledWith(7, {
+      title: "Updated checklist", content: "Verify the schedule.", color: "blue", expectedRevision: 1,
+    }, undefined));
+    fireEvent.click(notepad.getByRole("button", { name: "Pin notepad" }));
+    expect(managerNotepadApi.saveState).toHaveBeenLastCalledWith({ isExpanded: true, isPinned: true, height: 520 });
+    const resize = notepad.getByRole("separator", { name: "Resize notepad" });
+    const region = await panel();
+    vi.spyOn(region, "getBoundingClientRect").mockReturnValue(new DOMRect(0, 0, 420, 520));
+    vi.spyOn(document.documentElement, "clientHeight", "get").mockReturnValue(900);
+    Object.assign(resize, { setPointerCapture: vi.fn(), hasPointerCapture: vi.fn(() => false) });
+    fireEvent.pointerDown(resize, { clientY: 500, pointerId: 1, isPrimary: true, button: 0 });
+    fireEvent.pointerMove(resize, { clientY: 620, pointerId: 1 });
+    fireEvent.pointerUp(resize, { pointerId: 1 });
+    expect(managerNotepadApi.saveState).toHaveBeenLastCalledWith({ isExpanded: true, isPinned: true, height: 640 });
+  });
+
+  it("allows title-only edits when legacy plain text fits the stored limit", async () => {
+    const content = "X".repeat(19_998) + " &";
+    const original = note(1, { title: "Legacy note", content });
+    data.notes = [original];
+    const update = vi.spyOn(managerNotepadApi, "updateNote").mockResolvedValue({ ...original, title: "Renamed", revision: 2 });
+    mount();
+    const notepad = within(await panel());
+    fireEvent.click(notepad.getByText("Legacy note"));
+    fireEvent.change(await notepad.findByRole("textbox", { name: "Note title" }), { target: { value: "Renamed" } });
+    fireEvent.click(notepad.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(update).toHaveBeenCalledWith(1, expect.objectContaining({ title: "Renamed", content }), undefined));
+  });
+
+  it("collapses an unpinned panel on an outside click", async () => {
+    mount();
+    await panel();
     fireEvent.pointerDown(document.body);
-
-    await waitFor(() => expect(mocks.stateMutate).toHaveBeenCalledWith(
-      { isExpanded: false, isPinned: false, height: 520 },
-      expect.objectContaining({ onError: expect.any(Function) }),
-    ));
-    expect(screen.getByRole("button", { name: "Open notepad" })).toBeInTheDocument();
+    await waitFor(() => expect(managerNotepadApi.saveState).toHaveBeenCalledWith({ isExpanded: false, isPinned: false, height: 520 }));
+    expect(screen.getByRole("button", { name: "Open notepad" })).toBeVisible();
   });
 
-  test("formats selected text from the side toolbar and collapses from the bottom button", async () => {
-    const user = userEvent.setup();
-    render(<ManagerNotepad />);
-
-    await user.click(await screen.findByRole("button", { name: /Release checklist/i }));
-    await user.click(screen.getByRole("button", { name: "Bold" }));
-    expect(mocks.execCommand).toHaveBeenCalledWith("bold", false, undefined);
-
-    await user.click(screen.getByRole("button", { name: "Text color" }));
-    expect(screen.getByRole("dialog", { name: "Choose text color" })).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Text color #dc2626" }));
-    expect(mocks.execCommand).toHaveBeenCalledWith("foreColor", false, "#dc2626");
-
-    await user.click(screen.getByRole("button", { name: "Collapse notepad" }));
-    expect(mocks.stateMutate).toHaveBeenLastCalledWith(
-      { isExpanded: false, isPinned: false, height: 520 },
-      expect.objectContaining({ onError: expect.any(Function) }),
-    );
+  it("retains formatting commands and bottom collapse", async () => {
+    data.notes = [note(7, { title: "Release checklist" })];
+    const execCommand = vi.fn();
+    const descriptor = Object.getOwnPropertyDescriptor(document, "execCommand");
+    Object.defineProperty(document, "execCommand", { configurable: true, value: execCommand });
+    try {
+      mount();
+      const notepad = within(await panel());
+      fireEvent.click(notepad.getByRole("button", { name: /Release checklist/ }));
+      expect((await notepad.findByRole("button", { name: "Notes" })).closest("header")).not.toBeNull();
+      expect(notepad.queryByText("Edit note")).toBeNull();
+      expect(notepad.queryByRole("button", { name: "Align left" })).toBeNull();
+      fireEvent.click(notepad.getByRole("button", { name: "Bold" }));
+      expect(execCommand).toHaveBeenCalledWith("bold", false, undefined);
+      const overflow = () => fireEvent.click(notepad.getByRole("button", { name: "More formatting actions" }));
+      overflow();
+      fireEvent.click(screen.getByRole("button", { name: "Text color" }));
+      const colors = within(screen.getByRole("dialog", { name: "Text color" }));
+      fireEvent.click(colors.getByRole("button", { name: "Red" }));
+      expect(execCommand).toHaveBeenCalledWith("foreColor", false, "#dc2626");
+      overflow();
+      fireEvent.click(screen.getByRole("button", { name: "Bulleted list" }));
+      overflow();
+      fireEvent.click(screen.getByRole("button", { name: "Numbered list" }));
+      expect(execCommand).toHaveBeenCalledWith("insertUnorderedList", false, undefined);
+      expect(execCommand).toHaveBeenCalledWith("insertOrderedList", false, undefined);
+      fireEvent.click(notepad.getByRole("button", { name: "Collapse notepad" }));
+      await waitFor(() => expect(managerNotepadApi.saveState).toHaveBeenLastCalledWith({ isExpanded: false, isPinned: false, height: 520 }));
+    } finally {
+      if (descriptor) Object.defineProperty(document, "execCommand", descriptor);
+      else Reflect.deleteProperty(document, "execCommand");
+    }
   });
 
-  test("keeps typed and deleted rich text stable across React rerenders", async () => {
-    const user = userEvent.setup();
-    render(<ManagerNotepad />);
-
-    await user.click(await screen.findByRole("button", { name: /Release checklist/i }));
-    const editor = screen.getByRole("textbox", { name: "Note content" });
-
+  it("keeps typed and deleted formatting through a background refetch", async () => {
+    const original = note(7, { title: "Release checklist", content: "Original", color: "blue" });
+    data.notes = [original];
+    const update = vi.spyOn(managerNotepadApi, "updateNote").mockResolvedValue({ ...original, revision: 2, content: "First lin<br>Second line" });
+    mount();
+    const notepad = within(await panel());
+    fireEvent.click(notepad.getByRole("button", { name: /Release checklist/ }));
+    const editor = await notepad.findByRole("textbox", { name: "Note content" });
     editor.innerHTML = "First line<br>Second line";
     fireEvent.input(editor);
-    await waitFor(() => expect(editor.innerHTML).toBe("First line<br>Second line"));
-
+    expect(editor.innerHTML).toBe("First line<br>Second line");
     editor.innerHTML = "First lin<br>Second line";
     fireEvent.input(editor);
-    await waitFor(() => expect(editor.innerHTML).toBe("First lin<br>Second line"));
-
-    await user.click(screen.getByRole("button", { name: "Save" }));
-    expect(mocks.updateMutate).toHaveBeenCalledWith(
-      {
-        noteId: 7,
-        payload: {
-          title: "Release checklist",
-          content: "First lin<br>Second line",
-          color: "blue",
-        },
-      },
-      expect.objectContaining({ onSuccess: expect.any(Function), onError: expect.any(Function) }),
-    );
+    expect(editor.innerHTML).toBe("First lin<br>Second line");
+    fireEvent.click(notepad.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(update).toHaveBeenCalledWith(7, {
+      title: "Release checklist", content: "First lin<br>Second line", color: "blue", expectedRevision: 1,
+    }, undefined));
+    expect(editor.innerHTML).toBe("First lin<br>Second line");
   });
 
-  test("keeps navigation under the Notepad label and exposes working list commands only", async () => {
-    const user = userEvent.setup();
-    render(<ManagerNotepad />);
+  it("attempts a final save and recovers a failed draft when the workspace remounts", async () => {
+    const client = new QueryClient();
+    setAuthAccessToken("notepad-test-session");
+    const create = vi.spyOn(managerNotepadApi, "createNote").mockRejectedValue(new Error("Offline"));
+    try {
+      const workspace = mount(client);
+      const notepad = within(await panel());
+      fireEvent.click(notepad.getByRole("button", { name: "New" }));
+      fireEvent.change(notepad.getByRole("textbox", { name: "Note title" }), { target: { value: "Recovered draft" } });
+      workspace.unmount();
+      expect(create).toHaveBeenCalledTimes(1);
 
-    await user.click(await screen.findByRole("button", { name: /Release checklist/i }));
-    const backButton = screen.getByRole("button", { name: "Notes" });
-    expect(backButton.closest("header")).not.toBeNull();
-    expect(screen.queryByText("Edit note")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Align left" })).not.toBeInTheDocument();
+      mount(client);
+      const reopened = within(await panel());
+      expect(await reopened.findByRole("textbox", { name: "Note title" })).toHaveValue("Recovered draft");
+      expect(reopened.getByRole("button", { name: "Retry" })).toBeVisible();
+      expect(create).toHaveBeenCalledTimes(1);
+    } finally {
+      setAuthAccessToken(null);
+    }
+  });
 
-    await user.click(screen.getByRole("button", { name: "Bulleted list" }));
-    await user.click(screen.getByRole("button", { name: "Numbered list" }));
-    expect(mocks.execCommand).toHaveBeenCalledWith("insertUnorderedList", false, undefined);
-    expect(mocks.execCommand).toHaveBeenCalledWith("insertOrderedList", false, undefined);
+  it("shows a fetch error and allows retry", async () => {
+    vi.mocked(managerNotepadApi.get).mockRejectedValueOnce(new Error("Offline"));
+    mount();
+    fireEvent.click(screen.getByRole("button", { name: "Open notepad" }));
+    const notepad = within(await panel());
+    expect(await notepad.findByRole("alert")).toHaveTextContent("Offline");
+    fireEvent.click(notepad.getByRole("button", { name: "Retry" }));
+    expect(await notepad.findByText("No private notes yet.")).toBeVisible();
   });
 });

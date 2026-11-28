@@ -18,7 +18,7 @@ function mount(props: ComponentProps<typeof ManagerPhonePage> = {}) {
 test("optional title and parent Back link, including title without Back", () => {
   const view = mount({ backTo: "/container/1", title: "Schedule Profile" });
   expect(screen.getByRole("link", { name: "Back" })).toHaveAttribute("href", "/container/1");
-  expect(screen.getByText("Schedule Profile").tagName).toBe("SPAN");
+  expect(screen.getByText("Schedule Profile").tagName).toBe("H1");
   view.unmount();
   mount({ title: "Schedule Profile" });
   expect(screen.getByText("Schedule Profile")).toBeInTheDocument();
@@ -28,6 +28,7 @@ test("normal callers retain optional search without title", () => {
   const onQueryChange = vi.fn();
   mount({ backTo: "/container", query: "Anna", onQueryChange });
   expect(screen.queryByText("Schedule Profile")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Search", exact: true }));
   fireEvent.change(screen.getByRole("searchbox"), { target: { value: "Jan" } });
   expect(onQueryChange).toHaveBeenCalledWith("Jan");
   fireEvent.click(screen.getByRole("button", { name: "Clear Search" }));

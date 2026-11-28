@@ -7,6 +7,7 @@ import { warsawToday } from "@entities/urlop/model/calendar";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { NavLink } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@app/providers/AuthProvider";
 import {
   useEmployeeScheduleListQuery,
@@ -15,6 +16,7 @@ import {
 } from "@entities/employee-schedule";
 import {
   useCreateShiftCorrectionMutation,
+  useEmployeeCorrectionSchedulesQuery,
   useEmployeeShiftCorrectionsQuery,
   type CreateShiftCorrectionInput,
 } from "@entities/shift-corrections";
@@ -23,6 +25,7 @@ import { ContainerGraphMatrix } from "@entities/containers/ui/ContainerGraphMatr
 import { employeeUiStateApi, useEmployeeUiStateQuery } from "@entities/employee-ui-state";
 import { useEmployeeShiftSwapsQuery } from "@entities/shift-swaps";
 import { getErrorMessage } from "@shared/api/httpClient";
+import { queryKeys } from "@shared/api/queryKeys";
 import { downloadExportFile } from "@entities/exports/lib/download";
 import { employeeScheduleApi } from "@entities/employee-schedule/api/employeeScheduleApi";
 import { formatScheduleLastUpdate } from "@shared/lib/scheduleLastUpdate";
@@ -346,6 +349,11 @@ export function EmployeeSchedulePage() {
   const [selectedDayOfMonth, setSelectedDayOfMonth] = useState<number | null>(null);
   const activeDailyScheduleDayRef = useRef<HTMLButtonElement | null>(null);
   const [isShiftCorrectionDialogOpen, setIsShiftCorrectionDialogOpen] = useState(false);
+  const queryClient = useQueryClient();
+  const candidatesQuery = useEmployeeCorrectionSchedulesQuery(isShiftCorrectionDialogOpen && currentEmployeeId !== null);
+  const correctionSchedules = useMemo(() => currentEmployeeId === null ? [] :
+    rankEmployeeSchedules(candidatesQuery.data ?? [], currentEmployeeId, currentMonth),
+  [candidatesQuery.data, currentEmployeeId, currentMonth]);
   const correctionSendingRef = useRef(false);
   const [shiftCorrectionError, setShiftCorrectionError] = useState<string | null>(null);
   const [shiftCorrectionSubmitted, setShiftCorrectionSubmitted] = useState(false);
@@ -448,7 +456,8 @@ export function EmployeeSchedulePage() {
       {
         content: <ScheduleShiftBadges status={status} />,
         tone: getScheduleStatusTone(status),
-        count: Number(Boolean(status.correctionPending)) + Number(status.open.length > 0) + Number(status.accepted.length > 0),
+        count: Number(Boolean(status.correctionPending)) + Number(status.open.length > 0) +
+          Number(Boolean(status.correctionApproved)) + Number(status.accepted.length > 0),
       },
     ] as const)),
   ), [language, shiftStatuses]);
@@ -578,6 +587,11 @@ export function EmployeeSchedulePage() {
     });
   };
 
+  const openCorrectionButton = currentEmployeeId !== null && (
+    <button type="button" className={`${styles.openSchedulePdfButton} ${styles.openScheduleCorrectionButton}`}
+      onClick={() => { setShiftCorrectionError(null); setShiftCorrectionSubmitted(false); setIsShiftCorrectionDialogOpen(true); }}
+      title={t("Request a shift correction")} aria-label={t("Request a shift correction")}>{t("Adjust")}</button>
+  );
   const scheduleSelectorRow = selectedSchedule ? (
     <div className={styles.scheduleSelectorRow}>
       <button type="button" className={styles.scheduleSelectTrigger}
@@ -597,9 +611,7 @@ export function EmployeeSchedulePage() {
             : formatScheduleLastUpdate(selectedSchedule.lastUpdatedAtUtc)}</span>
         </span>
       </button>
-      <button type="button" className={`${styles.openSchedulePdfButton} ${styles.openScheduleCorrectionButton}`}
-        onClick={() => { setShiftCorrectionError(null); setShiftCorrectionSubmitted(false); setIsShiftCorrectionDialogOpen(true); }}
-        title={t("Request a shift correction")} aria-label={t("Request a shift correction")}>{t("Adjust")}</button>
+      {openCorrectionButton}
     </div>
   ) : null;
 
@@ -654,8 +666,7 @@ export function EmployeeSchedulePage() {
 
       {!scheduleQuery.isLoading && schedules.length === 0 ? (
         <section className={workspaceStyles.panel} data-employee-motion="schedule-panel">
-          <span className={workspaceStyles.panelEyebrow}>{t("No published schedules")}</span>
-          <h2 className={workspaceStyles.panelTitle}>{t("Nothing is public for your account yet.")}</h2>
+          <h2 className={workspaceStyles.panelTitle}>{t("No published schedules assigned to you")}</h2>
           <NavLink to="/availability" className={workspaceStyles.linkCard}>
             <span className={workspaceStyles.linkIcon}>
               <AvailabilityIcon size={18} />
@@ -663,6 +674,10 @@ export function EmployeeSchedulePage() {
             <span className={workspaceStyles.linkTitle}>{t("Go to Availability")}</span>
             <span className={workspaceStyles.linkText}>{t("Submit availability when a manager opens a window.")}</span>
           </NavLink>
+          {currentEmployeeId !== null && <button type="button" className={styles.openSchedulePdfButton}
+            aria-haspopup="dialog" aria-expanded={isScheduleSelectOpen}
+            onClick={() => setIsScheduleSelectOpen(true)}>{t("View More")}</button>}
+          {openCorrectionButton}
         </section>
       ) : null}
 
@@ -741,7 +756,10 @@ export function EmployeeSchedulePage() {
 
       <EmployeeShiftCorrectionDialog
         open={isShiftCorrectionDialogOpen}
-        schedules={rankedSchedules}
+        schedules={correctionSchedules}
+        isLoadingSchedules={candidatesQuery.isLoading || candidatesQuery.isFetching}
+        schedulesErrorMessage={candidatesQuery.error ? getErrorMessage(candidatesQuery.error, t("Could not load correction schedules.")) : null}
+        onRetrySchedules={() => { void queryClient.invalidateQueries({ queryKey: queryKeys.employeeSchedules.correctionCandidates() }); }}
         employeeId={currentEmployeeId}
         existingRequests={shiftCorrectionsQuery.data ?? []}
         activeSwaps={shiftSwapsQuery.data ?? []}

@@ -15,6 +15,12 @@ namespace GF3.Tests;
 
 public sealed class DatabaseMigrationStartupTests
 {
+    private const string AddCommunicationContentBlocks = "20261123140000_AddCommunicationContentBlocks";
+    private const string ExpandManagerNotepad = "20261126170000_ExpandManagerNotepad";
+    private const string AddManagerNoteEditSessions = "20261126180000_AddManagerNoteEditSessions";
+    private static readonly string[] NotepadTables =
+        ["manager_note", "manager_note_folder", "manager_note_share", "manager_note_tag", "manager_note_tag_link", "manager_note_version"];
+
     [Fact]
     public async Task ReviewedReleaseSchemaPrefixes_MatchImmutableContract()
     {
@@ -142,13 +148,17 @@ public sealed class DatabaseMigrationStartupTests
                     File.Copy(rehearsalPath, Path.Combine(prefixes, $"prefix-{i + 1}.db"), overwrite: true);
                 }
             }
+            Assert.Equal("0", await ReadPragmaAsync(workspace.ConnectionString, "PRAGMA wal_checkpoint(TRUNCATE)"));
+            SqliteConnection.ClearAllPools();
+            var sourceHash = await HashAsync(sourcePath);
+            var backupHash = await HashAsync(backup.Path);
             File.Copy(backup.Path, clonePath);
             var cloneWorkspace = new SqliteDatabaseWorkspace(clonePath);
             await using (var clone = CreateContext(cloneWorkspace.ConnectionString))
             {
                 var result = await DatabaseMigrationStartup.ApplyAsync(clone, cloneWorkspace,
                     requireExistingDatabase: true, backupBeforeMigrate: true, NullLogger.Instance);
-                Assert.Equal(expectedMigrations, result.AppliedMigrations);
+                Assert.Equal(expectedMigrations.Append(ExpandManagerNotepad).Append(AddManagerNoteEditSessions), result.AppliedMigrations);
                 var correction = await clone.ShiftCorrectionRequests.SingleAsync();
                 Assert.Equal(ShiftCorrectionOperation.ChangeTimes, correction.Operation);
                 Assert.Null(correction.RemovalSnapshotJson);
@@ -165,8 +175,165 @@ public sealed class DatabaseMigrationStartupTests
                 Assert.Null(message.PhotoAttachmentJson);
                 Assert.Null(message.ContentBlocksJson);
                 Assert.Equal("Legacy text survives the release", message.Body);
+                Assert.Empty(await clone.Database.GetPendingMigrationsAsync());
+                Assert.False(clone.Database.HasPendingModelChanges());
                 Assert.Equal("ok", await ReadPragmaAsync(cloneWorkspace.ConnectionString, "PRAGMA integrity_check"));
                 Assert.Null(await ReadPragmaAsync(cloneWorkspace.ConnectionString, "PRAGMA foreign_key_check"));
+            }
+            Assert.Equal(sourceHash, await HashAsync(sourcePath));
+            Assert.Equal(backupHash, await HashAsync(backup.Path));
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task NotepadReleaseSchemaPrefixes_MatchImmutableContract()
+    {
+        var root = CreateTempRoot();
+        try
+        {
+            await using var db = CreateContext($"Data Source={Path.Combine(root, "SQLite.db")}");
+            var migrator = db.GetService<IMigrator>();
+            var contracts = new List<object>();
+            foreach (var prefix in new[] { AddCommunicationContentBlocks, ExpandManagerNotepad, AddManagerNoteEditSessions })
+            {
+                await migrator.MigrateAsync(prefix);
+                contracts.Add(await ReadReviewedSchemaPrefixAsync(db, prefix, NotepadTables));
+            }
+
+            var actual = JsonSerializer.Serialize(contracts, new JsonSerializerOptions { WriteIndented = true, NewLine = "\n" }) + "\n";
+            var exportPath = Environment.GetEnvironmentVariable("GF3_EXPORT_NOTEPAD_SCHEMA_PREFIX_CONTRACTS");
+            if (!string.IsNullOrWhiteSpace(exportPath))
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(exportPath))!);
+                await File.WriteAllTextAsync(exportPath, actual);
+                return;
+            }
+
+            var expected = await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, "reviewed-notepad-schema-prefix-contracts.json"));
+            Assert.Equal(expected.ReplaceLineEndings("\n").Replace("\\r\\n", "\\n"), actual.Replace("\\r\\n", "\\n"));
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task NotepadReleaseTransition_PreservesRepresentativeRowsAndExportsSyntheticBaseline()
+    {
+        var root = CreateTempRoot();
+        var sourcePath = Path.Combine(root, "SQLite.db");
+        var workspace = new SqliteDatabaseWorkspace(sourcePath);
+        var mediaDirectory = Path.Combine(root, "communication-gifs");
+        Directory.CreateDirectory(mediaDirectory);
+        var gif = Convert.FromBase64String("R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=");
+        var key = Guid.Parse("01234567-89ab-cdef-0123-456789abcdef");
+        var referencedMedia = Path.Combine(mediaDirectory, $"{key:N}.gif");
+        var unreferencedMedia = Path.Combine(mediaDirectory, "aabbccddeeff00112233445566778899.gif");
+        await File.WriteAllBytesAsync(referencedMedia, gif);
+        await File.WriteAllBytesAsync(unreferencedMedia, gif);
+        try
+        {
+            string[][] tableColumns;
+            string[] oldRows;
+            string[] history;
+            string[] oldHistory;
+            await using (var source = CreateContext(workspace.ConnectionString))
+            {
+                await source.GetService<IMigrator>().MigrateAsync(AddCommunicationContentBlocks);
+                await SeedNotepadReleaseBaseline(source, key, gif.Length);
+                oldHistory = (await source.Database.GetAppliedMigrationsAsync()).ToArray();
+                history = oldHistory.Append(ExpandManagerNotepad).Append(AddManagerNoteEditSessions).ToArray();
+                await source.Database.OpenConnectionAsync();
+                var tables = await QueryRows(source, """
+                    SELECT name FROM sqlite_schema WHERE type = 'table'
+                    AND (name NOT LIKE 'sqlite_%' OR name = 'sqlite_sequence')
+                    AND name NOT IN ('__EFMigrationsHistory', '__EFMigrationsLock') ORDER BY name
+                    """);
+                var projections = new List<string[]>();
+                foreach (var table in tables)
+                {
+                    var name = (string)table[0]!;
+                    var columns = await ReadPragmaAsync(source, $"table_xinfo({QuoteIdentifier(name)})");
+                    projections.Add([name, .. columns.Select(column => (string)column[1]!)]);
+                }
+                tableColumns = projections.ToArray();
+                oldRows = await ReadNotepadBaselineRows(source, tableColumns, oldHistory.Length);
+                Assert.Equal(9001, await source.Database.SqlQueryRaw<int>("SELECT seq AS Value FROM sqlite_sequence WHERE name = 'manager_note'").SingleAsync());
+                await source.Database.CloseConnectionAsync();
+            }
+
+            var backup = await workspace.CreateAutomaticBackupAsync(default);
+            Assert.Equal("0", await ReadPragmaAsync(workspace.ConnectionString, "PRAGMA wal_checkpoint(TRUNCATE)"));
+            SqliteConnection.ClearAllPools();
+            var sourceHash = await HashAsync(sourcePath);
+            var backupHash = await HashAsync(backup.Path);
+            var backedUpMedia = Path.Combine(Path.GetDirectoryName(backup.Path)!, "communication-gifs", Path.GetFileName(referencedMedia));
+            Assert.Equal(gif, await File.ReadAllBytesAsync(backedUpMedia));
+            var paths = Enumerable.Range(0, 3).Select(prefix => Path.Combine(root, $"prefix-{prefix}.db")).ToArray();
+            for (var prefix = 0; prefix < paths.Length; prefix++)
+            {
+                File.Copy(prefix == 0 ? backup.Path : paths[prefix - 1], paths[prefix]);
+                var connectionString = $"Data Source={paths[prefix]}";
+                await using (var copy = CreateContext(connectionString))
+                {
+                    if (prefix != 0)
+                        await copy.GetService<IMigrator>().MigrateAsync(history[oldHistory.Length + prefix - 1]);
+                    Assert.Equal(history.Take(oldHistory.Length + prefix), await copy.Database.GetAppliedMigrationsAsync());
+                    await copy.Database.OpenConnectionAsync();
+                    Assert.Equal(oldRows, await ReadNotepadBaselineRows(copy, tableColumns, oldHistory.Length));
+                    if (prefix >= 1)
+                    {
+                        foreach (var table in NotepadTables.Skip(1))
+                            Assert.Empty(await QueryRows(copy, $"SELECT 1 FROM {QuoteIdentifier(table)}"));
+                        Assert.Empty(await QueryRows(copy, """
+                            SELECT id FROM manager_note WHERE is_locked IS NOT 0 OR is_pinned IS NOT 0 OR revision IS NOT 1
+                            OR visibility IS NOT 'private' OR last_edited_by_manager_id IS NOT NULL OR folder_id IS NOT NULL
+                            """));
+                    }
+                    if (prefix == 2)
+                    {
+                        Assert.Empty(await QueryRows(copy, """
+                            SELECT id FROM manager_note WHERE edit_session_id IS NOT NULL OR edit_manager_id IS NOT NULL
+                            OR edit_started_at_ms IS NOT NULL OR edit_expires_at_ms IS NOT NULL
+                            """));
+                        Assert.Empty(await copy.Database.GetPendingMigrationsAsync());
+                        Assert.False(copy.Database.HasPendingModelChanges());
+                    }
+                    await copy.Database.CloseConnectionAsync();
+                }
+                Assert.Equal("ok", await ReadPragmaAsync(connectionString, "PRAGMA integrity_check"));
+                Assert.Null(await ReadPragmaAsync(connectionString, "PRAGMA foreign_key_check"));
+                Assert.Equal("0", await ReadPragmaAsync(connectionString, "PRAGMA wal_checkpoint(TRUNCATE)"));
+                SqliteConnection.ClearAllPools();
+            }
+
+            var constraintsPath = Path.Combine(root, "constraints.db");
+            File.Copy(paths[1], constraintsPath);
+            await using (var constraints = CreateContext($"Data Source={constraintsPath};Foreign Keys=True"))
+                await AssertNotepadMigrationConstraints(constraints);
+
+            Assert.Equal(sourceHash, await HashAsync(sourcePath));
+            Assert.Equal(backupHash, await HashAsync(backup.Path));
+            Assert.Equal(gif, await File.ReadAllBytesAsync(referencedMedia));
+            Assert.Equal(gif, await File.ReadAllBytesAsync(unreferencedMedia));
+            Assert.Equal(gif, await File.ReadAllBytesAsync(backedUpMedia));
+            var artifact = Environment.GetEnvironmentVariable("GF3_EXPORT_RELEASE_BASELINE_DIRECTORY");
+            if (!string.IsNullOrWhiteSpace(artifact))
+            {
+                var artifactDirectory = Path.Combine(Path.GetFullPath(artifact), "notepad");
+                var prefixes = Path.Combine(artifactDirectory, "prefixes");
+                Directory.CreateDirectory(prefixes);
+                File.Copy(backup.Path, Path.Combine(artifactDirectory, "SQLite.db"), overwrite: true);
+                DirectoryCopy(mediaDirectory, Path.Combine(artifactDirectory, "communication-gifs"));
+                foreach (var path in paths)
+                    File.Copy(path, Path.Combine(prefixes, Path.GetFileName(path)), overwrite: true);
             }
         }
         finally
@@ -176,18 +343,125 @@ public sealed class DatabaseMigrationStartupTests
         }
     }
 
-    private static async Task<object> ReadReviewedSchemaPrefixAsync(AppDbContext db, string migrationId)
+    private static async Task SeedNotepadReleaseBaseline(AppDbContext db, Guid mediaKey, int mediaSize)
     {
-        string[] tables = ["communication_message", "employee_account", "shift_correction_request", "shift_swap_request", "workflow_log_entry"];
+        var now = new DateTimeOffset(2026, 11, 26, 9, 0, 0, TimeSpan.Zero);
+        var managers = new[] { "legacy-owner", "legacy-peer" }.Select(name => new ManagerAccountModel
+        {
+            Username = name, DisplayName = name, PasswordHash = "synthetic-hash", PasswordUpdatedAtUtc = now,
+            CreatedAtUtc = now, UpdatedAtUtc = now,
+        }).ToArray();
+        db.ManagerAccounts.AddRange(managers);
+        var (owner, _, schedule, slot) = await EmployeePushNotificationSourceTests.Seed(db);
+        db.ShiftSwapRequests.Add(EmployeePushNotificationSourceTests.Offer(owner, schedule, slot));
+        db.EmployeeAccounts.Add(new EmployeeAccountModel
+        {
+            EmployeeId = owner, Username = "legacy-employee", PasswordHash = "synthetic-hash", PasswordUpdatedAtUtc = now,
+        });
+        db.CommunicationMessages.Add(new CommunicationMessageModel
+        {
+            Title = "Legacy communication", Body = "Synthetic body", CreatedByManagerId = managers[0].Id,
+            CreatedByManagerName = managers[0].DisplayName, CreatedAtUtc = now, DeadlineAtUtc = now.AddDays(1),
+            GifAttachmentJson = JsonSerializer.Serialize(new { Key = mediaKey, Size = mediaSize, FileName = "synthetic.gif" }),
+        });
+        await db.SaveChangesAsync();
+        await db.Database.ExecuteSqlInterpolatedAsync($"""
+            INSERT INTO workflow_log_entry (occurred_at_utc, actor_role, actor_employee_id, actor_name, action)
+            VALUES ({now}, 'employee', {owner}, 'Synthetic employee', 'Opened schedule');
+            INSERT INTO shift_correction_request
+                (schedule_id, employee_id, schedule_slot_id, day_of_month, original_from_time,
+                 original_to_time, requested_from_time, requested_to_time, status, created_at_utc)
+            VALUES ({schedule.Id}, {owner}, {slot.Id}, 20, '08:00', '16:00', '08:00', '16:30', 'Pending', {now});
+            INSERT INTO manager_note (id, manager_account_id, title, content, color, created_at_utc, updated_at_utc) VALUES
+                (101, {managers[0].Id}, 'Legacy plain', 'Plain text', 'blue', {now}, {now}),
+                (102, {managers[1].Id}, 'Legacy rich', '<b>Rich</b><br>Text', 'green', {now}, {now.AddMinutes(1)}),
+                (9001, {managers[0].Id}, 'Sequence sentinel', '', 'yellow', {now}, {now});
+            DELETE FROM manager_note WHERE id = 9001;
+            INSERT INTO manager_notepad_state (manager_account_id, is_expanded, is_pinned, height, updated_at_utc)
+            VALUES ({managers[0].Id}, 1, 1, 777, {now}), ({managers[1].Id}, 0, 1, 390, {now});
+            """);
+    }
+
+    private static async Task<string[]> ReadNotepadBaselineRows(AppDbContext db, string[][] tableColumns, int oldMigrationCount)
+    {
+        var snapshots = new List<string>();
+        foreach (var projection in tableColumns)
+        {
+            var columns = string.Join(", ", projection.Skip(1).Select(QuoteIdentifier));
+            var rows = await QueryRows(db, $"SELECT {columns} FROM {QuoteIdentifier(projection[0])}");
+            snapshots.Add(JsonSerializer.Serialize(rows.Select(row => JsonSerializer.Serialize(row)).Order(StringComparer.Ordinal)));
+        }
+        var history = await QueryRows(db, $"SELECT MigrationId, ProductVersion FROM __EFMigrationsHistory ORDER BY MigrationId LIMIT {oldMigrationCount}");
+        snapshots.Add(JsonSerializer.Serialize(history));
+        return snapshots.ToArray();
+    }
+
+    private static async Task<List<object?[]>> QueryRows(AppDbContext db, string sql)
+    {
+        var rows = new List<object?[]>();
+        await using var command = db.Database.GetDbConnection().CreateCommand();
+        command.CommandText = sql;
+        await using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            var values = new object[reader.FieldCount];
+            reader.GetValues(values);
+            rows.Add(values.Select(value => value is DBNull ? null : value).ToArray());
+        }
+        return rows;
+    }
+
+    private static string QuoteIdentifier(string identifier) => "\"" + identifier.Replace("\"", "\"\"") + "\"";
+
+    private static async Task AssertNotepadMigrationConstraints(AppDbContext db)
+    {
+        var firstManager = await db.ManagerAccounts.OrderBy(manager => manager.Id).Select(manager => manager.Id).FirstAsync();
+        var secondManager = await db.ManagerAccounts.OrderBy(manager => manager.Id).Select(manager => manager.Id).LastAsync();
+        const string now = "2026-11-26 09:00:00+00:00";
+        await db.Database.ExecuteSqlInterpolatedAsync($"""
+            INSERT INTO manager_note_folder (id, manager_account_id, name, created_at_utc, updated_at_utc)
+            VALUES (1, {firstManager}, 'Work', {now}, {now}), (2, {secondManager}, 'work', {now}, {now});
+            INSERT INTO manager_note_tag (id, manager_account_id, name, created_at_utc)
+            VALUES (1, {firstManager}, 'Urgent', {now}), (2, {secondManager}, 'urgent', {now});
+            UPDATE manager_note SET folder_id = 1 WHERE id = 101;
+            INSERT INTO manager_note_share (note_id, manager_account_id) VALUES (101, {secondManager});
+            INSERT INTO manager_note_tag_link (note_id, tag_id) VALUES (101, 1);
+            INSERT INTO manager_note_version (note_id, revision, title, content, color, saved_at_utc, saved_by_manager_id)
+            VALUES (101, 1, 'Old title', 'Old content', 'blue', {now}, {firstManager});
+            """);
+        foreach (var duplicate in new FormattableString[]
+        {
+            $"INSERT INTO manager_note_folder (manager_account_id, name, created_at_utc, updated_at_utc) VALUES ({firstManager}, 'work', {now}, {now})",
+            $"INSERT INTO manager_note_tag (manager_account_id, name, created_at_utc) VALUES ({firstManager}, 'urgent', {now})",
+            $"INSERT INTO manager_note_share (note_id, manager_account_id) VALUES (101, {secondManager})",
+            $"INSERT INTO manager_note_tag_link (note_id, tag_id) VALUES (101, 1)",
+            $"INSERT INTO manager_note_version (note_id, revision, title, content, color, saved_at_utc, saved_by_manager_id) VALUES (101, 1, 'Old title', 'Old content', 'blue', {now}, {firstManager})",
+        })
+        {
+            var error = await Assert.ThrowsAsync<SqliteException>(() => db.Database.ExecuteSqlInterpolatedAsync(duplicate));
+            Assert.Contains(error.SqliteExtendedErrorCode, new[] { 1555, 2067 });
+        }
+        await db.Database.ExecuteSqlRawAsync("DELETE FROM manager_note_folder WHERE id = 1");
+        Assert.Null(await db.Database.SqlQueryRaw<int?>("SELECT folder_id AS Value FROM manager_note WHERE id = 101").SingleAsync());
+        await db.Database.ExecuteSqlRawAsync("DELETE FROM manager_note WHERE id = 101");
+        Assert.Equal(0, await db.ManagerNoteTagLinks.CountAsync());
+        Assert.Equal(0, await db.ManagerNoteShares.CountAsync());
+        Assert.Equal(0, await db.ManagerNoteVersions.CountAsync());
+        Assert.Equal(1, await db.Database.SqlQueryRaw<int>("SELECT COUNT(*) AS Value FROM manager_note WHERE id = 102").SingleAsync());
+    }
+
+    private static async Task<object> ReadReviewedSchemaPrefixAsync(AppDbContext db, string migrationId, string[]? selectedTables = null)
+    {
+        string[] tables = selectedTables ?? ["communication_message", "employee_account", "shift_correction_request", "shift_swap_request", "workflow_log_entry"];
         await db.Database.OpenConnectionAsync();
         try
         {
         var schemaObjects = new List<object?[]>();
         await using (var command = db.Database.GetDbConnection().CreateCommand())
         {
-            command.CommandText = "SELECT type, name, tbl_name, sql FROM sqlite_schema WHERE " +
+            command.CommandText = "SELECT type, name, tbl_name, sql FROM sqlite_schema WHERE (" +
                 string.Join(" OR ", tables.Select((_, i) => $"name = @table{i} OR tbl_name = @table{i}")) +
-                " ORDER BY type, name";
+                ")" + (selectedTables is null ? "" : " AND sql IS NOT NULL") + " ORDER BY type, name";
             for (var i = 0; i < tables.Length; i++)
             {
                 var parameter = command.CreateParameter();
@@ -279,8 +553,9 @@ public sealed class DatabaseMigrationStartupTests
             {
                 var result = await DatabaseMigrationStartup.ApplyAsync(clone, cloneWorkspace, true, true,
                     NullLogger.Instance);
-                Assert.Equal(new[] { correction, refresh, disjointSwaps, launchModes, launchLog, removal, gif, photo, contentBlocks },
+                Assert.Equal(new[] { correction, refresh, disjointSwaps, launchModes, launchLog, removal, gif, photo, contentBlocks, ExpandManagerNotepad, AddManagerNoteEditSessions },
                     result.AppliedMigrations);
+                Assert.Empty(await clone.Database.GetPendingMigrationsAsync());
                 Assert.Equal(new[] { "Owner", "Recipient" }, await clone.Employees.OrderBy(employee => employee.Id).Select(employee => employee.FirstName).ToArrayAsync());
                 var legacy = await clone.ShiftCorrectionRequests.SingleAsync();
                 Assert.Equal(ShiftCorrectionOperation.ChangeTimes, legacy.Operation);
@@ -343,11 +618,6 @@ public sealed class DatabaseMigrationStartupTests
             return (await command.ExecuteScalarAsync())?.ToString();
         }
 
-        static async Task<byte[]> HashAsync(string path)
-        {
-            await using var file = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
-            return await SHA256.HashDataAsync(file);
-        }
     }
 
     [Fact]
@@ -709,6 +979,12 @@ public sealed class DatabaseMigrationStartupTests
         var root = Path.Combine(Path.GetTempPath(), "GF3.Tests", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
         return root;
+    }
+
+    private static async Task<byte[]> HashAsync(string path)
+    {
+        await using var file = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+        return await SHA256.HashDataAsync(file);
     }
 
     private static void DirectoryCopy(string source, string destination)

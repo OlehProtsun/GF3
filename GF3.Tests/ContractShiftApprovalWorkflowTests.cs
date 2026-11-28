@@ -50,7 +50,13 @@ public sealed class ContractShiftApprovalWorkflowTests
             RequestKind = "exchange", ReturnOriginalDayOfMonth = 7, ReturnYear = 2027, ReturnMonth = 1,
             ReturnFromTime = "10:00", ReturnToTime = "16:00" };
         db.Add(request); slot.EmployeeId = f.Third; await db.SaveChangesAsync();
-        var dto = Assert.Single(await ContractTestFactory.Approvals(db).GetGraphRequestsAsync(f.Container, f.SourceSchedule));
+        var approvals = ContractTestFactory.Approvals(db);
+        var dto = Assert.Single(await approvals.GetGraphRequestsAsync(f.Container, f.SourceSchedule));
+        var exact = await approvals.GetGraphRequestAsync(f.Container, f.SourceSchedule, request.Id);
+        Assert.Equivalent(dto, exact);
+        await Assert.ThrowsAsync<KeyNotFoundException>(() => approvals.GetGraphRequestAsync(f.Container + 1, f.SourceSchedule, request.Id));
+        await Assert.ThrowsAsync<KeyNotFoundException>(() => approvals.GetGraphRequestAsync(f.Container, f.SourceSchedule + 1, request.Id));
+        await Assert.ThrowsAsync<KeyNotFoundException>(() => approvals.GetGraphRequestAsync(f.Container, f.SourceSchedule, request.Id + 1));
         Assert.Equal(kind == "claim" ? managerCreated || missingOffer ? (int?)null : f.Owner : f.Owner, dto.FromEmployeeId);
         Assert.Equal(kind == "claim" ? f.Target : privateOffer ? f.Target : (int?)null, dto.ToEmployeeId);
         if (dto.FromEmployeeId.HasValue) Assert.Equal("Worker1 Test", dto.FromEmployeeName); else Assert.Null(dto.FromEmployeeName);

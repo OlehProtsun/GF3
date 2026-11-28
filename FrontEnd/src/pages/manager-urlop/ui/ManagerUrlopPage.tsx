@@ -102,7 +102,6 @@ export function ManagerUrlopPage() {
   useEffect(() => {
     if (!editorOpen) return;
     const previousOverflow = document.body.style.overflow;
-    const fallbackFocus = addButton.current;
     document.body.style.overflow = "hidden";
     const siblings = [...document.body.children].filter((element): element is HTMLElement => element instanceof HTMLElement && element !== layer.current);
     const previousInert = siblings.map(element => element.inert);
@@ -110,10 +109,14 @@ export function ManagerUrlopPage() {
     return () => {
       document.body.style.overflow = previousOverflow;
       siblings.forEach((element, index) => { element.inert = previousInert[index]; });
-      const target = invoker.current?.isConnected ? invoker.current : fallbackFocus;
-      target?.focus();
     };
   }, [editorOpen]);
+  useEffect(() => {
+    if (editorOpen || busy || !data || !invoker.current) return;
+    const target = invoker.current.isConnected ? invoker.current : addButton.current;
+    invoker.current = null;
+    target?.focus();
+  }, [editorOpen, busy, data]);
   useEffect(() => {
     if (!editorOpen) return;
     const dialogs = layer.current?.querySelectorAll<HTMLElement>('[role="dialog"]');

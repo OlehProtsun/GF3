@@ -16,6 +16,12 @@ public sealed class ManagerContractShiftApprovalsController(ContractShiftApprova
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<ContractShiftApprovalDto>>> Get(int containerId, int graphId, CancellationToken ct)
         => Ok(await service.GetGraphRequestsAsync(containerId, graphId, ct));
+
+    [HttpGet("{id:int}")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    public async Task<ActionResult<ContractShiftApprovalDto>> GetGraphRequest(int containerId, int graphId, int id, CancellationToken ct)
+        => Ok(await service.GetGraphRequestAsync(containerId, graphId, id, ct));
+
     [HttpPost("{id:int}/approve")]
     public async Task<ActionResult<ContractShiftApprovalDto>> Approve(int containerId, int graphId, int id, CancellationToken ct)
     {

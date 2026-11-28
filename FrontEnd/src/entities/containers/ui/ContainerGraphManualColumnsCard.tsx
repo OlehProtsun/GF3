@@ -6,7 +6,7 @@ import type { Employee } from "@entities/employees";
 import type { ShiftSwap } from "@entities/shift-swaps";
 import { IosButton } from "@shared/ui/components/IosButton";
 import { SearchableSelect, type SearchableSelectOption } from "@shared/ui/components/SearchableSelect";
-import { CheckIcon, ChevronRightIcon, ClockIcon, CloseIcon, PlusIcon, InformationIcon, ShareIcon, SwapHistoryIcon } from "@shared/ui/icons";
+import { CheckIcon, ChevronRightIcon, ClockIcon, CloseIcon, InformationIcon, ShareIcon, SwapHistoryIcon } from "@shared/ui/icons";
 import { CardSection } from "@shared/ui/sections/CardSection";
 import activity from "./ContainerGraphActivity.module.css";
 import styles from "./ContainerGraphManualColumnsCard.module.css";
@@ -49,8 +49,6 @@ type ContainerGraphManualColumnsCardProps = {
   publishedShifts?: ShiftSwap[];
   pendingPublishedShifts?: PendingManualColumnShiftPublication[];
   headerRightSlot?: ReactNode;
-  onAddColumn: () => void;
-  onDeleteColumn: (columnId: number) => void;
   onPublishShift: (input: ManualColumnShiftPublicationInput) => void;
   onCancelPublishedShift?: (shiftId: number) => void;
   onRefreshPublishedShift?: (shift: ShiftSwap) => void;
@@ -87,7 +85,7 @@ export function ContainerGraphManualColumnsCard({
   columns, allowSwap = true, isSchedulePublished = true, year, month, employees,
     isPublishingShift = false, isCancellingPublishedShift = false, refreshingPublishedShiftId = null, refreshedPublishedShiftId = null, publishError = null,
   publishedShifts = [], pendingPublishedShifts = [], headerRightSlot,
-    onAddColumn, onDeleteColumn, onPublishShift, onCancelPublishedShift, onRefreshPublishedShift, onCancelPendingPublishedShift,
+    onPublishShift, onCancelPublishedShift, onRefreshPublishedShift, onCancelPendingPublishedShift,
 }: ContainerGraphManualColumnsCardProps) {
   useLanguageRevision();
   const groups = columns.map((column, index) => ({ columnLabel: column.label.trim() || t("Manual column {0}", index + 1) }));
@@ -134,21 +132,6 @@ export function ContainerGraphManualColumnsCard({
       </>}>
       <div className={`${activity.stack} ${styles.layout}`}>
         <p className={styles.muted}>{t("Select a shift and publish it for employees to claim.")}</p>
-        <section className={styles.panel} aria-label={t("Columns")}>
-          <div className={styles.heading}><span>{t("Columns")} <span className={styles.badge}>{columns.length}</span></span>
-            <IosButton className={styles.addButton} label={t("Add")} icon={<PlusIcon size={16} />} size="compact" variant="secondary" onClick={onAddColumn} />
-          </div>
-          {columns.length === 0 ? <p className={activity.state}>{t("No manual columns yet.")}</p> : (
-            <div className={styles.list}>{columns.map((column, index) => (
-              <div key={column.columnId} className={styles.column}>
-                <span className={styles.columnName} title={t("Edit header and values in the grid")}>{groups[index].columnLabel}</span>
-                <span className={styles.badge}>{options.filter(option => option.manualColumnId === column.columnId).length}</span>
-                {column.source === "generated-unfilled" ? <span className={styles.autoBadge}>{t("Auto")}</span> : null}
-                <button type="button" className={styles.quietButton} aria-label={t("Delete {0}", groups[index].columnLabel)} onClick={() => onDeleteColumn(column.columnId)}><CloseIcon size={14} /></button>
-              </div>
-            ))}</div>
-          )}
-        </section>
         <section className={styles.panel}>
           <div className={styles.heading}><span>{t("Available shifts")} <span className={styles.badge}>{options.length}</span></span></div>
           {options.length === 0 ? <p className={activity.state}>{t("No available shifts. Enter a time range in the matrix.")}</p> : (

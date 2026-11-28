@@ -45,7 +45,7 @@ for (const role of ["manager", "employee"]) {
         await expect(page.getByRole("dialog", { name: "Developer access" }).locator('[class*="surface_"]')).toBeInViewport({ ratio: 1 });
         await page.goto("/manager-profile");
         await page.getByRole("button", { name: "Open notepad", exact: true }).click();
-        await expect(page.getByRole("complementary", { name: "Manager notepad", exact: true })).toBeInViewport({ ratio: 1 });
+        await expect(page.getByRole("dialog", { name: "Manager notepad", exact: true })).toBeInViewport({ ratio: 1 });
       }
     }
     expect(errors).toEqual([]);

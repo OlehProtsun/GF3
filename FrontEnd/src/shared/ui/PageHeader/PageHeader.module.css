@@ -339,6 +339,11 @@
   margin-left: auto;
 }
 
+:global([data-compact-docked-workspace]) .actions {
+  min-width: 0;
+  max-width: 100%;
+}
+
 @media (max-width: 1024px) {
   .utilityGroup {
     flex: 1 1 100%;

@@ -335,6 +335,8 @@ for (const throttle of [false, true]) test(`editor tab round trips preserve a te
   const { go } = fixture;
   await page.goto(tabEditorUrl(42));
   await expect(scheduleCell(page, "1:12")).toContainText("08:00 - 12:00");
+  await expect(scheduleCell(page, "2:12")).toContainText("Graph 35");
+  await expect(scheduleCell(page, "3:12")).toContainText("Graph 31");
   const clean = await matrixState(page);
   await fixture.startRecording();
   await go(35);
@@ -425,6 +427,7 @@ for (const failure of ["500", "timeout", "canceled"] as const) test(`editor tab 
 test("50 switches and realtime refresh preserve text, time and color drafts through one Save", async ({ page, baseURL }, testInfo) => {
   desktopOnly(testInfo.project.name);
   test.setTimeout(65_000);
+  await page.clock.setFixedTime(new Date("2026-11-26T12:00:00Z"));
   const fixture = await openTabFixture(page, baseURL!);
   await page.goto(tabEditorUrl(42));
   await expect.poll(fixture.connected).toBe(true);

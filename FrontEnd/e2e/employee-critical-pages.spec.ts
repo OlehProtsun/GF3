@@ -10,7 +10,7 @@ import {
 const employeeRoutes = [
   { path: "/", text: "Inbox" },
   { path: "/availability", text: "No active windows" },
-  { path: "/schedule", text: "No published schedules" },
+  { path: "/schedule", text: "No published schedules assigned to you" },
   { path: "/swap", text: "Open swaps" },
   { path: "/profile", text: "Recovery email" },
 ] as const;

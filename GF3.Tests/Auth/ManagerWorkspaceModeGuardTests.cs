@@ -29,6 +29,24 @@ public sealed class ManagerWorkspaceModeGuardTests
             var response = await host.Client.SendAsync(new HttpRequestMessage(method, path) { Content = JsonContent.Create(body) });
             Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
         }
+        foreach (var (method, path) in new[]
+        {
+            (HttpMethod.Put, "/api/containers/1/graphs/1"),
+            (HttpMethod.Put, "/api/shops/1"),
+            (HttpMethod.Post, "/api/availability-groups/save-graph"),
+            (HttpMethod.Post, "/api/containers/1/graphs/1/shift-corrections/1/approve"),
+            (HttpMethod.Post, "/api/manager-notepad/notes/0/edit-session"),
+            (HttpMethod.Put, "/api/manager-notepad/notes/1/edit-session/extra"),
+            (HttpMethod.Put, "/api/manager-notepad/notes/1/metadata"),
+            (HttpMethod.Post, "/api/manager-notepad/notes/1/restore/0"),
+            (HttpMethod.Post, "/api/manager-notepad/notes/1/restore/1/extra"),
+        })
+        {
+            using var request = new HttpRequestMessage(method, path);
+            using var response = await host.Client.SendAsync(request);
+            Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+            Assert.Equal("manager_phone_read_only", (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("code").GetString());
+        }
         Assert.Equal(before, await State(host));
         await host.Exchange("pc");
         Assert.Equal(HttpStatusCode.OK, (await host.Client.PostAsync("/api/guard-write", null)).StatusCode);
@@ -49,6 +67,7 @@ public sealed class ManagerWorkspaceModeGuardTests
         if (mode == "phone") await host.Exchange(mode);
         var id = await host.Publish("1.0");
         Assert.Equal((HttpStatusCode)428, (await host.Client.GetAsync("/api/containers")).StatusCode);
+        Assert.Equal((HttpStatusCode)428, (await host.Client.GetAsync("/api/manager-notepad")).StatusCode);
         foreach (var path in new[] { "/api/regulations/pending", "/api/regulations/history/me", $"/api/regulations/{id}/pdf", "/api/auth/session" })
             Assert.Equal(HttpStatusCode.OK, (await host.Client.GetAsync(path)).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await host.Client.PostAsync($"/api/regulations/{id}/accept", null)).StatusCode);
@@ -62,6 +81,15 @@ public sealed class ManagerWorkspaceModeGuardTests
     [InlineData("phone", "HEAD", "/api/employees", true)]
     [InlineData("phone", "OPTIONS", "/api/employees", true)]
     [InlineData("phone", "POST", "/api/auth/manager-mode", true)]
+    [InlineData("phone", "POST", "/API/REALTIME/PRESENCE/NEGOTIATE/", true)]
+    [InlineData("phone", "POST", "/api/realtime/presence", true)]
+    [InlineData("phone", "DELETE", "/api/realtime/presence/", true)]
+    [InlineData("phone", "DELETE", "/api/realtime/presence/negotiate", false)]
+    [InlineData("phone", "PUT", "/api/realtime/presence", false)]
+    [InlineData("phone", "POST", "/api/realtime/presence/negotiate/extra", false)]
+    [InlineData("phone", "POST", "/api/realtime/presence-other", false)]
+    [InlineData("choose", "POST", "/api/realtime/presence/negotiate", false)]
+    [InlineData("choose", "DELETE", "/api/realtime/presence", false)]
     [InlineData("choose", "POST", "/API/AUTH/MANAGER-MODE", true)]
     [InlineData("choose", "GET", "/api/auth/session", true)]
     [InlineData("choose", "GET", "/api/regulations/pending", true)]

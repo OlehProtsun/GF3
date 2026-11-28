@@ -21,12 +21,13 @@ type ScheduleSwap = { swap: ShiftSwap; legs: SwapLeg[] };
 export type ScheduleShiftStatus = {
   label: string;
   correctionPending?: boolean;
+  correctionApproved?: boolean;
   open: ScheduleSwap[];
   accepted: ScheduleSwap[];
 };
 
 export function getScheduleStatusTone(status: ScheduleShiftStatus) {
-  return status.correctionPending ? "correction" : status.open.length ? "open" : "accepted";
+  return status.correctionPending ? "correction" : status.open.length ? "open" : status.correctionApproved ? "corrected" : "accepted";
 }
 
 function savedOriginalInterval(
@@ -84,6 +85,12 @@ export function buildScheduleShiftStatuses(
   }
 
   for (const day of correctionDays) getStatus(day, employeeId, employeeName).correctionPending = true;
+  const daysInMonth = new Date(Date.UTC(schedule.year, schedule.month, 0)).getUTCDate();
+  for (const day of schedule.approvedCorrectionDays ?? []) {
+    if (Number.isInteger(day) && day > 0 && day <= daysInMonth) {
+      getStatus(day, employeeId, employeeName).correctionApproved = true;
+    }
+  }
 
   const slotsById = new Map(schedule.slots.map(slot => [slot.id, slot]));
   for (const swap of swaps) {

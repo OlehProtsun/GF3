@@ -1,9 +1,20 @@
 import { beforeEach, describe, expect, test } from "vitest";
 import { setLanguage } from "@shared/i18n";
 import type { HomeActivityKind, ManagerHomeActivityItem } from "../api/managerHomeActivityApi";
-import { getHomeActivityPresentation, getHomeActivityRoute, getWarsawShiftStatus, moveSelectedDay, parseHomeDay, setSelectedMonth, warsawToday } from "./homeActivity";
+import { getHomeActivityPresentation, getHomeActivityRoute, getHomeApprovalTarget, getWarsawShiftStatus, moveSelectedDay, parseHomeDay, setSelectedMonth, warsawToday } from "./homeActivity";
 const item: ManagerHomeActivityItem = { id: "event:1", kind: "swap_created", occurredAtUtc: "2026-11-04T10:00:00Z", employeeName: "Actual Person", status: "open", requiresApproval: false, targetType: "graph", containerId: 8, graphId: 20, shopName: "Shop", shiftDate: "2026-11-06", fromTime: "08:00", toTime: "16:00" };
 beforeEach(() => setLanguage("en"));
+test("only actionable pending graph requests have an exact Home review target", () => {
+ const pending = { ...item, requestId: 11, requiresApproval: true, status: "pending", kind: "correction_requested" as const };
+ const target = { kind: "correction", containerId: 8, graphId: 20, requestId: 11 };
+ expect(getHomeApprovalTarget(pending)).toEqual(target);
+ expect(getHomeApprovalTarget({ ...pending, kind: "day_off_requested" })).toEqual(target);
+ expect(getHomeApprovalTarget({ ...pending, kind: "approval_requested" })).toEqual({ ...target, kind: "contract" });
+ for (const invalid of [{ status: "approved" }, { requiresApproval: false }, { requestId: null }, { containerId: 0 },
+   { graphId: 1.5 }, { targetType: "urlop" as const }, { kind: "swap_created" as const }]) {
+   expect(getHomeApprovalTarget({ ...pending, ...invalid })).toBeNull();
+ }
+});
 test("routes use distinct owning IDs and validate all destinations", () => {
   expect(getHomeActivityRoute(item)).toBe("/container/8/graphs/20");
   expect(getHomeActivityRoute({ ...item, containerId: 0 })).toBeNull();

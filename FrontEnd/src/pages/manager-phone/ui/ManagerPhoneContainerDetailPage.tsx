@@ -36,7 +36,7 @@ export function ManagerPhoneContainerDetailPage() {
   const shopsById = new Map((shops.data ?? []).map(item => [item.id, item]));
   const summaries = filterGraphSummaries(buildContainerGraphSummaries(graphs, records.data ?? {}, shopsById), search);
   const statistics = buildContainerStatistics({ graphs, graphRecordsById: records.data ?? {}, shopsById, employeesById: new Map((employees.data ?? []).map(item => [item.id, item])), approvedUrlopDays: urlop.data });
-  return <ManagerPhonePage backTo="/container" valid={id !== null} missing={!container.data} query={search} onQueryChange={setSearch}
+  return <ManagerPhonePage title={container.data?.name || t("Container")} backTo="/container" valid={id !== null} missing={!container.data} query={search} onQueryChange={setSearch}
     queries={[container, graphsQuery, employees, shops, records, urlop]} queryKeys={[queryKeys.containers.all, queryKeys.employees.all, queryKeys.shops.all, queryKeys.urlop.all]}>
     <div className={styles.tiles}>
       {summaries.map(item => (

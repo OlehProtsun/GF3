@@ -45,7 +45,12 @@ public sealed class RealtimeNotifier(IHubContext<EmployeePresenceHub, IEmployeeP
         string reason,
         int? containerId = null,
         int? graphId = null)
-        => (resourceType == "employee-launches" ? hubContext.Clients.Group(EmployeePresenceHub.SystemManagersGroupName) : hubContext.Clients.All)
+        => (resourceType switch
+        {
+            "employee-launches" => hubContext.Clients.Group(EmployeePresenceHub.SystemManagersGroupName),
+            "manager-notepad" => hubContext.Clients.Group(EmployeePresenceHub.ManagersGroupName),
+            _ => hubContext.Clients.All,
+        })
             .ManagerDataChanged(new ManagerDataChangedMessage
         {
             ResourceType = resourceType,

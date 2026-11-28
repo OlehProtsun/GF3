@@ -132,7 +132,7 @@ class ManagedDeploymentTests(unittest.TestCase):
         root = root or self.root
         file = root / path
         file.parent.mkdir(parents=True, exist_ok=True)
-        file.write_text(contents, encoding="utf-8")
+        file.write_text(contents, encoding="utf-8", newline="\n")
         self.git("add", path, root=root)
         self.git("commit", "-m", path, root=root)
         return self.git("rev-parse", "HEAD", root=root).strip()
@@ -421,6 +421,71 @@ class ManagedDeploymentTests(unittest.TestCase):
         rehearse.assert_called_once_with(target, deploy=True)
         self.engine.assert_not_called()
         self.assertEqual(self.approval.read_bytes(), self.approval_contents)
+
+    def test_new_standalone_source_dispatches_and_unsupported_source_cannot_deploy(self):
+        before = "20260101000000_Initial"
+        self.current = self.commit_file(f"{maintenance.MIGRATIONS}/{before}.cs", f'[Migration("{before}")]\n')
+        release.store(self.previous / "release.json", {"sha": self.current, "baseline": BASELINE})
+        self.git("push", "origin", "PROD2")
+        self.git("pull", "--ff-only", root=self.writer)
+        extra = "20261126190000_Unsupported"
+        target = self.push(f"{maintenance.MIGRATIONS}/{extra}.cs", f'[Migration("{extra}")]\n')
+        with patch.object(prepare, "maintenance_rehearse", return_value=0) as rehearse:
+            self.assertEqual(prepare.prepare(False), 0)
+        rehearse.assert_called_once_with(target, deploy=True)
+        with (patch.object(release, "maintenance_tool", return_value=maintenance),
+              patch.object(prepare, "MAINTENANCE_TOOLING_REVIEW", self.base / "no-tooling-review"),
+              patch.object(release, "preflight") as preflight):
+            with self.assertRaisesRegex(release.ReleaseError, "complete, append-only EF migration pairs"):
+                prepare.prepare(True)
+        preflight.assert_not_called()
+        self.engine.assert_not_called()
+        self.assertEqual(self.approval.read_bytes(), self.approval_contents)
+
+    def test_notepad_rehearsal_selects_protected_review_and_verifies_both_modes(self):
+        predecessor = maintenance.NOTEPAD_SCHEMA_PREFIX_CONTRACTS[0]["migrationId"]
+        self.current = self.commit_file(f"{maintenance.MIGRATIONS}/{predecessor}.cs", f'[Migration("{predecessor}")]\n')
+        release.store(self.previous / "release.json", {"sha": self.current, "baseline": BASELINE})
+        self.git("push", "origin", "PROD2")
+        self.git("pull", "--ff-only", root=self.writer)
+        source_root = Path(__file__).resolve().parents[3]
+        for migration in maintenance.NOTEPAD_RELEASE_MIGRATIONS:
+            path = f"{maintenance.MIGRATIONS}/{migration}.cs"
+            self.push(path, (source_root / path).read_text(encoding="utf-8"))
+        target = self.push(prepare.HELPER_PATH, "synthetic reviewed helper")
+        helper_blob = self.git("rev-parse", f"{target}:{prepare.HELPER_PATH}", root=self.writer).strip()
+        review = self.base / "protected-tooling-review.json"
+        contents = json.dumps({"before": self.current, "target": target, "blobs": {prepare.HELPER_PATH: helper_blob},
+                               "reviewed_build_inputs": {}})
+        review.write_text(contents, encoding="utf-8")
+        review.chmod(0o600)
+        with (patch.object(maintenance, "NOTEPAD_RELEASE_BASELINE", self.current),
+              patch.object(prepare, "MAINTENANCE_TOOLING_REVIEW", review),
+              patch.object(prepare, "MAINTENANCE_REVIEW", self.base / "nonreviewed-plan.json"),
+              patch.object(release, "maintenance_tool", return_value=maintenance),
+              patch.object(release, "preflight"),
+              patch.object(release, "fence_rules", return_value="disposable rules"),
+              patch.object(release, "maintenance_database", return_value=self.root / "fixture.db"),
+              patch.object(maintenance, "image_id", return_value="sha256:" + "f" * 64),
+              patch.object(maintenance, "snapshot"), patch.object(maintenance, "copy_media_snapshot"),
+              patch.object(maintenance, "rehearse") as rehearse,
+              patch.object(prepare.sys.stdin, "isatty", return_value=True),
+              patch("builtins.input", side_effect=["yes", target])):
+            self.assertEqual(prepare.prepare(True), 0)
+            rehearse.assert_not_called()
+            self.assertIn("Pending migrations (2)", self.output.getvalue())
+            self.assertEqual(prepare.maintenance_rehearse(target), 0)
+            self.assertEqual(rehearse.call_args.kwargs, {"verify_modes": True})
+            plan = rehearse.call_args.args[-1]
+            self.assertEqual(plan.migrations, maintenance.NOTEPAD_RELEASE_MIGRATIONS)
+            self.assertEqual(plan.target, target)
+            review.write_text(contents.replace(target, "0" * 40), encoding="utf-8")
+            with self.assertRaisesRegex(release.ReleaseError, "does not match this transition"):
+                prepare.prepare(True)
+        self.engine.assert_not_called()
+        self.confirm.assert_not_called()
+        self.assertEqual(self.approval.read_bytes(), self.approval_contents)
+        self.assertEqual(list(self.state.glob("maintenance-*/capability.json")), [])
 
     def test_supported_migration_passes_classification_and_preflight(self):
         migration = f"{maintenance.MIGRATIONS}/20260101000000_Initial.Designer.cs"

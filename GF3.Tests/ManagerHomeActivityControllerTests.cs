@@ -105,9 +105,11 @@ public sealed class ManagerHomeActivityControllerTests
     {
         await using var database = await SqliteTestDatabase.CreateAsync(); await using var db = database.CreateContext(); await Seed(db);
         var correction = Correction(1, 1, ShiftCorrectionStatus.Approved); correction.ScheduleSlotId = 1; correction.OriginalFromTime = "08:00"; correction.OriginalToTime = "16:00"; correction.ReviewedAtUtc = Stamp.AddHours(1);
-        db.Add(correction); db.Add(Correction(1, 2, ShiftCorrectionStatus.Pending, Stamp.AddMonths(-2)));
+        var dayOff = Correction(1, 2, ShiftCorrectionStatus.Pending, Stamp.AddMonths(-2));
+        db.Add(correction); db.Add(dayOff);
         db.Add(Correction(2, 3, ShiftCorrectionStatus.Rejected));
-        db.Add(new ContractShiftApprovalRequestModel { EmployeeId = 1, ScheduleId = 2, ScheduleSlotId = 2, ShopId = 1, Year = 2026, Month = 11, OriginalDayOfMonth = 4, FromTime = "08:00", ToTime = "16:00", OriginalFromTime = "08:00", OriginalToTime = "16:00", CreatedAtUtc = Stamp });
+        var approval = new ContractShiftApprovalRequestModel { EmployeeId = 1, ScheduleId = 2, ScheduleSlotId = 2, ShopId = 1, Year = 2026, Month = 11, OriginalDayOfMonth = 4, FromTime = "08:00", ToTime = "16:00", OriginalFromTime = "08:00", OriginalToTime = "16:00", CreatedAtUtc = Stamp };
+        db.Add(approval);
         db.Add(new AvailabilityGroupMemberModel { AvailabilityGroupId = 1, EmployeeId = 1, EmployeeLastModifiedAtUtc = Stamp });
         var requestId = Guid.NewGuid();
         for (var day = 10; day <= 12; day++) db.Add(new UrlopDayModel { RequestId = requestId, EmployeeId = 1, ShopId = 1, Date = new(2026, 12, day), Status = "pending", CreatedAtUtc = Stamp });
@@ -126,11 +128,16 @@ public sealed class ManagerHomeActivityControllerTests
         Assert.All(corrections.Items, item => Assert.True(item.Kind.StartsWith("correction_") || item.Kind.StartsWith("day_off_")));
         Assert.All(pending.Items, item => { Assert.True(item.RequiresApproval); Assert.Equal("pending", item.Status); });
         Assert.Contains(pending.Items, item => item.OccurredAtUtc.Month == 9);
+        Assert.Equal(dayOff.Id, Assert.Single(pending.Items, item => item.Kind == "day_off_requested").RequestId);
+        Assert.Equal(approval.Id, Assert.Single(pending.Items, item => item.Kind == "approval_requested").RequestId);
         Assert.Single(all.Items, x => x.Kind == "availability_updated");
         var vacation = Assert.Single(all.Items, x => x.Kind == "urlop_requested");
         Assert.Equal(3, vacation.VacationDays!.Count); Assert.Equal(12, vacation.Month); Assert.Equal(2026, vacation.Year); Assert.Equal(requestId.ToString(), vacation.Id[14..]);
         Assert.Single(all.Items, x => x.Kind == "urlop_manager_created"); Assert.Single(all.Items, x => x.Kind == "urlop_reviewed");
         var reviewed = Assert.Single(all.Items, x => x.Kind == "correction_reviewed"); Assert.Equal("approved", reviewed.Status); Assert.False(reviewed.RequiresApproval);
+        Assert.Equal(correction.Id, reviewed.RequestId);
+        Assert.Null(vacation.RequestId);
+        Assert.Null(Assert.Single(all.Items, x => x.Kind == "availability_updated").RequestId);
         Assert.All(all.Items.Where(x => x.TargetType == "graph"), item => Assert.Equal(item.GraphId == 1 ? 1 : 2, item.ContainerId));
         Assert.Empty(db.ChangeTracker.Entries()); Assert.Equal(4, await db.UrlopDays.CountAsync());
     }

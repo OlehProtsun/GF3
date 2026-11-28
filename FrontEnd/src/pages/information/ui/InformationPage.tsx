@@ -1,5 +1,8 @@
-import { t, translateServerMessage } from "@shared/i18n";
-import { useMemo, useState } from "react";
+import { getLocale, t, translateServerMessage } from "@shared/i18n";
+import { useId, useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useEmployeesListQuery } from "@entities/employees/api/queries";
+import { useManagerListQuery } from "@features/manager-profile/api/queries";
 import {
   useBulkDeleteWorkflowLogsMutation,
   useDeleteWorkflowLogMutation,
@@ -12,8 +15,10 @@ import {
 } from "@entities/workflow-logs";
 import { AvailabilityDateTimeField } from "@entities/availability-groups";
 import { getErrorMessage } from "@shared/api/httpClient";
+import { queryKeys } from "@shared/api/queryKeys";
 import { ConfirmDialog } from "@shared/ui/ConfirmDialog";
 import { PageHeader } from "@shared/ui/PageHeader";
+import { PresenceBadge } from "@shared/ui/components/PresenceBadge";
 import { CloseIcon, InformationIcon, MonitorIcon, SearchIcon, SmartphoneIcon } from "@shared/ui/icons";
 import {
   formatWorkflowLogTime,
@@ -36,6 +41,20 @@ type DeleteIntent =
   | { kind: "bulk"; payload: WorkflowLogBulkDeleteRequest; title: string; message: string; confirmText: string };
 
 export function InformationPage() {
+  const onlineTitleId = useId();
+  const client = useQueryClient();
+  const employees = useEmployeesListQuery();
+  const managers = useManagerListQuery();
+  const employeesLoaded = employees.data !== undefined && !employees.isLoading && !employees.error;
+  const managersLoaded = managers.data !== undefined && !managers.isLoading && !managers.error;
+  const presenceLoaded = employeesLoaded && managersLoaded;
+  const onlineUsers = [
+    ...(employeesLoaded ? employees.data ?? [] : []).filter(employee => employee.isOnline === true)
+      .map(employee => ({ id: employee.id, name: `${employee.firstName} ${employee.lastName}`.trim(), role: "employee" })),
+    ...(managersLoaded ? managers.data ?? [] : []).filter(manager => manager.isOnline === true)
+      .map(manager => ({ id: manager.id, name: manager.displayName?.trim() || manager.userName, role: "manager" })),
+  ].sort((a, b) => a.name.localeCompare(b.name, getLocale(), { sensitivity: "base" }) ||
+    a.role.localeCompare(b.role) || a.id - b.id);
   const logsQuery = useWorkflowLogsQuery();
   const settingsQuery = useWorkflowLogSettingsQuery();
   const updateSettingsMutation = useUpdateWorkflowLogSettingsMutation();
@@ -136,6 +155,31 @@ export function InformationPage() {
   return (
     <div className={styles.page}>
       <PageHeader title={t("Information")} subtitle={t("Employee and manager workflow activity")} backTo={-1} />
+
+      <section className={`${styles.panel} ${styles.onlinePanel}`} aria-labelledby={onlineTitleId}>
+        <div className={styles.panelHeader}>
+          <h2 id={onlineTitleId}>{t("Online users")}</h2>
+          {presenceLoaded && <span className={styles.countPill} aria-label={t("{0} online users", onlineUsers.length)}>{onlineUsers.length}</span>}
+        </div>
+        {(employees.isLoading || managers.isLoading) && <p className={styles.stateText} role="status">{t("Loading online users...")}</p>}
+        {employees.error && <div className={styles.onlineError}>
+          <span role="alert">{t("Employees")} · {getErrorMessage(employees.error, t("Could not load employee presence."))}</span>
+          <button type="button" className={styles.audienceButton} onClick={() => client.invalidateQueries({ queryKey: queryKeys.employees.list() })}>{t("Retry")}</button>
+        </div>}
+        {managers.error && <div className={styles.onlineError}>
+          <span role="alert">{t("Managers")} · {getErrorMessage(managers.error, t("Could not load manager presence."))}</span>
+          <button type="button" className={styles.audienceButton} onClick={() => client.invalidateQueries({ queryKey: queryKeys.managerProfile.list() })}>{t("Retry")}</button>
+        </div>}
+        {onlineUsers.length > 0 && <div className={styles.onlineTableWrapper}>
+          <table className={styles.onlineTable} aria-labelledby={onlineTitleId}>
+            <thead><tr><th scope="col">{t("Name")}</th><th scope="col">{t("Role")}</th><th scope="col">{t("Status")}</th></tr></thead>
+            <tbody>{onlineUsers.map(user => <tr key={`${user.role}:${user.id}`}>
+              <td>{user.name}</td><td>{getRoleLabel(user.role)}</td><td><PresenceBadge tone="online" size="sm" label={t("Online")} /></td>
+            </tr>)}</tbody>
+          </table>
+        </div>}
+        {presenceLoaded && onlineUsers.length === 0 && <p className={styles.stateText}>{t("No users online.")}</p>}
+      </section>
 
       <section className={styles.panel}>
         <div className={styles.panelHeader}>

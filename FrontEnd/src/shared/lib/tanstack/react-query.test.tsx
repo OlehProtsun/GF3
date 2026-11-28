@@ -305,6 +305,33 @@ describe("react-query shim", () => {
     expect(onError.mock.calls[0][1]).toEqual({ queryKey: ["items"] });
   });
 
+  test("preserves confirmed data until one refetch settles after in-flight invalidations", async () => {
+    const client = new QueryClient();
+    const key = ["items", 1];
+    const unrelated = ["items", 2];
+    client.setQueryData(key, "confirmed");
+    client.setQueryData(unrelated, "sibling");
+    const replies: Array<(data: string) => void> = [];
+    const queryFn = vi.fn(() => new Promise<string>(resolve => replies.push(resolve)));
+    renderWithClient(client, <QueryHarness queryKey={key} queryFn={queryFn} />);
+
+    expect(queryFn).toHaveBeenCalledTimes(1);
+    act(() => {
+      client.invalidateQueries({ queryKey: key, exact: true });
+      client.invalidateQueries({ queryKey: key, exact: true });
+    });
+    expect(client.getQueryState(unrelated).updatedAt).toBeGreaterThan(0);
+    expect(queryFn).toHaveBeenCalledTimes(1);
+    await act(async () => { replies[0]("stale"); });
+    expect(queryFn).toHaveBeenCalledTimes(2);
+    expect(screen.getByLabelText("data")).toHaveTextContent("confirmed");
+    expect(client.getQueryState(key).data).toBe("confirmed");
+
+    await act(async () => { replies[1]("fresh"); });
+    expect(screen.getByLabelText("data")).toHaveTextContent("fresh");
+    expect(queryFn).toHaveBeenCalledTimes(2);
+  });
+
   test("useQuery cancels in-flight work on unmount when requested", async () => {
     const client = new QueryClient();
     let signal: AbortSignal | null = null;

@@ -60,6 +60,17 @@ Base path: `/api`
 | AdminDb | POST | `/api/admin/db/execute` | `{sql}` | `{affectedRows:number}` | loopback + `X-Admin-Token`, feature flag + write flag | 400,403,404,500 | ✅ mutation |
 | AdminDb | POST | `/api/admin/db/import` | multipart `file` | import result object | loopback + `X-Admin-Token`, feature flag + write flag | 400,403,404,500 | ✅ mutation |
 | Health | GET | `/api/health` | - | `{status,canConnect}` | none | 500 | ✅ query |
+| EmployeeSchedules | GET | `/api/employee-schedules` | - | `EmployeeScheduleDto[]` with `approvedCorrectionDays` | Employee | 400,401,403 | Own schedule matrix and daily view |
+| EmployeeShiftCorrections | GET | `/api/employee-shift-corrections/schedules` | - | `ShiftCorrectionScheduleDto[]` | Active employee | 400,401,403 | Correction wizard |
+| ManagerShiftCorrections | GET | `/api/containers/{containerId}/graphs/{graphId}/shift-corrections/{id}` | path IDs | `ShiftCorrectionRequestDto` | Manager | 401,403,404 | Focused Home review |
+| ManagerContractShiftApprovals | GET | `/api/containers/{containerId}/graphs/{graphId}/shift-swap-approvals/{id}` | path IDs | `ContractShiftApprovalDto` | Manager | 401,403,404 | Focused Home review |
+| ManagerHome | GET | `/api/manager-home/activity` | existing activity filters and paging | `ManagerHomeActivityPageDto` with nullable item `requestId` | Manager | 400,401,403 | Home activity feed |
+
+`approvedCorrectionDays` contains sorted, distinct day numbers from the employee's approved additions, adjustments and removals in each own schedule. Public-preview responses use an empty array and retain their existing browsing policy.
+
+The correction catalog contains every public schedule across containers and months. Each record contains its ID, name, period, publication status, last update and the requester's own slots. An employee can request an addition to a public schedule before joining it. Approval creates any missing membership in the same transaction as the shift. Submission and rejection leave membership unchanged. Adjustment and removal require membership and the employee's own source shifts.
+
+Both focused review routes check the request, graph and container together. The focused routes and catalog send `Cache-Control: no-store`. Existing review POST paths and payloads remain compatible. Activity items use `requestId` for correction and contract sources and retain `id` as the event identifier.
 
 ## Integration status
 

@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { NavLink as Link } from "react-router-dom";
+import { NavLink as Link, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { dateTimeFormat, getLocale, t } from "@shared/i18n";
 import { useLanguageRevision } from "@shared/i18n/useLanguageRevision";
@@ -7,17 +7,18 @@ import { usePageScrollbarHidden } from "@shared/lib/usePageScrollbarHidden";
 import { getErrorMessage } from "@shared/api/httpClient";
 import { queryKeys } from "@shared/api/queryKeys";
 import { ErrorBanner } from "@shared/ui/components/ErrorBanner";
+import { ActionMenu } from "@shared/ui/components/ActionMenu";
 import { SearchableSelect } from "@shared/ui/components/SearchableSelect";
 import { CardSection } from "@shared/ui/sections/CardSection";
 import { PageHeader } from "@shared/ui/PageHeader";
-import { AvailabilityIcon, CheckIcon, ChevronLeftIcon, ChevronRightIcon, ClockIcon, GroupIcon, NoteIcon, ScheduleDetailsIcon, ShopIcon, StatisticsIcon, SwapOffersIcon, WarnIcon } from "@shared/ui/icons";
+import { AvailabilityIcon, CheckIcon, ChevronLeftIcon, ChevronRightIcon, ClockIcon, ExternalLinkIcon, GroupIcon, NoteIcon, RequestReviewIcon, ScheduleDetailsIcon, ScheduleIcon, ShopIcon, StatisticsIcon, SwapOffersIcon, WarnIcon } from "@shared/ui/icons";
 import { managerHomeActivityApi, type HomeActivityTab } from "../api/managerHomeActivityApi";
-import { formatHomeDate, getHomeActivityPresentation, getHomeActivityRoute, getWarsawShiftStatus, moveSelectedDay, parseHomeDay, warsawToday } from "./homeActivity";
-import { loadHomeDashboard } from "./homeDashboard";
+import { formatHomeDate, getHomeActivityPresentation, getHomeActivityRoute, getHomeApprovalTarget, moveSelectedDay, parseHomeDay, warsawToday, type HomeApprovalTarget } from "./homeActivity";
+import { getHomeDashboardQuery, getHomeEmployeeInitials, getHomeScheduleRows, getHomeShiftStatusLabel } from "./homeSchedule";
+import { HomeApprovalDialog } from "./HomeApprovalDialog";
 import { useHomeActivityQuery } from "./useHomeActivityQuery";
 import styles from "./HomePage.module.css";
 
-const shiftStatusOrder = { in_progress: 0, completed: 1, upcoming: 2 };
 const activityTabs = [
   { value: "all", label: "All Activity", Icon: StatisticsIcon },
   { value: "swaps", label: "Swaps", Icon: SwapOffersIcon },
@@ -40,11 +41,14 @@ function ManagerPcHomePage() {
   useLanguageRevision();
   usePageScrollbarHidden();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [now, setNow] = useState(() => new Date());
   const [selectedDay, setSelectedDay] = useState(() => warsawToday(now));
   const [period, setPeriod] = useState(() => warsawToday(now).slice(0, 7));
   const [selectedShop, setSelectedShop] = useState<number | null>(null);
   const [tab, setTab] = useState<HomeActivityTab>("all");
+  const [activityMenu, setActivityMenu] = useState<{ eventId: string; anchor: HTMLButtonElement; scope: string } | null>(null);
+  const [review, setReview] = useState<{ target: HomeApprovalTarget; anchor: HTMLButtonElement; editorRoute: string } | null>(null);
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const feedRef = useRef<HTMLDivElement>(null);
   const feedContentRef = useRef<HTMLDivElement>(null);
@@ -83,12 +87,8 @@ function ManagerPcHomePage() {
     window.addEventListener("focus", refresh); document.addEventListener("visibilitychange", refresh);
     return () => { window.removeEventListener("focus", refresh); document.removeEventListener("visibilitychange", refresh); };
   }, [queryClient, selectedDay, year, month, tab]);
-  const home = useQuery({ queryKey: queryKeys.home.dashboard(selectedDay), staleTime: 30_000, queryFn: ({ signal }) => loadHomeDashboard(selectedDay, signal) });
-  const filteredRows = (home.data?.todayRows ?? []).filter(row => selectedShop === null || row.shopId === selectedShop);
-  const employeeCount = selectedShop === null ? home.data?.todayActiveEmployeesCount : new Set(filteredRows.map(row => row.employeeId)).size;
-  const todayRows = filteredRows
-    .map(row => ({ row, status: getWarsawShiftStatus(selectedDay, row.fromTime, row.toTime, now) }))
-    .sort((left, right) => shiftStatusOrder[left.status] - shiftStatusOrder[right.status]);
+  const home = useQuery(getHomeDashboardQuery(selectedDay));
+  const { employeeCount, todayRows } = getHomeScheduleRows(home.data, selectedDay, selectedShop, now);
   const activity = useHomeActivityQuery(year, month, tab);
   const counts = activity.data?.pages[0] ??
     queryClient.getQueryState<NonNullable<typeof activity.data>>([...queryKeys.home.activity(), year, month, "all"]).data?.pages[0];
@@ -99,6 +99,12 @@ function ManagerPcHomePage() {
   });
   const requiresApprovalCount = activity.data?.pages[0]?.requiresApprovalCount ?? navBadges.data?.totalPending ?? counts?.requiresApprovalCount;
   const items = activity.data?.pages.flatMap(page => page.items) ?? [];
+  const feedScope = `${period}:${tab}`;
+  const menuItem = activityMenu?.scope === feedScope ? items.find(item => item.id === activityMenu.eventId) : undefined;
+  const menuTarget = menuItem ? getHomeApprovalTarget(menuItem) : null;
+  const menuRoute = menuItem ? getHomeActivityRoute(menuItem) : null;
+  const menuEditorRoute = menuRoute ? `${menuRoute}/edit` : null;
+  if (activityMenu && (!menuTarget || !menuRoute)) setActivityMenu(null);
   const lastOffset = activity.data?.pages.at(-1)?.nextOffset;
   const canLoadMore = activity.hasNextPage && !activity.isError && !activity.isLoading && !activity.isFetching &&
     !activity.isFetchingNextPage && !activity.nextPageError;
@@ -211,9 +217,9 @@ function ManagerPcHomePage() {
       <div className={styles.tableScroll} tabIndex={0} role="region" aria-label={t("Scheduled employees")} aria-busy={home.isLoading}>
         <table className={styles.table}><thead><tr>{[t("Employee"), t("Shift"), t("Shop"), t("Hours"), t("Status")].map(label => <th key={label} scope="col">{label}</th>)}</tr></thead>
           <tbody>{todayRows.map(({ row, status }) => {
-            const label = status === "upcoming" ? t("Upcoming") : status === "in_progress" ? t("In Progress") : t("Completed");
+            const label = getHomeShiftStatusLabel(status);
             const to = `/container/${row.containerId}/graphs/${row.graphId}`;
-            const initials = row.employee.split(/\s+/).filter(Boolean).slice(0, 2).map(part => Array.from(part)[0]).join("").toUpperCase();
+            const initials = getHomeEmployeeInitials(row.employee);
             return <tr key={row.id}>
               <td><Link to={to} className={styles.employeeLink} aria-label={t("Open schedule for {0}: {1}, {2}, {3}", row.employee, row.shift, row.shop, row.dateLabel)}><span className={styles.initials} data-tone={row.employeeId % 3} aria-hidden="true">{initials}</span><strong title={row.employee}>{row.employee}</strong></Link></td>
               <td><Link to={to} tabIndex={-1}><ClockIcon size={15} />{row.shift}</Link></td>
@@ -256,7 +262,7 @@ function ManagerPcHomePage() {
           : value === "approvals" ? requiresApprovalCount : counts?.categoryCounts?.[value]) ?? "—"}</span></button>)}
       </div>
       </div>
-      <p className={styles.scope}>{tab === "approvals" ? t("All outstanding approvals, including earlier months") : t("Events recorded in {0}", periodLabel)}</p>
+      <p className={styles.scope}><ScheduleIcon size={15} aria-hidden="true" />{tab === "approvals" ? t("All outstanding approvals, including earlier months") : t("Events recorded in {0}", periodLabel)}</p>
       {activity.isError && <ErrorBanner dismissible={false}>{getErrorMessage(activity.error, t("Could not load application activity."))}<button className={styles.retry} onClick={activity.refetch}>{t("Retry")}</button></ErrorBanner>}
       <div ref={feedRef} id="home-activity-panel" role="tabpanel" aria-labelledby={`home-tab-${tab}`} className={styles.feed}
         tabIndex={0} aria-busy={activity.isFetching || activity.isFetchingNextPage}
@@ -267,16 +273,31 @@ function ManagerPcHomePage() {
         {items.map(item => {
           const view = getHomeActivityPresentation(item, item.employeeId != null ? home.data?.employees.get(item.employeeId) : undefined);
           const route = getHomeActivityRoute(item);
+          const target = getHomeApprovalTarget(item);
           const Icon = view.iconKind === "swap" ? SwapOffersIcon : view.iconKind === "correction" ? NoteIcon
             : view.iconKind === "availability" ? AvailabilityIcon : ScheduleDetailsIcon;
+          const details = [view.description, item.targetType === "graph" && item.graphId ? t("Schedule #{0}", item.graphId) : null]
+            .filter(Boolean).join(" · ");
           const content = <>
-            <span className={`${styles.eventIcon} ${styles[view.tone]}`}><Icon size={18} /></span>
-            <span className={styles.eventText}><strong>{view.title}</strong><span>{view.description}</span>{!route && <span>{t("This activity's resource is no longer available.")}</span>}</span>
-            <span className={`${styles.status} ${styles[view.tone]}`}>{view.localizedStatus}</span>
+            <span className={`${styles.eventIcon} ${styles[view.tone]}`} aria-hidden="true"><Icon size={19} /></span>
+            <span className={styles.eventText}><strong>{view.title}</strong>{details && <span>{details}</span>}{!route && <span>{t("This activity's resource is no longer available.")}</span>}</span>
+            <span className={`${styles.status} ${styles[view.tone]}`}>
+              {view.tone === "success" && <CheckIcon size={12} aria-hidden="true" />}
+              {view.tone === "pending" && <ClockIcon size={12} aria-hidden="true" />}
+              {view.tone === "open" && <span className={styles.statusDot} aria-hidden="true" />}
+              <span>{view.localizedStatus}</span>
+            </span>
             <time dateTime={item.occurredAtUtc} title={view.dateTimeLabel} aria-label={view.dateTimeLabel}>{view.time}</time>
           </>;
-          return route ? <Link key={item.id} to={route} className={styles.event}>{content}</Link>
-            : <div key={item.id} className={`${styles.event} ${styles.unavailableEvent}`} aria-disabled="true">{content}</div>;
+          return target && route ? <button key={item.id} type="button" className={`${styles.event} ${styles.eventButton}`}
+            data-tone={view.tone}
+            aria-haspopup="menu" aria-expanded={activityMenu?.eventId === item.id}
+            onClick={event => {
+              const anchor = event.currentTarget;
+              setActivityMenu(current => current?.eventId === item.id ? null : { eventId: item.id, anchor, scope: feedScope });
+            }}>{content}</button>
+            : route ? <Link key={item.id} to={route} className={styles.event} data-tone={view.tone}>{content}</Link>
+            : <div key={item.id} className={styles.event} data-tone={view.tone} aria-disabled="true">{content}</div>;
         })}
         <div ref={sentinelRef} aria-hidden="true" />
         {activity.isFetchingNextPage && <p role="status" className={styles.loadingMore}>{t("Loading more activity...")}</p>}
@@ -284,6 +305,18 @@ function ManagerPcHomePage() {
       </div>
       {Boolean(activity.nextPageError) && <ErrorBanner dismissible={false}>{t("Could not load more activity.")}<button className={styles.retry} onClick={() => void activity.fetchNextPage()}>{t("Retry")}</button></ErrorBanner>}
     </CardSection>
+    {activityMenu && menuTarget && menuEditorRoute && <ActionMenu open anchor={activityMenu.anchor} label={t("Request actions")}
+      heading={{ title: t("Request actions") }} width={350}
+      onClose={() => setActivityMenu(null)} items={[
+        { id: "review", label: t("Fast approve"), description: t("Review and decide"), accent: true,
+          icon: <RequestReviewIcon size={20} />, trailingIcon: <ChevronRightIcon size={15} />,
+          onSelect: () => setReview({ target: menuTarget, anchor: activityMenu.anchor, editorRoute: menuEditorRoute }) },
+        { id: "go", label: t("Go to schedule"), description: t("Open schedule editor"),
+          icon: <ScheduleIcon size={20} />, trailingIcon: <ExternalLinkIcon size={15} />,
+          onSelect: () => navigate(menuEditorRoute) },
+      ]} />}
+    {review && <HomeApprovalDialog target={review.target} trigger={review.anchor} fallbackFocusRef={feedRef}
+      onGoToSchedule={() => navigate(review.editorRoute)} onClose={() => setReview(null)} />}
     </div>
   </div>;
 }

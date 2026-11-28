@@ -13,7 +13,7 @@ const events: ManagerHomeActivityItem[] = [
  { ...base, id: "swap:7", kind: "swap_accepted", counterpartyName: "Receiving Worker", status: "accepted" },
  { ...base, id: "urlop:8", kind: "urlop_manager_created", targetType: "urlop", shopId: 2, year: 2026, month: 12, vacationDays: ["2026-12-10"], status: "approved" },
 ];
-async function fixture(page: Page, items = events, language = "en", failNext = false, manyShops = false) {
+async function fixture(page: Page, items = events, language = "en", failNext = false, manyShops = false, unavailableReview = false) {
  const errors: string[] = [], writes: string[] = [];
  const offsets: number[] = [];
  page.on("pageerror", error => errors.push(error.message));
@@ -31,6 +31,25 @@ async function fixture(page: Page, items = events, language = "en", failNext = f
   if (path.includes("negotiate")) return json({}, 503);
   if (path === "/api/auth/session") return json({ role: "manager", workspaceMode: "pc", managerId: 1, userName: "fixture", displayName: "Manager", isSystemManager: false });
   if (path === "/api/account-language") return json({ language });
+  const correctionDetail = /^\/api\/containers\/9\/graphs\/21\/shift-corrections\/2(?:\/(approve|reject))?$/.exec(path);
+  const contractDetail = /^\/api\/containers\/8\/graphs\/20\/shift-swap-approvals\/3(?:\/(approve|reject))?$/.exec(path);
+  if (correctionDetail || contractDetail) {
+   if (unavailableReview) return json({ title: "Request unavailable" }, 404);
+   const item = items.find(row => row.requestId === (correctionDetail ? 2 : 3))!;
+   const action = (correctionDetail ?? contractDetail)?.[1];
+   if (action) {
+    if (correctionDetail && action === "approve") expect(request.postDataJSON()).toEqual({});
+    item.status = action === "approve" ? "approved" : "rejected";
+    item.requiresApproval = false;
+   }
+   const common = { id: item.requestId, employeeId: 99, employeeName: "Navigation Worker", scheduleId: item.graphId,
+    scheduleName: "Assigned graph", shopName: "Target shop", year: 2026, month: 11, dayOfMonth: 4,
+    status: item.status, createdAtUtc: item.occurredAtUtc };
+   return json(correctionDetail ? { ...common, containerId: 9, scheduleSlotId: 1, isDayOffRequest: false,
+    originalFromTime: "08:00", originalToTime: "16:00", requestedFromTime: "08:30", requestedToTime: "16:00",
+    comment: "Please adjust the start time." } : { ...common, kind: "claim", fromEmployeeName: "Original Worker",
+    toEmployeeName: "Navigation Worker", fromTime: "08:00", toTime: "16:00", isStale: false });
+  }
   if (path === "/api/manager-home/activity") {
    const categories = {
     swaps: items.filter(item => item.kind.startsWith("swap_")),
@@ -130,6 +149,67 @@ test("approval filtering keeps graph ownership and keyboard activation", async (
  await expect(page).toHaveURL(/\/container\/8\/graphs\/20$/);
  await expect(page.getByRole("heading", { name: "Schedule Profile", exact: true })).toBeVisible();
  expect(f.errors).toEqual([]);
+});
+
+test("pending Home rows open focused review and the explicit action refreshes the feed", async ({ page, isMobile }) => {
+ test.skip(isMobile, "Manager PC review");
+ test.setTimeout(75_000);
+ await page.emulateMedia({ reducedMotion: "reduce" });
+ const f = await fixture(page, [{ ...events[1], requestId: 2 }, { ...events[2], requestId: 3 }]);
+ await page.goto("/");
+ const tab = page.getByRole("tab", { name: /Requires Approval/ });
+ await tab.click();
+ await expect(tab).toContainText("2");
+ const panel = page.getByRole("tabpanel");
+ const source = panel.getByRole("button", { name: /requested a schedule correction/ });
+ await source.focus();
+ await page.keyboard.press("Enter");
+ const menu = page.getByRole("menu", { name: "Request actions" });
+ await expect(menu.getByRole("menuitem").nth(0)).toHaveAccessibleName("Fast approve");
+ await expect(menu.getByRole("menuitem").nth(1)).toHaveAccessibleName("Go to schedule");
+ await menu.getByRole("menuitem", { name: "Fast approve" }).click();
+ const review = page.getByRole("dialog", { name: "Review request" });
+ await expect(review.getByText("Please adjust the start time.")).toBeVisible();
+ expect(f.writes.filter(path => path.includes("shift-corrections"))).toEqual([]);
+ await review.getByRole("button", { name: "Reject", exact: true }).click();
+ await expect(review.getByText("Rejected", { exact: true })).toBeVisible();
+ await expect(tab).toContainText("1");
+ await expect(source).toHaveCount(0);
+ await review.getByRole("button", { name: "Close", exact: true }).click();
+ await expect(panel).toBeFocused();
+ await panel.getByRole("button", { name: /Shift approval requested/ }).click();
+ await page.getByRole("menuitem", { name: "Fast approve" }).click();
+ await review.getByRole("button", { name: "Approve", exact: true }).click();
+ const transfer = page.getByRole("dialog", { name: "Approve shift transfer?" });
+ await expect(transfer).toBeVisible();
+ await expect.poll(() => transfer.evaluate(node => Number(getComputedStyle(node).zIndex))).toBeGreaterThan(1500);
+ expect(f.writes.filter(path => path.includes("shift-swap-approvals"))).toEqual([]);
+ await page.keyboard.press("Escape");
+ await expect(transfer).toHaveCount(0);
+ await expect(review).toBeVisible();
+ await review.getByRole("button", { name: "Approve", exact: true }).click();
+ await transfer.getByRole("button", { name: "Approve", exact: true }).click();
+ await expect(review.getByText("Approved", { exact: true })).toBeVisible();
+ await expect(panel.getByText("No outstanding approvals.")).toBeVisible();
+ await expect(page).toHaveURL(/\/$/);
+ expect(f.errors).toEqual([]);
+});
+
+test("a deleted request is unavailable and the schedule action still routes by the owning IDs", async ({ page, isMobile }) => {
+ test.skip(isMobile, "Manager PC review");
+ const f = await fixture(page, [{ ...events[1], requestId: 2 }], "en", false, false, true);
+ await page.goto("/");
+ const row = page.getByRole("tabpanel").getByRole("button", { name: /requested a schedule correction/ });
+ await row.click();
+ await page.getByRole("menuitem", { name: "Fast approve" }).click();
+ const review = page.getByRole("dialog", { name: "Review request" });
+ await expect(review.getByText("This request is no longer available.")).toBeVisible();
+ await expect(review.getByRole("button", { name: "Approve", exact: true })).toHaveCount(0);
+ await review.getByRole("button", { name: "Close" }).click();
+ await row.click();
+ await page.getByRole("menuitem", { name: "Go to schedule" }).click();
+ await expect(page).toHaveURL(/\/container\/9\/graphs\/21\/edit$/);
+ expect(f.writes.filter(path => path.includes("shift-corrections"))).toEqual([]);
 });
 
 test("long shop filters scroll below the date controls and preserve selection across dates", async ({ page }) => {

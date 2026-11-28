@@ -33,6 +33,9 @@ export const queryKeys = {
   },
   managerNotepad: {
     current: () => ["managerNotepad", "current"] as const,
+    shareTargets: () => ["managerNotepad", "shareTargets"] as const,
+    draftRecovery: () => ["managerNotepad", "draftRecovery"] as const,
+    versions: (noteId: number) => ["managerNotepad", "versions", noteId] as const,
   },
   managerGraphFillColorBinds: {
     current: () => ["managerGraphFillColorBinds", "current"] as const,
@@ -51,13 +54,16 @@ export const queryKeys = {
     byId: (id: number) => ["employeeAvailability", "byId", id] as const,
   },
   employeeSchedules: {
+    correctionCandidates: () => ["employeeSchedules", "correctionCandidates"] as const,
     all: ["employeeSchedules"] as const,
     list: () => ["employeeSchedules", "list"] as const,
-    publicList: () => ["employeeSchedules", "publicList"] as const,
+    publicList: () => ["employeeSchedules", "publicCatalog"] as const,
   },
   shiftSwaps: {
     employeeApprovals: () => ["shiftSwaps", "employeeApprovals"] as const,
     graphApprovals: (containerId: number, graphId: number) => ["shiftSwaps", "graphApprovals", containerId, graphId] as const,
+    graphApprovalById: (containerId: number, graphId: number, id: number) =>
+      ["shiftSwaps", "graphApprovals", containerId, graphId, "request", id] as const,
     candidates: (params: object | null) => ["shiftSwaps", "returnCandidates", params] as const,
     preview: (payload: object | null) => ["shiftSwaps", "preview", payload] as const,
     all: ["shiftSwaps"] as const,
@@ -65,6 +71,8 @@ export const queryKeys = {
     employees: () => ["shiftSwaps", "employees"] as const,
     employeeCorrections: () => ["shiftSwaps", "employeeCorrections"] as const,
     graphCorrections: (containerId: number, graphId: number) => ["shiftSwaps", "graphCorrections", containerId, graphId] as const,
+    graphCorrectionById: (containerId: number, graphId: number, id: number) =>
+      ["shiftSwaps", "graphCorrections", containerId, graphId, "request", id] as const,
     correctionSettings: () => ["shiftSwaps", "correctionSettings"] as const,
     graphLog: (containerId: number, graphId: number) => ["shiftSwaps", "graphLog", containerId, graphId] as const,
     graphHighlightSetting: (containerId: number, graphId: number) => ["shiftSwaps", "graphHighlightSetting", containerId, graphId] as const,

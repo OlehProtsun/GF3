@@ -1,6 +1,8 @@
 from contextlib import closing, nullcontext
 from pathlib import Path
+import copy
 import json
+import shutil
 import sqlite3
 import subprocess
 import sys
@@ -169,6 +171,156 @@ class MaintenanceTests(unittest.TestCase):
         self.assertEqual(tuple(item["migrationId"] for item in contracts),
                          ("20261115135735_RefreshManualShiftOffer",) + maintenance.REVIEWED_RELEASE_MIGRATIONS)
         self.assertTrue(all(len(item["tables"]) == len(maintenance.REVIEWED_SCHEMA_TABLES) for item in contracts))
+
+    def test_notepad_contract_matches_ef_fixture_and_rejects_changed_constraints(self):
+        fixture = Path(__file__).parent / "fixtures" / "reviewed-notepad-schema-prefix-contracts.json"
+        contracts = json.loads(fixture.read_text(encoding="utf-8"))
+        self.assertEqual(maintenance.NOTEPAD_SCHEMA_PREFIX_CONTRACTS, contracts)
+        self.assertTrue(maintenance.validate_notepad_schema_contracts(contracts))
+        changed = copy.deepcopy(contracts)
+        changed[1]["tables"][0]["columns"][7][4] = "1"
+        with self.assertRaisesRegex(maintenance.MaintenanceError, "defaults"):
+            maintenance.validate_notepad_schema_contracts(changed)
+
+    def test_notepad_standalone_classification_and_plan_require_the_exact_pinned_chain(self):
+        baseline = maintenance.NOTEPAD_RELEASE_BASELINE
+        target = "a" * 40
+        pending = maintenance.NOTEPAD_RELEASE_MIGRATIONS
+        predecessor = maintenance.NOTEPAD_SCHEMA_PREFIX_CONTRACTS[0]["migrationId"]
+        originals = (predecessor,)
+        target_ids = originals + pending
+        blobs = {f"{maintenance.MIGRATIONS}/{name}.cs": blob for name, blob in maintenance.NOTEPAD_RELEASE_BLOBS.items()}
+
+        def record(path, mode="100644", status="A", old="000000"):
+            return f":{old} {mode} {'0' * 40} {blobs.get(path, 'a' * 40)} {status}\0{path}\0"
+
+        first, second = blobs
+        valid = record(first) + record(second)
+        diff, listed, ancestry, overrides = valid, target_ids, True, {}
+
+        def git(*args):
+            if args[0] == "merge-base":
+                if not ancestry:
+                    raise maintenance.MaintenanceError("Divergent fixture revisions")
+                return ""
+            if args[0] == "diff":
+                return diff
+            if args[0] == "grep":
+                return "".join(f'[Migration("{value}")]\n' for value in (listed if args[-3] == target else originals))
+            path = args[1].split(":", 1)[1]
+            return overrides.get(path, blobs[path])
+
+        self.assertEqual(maintenance.classify(git, baseline, target)[1:], (originals, target_ids))
+        plan = maintenance.migration_plan(git, baseline, target, pending)
+        self.assertEqual(plan.migrations, pending)
+        self.assertEqual(plan.migration_blobs, tuple((name, blob, None) for name, blob in maintenance.NOTEPAD_RELEASE_BLOBS.items()))
+        self.assertEqual(plan.schema_tables, maintenance.NOTEPAD_SCHEMA_TABLES)
+        self.assertEqual(plan.empty_new_tables, tuple((1, table) for table in maintenance.NOTEPAD_NEW_TABLES))
+        self.assertEqual(len(plan.nullable_columns), 6)
+        self.assertEqual(len(plan.expected_new_values), 10)
+        self.assertIsNone(plan.correction_rebuild_prefix)
+        for diff, listed, ancestry, overrides, before in (
+            (valid, target_ids, True, {}, maintenance.RELEASE_BASELINE),
+            (valid, target_ids, True, {second: "0" * 40}, baseline),
+            (record(first), originals + pending[:1], True, {}, baseline),
+            (valid + record(first.replace(".cs", ".Designer.cs")), target_ids, True, {}, baseline),
+            (valid + record(f"{maintenance.MIGRATIONS}/20261126190000_Extra.cs"), target_ids + ("20261126190000_Extra",), True, {}, baseline),
+            (valid + record(f"{maintenance.MIGRATIONS}/{predecessor}.cs", status="M", old="100644"), target_ids, True, {}, baseline),
+            (valid + record(f"{maintenance.MIGRATIONS}/{predecessor}.cs", mode="000000", status="D", old="100644"), target_ids, True, {}, baseline),
+            (record(first, mode="100755") + record(second), target_ids, True, {}, baseline),
+            (valid, target_ids, False, {}, baseline),
+            (valid + record(".github/workflows/unreviewed.yml"), target_ids, True, {}, baseline),
+            (valid, target_ids + (pending[1],), True, {}, baseline),
+        ):
+            with self.subTest(diff=diff, listed=listed, ancestry=ancestry, before=before):
+                with self.assertRaises(maintenance.MaintenanceError):
+                    maintenance.classify(git, before, target, lambda path: path.startswith("FrontEnd/"))
+        for invalid in (pending[::-1], pending[1:], (*pending, "20261126190000_Extra")):
+            with self.assertRaisesRegex(maintenance.MaintenanceError, "complete ordered chain"):
+                maintenance.migration_plan(git, baseline, target, invalid)
+
+    def test_notepad_tooling_review_must_cover_every_changed_reviewed_path(self):
+        baseline, target = maintenance.NOTEPAD_RELEASE_BASELINE, "a" * 40
+        old, new = "b" * 40, "c" * 40
+        helper = "deploy/security/gf3_prepare_release.py"
+        ci = ".github/workflows/ci.yml"
+        rehearsals = "deploy/security/tests/rehearse_release.py"
+        diff = "".join(f":100644 100644 {old} {new} M\0{path}\0" for path in (helper, ci, rehearsals))
+        git = Mock(side_effect=lambda command, *_: diff if command == "diff" else new)
+        review = {"before": baseline, "target": target, "blobs": {helper: new},
+                  "reviewed_build_inputs": {path: {"status": "M", "before": old, "after": new} for path in (ci, rehearsals)}}
+        self.assertEqual(maintenance.bootstrap_paths(git, baseline, target, json.dumps(review)), {helper, ci, rehearsals})
+        for invalid in (
+            b"", b"{invalid", b"[]", json.dumps({**review, "target": "d" * 40}), json.dumps({**review, "before": old}),
+            json.dumps({**review, "blobs": {}}), json.dumps({**review, "blobs": {helper: old}}),
+            json.dumps({**review, "reviewed_build_inputs": {ci: review["reviewed_build_inputs"][ci]}}),
+            json.dumps({**review, "blobs": {**review["blobs"], "GF3.WebApi/Program.cs": new}}),
+        ):
+            with self.subTest(review=invalid), self.assertRaises(maintenance.MaintenanceError):
+                maintenance.bootstrap_paths(git, baseline, target, invalid)
+
+    def test_notepad_reviewed_recovery_and_qualification_reject_row_schema_and_sequence_drift(self):
+        contracts = maintenance.NOTEPAD_SCHEMA_PREFIX_CONTRACTS
+        original_ids = (contracts[0]["migrationId"],)
+        target_ids = original_ids + maintenance.NOTEPAD_RELEASE_MIGRATIONS
+        git = lambda _, path: maintenance.NOTEPAD_RELEASE_BLOBS[Path(path).stem]
+        plan = maintenance.migration_plan(git, maintenance.NOTEPAD_RELEASE_BASELINE, "a" * 40, target_ids[1:])
+        paths = [self.root / f"notepad-prefix-{prefix}.db" for prefix in range(3)]
+        for prefix, (path, contract) in enumerate(zip(paths, contracts, strict=True)):
+            with closing(sqlite3.connect(path)) as db, db:
+                db.executescript("""
+                    CREATE TABLE manager_account(id INTEGER PRIMARY KEY);
+                    INSERT INTO manager_account VALUES (1), (2);
+                    CREATE TABLE manager_notepad_state(manager_account_id INTEGER PRIMARY KEY, height INTEGER);
+                    INSERT INTO manager_notepad_state VALUES (1, 777);
+                    CREATE TABLE employee(id INTEGER PRIMARY KEY, name TEXT);
+                    INSERT INTO employee VALUES (1, 'fixture');
+                    CREATE TABLE __EFMigrationsHistory(MigrationId TEXT PRIMARY KEY, ProductVersion TEXT NOT NULL);
+                    """)
+                for kind, _, _, sql in contract["schemaObjects"]:
+                    if kind == "table":
+                        db.execute(sql)
+                indexes = {name: sql for kind, name, _, sql in contract["schemaObjects"] if kind == "index"}
+                for table in contract["tables"]:
+                    for item in reversed(table["indexes"]):
+                        name = item["row"][1]
+                        if name in indexes:
+                            db.execute(indexes[name])
+                db.execute("""INSERT INTO manager_note
+                    (id, manager_account_id, title, content, color, created_at_utc, updated_at_utc)
+                    VALUES (1, 1, 'fixture', 'legacy', 'blue', 'created', 'updated')""")
+                db.execute("UPDATE sqlite_sequence SET seq=9001 WHERE name='manager_note'")
+                db.executemany("INSERT INTO __EFMigrationsHistory VALUES (?, '10.0.9')",
+                               [(item,) for item in target_ids[:prefix + 1]])
+            self.assertEqual(maintenance.verify_no_data_drift(paths[0], path, plan), prefix)
+        maintenance.verify_migration(paths[0], paths[2], original_ids, target_ids, plan)
+        for sql in (
+            "UPDATE manager_note SET title='changed'",
+            "DELETE FROM manager_note",
+            "UPDATE manager_notepad_state SET height=900",
+            "UPDATE employee SET name='changed'",
+            "UPDATE manager_note SET is_pinned=1",
+            "UPDATE manager_note SET edit_expires_at_ms=1",
+            "INSERT INTO manager_note_folder VALUES (1,1,'folder','created','updated')",
+            "INSERT INTO manager_note_share VALUES (1,2)",
+            "INSERT INTO manager_note_tag VALUES (1,1,'tag','created')",
+            "INSERT INTO manager_note_tag_link VALUES (1,1)",
+            "INSERT INTO manager_note_version VALUES (1,1,1,'title','content','blue','created',1)",
+            "DROP INDEX IX_manager_note_version_note_id_revision",
+            "CREATE INDEX extra ON employee(name)",
+            "DELETE FROM __EFMigrationsHistory WHERE MigrationId LIKE '%EditSessions'",
+            "UPDATE __EFMigrationsHistory SET ProductVersion='different' WHERE MigrationId LIKE '%ContentBlocks'",
+            "UPDATE sqlite_sequence SET seq=9002 WHERE name='manager_note'",
+            "UPDATE manager_note SET manager_account_id=999",
+        ):
+            with self.subTest(sql=sql):
+                shutil.copyfile(paths[2], self.clone)
+                with closing(sqlite3.connect(self.clone)) as db, db:
+                    db.execute(sql)
+                with self.assertRaises(maintenance.MaintenanceError):
+                    maintenance.verify_no_data_drift(paths[0], self.clone, plan)
+                with self.assertRaises(maintenance.MaintenanceError):
+                    maintenance.verify_migration(paths[0], self.clone, original_ids, target_ids, plan)
 
     def test_correction_sequence_accepts_only_the_reviewed_rebuild_value_before_rollback(self):
         for path, high in ((self.snapshot, 9001), (self.clone, 4)):

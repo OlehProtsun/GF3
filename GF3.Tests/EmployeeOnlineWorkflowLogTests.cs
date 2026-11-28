@@ -150,7 +150,7 @@ public sealed class EmployeeOnlineWorkflowLogTests
         Assert.Empty(clients.Deliveries);
         if (mode != ManagerWorkspaceModes.Pc)
         {
-            Assert.True(context.Aborted);
+            Assert.Equal(mode == ManagerWorkspaceModes.Choose, context.Aborted);
             Assert.Empty(groups.AddedGroups);
             return;
         }
@@ -160,6 +160,34 @@ public sealed class EmployeeOnlineWorkflowLogTests
             ? new[] { (context.ConnectionId, EmployeePresenceHub.ManagersGroupName), (context.ConnectionId, EmployeePresenceHub.SystemManagersGroupName) }
             : new[] { (context.ConnectionId, EmployeePresenceHub.ManagersGroupName) };
         Assert.Equal(expected, groups.AddedGroups);
+    }
+
+    [Fact]
+    public async Task PcAndPhoneSharePresenceUntilTheLastManagerConnectionCloses()
+    {
+        var presence = new ManagerPresenceService();
+        var notifier = new RecordingRealtimeNotifier();
+        var log = new ThrowingWorkflowLogService();
+        var clients = new WorkflowLogRealtimeAuthorizationTests.RecordingClients();
+        EmployeePresenceHub Hub(string mode) => CreateHub(new ClaimsPrincipal(new ClaimsIdentity([
+            new Claim(ClaimTypes.Role, AuthRoles.Manager), new Claim("manager_id", "7"),
+            new Claim(ManagerWorkspaceModes.ClaimType, mode), new Claim(AuthPolicies.SystemManagerClaim, "true"),
+        ], "test")), new EmployeePresenceService(), notifier, log, clients, presence);
+        var pc = Hub(ManagerWorkspaceModes.Pc);
+        var phone = Hub(ManagerWorkspaceModes.Phone);
+        await pc.OnConnectedAsync();
+        await phone.OnConnectedAsync();
+        Assert.True(presence.IsManagerOnline(7));
+        Assert.Empty(Assert.IsType<RecordingGroupManager>(phone.Groups).AddedGroups);
+        await Assert.ThrowsAsync<HubException>(() => phone.SetManagerEditLocks([ManagerEditLockTargets.Schedule(1, 1)]));
+        await Assert.ThrowsAsync<HubException>(() => phone.SetScheduleEditLocks([new ScheduleEditLockTarget(1, 1)]));
+        await pc.OnDisconnectedAsync(null);
+        Assert.True(presence.IsManagerOnline(7));
+        Assert.Single(notifier.ManagerDataChanges);
+        await phone.OnDisconnectedAsync(null);
+        Assert.False(presence.IsManagerOnline(7));
+        Assert.Equal(2, notifier.ManagerDataChanges.Count);
+        Assert.Equal(0, log.Attempts);
     }
 
     [Fact]
@@ -182,8 +210,9 @@ public sealed class EmployeeOnlineWorkflowLogTests
         EmployeePresenceService presence,
         IRealtimeNotifier notifier,
         IWorkflowLogService service,
-        IHubCallerClients<IEmployeePresenceClient> clients)
-        => new(presence, new ManagerPresenceService(), new RecordingEmployeeAccountService(),
+        IHubCallerClients<IEmployeePresenceClient> clients,
+        ManagerPresenceService? managerPresence = null)
+        => new(presence, managerPresence ?? new ManagerPresenceService(), new RecordingEmployeeAccountService(),
             new ManagerEditLockService(), notifier, service, NullLogger<EmployeePresenceHub>.Instance)
         {
             Context = new FakeHubCallerContext(Guid.NewGuid().ToString("N"), user),

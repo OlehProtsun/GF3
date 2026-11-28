@@ -196,7 +196,7 @@
   box-shadow: 0 8px 20px rgb(30 47 74 / 10%), inset 0 1px rgb(255 255 255 / 45%);
 }
 
-.matrixCard div:has(> table) { overscroll-behavior-y: auto; }
+.matrixCard div:has(> div > table) { overscroll-behavior-y: auto; }
 
 .emptyComparison {
   display: grid;
@@ -228,7 +228,7 @@
     flex: 1 1 0;
     grid-template-rows: auto minmax(0, 1fr);
   }
-  .dialog[data-paired-matrices] .matrixCard div:has(> table) {
+  .dialog[data-paired-matrices] .matrixCard div:has(> div > table) {
     flex: 1 1 0;
     min-height: 0;
     overscroll-behavior-y: contain;
