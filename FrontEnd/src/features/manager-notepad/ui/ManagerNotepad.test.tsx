@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { managerNotepadApi, type ManagerNote, type ManagerNotepad as NotepadResponse } from "@entities/manager-notepad";
-import { setAuthAccessToken } from "@shared/api/httpClient";
+import { ApiError, setAuthAccessToken } from "@shared/api/httpClient";
 import { setLanguage } from "@shared/i18n";
 import { ManagerNotepad } from "./ManagerNotepad";
 
@@ -21,6 +21,11 @@ beforeEach(() => {
   setLanguage("en");
   data = { notes: [], folders: [], tags: [], state: { isExpanded: true, isPinned: false, height: 520 } };
   vi.spyOn(managerNotepadApi, "get").mockImplementation(async () => data);
+  vi.spyOn(managerNotepadApi, "getNote").mockImplementation(async id => {
+    const selected = data.notes.find(item => item.id === id);
+    if (!selected) throw new ApiError({ status: 404, message: "Not found" });
+    return selected;
+  });
   vi.spyOn(managerNotepadApi, "saveState").mockResolvedValue();
 });
 afterEach(() => vi.restoreAllMocks());
@@ -66,12 +71,10 @@ describe("manager notepad", () => {
     const notepad = within(await panel());
     expect(notepad.getByText("No private notes yet.")).toBeVisible();
     fireEvent.click(notepad.getByRole("button", { name: "New" }));
-    expect(screen.getAllByRole("menuitem").map(item => item.textContent)).toEqual(["New note"]);
-    fireEvent.click(screen.getByRole("menuitem", { name: "New note" }));
     expect(create).not.toHaveBeenCalled();
     fireEvent.change(notepad.getByRole("textbox", { name: "Note title" }), { target: { value: "New draft" } });
     fireEvent.click(notepad.getByRole("button", { name: "Save" }));
-    expect(await notepad.findByText("Saved")).toBeVisible();
+    expect(await notepad.findByRole("button", { name: "Saved" })).toBeDisabled();
     expect(create).toHaveBeenCalledExactlyOnceWith({ title: "New draft", content: "", color: "slate" });
   });
 
@@ -80,14 +83,13 @@ describe("manager notepad", () => {
     mount();
     const notepad = within(await panel());
     fireEvent.click(notepad.getByRole("button", { name: "New" }));
-    fireEvent.click(screen.getByRole("menuitem", { name: "New note" }));
     const title = notepad.getByRole("textbox", { name: "Note title" });
     fireEvent.change(title, { target: { value: "Keep my work" } });
     fireEvent.click(notepad.getByRole("button", { name: "Notes" }));
     const prompt = within(await screen.findByRole("dialog", { name: "Discard unsaved changes?" }));
     fireEvent.click(prompt.getByRole("button", { name: "Keep editing" }));
     expect(title).toHaveValue("Keep my work");
-    expect(notepad.getByText("Not saved")).toBeVisible();
+    expect(notepad.getByRole("alert")).toHaveTextContent("Offline");
     expect(notepad.getByRole("button", { name: "Retry" })).toBeVisible();
   });
 
@@ -99,8 +101,7 @@ describe("manager notepad", () => {
     const notepad = within(await panel());
     fireEvent.click(notepad.getByRole("button", { name: "Public 1" }));
     fireEvent.click(notepad.getByRole("button", { name: /Shared checklist/ }));
-    expect(await notepad.findByText("Read only")).toBeVisible();
-    expect(notepad.getByRole("textbox", { name: "Note content" })).toHaveAttribute("contenteditable", "false");
+    expect(await notepad.findByRole("textbox", { name: "Note content" })).toHaveAttribute("contenteditable", "false");
     expect(notepad.queryByRole("button", { name: "Note actions" })).toBeNull();
     expect(notepad.queryByRole("button", { name: "Save" })).toBeNull();
     data = { ...data, notes: [] };
@@ -122,21 +123,22 @@ describe("manager notepad", () => {
     mount();
     const notepad = within(await panel());
     fireEvent.click(notepad.getByRole("button", { name: /To share/ }));
-    fireEvent.click(notepad.getByRole("button", { name: "Private" }));
-    fireEvent.click(await notepad.findByRole("button", { name: "Custom" }));
-    fireEvent.click(await notepad.findByRole("checkbox", { name: "Recipient" }));
-    fireEvent.click(notepad.getByRole("button", { name: "Save changes" }));
+    fireEvent.click(await notepad.findByRole("button", { name: "Private" }));
+    const visibility = within(await screen.findByRole("dialog", { name: "Visibility" }));
+    fireEvent.click(visibility.getByRole("button", { name: /^Custom/ }));
+    fireEvent.click(await visibility.findByRole("checkbox", { name: "Recipient" }));
+    fireEvent.click(notepad.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(patch).toHaveBeenCalledWith(1, expect.objectContaining({
       visibility: "custom", sharedWithManagerIds: [9], expectedRevision: 1,
-    })));
-    await waitFor(() => expect(notepad.getByRole("button", { name: "Save changes" })).toBeDisabled());
-    fireEvent.click(notepad.getByRole("button", { name: "Note" }));
+    }), undefined));
+    expect(await notepad.findByRole("button", { name: "Saved" })).toBeDisabled();
     fireEvent.click(await notepad.findByRole("button", { name: "Note actions" }));
-    fireEvent.click(screen.getByRole("menuitem", { name: "Delete" }));
+    const actions = within(await screen.findByRole("dialog", { name: "Note actions" }));
+    fireEvent.click(actions.getByRole("button", { name: /^Delete note/ }));
     const dialog = within(await screen.findByRole("dialog", { name: "Delete note?" }));
     expect(remove).not.toHaveBeenCalled();
     fireEvent.click(dialog.getByRole("button", { name: "Delete" }));
-    await waitFor(() => expect(remove).toHaveBeenCalledWith(1));
+    await waitFor(() => expect(remove).toHaveBeenCalledWith(1, undefined));
   });
 
   it("persists title-only edits, panel pinning and pointer resizing", async () => {
@@ -150,19 +152,23 @@ describe("manager notepad", () => {
     mount();
     const notepad = within(await panel());
     fireEvent.click(notepad.getByRole("button", { name: /Release checklist/ }));
-    const title = notepad.getByRole("textbox", { name: "Note title" });
-    expect(title.parentElement).toContainElement(notepad.getByText("Saved"));
+    const title = await notepad.findByRole("textbox", { name: "Note title" });
+    expect(notepad.getByRole("button", { name: "Saved" })).toBeDisabled();
     fireEvent.change(title, { target: { value: "Updated checklist" } });
     fireEvent.click(notepad.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(update).toHaveBeenCalledWith(7, {
       title: "Updated checklist", content: "Verify the schedule.", color: "blue", expectedRevision: 1,
-    }));
+    }, undefined));
     fireEvent.click(notepad.getByRole("button", { name: "Pin notepad" }));
     expect(managerNotepadApi.saveState).toHaveBeenLastCalledWith({ isExpanded: true, isPinned: true, height: 520 });
     const resize = notepad.getByRole("separator", { name: "Resize notepad" });
-    fireEvent.pointerDown(resize, { clientY: 500 });
-    fireEvent.pointerMove(window, { clientY: 620 });
-    fireEvent.pointerUp(window);
+    const region = await panel();
+    vi.spyOn(region, "getBoundingClientRect").mockReturnValue(new DOMRect(0, 0, 420, 520));
+    vi.spyOn(document.documentElement, "clientHeight", "get").mockReturnValue(900);
+    Object.assign(resize, { setPointerCapture: vi.fn(), hasPointerCapture: vi.fn(() => false) });
+    fireEvent.pointerDown(resize, { clientY: 500, pointerId: 1, isPrimary: true, button: 0 });
+    fireEvent.pointerMove(resize, { clientY: 620, pointerId: 1 });
+    fireEvent.pointerUp(resize, { pointerId: 1 });
     expect(managerNotepadApi.saveState).toHaveBeenLastCalledWith({ isExpanded: true, isPinned: true, height: 640 });
   });
 
@@ -174,9 +180,9 @@ describe("manager notepad", () => {
     mount();
     const notepad = within(await panel());
     fireEvent.click(notepad.getByText("Legacy note"));
-    fireEvent.change(notepad.getByRole("textbox", { name: "Note title" }), { target: { value: "Renamed" } });
+    fireEvent.change(await notepad.findByRole("textbox", { name: "Note title" }), { target: { value: "Renamed" } });
     fireEvent.click(notepad.getByRole("button", { name: "Save" }));
-    await waitFor(() => expect(update).toHaveBeenCalledWith(1, expect.objectContaining({ title: "Renamed", content })));
+    await waitFor(() => expect(update).toHaveBeenCalledWith(1, expect.objectContaining({ title: "Renamed", content }), undefined));
   });
 
   it("collapses an unpinned panel on an outside click", async () => {
@@ -196,17 +202,21 @@ describe("manager notepad", () => {
       mount();
       const notepad = within(await panel());
       fireEvent.click(notepad.getByRole("button", { name: /Release checklist/ }));
-      expect(notepad.getByRole("button", { name: "Notes" }).closest("header")).not.toBeNull();
+      expect((await notepad.findByRole("button", { name: "Notes" })).closest("header")).not.toBeNull();
       expect(notepad.queryByText("Edit note")).toBeNull();
       expect(notepad.queryByRole("button", { name: "Align left" })).toBeNull();
       fireEvent.click(notepad.getByRole("button", { name: "Bold" }));
       expect(execCommand).toHaveBeenCalledWith("bold", false, undefined);
-      fireEvent.click(notepad.getByRole("button", { name: "Text color" }));
-      const colors = within(notepad.getByRole("dialog", { name: "Choose text color" }));
-      fireEvent.click(colors.getByRole("button", { name: "Text color #dc2626" }));
+      const overflow = () => fireEvent.click(notepad.getByRole("button", { name: "More formatting actions" }));
+      overflow();
+      fireEvent.click(screen.getByRole("button", { name: "Text color" }));
+      const colors = within(screen.getByRole("dialog", { name: "Text color" }));
+      fireEvent.click(colors.getByRole("button", { name: "Red" }));
       expect(execCommand).toHaveBeenCalledWith("foreColor", false, "#dc2626");
-      fireEvent.click(notepad.getByRole("button", { name: "Bulleted list" }));
-      fireEvent.click(notepad.getByRole("button", { name: "Numbered list" }));
+      overflow();
+      fireEvent.click(screen.getByRole("button", { name: "Bulleted list" }));
+      overflow();
+      fireEvent.click(screen.getByRole("button", { name: "Numbered list" }));
       expect(execCommand).toHaveBeenCalledWith("insertUnorderedList", false, undefined);
       expect(execCommand).toHaveBeenCalledWith("insertOrderedList", false, undefined);
       fireEvent.click(notepad.getByRole("button", { name: "Collapse notepad" }));
@@ -224,7 +234,7 @@ describe("manager notepad", () => {
     mount();
     const notepad = within(await panel());
     fireEvent.click(notepad.getByRole("button", { name: /Release checklist/ }));
-    const editor = notepad.getByRole("textbox", { name: "Note content" });
+    const editor = await notepad.findByRole("textbox", { name: "Note content" });
     editor.innerHTML = "First line<br>Second line";
     fireEvent.input(editor);
     expect(editor.innerHTML).toBe("First line<br>Second line");
@@ -234,7 +244,7 @@ describe("manager notepad", () => {
     fireEvent.click(notepad.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(update).toHaveBeenCalledWith(7, {
       title: "Release checklist", content: "First lin<br>Second line", color: "blue", expectedRevision: 1,
-    }));
+    }, undefined));
     expect(editor.innerHTML).toBe("First lin<br>Second line");
   });
 
@@ -246,7 +256,6 @@ describe("manager notepad", () => {
       const workspace = mount(client);
       const notepad = within(await panel());
       fireEvent.click(notepad.getByRole("button", { name: "New" }));
-      fireEvent.click(screen.getByRole("menuitem", { name: "New note" }));
       fireEvent.change(notepad.getByRole("textbox", { name: "Note title" }), { target: { value: "Recovered draft" } });
       workspace.unmount();
       expect(create).toHaveBeenCalledTimes(1);

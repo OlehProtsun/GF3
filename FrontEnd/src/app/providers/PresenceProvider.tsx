@@ -415,7 +415,7 @@ export function PresenceProvider({ children }: PropsWithChildren) {
 
   const applyManagerDataChanged = useEffectEvent((update: ManagerDataChangedUpdate) => {
     if (update.resourceType === "manager-notepad") {
-      invalidateRealtimeQuery(queryClient, queryKeys.managerNotepad.current());
+      if (managerPcMode) invalidateRealtimeQuery(queryClient, queryKeys.managerNotepad.current());
       return;
     }
     if (update.resourceType === "employee-launches") {

@@ -112,8 +112,8 @@ test("a pending graph correction uses its explicit request ID and refreshes Home
  mount();
  const feed = within(screen.getByRole("tabpanel"));
  await user.click(await feed.findByRole("button", { name: /requested a schedule correction/ }));
- const menu = within(screen.getByRole("menu", { name: "Approval actions" }));
- expect(menu.getAllByRole("menuitem").map(item => item.textContent)).toEqual(["Go to schedule", "Fast approve"]);
+ const menu = within(screen.getByRole("menu", { name: "Request actions" }));
+ expect(menu.getAllByRole("menuitem").map(item => item.getAttribute("aria-label"))).toEqual(["Fast approve", "Go to schedule"]);
  await user.click(menu.getByRole("menuitem", { name: "Fast approve" }));
  const dialog = within(screen.getByRole("dialog", { name: "Review request" }));
  expect(await dialog.findByText("Review this comment")).toBeVisible();
@@ -135,7 +135,7 @@ test("Go to schedule uses the existing route and old pending rows remain direct 
  expect(await feed.findByRole("link", { name: /Personal name requested/ })).toHaveAttribute("href", "/container/8/graphs/20");
  await userEvent.click(feed.getByRole("button", { name: /Current worker requested/ }));
  await userEvent.click(screen.getByRole("menuitem", { name: "Go to schedule" }));
- expect(window.location.pathname).toBe("/container/8/graphs/20");
+ expect(window.location.pathname).toBe("/container/8/graphs/20/edit");
  expect(shiftCorrectionsApi.getGraphRequest).not.toHaveBeenCalled();
 });
 test("phone Home preserves its placeholder and starts no data requests", () => {

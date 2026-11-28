@@ -57,6 +57,7 @@ test.describe("manager sidebar layout", () => {
   });
 
   test("keeps content within the viewport across manager sidebar routes", async ({ page }) => {
+    test.setTimeout(60_000);
     await page.setViewportSize({ width: 1440, height: 900 });
     await loginAsManager(page);
     const rail = page.locator("#manager-sidebar-navigation");

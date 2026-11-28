@@ -164,8 +164,9 @@ test("pending Home rows open focused review and the explicit action refreshes th
  const source = panel.getByRole("button", { name: /requested a schedule correction/ });
  await source.focus();
  await page.keyboard.press("Enter");
- const menu = page.getByRole("menu", { name: "Approval actions" });
- await expect(menu.getByRole("menuitem")).toHaveText(["Go to schedule", "Fast approve"]);
+ const menu = page.getByRole("menu", { name: "Request actions" });
+ await expect(menu.getByRole("menuitem").nth(0)).toHaveAccessibleName("Fast approve");
+ await expect(menu.getByRole("menuitem").nth(1)).toHaveAccessibleName("Go to schedule");
  await menu.getByRole("menuitem", { name: "Fast approve" }).click();
  const review = page.getByRole("dialog", { name: "Review request" });
  await expect(review.getByText("Please adjust the start time.")).toBeVisible();
@@ -207,7 +208,7 @@ test("a deleted request is unavailable and the schedule action still routes by t
  await review.getByRole("button", { name: "Close" }).click();
  await row.click();
  await page.getByRole("menuitem", { name: "Go to schedule" }).click();
- await expect(page).toHaveURL(/\/container\/9\/graphs\/21$/);
+ await expect(page).toHaveURL(/\/container\/9\/graphs\/21\/edit$/);
  expect(f.writes.filter(path => path.includes("shift-corrections"))).toEqual([]);
 });
 

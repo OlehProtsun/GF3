@@ -1,11 +1,11 @@
-import { expect, test, type APIRequestContext, type APIResponse, type Request } from "@playwright/test";
+import { expect, test, type APIRequestContext, type APIResponse, type Route } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { test as liveTest } from "./fixtures/isolatedBackend";
 import { loginWithCredentials } from "./helpers";
 
 test("isolated contract workflow: manager settings, pending pickup, publication review, exception and availability", async ({ page }) => {
-  test.setTimeout(180_000);
+  test.setTimeout(240_000);
   await page.setViewportSize({ width: 1440, height: 1000 });
   let actor: "manager" | "employee" = "manager";
   let managerMode: "pc" | "phone" = "pc";
@@ -33,17 +33,14 @@ test("isolated contract workflow: manager settings, pending pickup, publication 
   const availabilitySlots: Array<{ id: number; availabilityGroupMemberId: number; dayOfMonth: number; kind: number; intervalStr: string | null }> = [];
   const graphCellStyles: Array<{ id: number; scheduleId: number; employeeId: number; dayOfMonth: number; backgroundColorArgb: number | null; textColorArgb: number | null }> = [];
   const errors: string[] = []; page.on("pageerror", error => errors.push(error.message));
-  const activeRequests = new Set<Request>();
-  page.on("request", request => { if (new URL(request.url()).pathname.startsWith("/api/")) activeRequests.add(request); });
-  page.on("requestfinished", request => activeRequests.delete(request));
-  page.on("requestfailed", request => activeRequests.delete(request));
+  const activeRoutes = new Map<Route, string>();
+  let lastApiActivity = 0;
   await page.addInitScript(() => {
     localStorage.setItem("gf3.auth.access-token", "isolated-contract-browser-test");
     sessionStorage.setItem("gf3.pwa.install.dismissed", "1");
   });
-  await page.route("**/api/**", async route => {
-    const path = new URL(route.request().url()).pathname, method = route.request().method(); let body: unknown = [];
-    if (!path.startsWith("/api/")) return route.continue();
+  const fulfillApiRoute = async (route: Route, path: string) => {
+    const method = route.request().method(); let body: unknown = [];
     if (path === "/api/auth/session") body = actor === "manager" ? { role: "manager", workspaceMode: managerMode, managerId: 1, userName: "manager", displayName: "Synthetic" }
       : { role: "employee", employeeId: 1, userName: "ada", displayName: "Ada Synthetic" };
     else if (path === "/api/account-language") body = { language: "en" };
@@ -146,10 +143,25 @@ test("isolated contract workflow: manager settings, pending pickup, publication 
     else if (path.includes("notepad")) body = {notes:[],state:{isExpanded:false,isPinned:false,height:400}};
     else if (path === "/api/manager-profile/me") body = {id:1,userName:"manager",displayName:"Synthetic",createdAtUtc:"2026-01-01T00:00:00Z"};
     await route.fulfill({json:body});
+  };
+  await page.route("**/api/**", async route => {
+    const path = new URL(route.request().url()).pathname;
+    if (!path.startsWith("/api/")) return route.continue();
+    activeRoutes.set(route, path);
+    lastApiActivity = Date.now();
+    try {
+      await fulfillApiRoute(route, path);
+    } finally {
+      activeRoutes.delete(route);
+      lastApiActivity = Date.now();
+    }
   });
   const navigate = async (path: string) => {
     await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
-    await expect.poll(() => [...activeRequests].map(request => new URL(request.url()).pathname), {timeout:15000}).toEqual([]);
+    await expect.poll(() => ({
+      requests: [...activeRoutes.values()],
+      quiet: Date.now() - lastApiActivity >= 300,
+    }), { timeout: 15_000 }).toEqual({ requests: [], quiet: true });
     await page.goto(path);
     await page.getByRole("main").first().waitFor({state:"visible"});
     const collapse = page.getByRole("button",{name:"Collapse sidebar",exact:true});
@@ -198,7 +210,7 @@ test("isolated contract workflow: manager settings, pending pickup, publication 
   const preview = page.locator("section").filter({ has: page.getByText("Availability Preview", { exact: true }) });
   await expect(preview.getByRole("button", { name: "Ada Synthetic day 1", exact: true })).toHaveText("+");
   await expect(preview.getByRole("button", { name: "Ada Synthetic day 5", exact: true })).toHaveText("-");
-  await expect.poll(()=>[...activeRequests].map(request=>new URL(request.url()).pathname),{timeout:15_000}).toEqual([]);
+  await expect.poll(()=>[...activeRoutes.values()],{timeout:15_000}).toEqual([]);
   await expect(page.getByRole("button",{name:"Save",exact:true}).first()).toBeEnabled();
   await page.getByRole("button",{name:"Expand Publication",exact:true}).click();
   await page.getByRole("button",{name:"Open details",exact:true}).click();

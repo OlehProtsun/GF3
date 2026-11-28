@@ -1,4 +1,7 @@
+using System.Net;
+using System.Net.Http.Json;
 using System.Security.Claims;
+using System.Text.Json;
 using BusinessLogicLayer.Common;
 using BusinessLogicLayer.Contracts.Employees;
 using BusinessLogicLayer.Contracts.Models;
@@ -9,8 +12,10 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using WebApi.Auth;
+using WebApi.Controllers;
 using WebApi.Middleware;
 using WebApi.Realtime;
 using WorkflowLogEntryModel = DataAccessLayer.Models.WorkflowLogEntryModel;
@@ -19,6 +24,44 @@ namespace GF3.Tests;
 
 public sealed class RealtimeMiddlewareAndGenericCoverageTests
 {
+    [Fact]
+    public async Task NotepadWritesSendOnlyManagerInvalidationWithoutNoteDataOrLeaseToken()
+    {
+        var all = new RecordingPresenceClient();
+        var managers = new RecordingPresenceClient();
+        var systemManagers = new RecordingPresenceClient();
+        var notifier = new RealtimeNotifier(new FakeHubContext(all, managers, systemManagers));
+        await using var host = await ManagerWorkspaceTestHost.CreateAsync(configureServices: services =>
+            services.AddSingleton<IRealtimeNotifier>(notifier));
+        await host.Login("manager");
+        await host.Exchange("pc");
+        const string title = "Synthetic note title";
+        const string content = "Synthetic note body";
+        using var created = await host.Client.PostAsJsonAsync("/api/manager-notepad/notes", new { title, content, visibility = "public" });
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        var note = (await created.Content.ReadFromJsonAsync<ManagerNoteDto>())!;
+        var leasePath = $"/api/manager-notepad/notes/{note.Id}/edit-session";
+        var token = Guid.NewGuid().ToString();
+        host.Client.DefaultRequestHeaders.Add("X-Notepad-Edit-Session", token);
+        Assert.Equal(HttpStatusCode.OK, (await host.Client.PostAsync(leasePath, null)).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await host.Client.DeleteAsync(leasePath)).StatusCode);
+
+        Assert.DoesNotContain(all.ManagerDataMessages, message => message.ResourceType == "manager-notepad");
+        Assert.DoesNotContain(systemManagers.ManagerDataMessages, message => message.ResourceType == "manager-notepad");
+        var changes = managers.ManagerDataMessages.Where(message => message.ResourceType == "manager-notepad").ToArray();
+        Assert.Equal(new[] { "public-notes-changed", "edit-session-started", "edit-session-released" }, changes.Select(change => change.Reason));
+        Assert.All(changes, change =>
+        {
+            Assert.Null(change.ResourceId);
+            Assert.Null(change.ContainerId);
+            Assert.Null(change.GraphId);
+            var json = JsonSerializer.Serialize(change);
+            Assert.DoesNotContain(title, json);
+            Assert.DoesNotContain(content, json);
+            Assert.DoesNotContain(token, json, StringComparison.OrdinalIgnoreCase);
+        });
+    }
+
     [Fact]
     public async Task WorkflowLog_IsSentOnlyToSystemManagers()
     {
@@ -205,6 +248,28 @@ public sealed class RealtimeMiddlewareAndGenericCoverageTests
         await middleware.InvokeAsync(context, accountService);
 
         Assert.Equal([12, 12], accountService.TouchLastSeenEmployeeIds);
+    }
+
+    [Theory]
+    [InlineData("/api/employee-schedules/public")]
+    [InlineData("/api/employee-schedules/public/3")]
+    [InlineData("/api/employee-schedules/public/3/export/pdf")]
+    [InlineData("/api/employee-shift-corrections/schedules")]
+    public async Task ReadOnlyScheduleDiscoveryDoesNotReserveOrWriteEmployeePresence(string path)
+    {
+        var calls = 0;
+        var middleware = new EmployeePresenceMiddleware(_ => { calls++; return Task.CompletedTask; },
+            NullLogger<EmployeePresenceMiddleware>.Instance);
+        var accounts = new RecordingEmployeeAccountService();
+        var context = CreateHttpContext(CreateUser(AuthRoles.Employee, employeeId: 12));
+        context.Request.Method = HttpMethods.Get;
+        context.Request.Path = path;
+        await middleware.InvokeAsync(context, accounts);
+        Assert.Empty(accounts.TouchLastSeenEmployeeIds);
+        context.Request.Path = "/api/employee-schedules";
+        await middleware.InvokeAsync(context, accounts);
+        Assert.Equal([12], accounts.TouchLastSeenEmployeeIds);
+        Assert.Equal(2, calls);
     }
 
     [Fact]

@@ -202,7 +202,7 @@ test("mocked API: phone workspace exposes no priority write controls", async ({ 
     await route.fulfill({ contentType: "application/json", body: JSON.stringify(body) });
   });
   await page.goto("/settings");
-  await expect(page.getByRole("heading", { name: "Coming Soon", exact: true })).toBeVisible();
+  await expect(page.locator("[data-manager-phone]").getByRole("heading", { name: "Home", exact: true })).toBeVisible();
   await expect(page.getByRole("textbox", { name: "Priority shift duration", exact: true })).toHaveCount(0);
   await expect(page.getByRole("switch", { name: "Respect priority employee availability", exact: true })).toHaveCount(0);
   expect(writes).toBe(0);

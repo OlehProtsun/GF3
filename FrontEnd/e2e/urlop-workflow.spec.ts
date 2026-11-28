@@ -386,7 +386,9 @@ test("monthly dashboard overflow, exact dates, navigation and accessible modal a
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({ path: test.info().outputPath("urlop-overview-sidebar-expanded.png"), fullPage: true, scale: "css", animations: "disabled" });
   const collapse = page.getByRole("button", { name: "Collapse sidebar", exact: true });
-  if (await collapse.isVisible()) await collapse.click();
+  await collapse.press("Enter");
+  await page.mouse.move(1300, 100);
+  await expect(page.getByRole("button", { name: "Open sidebar", exact: true })).toBeVisible();
   await choose(page, "Month", "December");
   await page.getByRole("button", { name: "Next month", exact: true }).click();
   await expect(page.getByRole("button", { name: "Year", exact: true })).toHaveText("2027");

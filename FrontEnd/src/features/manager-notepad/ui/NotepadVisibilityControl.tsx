@@ -20,10 +20,10 @@ export function NotepadVisibilityControl({ value, expanded, busy, onChange }: {
   busy: boolean;
   onChange: (access: NoteAccess) => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const [portalContainer, setPortalContainer] = useState<Element | null>(null);
   const anchor = useRef<HTMLButtonElement>(null);
   const popover = useRef<HTMLDivElement>(null);
-  const visible = open && expanded;
+  const visible = expanded && portalContainer !== null;
   const position = useDropdownPosition(visible, anchor, popover, "down", 302, "end");
   const selected = options.find(option => option.value === value.visibility) ?? options[0];
 
@@ -35,7 +35,7 @@ export function NotepadVisibilityControl({ value, expanded, busy, onChange }: {
     if (!visible) return;
     const dismiss = (event: PointerEvent) => {
       if (event.target instanceof Node && !anchor.current?.contains(event.target) && !popover.current?.contains(event.target)) {
-        setOpen(false);
+        setPortalContainer(null);
       }
     };
     document.addEventListener("pointerdown", dismiss);
@@ -45,23 +45,25 @@ export function NotepadVisibilityControl({ value, expanded, busy, onChange }: {
   return (
     <>
       <button ref={anchor} type="button" className={styles.visibilityButton} aria-haspopup="dialog"
-        aria-label={t(selected.label)} title={t(selected.label)} aria-expanded={visible} disabled={busy} onClick={() => setOpen(!open)}>
+        aria-label={t(selected.label)} title={t(selected.label)} aria-expanded={visible} disabled={busy} onClick={event => {
+          setPortalContainer(visible ? null : event.currentTarget.closest("[data-manager-notepad-modal]") ?? document.body);
+        }}>
         {selected.value === "custom" ? <ShareIcon size={15} /> : <NotepadIcon name={selected.icon} size={15} />}<span className={styles.compactLabel}>{t(selected.label)}</span><NotepadIcon name="chevron" size={13} />
       </button>
-      {visible && createPortal(
+      {expanded && portalContainer && createPortal(
         <div ref={popover} className={styles.visibilityPopover} style={position} role="dialog" aria-label={t("Visibility")}
           onKeyDown={event => {
             if (event.key !== "Escape") return;
             event.preventDefault();
             event.stopPropagation();
-            setOpen(false);
+            setPortalContainer(null);
             anchor.current?.focus();
           }}>
           <div className={styles.visibilityContents}>
             <strong>{t("Visibility")}</strong>
             <NotepadVisibilityOptions value={value} busy={busy} onChange={onChange} />
           </div>
-        </div>, anchor.current?.closest("[data-manager-notepad-modal]") ?? document.body,
+        </div>, portalContainer,
       )}
     </>
   );

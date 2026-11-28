@@ -244,21 +244,23 @@ test("adjacent More previews replace each other and fit available viewport space
       for (const index of [0, 3]) {
         const trigger = buttons.nth(index);
         await trigger.scrollIntoViewIfNeeded();
-        await trigger.locator("xpath=ancestor::table/..").evaluate(el => { el.scrollTop = 0; });
+        await trigger.locator("xpath=ancestor::table/../..").evaluate(el => { el.scrollTop = 0; });
         if (viewport.height === 450) {
           await trigger.evaluate((el, first) => {
             const offset = () => {
               const r = el.getBoundingClientRect();
               return first ? r.top - 80 : r.bottom - innerHeight + 24;
             };
+            const scrollParents: HTMLElement[] = [];
             let ancestor = el.closest("table")!.parentElement!.parentElement;
             while (ancestor) {
               if (/(auto|scroll)/.test(getComputedStyle(ancestor).overflowY) && ancestor.scrollHeight > ancestor.clientHeight) {
-                ancestor.scrollBy(0, offset());
+                scrollParents.push(ancestor);
               }
               ancestor = ancestor.parentElement;
             }
-            window.scrollBy(0, offset());
+            window.scrollBy({ top: offset(), behavior: "instant" });
+            for (const scroller of scrollParents.reverse()) scroller.scrollBy({ top: offset(), behavior: "instant" });
           }, index === 0);
         }
         await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));

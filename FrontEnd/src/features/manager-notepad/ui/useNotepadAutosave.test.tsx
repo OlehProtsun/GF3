@@ -54,8 +54,47 @@ describe("notepad autosave", () => {
     await act(() => vi.advanceTimersByTimeAsync(2400));
     expect(update).toHaveBeenCalledTimes(1);
     await act(async () => { complete({ ...savedNote, revision: 2 }); expect(await flushed).toBe(true); });
-    expect(update).toHaveBeenNthCalledWith(1, 7, expect.objectContaining({ expectedRevision: 1, title: "Draft" }));
-    expect(update).toHaveBeenNthCalledWith(2, 7, expect.objectContaining({ expectedRevision: 2, title: "Latest" }));
+    expect(update).toHaveBeenNthCalledWith(1, 7, expect.objectContaining({ expectedRevision: 1, title: "Draft" }), undefined);
+    expect(update).toHaveBeenNthCalledWith(2, 7, expect.objectContaining({ expectedRevision: 2, title: "Latest" }), undefined);
+  });
+
+  it("uses one explicit phone save with the lease and current revision", async () => {
+    const update = vi.spyOn(managerNotepadApi, "updateNote").mockResolvedValue({ ...savedNote, revision: 2 });
+    const hook = mount({ noteId: 7, revision: 1, explicitSave: true, sessionRequired: true });
+    await act(() => vi.advanceTimersByTimeAsync(5_000));
+    await act(async () => { expect(await hook.result.current.save()).toBe(false); });
+    expect(update).not.toHaveBeenCalled();
+    hook.rerender({ ...hook.props, sessionToken: "tab-lease", revision: 3 });
+    await act(() => vi.advanceTimersByTimeAsync(5_000));
+    expect(update).not.toHaveBeenCalled();
+    await act(async () => { expect(await hook.result.current.save()).toBe(true); });
+    expect(update).toHaveBeenCalledExactlyOnceWith(7, expect.objectContaining({ expectedRevision: 3 }), "tab-lease");
+  });
+
+  it("updates only metadata and distinguishes an edit-session conflict from a revision conflict", async () => {
+    const conflict = new ApiError({ status: 409, message: "Lease expired", details: { code: "notepad_edit_session_conflict" } });
+    const patch = vi.spyOn(managerNotepadApi, "updateMetadata").mockRejectedValue(conflict);
+    const update = vi.spyOn(managerNotepadApi, "updateNote");
+    const hook = mount({ noteId: 7, revision: 2, dirty: false, sessionRequired: true, sessionToken: "old-token" });
+    await act(async () => {
+      expect(await hook.result.current.save(false, { visibility: "custom", sharedWithManagerIds: [9] })).toBe(false);
+    });
+    expect(patch).toHaveBeenCalledExactlyOnceWith(7, { visibility: "custom", sharedWithManagerIds: [9], expectedRevision: 2 }, "old-token");
+    expect(update).not.toHaveBeenCalled();
+    expect(hook.result.current.error).toEqual({ kind: "error", cause: conflict });
+    expect(hook.props.onSaved).not.toHaveBeenCalled();
+  });
+
+  it("never applies a save acknowledgment to a different selected note", async () => {
+    let complete!: (note: ManagerNote) => void;
+    const update = vi.spyOn(managerNotepadApi, "updateNote").mockImplementationOnce(() => new Promise(resolve => { complete = resolve; }));
+    const hook = mount({ noteId: 7, revision: 1, explicitSave: true });
+    let saving!: Promise<boolean>;
+    await act(async () => { saving = hook.result.current.save(); });
+    hook.rerender({ ...hook.props, noteId: 8, revision: 3, title: "Another note" });
+    await act(async () => { complete({ ...savedNote, revision: 2 }); expect(await saving).toBe(false); });
+    expect(update).toHaveBeenCalledTimes(1);
+    expect(hook.props.onSaved).not.toHaveBeenCalled();
   });
 
   it("keeps a revision conflict and prevents manual or automatic overwrite", async () => {

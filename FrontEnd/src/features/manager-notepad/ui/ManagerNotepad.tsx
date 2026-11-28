@@ -549,7 +549,7 @@ export function ManagerNotepad({ onClosePhone }: { onClosePhone?: () => void } =
   const canSaveDraft = Boolean(draft && !sessionBlocked && (dirty ? canEdit : access && draft.saved?.canManage) && !contentTooLong);
   const selectedNote = publicNote ?? note ?? draft?.saved ?? null;
   const publicAccessLost = publicNote !== null && (publicSession.status === "unavailable" ||
-    (notepad.isSuccess && !note && !publicNote.canManage));
+    (notepad.data !== undefined && !notepad.isError && !note && !publicNote.canManage));
   const publicEditor = note?.activeEditor;
   useEffect(() => {
     if (!publicNote || !note || !sessionBlocked || dirty || access || note.revision <= publicNote.revision) return;

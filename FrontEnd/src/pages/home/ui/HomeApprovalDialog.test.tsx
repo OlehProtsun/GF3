@@ -93,6 +93,7 @@ test("keeps the active dialog open during review then renders the terminal resul
   const dialog = within(parent);
   await user.click(await dialog.findByRole("button", { name: "Reject" }));
   expect(dialog.getByRole("button", { name: "Close" })).toBeDisabled();
+  expect(dialog.getByRole("button", { name: "Rejecting..." })).toBeDisabled();
   await user.keyboard("{Escape}");
   expect(parent).toBeVisible();
   const terminal = { ...correction, status: "rejected" };
@@ -101,6 +102,7 @@ test("keeps the active dialog open during review then renders the terminal resul
   expect(await dialog.findByText("Rejected", { exact: true })).toBeVisible();
   await waitFor(() => expect(dialog.getByRole("button", { name: "Close" })).toBeEnabled());
   expect(dialog.queryByRole("button", { name: "Approve" })).toBeNull();
+  expect(mocks.reject).toHaveBeenCalledTimes(1);
 });
 
 test("a missing exact request is unavailable without review controls", async () => {
@@ -109,4 +111,20 @@ test("a missing exact request is unavailable without review controls", async () 
   await open();
   expect(await screen.findByText("This request is no longer available.")).toBeVisible();
   expect(screen.queryByRole("button", { name: "Approve" })).toBeNull();
+});
+
+test("a review conflict refreshes the exact request and displays its current status", async () => {
+  mocks.reject.mockImplementationOnce(async () => {
+    mocks.correction.mockResolvedValue({ ...correction, status: "approved" });
+    throw new ApiError({ status: 409, message: "This request was already reviewed." });
+  });
+  const { open, user } = mount("correction");
+  await open();
+  const dialog = within(screen.getByRole("dialog", { name: "Review request" }));
+  await user.click(await dialog.findByRole("button", { name: "Reject" }));
+  expect(await dialog.findByText("Approved", { exact: true })).toBeVisible();
+  expect(dialog.getByRole("alert")).toHaveTextContent("This request was already reviewed.");
+  expect(dialog.queryByRole("button", { name: "Reject" })).toBeNull();
+  expect(mocks.reject).toHaveBeenCalledTimes(1);
+  expect(mocks.correction.mock.calls.map(args => args.slice(0, 3))).toEqual([[3, 9, 25], [3, 9, 25]]);
 });

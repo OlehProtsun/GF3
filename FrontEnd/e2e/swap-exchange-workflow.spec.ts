@@ -1094,7 +1094,7 @@ for (const viewport of [{ width: 320, height: 568 }, { width: 375, height: 667 }
     await page.screenshot({ path: test.info().outputPath("compact-exchange.png") });
     const area = page.locator('[data-swap-offers-scroll]');
     const launcher = cards.first().getByRole("button", { name: "View offer details for F27" });
-    await launcher.focus();
+    await launcher.evaluate((button: HTMLButtonElement) => button.focus({ preventScroll: true }));
     const scrollTop = await area.evaluate(el => el.scrollTop);
     await page.keyboard.press("Enter");
     const details = page.getByRole("dialog", { name: "Offer details", exact: true });

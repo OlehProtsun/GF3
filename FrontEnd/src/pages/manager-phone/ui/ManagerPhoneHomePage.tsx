@@ -1,5 +1,5 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type ComponentPropsWithoutRef } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatHoursMinutes, getSlotDurationMinutes } from "@entities/containers";
 import { formatHomeDate, moveSelectedDay, parseHomeDay, warsawToday } from "@pages/home/ui/homeActivity";
 import {
@@ -58,7 +58,10 @@ export function ManagerPhoneHomePage() {
   const [now, setNow] = useState(() => new Date());
   const [selectedDay, setSelectedDay] = useState(() => warsawToday());
   const [selectedShop, setSelectedShop] = useState<number | null>(null);
-  const home = useQuery(getHomeDashboardQuery(selectedDay));
+  const homeQuery = getHomeDashboardQuery(selectedDay);
+  const home = useQuery(homeQuery);
+  const client = useQueryClient();
+  const retry = () => client.invalidateQueries({ queryKey: homeQuery.queryKey });
   const loading = home.isLoading;
   const { todayRows } = getHomeScheduleRows(loading || home.isError ? undefined : home.data, selectedDay, selectedShop, now);
   const today = warsawToday(now);
@@ -129,13 +132,13 @@ export function ManagerPhoneHomePage() {
         {home.isError && (
           <div className={styles.message} role="alert">
             <p>{getErrorMessage(home.error, t("Could not load scheduled employees."))}</p>
-            <button type="button" className={styles.today} onClick={() => void home.refetch()}>{t("Retry")}</button>
+            <button type="button" className={styles.today} onClick={retry}>{t("Retry")}</button>
           </div>
         )}
         {!home.isError && !loading && home.data?.hasPartialData && (
           <div className={styles.message} role="status">
             <p>{t("Some schedules could not be loaded. Results may be incomplete.")}</p>
-            <button type="button" className={styles.today} onClick={() => void home.refetch()}>{t("Retry")}</button>
+            <button type="button" className={styles.today} onClick={retry}>{t("Retry")}</button>
           </div>
         )}
         {!home.isError && (

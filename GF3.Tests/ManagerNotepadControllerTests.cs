@@ -1,8 +1,10 @@
 using System.Security.Claims;
 using DataAccessLayer.Models;
+using DataAccessLayer.Models.DataBaseContext;
 using GF3.Tests.Infrastructure;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
@@ -12,7 +14,7 @@ using WebApi.Controllers;
 
 namespace GF3.Tests;
 
-public sealed class ManagerNotepadControllerTests
+public sealed partial class ManagerNotepadControllerTests
 {
     [Fact]
     public async Task NotesAndWindowState_ArePersistedAndIsolatedPerManager()
@@ -93,26 +95,44 @@ public sealed class ManagerNotepadControllerTests
     [Fact]
     public async Task MigrationPreservesLegacyNotesAndPanelState()
     {
-        await using var database = await SqliteTestDatabase.CreateAsync();
-        await using var db = database.CreateContext();
-        var migrator = db.GetService<IMigrator>();
-        await migrator.MigrateAsync("20261123140000_AddCommunicationContentBlocks");
-        var manager = CreateManager("legacy", DateTimeOffset.UtcNow);
-        db.ManagerAccounts.Add(manager);
-        await db.SaveChangesAsync();
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync(Ct);
+        var options = new DbContextOptionsBuilder<AppDbContext>().UseSqlite(connection).Options;
         var now = DateTimeOffset.UtcNow;
+        var manager = CreateManager("legacy", now);
         const string original = "<b>Legacy</b><br>Keep this text";
-        await db.Database.ExecuteSqlInterpolatedAsync($"""
-            INSERT INTO manager_note (id, manager_account_id, title, content, color, created_at_utc, updated_at_utc)
-            VALUES (81, {manager.Id}, 'Legacy', {original}, 'blue', {now}, {now})
-            """);
-        var controller = CreateController(db, manager.Id);
-        await controller.SaveState(new SaveManagerNotepadStateRequest { Height = 10_000, IsExpanded = true, IsPinned = true }, Ct);
-        await migrator.MigrateAsync();
-        var current = Read(await controller.GetCurrent(Ct), 200);
+        await using (var db = new AppDbContext(options))
+        {
+            var migrator = db.GetService<IMigrator>();
+            await migrator.MigrateAsync("20261123140000_AddCommunicationContentBlocks", Ct);
+            db.ManagerAccounts.Add(manager);
+            await db.SaveChangesAsync(Ct);
+            await db.Database.ExecuteSqlInterpolatedAsync($"""
+                INSERT INTO manager_note (id, manager_account_id, title, content, color, created_at_utc, updated_at_utc)
+                VALUES (81, {manager.Id}, 'Legacy', {original}, 'blue', {now}, {now});
+                INSERT INTO manager_notepad_state (manager_account_id, height, is_expanded, is_pinned, updated_at_utc)
+                VALUES ({manager.Id}, 873, 1, 1, {now});
+                """, Ct);
+            await migrator.MigrateAsync("20261126170000_ExpandManagerNotepad", Ct);
+            Assert.Equal(1, await db.Database.SqlQueryRaw<int>("""
+                SELECT COUNT(*) AS Value FROM manager_note
+                WHERE id = 81 AND visibility = 'private' AND revision = 1 AND is_locked = 0 AND is_pinned = 0
+                AND last_edited_by_manager_id IS NULL AND folder_id IS NULL
+                """).SingleAsync(Ct));
+            Assert.Equal(original, await db.Database.SqlQueryRaw<string>("SELECT content AS Value FROM manager_note").SingleAsync(Ct));
+            await migrator.MigrateAsync("20261126180000_AddManagerNoteEditSessions", Ct);
+        }
+
+        await using var verify = new AppDbContext(options);
+        var current = Read(await CreateController(verify, manager.Id).GetCurrent(Ct), 200);
         var note = Assert.Single(current.Notes);
         Assert.Equal(81, note.Id);
+        Assert.Equal(manager.Id, note.OwnerManagerId);
+        Assert.Equal("Legacy", note.Title);
         Assert.Equal(original, note.Content);
+        Assert.Equal("blue", note.Color);
+        Assert.Equal(now, note.CreatedAtUtc);
+        Assert.Equal(now, note.UpdatedAtUtc);
         Assert.Equal("private", note.Visibility);
         Assert.Equal(1L, note.Revision);
         Assert.False(note.IsPinned);
@@ -122,10 +142,34 @@ public sealed class ManagerNotepadControllerTests
         Assert.Empty(note.SharedWithManagerIds);
         Assert.True(current.State.IsExpanded);
         Assert.True(current.State.IsPinned);
-        Assert.Equal(900, current.State.Height);
-        await migrator.MigrateAsync("20261123140000_AddCommunicationContentBlocks");
-        Assert.Equal(original, await db.Database.SqlQueryRaw<string>("SELECT content AS Value FROM manager_note").SingleAsync());
-        Assert.Equal(900, await db.Database.SqlQueryRaw<int>("SELECT height AS Value FROM manager_notepad_state").SingleAsync());
+        Assert.Equal(873, current.State.Height);
+        var stored = await verify.ManagerNotes.AsNoTracking().SingleAsync(Ct);
+        Assert.Null(stored.EditSessionId);
+        Assert.Null(stored.EditManagerId);
+        Assert.Null(stored.EditStartedAtMs);
+        Assert.Null(stored.EditExpiresAtMs);
+    }
+
+    [Fact]
+    public async Task NotepadMigrationsCanGoDownAndUpOnADisposableCopy()
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        var managerId = Assert.Single(await SeedManagers(database, 1));
+        await using var db = database.CreateContext();
+        var controller = CreateController(db, managerId);
+        var note = Read(await controller.CreateNote(new() { Content = "Preserve on rollback" }, Ct), 201);
+        Assert.IsType<NoContentResult>(await controller.SaveState(new() { Height = 999 }, Ct));
+        var migrator = db.GetService<IMigrator>();
+        await migrator.MigrateAsync("20261126170000_ExpandManagerNotepad", Ct);
+        Assert.Equal(0, await db.Database.SqlQueryRaw<int>("SELECT COUNT(*) AS Value FROM pragma_table_xinfo('manager_note') WHERE name LIKE 'edit_%'").SingleAsync(Ct));
+        await migrator.MigrateAsync("20261123140000_AddCommunicationContentBlocks", Ct);
+        Assert.Equal(note.Content, await db.Database.SqlQueryRaw<string>("SELECT content AS Value FROM manager_note").SingleAsync(Ct));
+        Assert.Equal(900, await db.Database.SqlQueryRaw<int>("SELECT height AS Value FROM manager_notepad_state").SingleAsync(Ct));
+        await migrator.MigrateAsync("20261126180000_AddManagerNoteEditSessions", Ct);
+        var restored = Read(await controller.GetNote(note.Id, Ct), 200);
+        Assert.Equal(note.Content, restored.Content);
+        Assert.Equal(note.Revision, restored.Revision);
+        Assert.Null(restored.ActiveEditor);
     }
 
     [Fact]
@@ -140,7 +184,7 @@ public sealed class ManagerNotepadControllerTests
         var (folder, tag) = await SeedNoteOrganization(db, ids[0]);
         var note = Read(await owner.CreateNote(new()
         {
-            Title = "Shared", FolderId = folder.Id, TagIds = [tag.Id],
+            Title = "Shared", Content = "Original text", FolderId = folder.Id, TagIds = [tag.Id],
         }, Ct), 201);
 
         Assert.IsType<NotFoundResult>((await recipient.GetNote(note.Id, Ct)).Result);
@@ -149,7 +193,7 @@ public sealed class ManagerNotepadControllerTests
         note = Read(await owner.UpdateMetadata(note.Id, new() { Visibility = "public", ExpectedRevision = note.Revision }, Ct), 200);
         var shared = Read(await other.GetNote(note.Id, Ct), 200);
         Assert.False(shared.CanManage);
-        Assert.False(shared.CanEdit);
+        Assert.True(shared.CanEdit);
         Assert.Null(shared.FolderId);
         Assert.Empty(shared.TagIds);
         Assert.Empty(shared.SharedWithManagerIds);
@@ -159,7 +203,10 @@ public sealed class ManagerNotepadControllerTests
             Assert.Single(current.Notes);
             Assert.Empty(current.Folders);
             Assert.Empty(current.Tags);
-            Assert.Equal(403, Assert.IsType<StatusCodeResult>((await reader.UpdateNote(note.Id, new() { Title = "Forbidden" }, Ct)).Result).StatusCode);
+            AssertSessionConflict((await reader.UpdateNote(note.Id, new()
+            {
+                Title = "Unleased", ExpectedRevision = note.Revision,
+            }, Ct)).Result);
             Assert.Equal(403, Assert.IsType<StatusCodeResult>((await reader.UpdateMetadata(note.Id, new() { ExpectedRevision = note.Revision, IsPinned = true }, Ct)).Result).StatusCode);
             Assert.IsType<NotFoundResult>((await reader.GetVersions(note.Id, Ct)).Result);
             Assert.Equal(403, Assert.IsType<StatusCodeResult>(await reader.DeleteNote(note.Id, Ct)).StatusCode);
@@ -167,19 +214,56 @@ public sealed class ManagerNotepadControllerTests
         var targets = Read(await owner.GetShareTargets(Ct), 200);
         Assert.Equal(ids.Skip(1), targets.Select(target => target.Id));
 
+        SetSession(recipient, Guid.NewGuid());
+        Read(await recipient.AcquireEditSession(note.Id, Ct), 200);
+        var rejected = await recipient.UpdateNote(note.Id, new()
+        {
+            Title = "Forbidden", Visibility = "private", ExpectedRevision = note.Revision,
+        }, Ct);
+        Assert.Equal(403, Assert.IsType<StatusCodeResult>(rejected.Result).StatusCode);
+        var edited = Read(await recipient.UpdateNote(note.Id, new()
+        {
+            Title = note.Title, Content = "Collaborator text", Color = note.Color, ExpectedRevision = note.Revision,
+        }, Ct), 200);
+        Assert.Equal(note.Revision + 1, edited.Revision);
+        var ownerView = Read(await owner.GetNote(note.Id, Ct), 200);
+        Assert.Equal(edited.Content, ownerView.Content);
+        Assert.Equal("public", ownerView.Visibility);
+        Assert.Equal(folder.Id, ownerView.FolderId);
+        Assert.Equal([tag.Id], ownerView.TagIds);
+        Assert.Empty(ownerView.SharedWithManagerIds);
+        Assert.Equal(note.Content, Assert.Single(Read(await owner.GetVersions(note.Id, Ct), 200)).Content);
+        Assert.IsType<NoContentResult>(await recipient.ReleaseEditSession(note.Id, Ct));
+
+        SetSession(owner, Guid.NewGuid());
+        Read(await owner.AcquireEditSession(note.Id, Ct), 200);
         note = Read(await owner.UpdateMetadata(note.Id, new()
         {
-            Visibility = "custom", SharedWithManagerIds = [ids[1]], ExpectedRevision = note.Revision,
+            Visibility = "custom", SharedWithManagerIds = [ids[1]], ExpectedRevision = edited.Revision,
         }, Ct), 200);
+        var stored = await db.ManagerNotes.AsNoTracking().SingleAsync(row => row.Id == note.Id);
+        Assert.Null(stored.EditSessionId);
+        Assert.Null(stored.EditManagerId);
+        Assert.Null(stored.EditStartedAtMs);
+        Assert.Null(stored.EditExpiresAtMs);
         Assert.Single(Read(await recipient.GetCurrent(Ct), 200).Notes);
         Assert.IsType<NotFoundResult>((await other.GetNote(note.Id, Ct)).Result);
-        Assert.Empty(Read(await recipient.GetNote(note.Id, Ct), 200).SharedWithManagerIds);
+        var custom = Read(await recipient.GetNote(note.Id, Ct), 200);
+        Assert.False(custom.CanEdit);
+        Assert.False(custom.CanManage);
+        Assert.Empty(custom.SharedWithManagerIds);
+        Assert.Equal(403, Assert.IsType<StatusCodeResult>((await recipient.UpdateNote(note.Id, new()
+        {
+            Title = "Forbidden", ExpectedRevision = note.Revision,
+        }, Ct)).Result).StatusCode);
+        Assert.IsType<NotFoundResult>((await recipient.AcquireEditSession(note.Id, Ct)).Result);
         note = Read(await owner.UpdateMetadata(note.Id, new() { Visibility = "public", ExpectedRevision = note.Revision }, Ct), 200);
         Assert.Empty(note.SharedWithManagerIds);
+        Read(await owner.AcquireEditSession(note.Id, Ct), 200);
         note = Read(await owner.UpdateMetadata(note.Id, new() { Visibility = "custom", ExpectedRevision = note.Revision }, Ct), 200);
         Assert.IsType<NotFoundResult>((await recipient.GetNote(note.Id, Ct)).Result);
         note = Read(await owner.UpdateMetadata(note.Id, new() { SharedWithManagerIds = [ids[1]], ExpectedRevision = note.Revision }, Ct), 200);
-        await owner.UpdateMetadata(note.Id, new() { Visibility = "private", ExpectedRevision = note.Revision }, Ct);
+        Read(await owner.UpdateMetadata(note.Id, new() { Visibility = "private", ExpectedRevision = note.Revision }, Ct), 200);
         Assert.Empty(await db.ManagerNoteShares.ToListAsync());
         Assert.Empty(Read(await recipient.GetCurrent(Ct), 200).Notes);
     }
@@ -305,6 +389,8 @@ public sealed class ManagerNotepadControllerTests
             new() { Visibility = "custom", SharedWithManagerIds = [ids[0]] },
             new() { Content = "<svg><script>bad</script></svg>" },
             new() { Content = "<b onclick=bad>invalid</b>" },
+            new() { Content = "<a href=\"javascript:alert(1)\">invalid</a>" },
+            new() { Content = "<iframe>invalid</iframe>" },
             new() { Content = "<span style=\"color: url(example)\">invalid</span>" },
         };
         foreach (var request in invalid)
@@ -313,11 +399,41 @@ public sealed class ManagerNotepadControllerTests
             Assert.Equal(400, Assert.IsAssignableFrom<ObjectResult>(response.Result).StatusCode);
         }
         var owner = CreateController(db, ids[0]);
-        const string checklist = """<ul data-checklist="true"><li data-checked="false"><font color="#2563eb" size="3">Text</font></li></ul><span style="color: rgb(1, 2, 3); font-size: 16px;">Safe</span>""";
+        const string checklist = """<ul data-checklist="true"><li data-checked="false"><font color="#2563eb" size="3">Text</font></li></ul><span style="color: rgb(1, 2, 3); font-size: 16px; line-height: 1.5;">Safe</span>""";
         var saved = Read(await owner.CreateNote(new() { Title = "   ", Content = checklist }, Ct), 201);
         Assert.Equal("Untitled note", saved.Title);
         Assert.Equal(checklist, saved.Content);
+        Assert.Equal(checklist, Read(await owner.GetNote(saved.Id, Ct), 200).Content);
+        var atLimit = Read(await owner.CreateNote(new() { Title = new string('a', 160), Content = new string('b', 20_000) }, Ct), 201);
+        Assert.Equal(160, atLimit.Title.Length);
+        Assert.Equal(20_000, atLimit.Content.Length);
         Assert.Equal(400, Assert.IsAssignableFrom<ObjectResult>((await owner.UpdateMetadata(saved.Id, new() { IsPinned = true }, Ct)).Result).StatusCode);
+    }
+
+    [Fact]
+    public async Task TitleOnlyEditPreservesExistingLegacyMarkup()
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        var managerId = Assert.Single(await SeedManagers(database, 1));
+        await using var db = database.CreateContext();
+        var owner = CreateController(db, managerId);
+        var saved = Read(await owner.CreateNote(new() { Title = "Legacy" }, Ct), 201);
+        const string legacy = "<a href=\"javascript:alert(1)\">Old text</a>";
+        await db.ManagerNotes.Where(note => note.Id == saved.Id)
+            .ExecuteUpdateAsync(update => update.SetProperty(note => note.Content, legacy), Ct);
+
+        var edited = Read(await owner.UpdateNote(saved.Id, new()
+        {
+            Title = "Renamed", Content = legacy, Color = saved.Color, ExpectedRevision = saved.Revision,
+        }, Ct), 200);
+        Assert.Equal("Renamed", edited.Title);
+        Assert.Equal(legacy, edited.Content);
+        var rejected = await owner.UpdateNote(saved.Id, new()
+        {
+            Title = edited.Title, Content = legacy + " changed", ExpectedRevision = edited.Revision,
+        }, Ct);
+        Assert.Equal(400, Assert.IsAssignableFrom<ObjectResult>(rejected.Result).StatusCode);
+        Assert.Equal(legacy, Read(await owner.GetNote(saved.Id, Ct), 200).Content);
     }
 
     private static T Read<T>(ActionResult<T> response, int status)

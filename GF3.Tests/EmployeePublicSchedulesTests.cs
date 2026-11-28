@@ -1,3 +1,4 @@
+using System.Net;
 using System.Security.Claims;
 using BusinessLogicLayer;
 using BusinessLogicLayer.Services.Abstractions;
@@ -19,7 +20,7 @@ namespace GF3.Tests;
 public sealed class EmployeePublicSchedulesTests
 {
     [Fact]
-    public async Task PublicListAndDetailsOnlyExposeRelatedPublishedSchedulesInOrder()
+    public async Task ActiveEmployeesCanBrowseEveryPublishedScheduleInOrderWithoutEnrollment()
     {
         await using var database = await SqliteTestDatabase.CreateAsync();
         await using var db = database.CreateContext();
@@ -33,9 +34,10 @@ public sealed class EmployeePublicSchedulesTests
         };
         var list = await controller.GetPublicSchedules(db, default);
         var summaries = Assert.IsAssignableFrom<IReadOnlyList<PublicScheduleSummaryDto>>(Assert.IsType<OkObjectResult>(list.Result).Value);
-        Assert.Equal(new[] { fixture.Preview, fixture.OtherPreview }, summaries.Select(row => row.Id));
-        Assert.All(summaries, x => Assert.Equal((2026, 8, "public"), (x.Year, x.Month, x.PublicationStatus)));
-        Assert.Equal(new[] { "Alpha", "Zulu" }, summaries.Select(row => row.Name));
+        Assert.Equal(new[] { fixture.Preview, fixture.Unrelated, fixture.Own, fixture.OtherPreview, fixture.July }, summaries.Select(row => row.Id));
+        Assert.Equal(new[] { "Alpha", "Other container", "Own", "Zulu", "July" }, summaries.Select(row => row.Name));
+        Assert.Equal(new[] { 8, 8, 8, 8, 7 }, summaries.Select(row => row.Month));
+        Assert.All(summaries, row => Assert.Equal((2026, "public"), (row.Year, row.PublicationStatus)));
         var preview = Assert.IsType<EmployeeScheduleDto>(Assert.IsType<OkObjectResult>(
             (await controller.GetPublicSchedule(fixture.Preview, db, default)).Result).Value);
         Assert.False(preview.AllowSwap);
@@ -45,6 +47,16 @@ public sealed class EmployeePublicSchedulesTests
         var related = Assert.Single(preview.RelatedScheduleAssignments);
         Assert.Equal(fixture.OtherPreview, related.ScheduleId);
         Assert.Equal(8, related.DayOfMonth);
+        Assert.DoesNotContain("Planner secret", preview.Note);
+        Assert.DoesNotContain("Private note content", preview.Note);
+        Assert.Contains("GF3_GRAPH_META:", preview.Note);
+        var unrelated = Assert.IsType<EmployeeScheduleDto>(Assert.IsType<OkObjectResult>(
+            (await controller.GetPublicSchedule(fixture.Unrelated, db, default)).Result).Value);
+        Assert.False(unrelated.AllowSwap);
+        Assert.Empty(unrelated.RelatedScheduleAssignments);
+        Assert.Equal(fixture.Own, Assert.Single(Assert.IsAssignableFrom<IEnumerable<EmployeeScheduleDto>>(Assert.IsType<OkObjectResult>(
+            (await controller.GetVisible(db, default)).Result).Value)).Id);
+        Assert.Equal(fixture.Own, await db.ScheduleEmployees.Where(member => member.EmployeeId == fixture.Owner).Select(member => member.ScheduleId).SingleAsync());
         foreach (var id in fixture.Hidden)
             Assert.IsType<NotFoundResult>((await controller.GetPublicSchedule(id, db, default)).Result);
 
@@ -54,8 +66,33 @@ public sealed class EmployeePublicSchedulesTests
         Assert.Empty(Assert.IsAssignableFrom<IReadOnlyList<PublicScheduleSummaryDto>>(
             Assert.IsType<OkObjectResult>((await controller.GetPublicSchedules(db, default)).Result).Value));
         Assert.IsType<NotFoundResult>((await controller.GetPublicSchedule(fixture.Preview, db, default)).Result);
+        controller.ControllerContext = Context(int.MaxValue);
+        Assert.Empty(Assert.IsAssignableFrom<IReadOnlyList<PublicScheduleSummaryDto>>(
+            Assert.IsType<OkObjectResult>((await controller.GetPublicSchedules(db, default)).Result).Value));
+        Assert.IsType<NotFoundResult>((await controller.GetPublicSchedule(fixture.Preview, db, default)).Result);
         controller.ControllerContext = Context(null);
         await Assert.ThrowsAsync<BadHttpRequestException>(() => controller.GetPublicSchedules(db, default));
+    }
+
+    [Fact]
+    public async Task PublicPreviewUsesEmployeeAuthorizationAndDoesNotTouchPresenceOrRoster()
+    {
+        await using var host = await ManagerWorkspaceTestHost.CreateAsync();
+        await using var db = host.Database.CreateContext();
+        var fixture = await Seed(db, "Public preview shop");
+        var route = "/api/employee-schedules/public";
+        Assert.Equal(HttpStatusCode.Unauthorized, (await host.Client.GetAsync(route)).StatusCode);
+        await host.Login("manager");
+        await host.Exchange("pc");
+        Assert.Equal(HttpStatusCode.Forbidden, (await host.Client.GetAsync($"{route}/{fixture.Preview}")).StatusCode);
+        await host.Login("employee");
+        await db.EmployeeAccounts.ExecuteUpdateAsync(set => set.SetProperty(account => account.LastSeenAtUtc, (DateTimeOffset?)null));
+        var count = await db.ScheduleEmployees.CountAsync();
+        using var response = await host.Client.GetAsync($"{route}/{fixture.Unrelated}");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.True(response.Headers.CacheControl?.NoStore);
+        Assert.Equal(count, await db.ScheduleEmployees.CountAsync());
+        Assert.Null(await db.EmployeeAccounts.Select(account => account.LastSeenAtUtc).SingleAsync());
     }
 
     [Fact]
@@ -80,7 +117,7 @@ public sealed class EmployeePublicSchedulesTests
             employee is int id ? [new Claim("employee_id", id.ToString())] : [], "test")) },
     };
 
-    internal static async Task<(int Owner, int Container, int Preview, int OtherPreview, int[] Hidden)> Seed(
+    internal static async Task<(int Owner, int Container, int Preview, int OtherPreview, int Own, int Unrelated, int July, int[] Hidden)> Seed(
         AppDbContext db, string shopName = "Central Shop")
     {
         var owner = TestDataFactory.CreateDalEmployee("Owner", "Fixture");
@@ -93,6 +130,7 @@ public sealed class EmployeePublicSchedulesTests
         var own = Graph("Own", container.Id, owner.Id);
         var zulu = Graph("Zulu", container.Id, colleague.Id);
         var alpha = Graph("Alpha", container.Id, colleague.Id);
+        alpha.Note = "Planner secret\n\n[[GF3_GRAPH_META:{\"o\":[1],\"t\":[[1,7,\"Private note content\"]]}]]";
         var privateGraph = Graph("Private", container.Id, colleague.Id);
         privateGraph.PublicationStatus = SchedulePublicationStatus.Private;
         var wrongMonth = Graph("July", container.Id, colleague.Id);
@@ -104,7 +142,7 @@ public sealed class EmployeePublicSchedulesTests
             TestDataFactory.CreateDalSlot(alpha.Id, 7, 1, colleague.Id, "09:00", "13:00"),
             TestDataFactory.CreateDalSlot(zulu.Id, 8, 1, colleague.Id, "14:00", "18:00"));
         await db.SaveChangesAsync();
-        return (owner.Id, container.Id, alpha.Id, zulu.Id, [own.Id, privateGraph.Id, wrongMonth.Id, wrongContainer.Id, int.MaxValue]);
+        return (owner.Id, container.Id, alpha.Id, zulu.Id, own.Id, wrongContainer.Id, wrongMonth.Id, [privateGraph.Id, int.MaxValue]);
 
         ScheduleModel Graph(string name, int containerId, int employeeId)
         {

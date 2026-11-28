@@ -112,7 +112,7 @@ export async function copyNoteToClipboard(title: string, editorHtml: string, mob
     })]);
   };
 
-  if (clipboard?.write && typeof ClipboardItem !== "undefined" &&
+  if (typeof clipboard?.write === "function" && typeof ClipboardItem !== "undefined" &&
     (!ClipboardItem.supports || (ClipboardItem.supports("text/html") &&
       (!mobileContainer || ClipboardItem.supports("text/plain"))))) {
     try {

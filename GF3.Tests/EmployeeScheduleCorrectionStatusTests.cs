@@ -20,7 +20,7 @@ public sealed class EmployeeScheduleCorrectionStatusTests
         await using var database = await SqliteTestDatabase.CreateAsync();
         await using var db = database.CreateContext();
         var fixture = await EmployeePublicSchedulesTests.Seed(db);
-        var ownGraph = fixture.Hidden[0];
+        var ownGraph = fixture.Own;
         var colleague = await db.Employees.SingleAsync(employee => employee.Id != fixture.Owner);
         var schedule = await db.Schedules.SingleAsync(item => item.Id == ownGraph);
         schedule.Month = 4;

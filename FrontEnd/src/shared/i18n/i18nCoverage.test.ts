@@ -39,7 +39,29 @@ const guideSuppliedLabels = new Set([
 
 // Each mapping is finite application text, reviewed at its declaration/callers.
 // API reasons use translateServerMessage instead, preserving unknown record content.
+const notepadColors = ["Ink", "Slate", "Blue", "Violet", "Pink", "Red", "Orange", "Gold", "Green", "Teal", "White"];
 const mappings: Record<string, Record<string, readonly string[]>> = {
+  "features/manager-notepad/ui/NotepadEditorView.tsx": {
+    "menuPresentation.label": ["Line spacing", "Text size", "Text color", "More formatting actions"],
+    "spacingLabels[value]": ["Single", "Compact", "Normal", "Relaxed", "Double"],
+    "paletteColor.label": notepadColors,
+    "color.label": notepadColors,
+  },
+  "features/manager-notepad/ui/NotepadListView.tsx": {
+    "option.label": ["Last updated — newest first", "Last updated — oldest first", "Date created — newest first",
+      "Date created — oldest first", "Title — A to Z", "Title — Z to A"],
+  },
+  "features/manager-notepad/ui/NotepadVersionHistoryView.tsx": {
+    group: ["Today", "Yesterday", "Older"],
+    change: ["Title changed", "Text updated", "Formatting changed", "Checklist updated", "Note color changed"],
+    "changeDetails[change]": ["The note title was edited.", "The note body was edited.", "The body formatting changed.",
+      "Checklist items or their completion states changed.", "The note color was changed."],
+  },
+  "features/manager-notepad/ui/NotepadVisibilityControl.tsx": {
+    "selected.label": ["Private", "Public", "Custom"],
+    "option.label": ["Private", "Public", "Custom"],
+    "option.detail": ["Only you can read this note.", "All signed-in managers can read this note.", "Selected managers can read this note."],
+  },
   "entities/containers/ui/ContainerGraphMatrix.tsx": { "day.holiday.name": holidayNames },
   "pages/employee-availability/ui/EmployeeAvailabilityMatrix.tsx": { "holiday.name": holidayNames },
   "pages/employee-schedule/ui/EmployeeSchedulePage.tsx": { "holiday.name": holidayNames },

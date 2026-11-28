@@ -16,11 +16,27 @@ using WebApi.Auth;
 using WebApi.Contracts.ShiftCorrections;
 using WebApi.Controllers;
 using WebApi.Realtime;
+using WebApi.Services;
 
 namespace GF3.Tests;
 
 public sealed class ShiftCorrectionControllerTests
 {
+    [Fact]
+    public void EnrollmentAddsOnlyMissingEmployeesAfterTheLargestDisplayOrder()
+    {
+        var schedule = new ScheduleModel { Id = 19 };
+        ScheduleEmployeeEnrollment.Ensure(schedule, 3);
+        var original = Assert.Single(schedule.Employees);
+        Assert.Equal((19, 3, 0), (original.ScheduleId, original.EmployeeId, original.DisplayOrder));
+        original.DisplayOrder = 7;
+        schedule.Employees.Add(new ScheduleEmployeeModel { ScheduleId = 19, EmployeeId = 5, DisplayOrder = 11 });
+        ScheduleEmployeeEnrollment.Ensure(schedule, 3);
+        ScheduleEmployeeEnrollment.Ensure(schedule, 8);
+        ScheduleEmployeeEnrollment.Ensure(schedule, 8);
+        Assert.Equal(new[] { (3, 7), (5, 11), (8, 12) }, schedule.Employees.Select(row => (row.EmployeeId, row.DisplayOrder)));
+    }
+
     [Theory]
     [InlineData(false, false)]
     [InlineData(false, true)]

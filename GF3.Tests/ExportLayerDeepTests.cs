@@ -2,6 +2,7 @@ using System.Collections;
 using System.Data;
 using System.Reflection;
 using System.Text;
+using System.Text.Json;
 using BusinessLogicLayer.Common;
 using BusinessLogicLayer.Contracts.Enums;
 using BusinessLogicLayer.Contracts.Models;
@@ -15,6 +16,45 @@ namespace GF3.Tests;
 
 public sealed partial class ExportLayerDeepTests
 {
+    [Theory]
+    [InlineData("legacy")]
+    [InlineData("portable-json")]
+    [InlineData("portable-base64")]
+    public void PublicPreviewNotePreservesOnlyReviewedVisualMetadata(string encoding)
+    {
+        const string json = """
+            {"g":[1],"m":[2],"manualColumns":[{"id":1,"label":"Visible"}],"o":[7],"columnOrder":[7],
+             "t":[[7,8,"Private compact hint"]],"textCells":[{"value":"Private legacy hint"}],"privateHint":"Private field"}
+            """;
+        const string text = "Private free-text planning note";
+        var original = encoding switch
+        {
+            "legacy" => $"{text}\n\n<!--GF3_GRAPH_META:{json}-->",
+            "portable-json" => $"{text}\n\n[[GF3_GRAPH_META:{json}]]",
+            _ => CreatePortableNote(text, json),
+        };
+        var preview = GraphNoteSqlExportBuilder.BuildPublicPreviewNote(original);
+        const string prefix = "[[GF3_GRAPH_META:b64:";
+        Assert.StartsWith(prefix, preview);
+        Assert.EndsWith("]]", preview);
+        var encoded = preview[prefix.Length..^2].Replace('-', '+').Replace('_', '/');
+        var decoded = Encoding.UTF8.GetString(Convert.FromBase64String(encoded.PadRight((encoded.Length + 3) / 4 * 4, '=')));
+        Assert.DoesNotContain("Private", decoded);
+        using var metadata = JsonDocument.Parse(decoded);
+        Assert.Equal(new[] { "g", "m", "manualColumns", "o", "columnOrder" }, metadata.RootElement.EnumerateObject().Select(value => value.Name));
+        using var source = JsonDocument.Parse(json);
+        Assert.All(metadata.RootElement.EnumerateObject(), property =>
+            Assert.True(JsonElement.DeepEquals(source.RootElement.GetProperty(property.Name), property.Value)));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("Private free text")]
+    [InlineData("[[GF3_GRAPH_META:b64:%%%]]")]
+    [InlineData("<!--GF3_GRAPH_META:{invalid}-->")]
+    [InlineData("[[GF3_GRAPH_META:{\"unknown\":true}]]")]
+    public void PublicPreviewNoteDropsMissingOrMalformedMetadata(string? raw)
+        => Assert.Empty(GraphNoteSqlExportBuilder.BuildPublicPreviewNote(raw));
     [Fact]
     public void ScheduleExcelContextBuilder_BuildScheduleContext_AppliesManualColumnsAndIgnoresTextOverridesInSummary()
     {

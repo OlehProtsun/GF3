@@ -358,11 +358,12 @@ export function useParams<T extends Record<string, string | undefined>>() {
 
 type NavLinkProps = Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "className" | "href"> & {
   to: string;
+  replace?: boolean;
   className?: string | ((params: { isActive: boolean }) => string);
   children: ReactNode;
 };
 
-export function NavLink({ to, className, children, ...rest }: NavLinkProps) {
+export function NavLink({ to, replace = false, className, children, ...rest }: NavLinkProps) {
   const { location, navigate } = useRouterContext();
   const { pathname } = location;
   const isActive = pathname === to;
@@ -375,7 +376,7 @@ export function NavLink({ to, className, children, ...rest }: NavLinkProps) {
       className={resolvedClassName}
       onClick={(event) => {
         event.preventDefault();
-        navigate(to);
+        navigate(to, { replace });
       }}
     >
       {children}

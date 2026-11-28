@@ -27,9 +27,10 @@ export function NotepadSettingsMenu({ anchor, note, access, busy, workspaceReadO
   onDelete: () => void;
 }) {
   // Align to the action bar so a wide menu stays inside the editor when there is room.
-  const trigger = useRef(anchor.closest("header") ?? anchor);
+  const triggerElement = anchor.closest("header") ?? anchor;
+  const trigger = useRef(triggerElement);
   const menu = useRef<HTMLDivElement>(null);
-  const position = useDropdownPosition(true, trigger, menu, "down", Math.min(300, trigger.current.clientWidth), "end");
+  const position = useDropdownPosition(true, trigger, menu, "down", Math.min(300, triggerElement.clientWidth), "end");
   useLayoutEffect(() => { menu.current?.focus({ preventScroll: true }); }, []);
   useEffect(() => {
     const dismiss = (event: PointerEvent) => {

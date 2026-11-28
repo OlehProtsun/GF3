@@ -74,7 +74,7 @@ export function usePublicNoteSession(
         heartbeat = window.setTimeout(() => request(false), 20_000);
       }, error => {
         if (closed || suspended) return;
-        lose(error instanceof ApiError && error.status === 404 ? "unavailable"
+        lose(first && error instanceof ApiError && error.status === 404 ? "unavailable"
           : first && error instanceof ApiError && error.status === 409 ? "busy" : "lost");
         if (!first) release();
       }).finally(() => { operation = undefined; });

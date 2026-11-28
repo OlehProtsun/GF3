@@ -1,6 +1,6 @@
 import { useEffect, useEffectEvent, useId, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { EmployeeSchedule } from "@entities/employee-schedule";
 import { employeeScheduleApi } from "@entities/employee-schedule/api/employeeScheduleApi";
 import { downloadExportFile } from "@entities/exports/lib/download";
@@ -45,7 +45,8 @@ function ScheduleSelectSheet({ schedules, selectedScheduleId, onSelect, onClose 
   const selectionScroll = useRef(0);
   const [view, setView] = useState<ScheduleView>(schedules.length === 0 ? "public" : "select");
   const [previewScheduleId, setPreviewScheduleId] = useState<number | null>(null);
-  const { data: publicSchedules, isError: publicError } = useQuery({
+  const queryClient = useQueryClient();
+  const { data: publicSchedules, isError: publicError, isFetching: publicFetching } = useQuery({
     queryKey: queryKeys.employeeSchedules.publicList(),
     queryFn: ({ signal }) => employeeScheduleApi.listPublic(signal),
     enabled: view === "public",
@@ -207,7 +208,11 @@ function ScheduleSelectSheet({ schedules, selectedScheduleId, onSelect, onClose 
             <ChevronRightIcon size={15} />
           </button>}
           {view === "public" && (
-            publicError ? <p className={styles.message} role="alert">{t("Could not load public schedules.")}</p>
+            publicError ? <div className={styles.message}>
+              <p role="alert">{t("Could not load public schedules.")}</p>
+              <button type="button" className={styles.disclosure} disabled={publicFetching}
+                onClick={() => queryClient.invalidateQueries({ queryKey: queryKeys.employeeSchedules.publicList() })}>{t("Retry")}</button>
+            </div>
               : publicSchedules === undefined ? <p className={styles.message} role="status">{t("Loading schedules...")}</p>
               : publicSchedules.length === 0 ? <p className={styles.message}>{t("No published schedules")}</p>
               : publicSchedules.map(schedule => (
@@ -248,6 +253,7 @@ function PublishedScheduleInfo({ schedule, showPeriod = false }: {
 function SchedulePreview({ scheduleId }: { scheduleId: number }) {
   const [schedule, setSchedule] = useState<EmployeeSchedule | null>(null);
   const [error, setError] = useState<"unavailable" | "failed" | null>(null);
+  const [attempt, setAttempt] = useState(0);
   const [viewMode, setViewMode] = useState<"matrix" | "daily">("matrix");
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const previewRef = useRef<HTMLDivElement>(null);
@@ -305,10 +311,16 @@ function SchedulePreview({ scheduleId }: { scheduleId: number }) {
       },
     );
     return () => request.abort();
-  }, [scheduleId]);
+  }, [attempt, scheduleId]);
 
   return <div className={styles.preview} ref={previewRef}>
-    {error ? <p className={styles.message} role="alert">{error === "unavailable" ? t("This schedule is no longer available.") : t("Could not load the schedule preview.")}</p>
+    {error ? <div className={styles.message}>
+      <p role="alert">{error === "unavailable" ? t("This schedule is no longer available.") : t("Could not load the schedule preview.")}</p>
+      {error === "failed" && <button type="button" className={styles.disclosure} onClick={() => {
+        setError(null);
+        setAttempt(value => value + 1);
+      }}>{t("Retry")}</button>}
+    </div>
       : !schedule ? <p className={styles.message} role="status">{t("Loading schedule preview...")}</p>
       : <>
         <div className={`${styles.row} ${styles.previewSummary}`}><PublishedScheduleInfo schedule={schedule} showPeriod /></div>

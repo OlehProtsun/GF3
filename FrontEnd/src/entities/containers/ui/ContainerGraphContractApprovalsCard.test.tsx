@@ -28,12 +28,14 @@ test("focused monthly exception waits for the exact read and reviews without a t
     return terminal;
   });
   const callback = vi.fn();
+  const onReviewTypeChange = vi.fn();
   render(<QueryClientProvider client={new QueryClient()}><ContainerGraphContractApprovalsCard
-    containerId={1} graphId={10} reviewRequestId={29} disabled={false} hasUnsavedChanges={false} onApproved={callback} /></QueryClientProvider>);
+    containerId={1} graphId={10} reviewRequestId={29} disabled={false} hasUnsavedChanges={false}
+    onReviewTypeChange={onReviewTypeChange} onApproved={callback} /></QueryClientProvider>);
   expect(screen.getByRole("status")).toHaveTextContent("Loading");
   expect(screen.queryByRole("button", { name: "Approve" })).toBeNull();
   finishRead(record);
-  expect(await screen.findByText("Monthly minimum exception")).toBeVisible();
+  await waitFor(() => expect(onReviewTypeChange).toHaveBeenLastCalledWith("Monthly minimum exception"));
   expect(screen.queryByRole("button", { name: /Collapse request/ })).toBeNull();
   await userEvent.click(screen.getByRole("button", { name: "Approve" }));
   expect(screen.queryByRole("dialog", { name: "Approve shift transfer?" })).toBeNull();

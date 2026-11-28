@@ -121,6 +121,7 @@ export function NotepadVersionHistoryView({ note, onBack, onRestored, workspaceR
         <h2><NotepadIcon name="clock" size={18} /><span className={views.compactLabel} title={t("Version history")}>{t("Version history")}</span></h2>
       </header>
       <div className={views.timelineScroll}>
+        {error && <div className={styles.errorMessage} role="alert">{error}</div>}
         {!workspaceReadOnly && note.isLocked && <p>{t("Unlock editing before restoring a version.")}</p>}
         {versions.isLoading && <p role="status" className={styles.emptyState}>{t("Loading versions...")}</p>}
         {versions.error && <div className={styles.errorMessage} role="alert">

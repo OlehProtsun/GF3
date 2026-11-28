@@ -723,7 +723,7 @@ describe("EmployeeSchedulePage", () => {
       </BrowserRouter>,
     );
 
-    expect(screen.getByText("Nothing is public for your account yet.")).toBeInTheDocument();
+    expect(screen.getByText("No published schedules assigned to you")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Go to Availability/i })).toHaveAttribute("href", "/availability");
   });
 });

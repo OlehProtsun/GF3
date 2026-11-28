@@ -43,7 +43,8 @@ public sealed class ManagerWorkspaceSignalRTests
     {
         var context = Context(mode); var groups = new RecordingGroupManager(); var locks = new ManagerEditLockService();
         var hub = new EmployeePresenceHub(new EmployeePresenceService(), new ManagerPresenceService(), new RecordingEmployeeAccountService(), locks, new RecordingRealtimeNotifier(), new EmployeeOnlineWorkflowLogTests.ThrowingWorkflowLogService(), NullLogger<EmployeePresenceHub>.Instance) { Context = context, Groups = groups };
-        await hub.OnConnectedAsync(); Assert.False(context.Aborted); Assert.Single(groups.AddedGroups);
+        await hub.OnConnectedAsync(); Assert.False(context.Aborted);
+        Assert.Equal((context.ConnectionId, EmployeePresenceHub.ManagersGroupName), Assert.Single(groups.AddedGroups));
         var result = await hub.SetScheduleEditLocks([new ScheduleEditLockTarget(1, 1)]); Assert.Single(result); Assert.True(result[0].IsLocked);
         await hub.OnDisconnectedAsync(null); Assert.Empty(locks.ReleaseConnection(context.ConnectionId));
     }

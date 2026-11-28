@@ -18,9 +18,9 @@ public sealed class AddManagerNoteEditSessions : Migration
 
     protected override void Down(MigrationBuilder migrationBuilder)
     {
-        migrationBuilder.DropColumn("edit_session_id", "manager_note");
-        migrationBuilder.DropColumn("edit_manager_id", "manager_note");
-        migrationBuilder.DropColumn("edit_started_at_ms", "manager_note");
-        migrationBuilder.DropColumn("edit_expires_at_ms", "manager_note");
+        migrationBuilder.Sql("ALTER TABLE manager_note DROP COLUMN edit_expires_at_ms");
+        migrationBuilder.Sql("ALTER TABLE manager_note DROP COLUMN edit_started_at_ms");
+        migrationBuilder.Sql("ALTER TABLE manager_note DROP COLUMN edit_manager_id");
+        migrationBuilder.Sql("ALTER TABLE manager_note DROP COLUMN edit_session_id");
     }
 }

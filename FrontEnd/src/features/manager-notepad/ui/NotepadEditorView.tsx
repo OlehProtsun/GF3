@@ -598,20 +598,20 @@ export function NotepadEditorView({
     <ToolbarButton label={label} active={active.has(command)} rememberSelection={rememberSelection}
       onClick={() => runCommand(command)}>{glyph}</ToolbarButton>
   );
-  const formatMenuItems = [
+  const formatMenuItems: Array<{ id: string; label: string; command: FormatCommand | "removeFormat" | "size" | "color"; icon?: ReactNode; description?: string }> = [
     ...(toolbarWidth < 370 ? [
-      { id: "underline", label: t("Underline"), onSelect: () => runCommand("underline") },
-      { id: "strike", label: t("Strikethrough"), onSelect: () => runCommand("strikeThrough") },
-    ] : []),
+      { id: "underline", label: t("Underline"), command: "underline" },
+      { id: "strike", label: t("Strikethrough"), command: "strikeThrough" },
+    ] as const : []),
     ...(toolbarWidth < 444 ? [
-      { id: "size", label: t("Text size"), onSelect: () => openOverflowPicker("size") },
-      { id: "color", label: t("Text color"), onSelect: () => openOverflowPicker("color") },
-    ] : []),
+      { id: "size", label: t("Text size"), command: "size" },
+      { id: "color", label: t("Text color"), command: "color" },
+    ] as const : []),
     ...(toolbarWidth < 298 ? [
-      { id: "bullets", label: t("Bulleted list"), onSelect: () => runCommand("insertUnorderedList") },
-      { id: "numbered", label: t("Numbered list"), onSelect: () => runCommand("insertOrderedList") },
-    ] : []),
-    { id: "clear", label: t("Clear formatting"), icon: <NotepadIcon name="clearFormat" size={18} />, description: t("Remove text styles"), onSelect: () => runCommand("removeFormat") },
+      { id: "bullets", label: t("Bulleted list"), command: "insertUnorderedList" },
+      { id: "numbered", label: t("Numbered list"), command: "insertOrderedList" },
+    ] as const : []),
+    { id: "clear", label: t("Clear formatting"), icon: <NotepadIcon name="clearFormat" size={18} />, description: t("Remove text styles"), command: "removeFormat" },
   ];
 
   const copyNote = async () => {
@@ -649,6 +649,7 @@ export function NotepadEditorView({
   const visibility = access ?? { visibility: note?.visibility ?? "private", sharedWithManagerIds: note?.sharedWithManagerIds ?? [] };
   const saveState = sessionBlocked ? "ready" : isSaving ? "saving" : saveFailed ? "error" : note && !dirty ? "saved" : "ready";
   const saveLabels = { ready: t("Save"), saving: t("Saving..."), saved: t("Saved"), error: t("Retry") };
+  const paletteColor = textColors.find(({ value }) => value === textColor);
 
   return (
     <div ref={layout} className={styles.editorLayout} onBlur={focusEditing ? event => {
@@ -830,12 +831,12 @@ export function NotepadEditorView({
                 <>
                   {textColor && <div className={styles.currentColor}>
                     <span style={{ backgroundColor: textColor }} />
-                    {t(textColors.find(({ value }) => value === textColor)?.label ?? textColor)}
+                    {paletteColor ? t(paletteColor.label) : textColor}
                   </div>}
                   <div className={styles.textColorGrid}>
-                    {textColors.map(({ value, label }) => <button type="button" key={value} className={styles.textColorButton}
-                      style={{ backgroundColor: value }} aria-pressed={value === textColor} aria-label={t(label)} title={t(label)}
-                      onPointerDown={event => event.preventDefault()} onClick={() => runCommand("foreColor", value)} />)}
+                    {textColors.map(color => <button type="button" key={color.value} className={styles.textColorButton}
+                      style={{ backgroundColor: color.value }} aria-pressed={color.value === textColor} aria-label={t(color.label)} title={t(color.label)}
+                      onPointerDown={event => event.preventDefault()} onClick={() => runCommand("foreColor", color.value)} />)}
                   </div>
                 </>
               )}
@@ -843,7 +844,10 @@ export function NotepadEditorView({
                 <div className={styles.moreOptions}>
                   {formatMenuItems.map(item => (
                     <button key={item.id} type="button" title={item.label} className={styles.popoverOption}
-                      onPointerDown={event => event.preventDefault()} onClick={item.onSelect}>
+                      onPointerDown={event => event.preventDefault()} onClick={() => {
+                        if (item.command === "size" || item.command === "color") openOverflowPicker(item.command);
+                        else runCommand(item.command);
+                      }}>
                       {"icon" in item && item.icon}
                       <span><strong>{item.label}</strong>{"description" in item && <small>{item.description}</small>}</span>
                     </button>

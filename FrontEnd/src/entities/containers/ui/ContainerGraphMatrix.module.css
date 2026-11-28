@@ -293,6 +293,7 @@
 
 .table .addColumnButton { position: absolute; top: 50%; right: -16px; transform: translateY(-50%); z-index: 4; }
 .table thead th.cornerActionHeader { z-index: 6; }
+.table thead th.valueHeader:has(> .addColumnButton[data-side="start"]) { z-index: 7; }
 .table thead th.dayHeader.cornerActionHeader { z-index: 8; }
 .cornerActionHeader .columnResizeHandle { top: 16px; height: calc(100% - 16px); }
 .table thead th.openActionHeader { background: #eaf3ff; }

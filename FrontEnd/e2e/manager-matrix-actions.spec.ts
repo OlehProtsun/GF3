@@ -58,7 +58,7 @@ test("matrix actions stay in their graph drafts until one explicit save", async 
 
   const remove = async () => {
     await source.getByRole("button", { name: /Actions for/ }).click();
-    await page.getByRole("menuitem", { name: "Remove employee from schedule" }).click();
+    await page.getByRole("menuitem", { name: "Remove from schedule" }).click();
     return page.getByRole("dialog", { name: "Remove employee", exact: true });
   };
   let confirmation = await remove();
@@ -80,13 +80,11 @@ test("matrix actions stay in their graph drafts until one explicit save", async 
   await leftCell.getByRole("button").dblclick();
   await leftCell.getByRole("textbox").fill("09:00 - 13:00");
   await leftCell.getByRole("textbox").press("Enter");
-  const deleteColumn = async (label: string) => {
-    await matrix.getByRole("button", { name: "Actions for manual column " + label }).click();
-    await page.getByRole("menuitem", { name: "Delete manual column" }).click();
-  };
-  await deleteColumn("Generated coverage");
+  await matrix.getByRole("button", { name: "Actions for manual column Generated coverage" }).click();
+  await page.getByRole("menuitem", { name: "Delete manual column" }).click();
   await expect(page.getByText("Cancel open manual offers before changing their demand.", { exact: true })).toBeVisible();
-  await deleteColumn("Right demand");
+  await matrix.getByRole("columnheader", { name: "Right demand" }).getByRole("button", { name: "Delete manual column" }).click();
+  await page.getByRole("dialog", { name: "Delete manual column?" }).getByRole("button", { name: "Delete column" }).click();
   await expect(matrix.getByRole("textbox", { name: "Manual column 3 header" })).toHaveCount(0);
 
   await page.getByRole("tab", { name: "Second schedule" }).click();

@@ -72,7 +72,7 @@ test("container detail includes private and public graphs and full manager worke
  expect(within(schedule).getByText("1 employee")).toBeVisible();
  expect(within(schedule).getByText("8h 0m")).toBeVisible();
  expect(within(screen.getByRole("link", { name: /Public schedule/ })).getByText("Public", { exact: true })).toBeVisible();
- expect(screen.queryByText(container.name)).not.toBeInTheDocument();
+ expect(screen.getByRole("heading", { name: container.name })).toBeVisible();
  expect(screen.queryByText(container.note)).not.toBeInTheDocument();
  expect(screen.getByRole("heading", { name: "Statistics" })).toBeVisible();
  expect(calls.every(call => call.method === "GET")).toBe(true);
@@ -117,12 +117,12 @@ test("loading stays non-interactive and 404 is a not-found state", async () => {
 });
 
 
-test("root wrapper and manager lists omit Back by default", async () => {
+test("root wrapper has no Back link and a manager list returns to Home", async () => {
  const view = mount(<ManagerPhonePage>Home</ManagerPhonePage>);
  expect(screen.queryByRole("link", { name: /Back/ })).not.toBeInTheDocument();
  view.unmount();
  mount(<ManagerPhoneContainersPage />, "/container"); await screen.findByText(container.name);
- expect(screen.queryByRole("link", { name: /Back/ })).not.toBeInTheDocument();
+ expect(screen.getByRole("link", { name: "Back" })).toHaveAttribute("href", "/");
 });
 
 test.each([
@@ -145,6 +145,19 @@ test("phone Home shows schedules through the shared read-only dashboard", async 
  expect((await screen.findAllByText("Other Worker")).length).toBeGreaterThan(0);
  expect(screen.getByRole("button", { name: "Central" })).toBeInTheDocument();
  expect(screen.queryByRole("button", { name: "Show more" })).not.toBeInTheDocument();
+ expect(calls.every(call => call.method === "GET")).toBe(true);
+});
+
+test("phone Home retries a failed schedule request for the selected date", async () => {
+ mode = "error";
+ mount(<ManagerPhoneHomePage />);
+ fireEvent.change(screen.getByLabelText("Select date"), { target: { value: "2026-04-01" } });
+ const retry = await screen.findByRole("button", { name: "Retry" });
+ mode = "data";
+ fireEvent.click(retry);
+ expect((await screen.findAllByText("Other Worker")).length).toBeGreaterThan(0);
+ expect(screen.getByLabelText("Select date")).toHaveValue("2026-04-01");
+ expect(screen.queryByRole("button", { name: "Retry" })).not.toBeInTheDocument();
  expect(calls.every(call => call.method === "GET")).toBe(true);
 });
 

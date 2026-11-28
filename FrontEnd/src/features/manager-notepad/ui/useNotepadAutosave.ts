@@ -6,7 +6,7 @@ import {
   type ManagerNote,
   type SaveManagerNoteInput,
 } from "@entities/manager-notepad";
-import { ApiError } from "@shared/api/httpClient";
+import { ApiError, getAuthGeneration } from "@shared/api/httpClient";
 
 export type NoteAccess = Required<Pick<SaveManagerNoteInput, "visibility" | "sharedWithManagerIds">>;
 
@@ -65,6 +65,8 @@ export function useNotepadAutosave(input: AutosaveInput) {
 
     resetError();
     setIsSaving(true);
+    const generation = getAuthGeneration();
+    const isCurrent = () => latest.current.noteId === current.noteId && getAuthGeneration() === generation;
     const payload: SaveManagerNoteInput = { title: current.title, content: current.content, color: current.color, ...access };
     const operation = current.noteId === null
       ? create(payload)
@@ -73,12 +75,14 @@ export function useNotepadAutosave(input: AutosaveInput) {
         : update({ noteId: current.noteId, token: current.sessionToken, payload: { ...payload, expectedRevision: current.revision! } });
 
     const promise = operation.then(note => {
+      if (!isCurrent()) return false;
       const next = latest.current;
       const changedSinceSubmission = next.title !== payload.title || next.content !== payload.content || next.color !== payload.color;
       latest.current = { ...next, noteId: note.id, revision: note.revision, dirty: changedSinceSubmission };
       next.onSaved(note, payload);
       return true;
     }, (cause: unknown) => {
+      if (!isCurrent()) return false;
       const nextError: NotepadSaveError = { kind: cause instanceof ApiError && cause.status === 409 && (cause.details as { code?: string } | null)?.code !== "notepad_edit_session_conflict" ? "conflict" : "error", cause };
       failure.current = nextError;
       setError(nextError);

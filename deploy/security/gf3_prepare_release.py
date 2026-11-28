@@ -346,20 +346,21 @@ def prepare(check_only):
         target = fetch_tip()
         migrations = release.git("diff", "--no-ext-diff", "--no-renames", "--diff-filter=A", "--name-only", "-z",
                                  current, target, "--", "DataAccessLayer/Migrations").split("\0")
-    if any(re.fullmatch(r"DataAccessLayer/Migrations/[0-9]{14}_[A-Za-z][A-Za-z0-9_]*\.Designer\.cs", name)
+    if any(re.fullmatch(r"DataAccessLayer/Migrations/[0-9]{14}_[A-Za-z][A-Za-z0-9_]*(?:\.Designer)?\.cs", name)
            for name in migrations):
         if check_only:
             with release.lock(DEPLOY_LOCK):
                 reviewed = maintenance_state(target, live=True)
                 tool = release.maintenance_tool(target, Path(__file__).absolute())
                 try:
-                    maintenance_changes(tool, reviewed[0], target, reviewed[5], True)
+                    _, before_ids, target_ids, _ = maintenance_changes(tool, reviewed[0], target, reviewed[5], True)
                 except tool.MaintenanceError as error:
                     raise release.ReleaseError(str(error)) from None
                 with candidate(target, reviewed[4]) as worktree:
                     with release.lock(release.RUNTIME / "state/guard.lock"):
                         release.preflight(worktree, target, reviewed[6])
                 release.command("nft", "-c", "-f", "-", data=release.fence_rules(reviewed[6]))
+            print(f"Pending migrations ({len(target_ids) - len(before_ids)}): {', '.join(target_ids[len(before_ids):])}")
             print(f"PROD2 {target} passed maintenance preflight. Interactive rehearsal and approval are required.")
             return 0
         return maintenance_rehearse(target, deploy=True)
@@ -448,7 +449,8 @@ def maintenance_state(target, live=False, reviewed_baseline=None):
     release.require(manifest["sha"] == current, "Git HEAD differs from the active release")
     approval = read_approval()
     environment = protected_file(release.ROOT / "deploy/.env")
-    if current == reviewed_baseline:
+    reviewed_baselines = (reviewed_baseline,) if isinstance(reviewed_baseline, str) else reviewed_baseline or ()
+    if current in reviewed_baselines:
         review = protected_file(MAINTENANCE_TOOLING_REVIEW)
     elif live:
         review = protected_file(MAINTENANCE_TOOLING_REVIEW) if os.path.lexists(MAINTENANCE_TOOLING_REVIEW) else b""
@@ -479,13 +481,14 @@ def maintenance_rehearse(target, deploy=False):
     release.require(sys.stdin.isatty() and release.SHA.fullmatch(target),
                     "Maintenance rehearsal requires an interactive terminal and the full target SHA")
     def state():
-        return maintenance_state(target, live=deploy, reviewed_baseline=tool.RELEASE_BASELINE)
+        return maintenance_state(target, live=deploy, reviewed_baseline=reviewed_baselines)
 
     with release.lock(DEPLOY_LOCK):
         tool = release.maintenance_tool(target, Path(__file__).absolute())
+        reviewed_baselines = (tool.RELEASE_BASELINE, tool.NOTEPAD_RELEASE_BASELINE)
         reviewed = state()
         current, _, _, _, environment, review, baseline, *_ = reviewed
-        reviewed_transition = current == tool.RELEASE_BASELINE
+        reviewed_transition = current in reviewed_baselines
         try:
             paths, before_ids, target_ids, columns = maintenance_changes(
                 tool, current, target, review, deploy or reviewed_transition)

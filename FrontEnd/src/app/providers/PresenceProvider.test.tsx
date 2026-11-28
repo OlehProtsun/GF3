@@ -91,6 +91,36 @@ test("refreshes dock badges for Urlop, non-graph swaps and reconnects", async ()
   }
 });
 
+test("delivers note invalidation only in PC workspace and detaches handlers on mode exchange", async () => {
+  const client = new QueryClient();
+  const invalidate = vi.spyOn(client, "invalidateQueries");
+  const workspace = () => <QueryClientProvider client={client}><PresenceProvider><span>workspace</span></PresenceProvider></QueryClientProvider>;
+  const view = render(workspace());
+  await waitFor(() => expect(realtime.handlers.has("ManagerDataChanged")).toBe(true));
+  const update = { resourceType: "manager-notepad", reason: "edit-session-started", resourceId: null };
+  const previous = realtime.handlers.get("ManagerDataChanged")!;
+  invalidate.mockClear();
+  act(() => previous(update));
+  expect(invalidate).toHaveBeenCalledExactlyOnceWith({ queryKey: queryKeys.managerNotepad.current() });
+  session.workspaceMode = "phone";
+  setAuthAccessToken("phone-token");
+  view.rerender(workspace());
+  await waitFor(() => expect(realtime.stop).toHaveBeenCalled());
+  expect(realtime.handlers.has("ManagerDataChanged")).toBe(false);
+  expect(realtime.reconnected).toBeNull();
+  invalidate.mockClear();
+  act(() => previous(update));
+  expect(invalidate).not.toHaveBeenCalled();
+  session.role = "employee";
+  session.employeeId = 12;
+  setAuthAccessToken("employee-token");
+  view.rerender(workspace());
+  await waitFor(() => expect(realtime.handlers.has("ManagerDataChanged")).toBe(true));
+  invalidate.mockClear();
+  act(() => realtime.handlers.get("ManagerDataChanged")!(update));
+  expect(invalidate).not.toHaveBeenCalled();
+});
+
 test("defers save-related events and keeps confirmed cache data on gate exit", async () => {
   const client = new QueryClient();
   const invalidate = vi.spyOn(client, "invalidateQueries");

@@ -203,7 +203,7 @@ isolatedTest("an unenrolled employee joins a public schedule only when Home appr
     const employee = await workerContext.newPage();
     await loginWithCredentials(employee, worker.username, worker.password);
     await employee.goto("/schedule");
-    await expect(employee.getByText("Nothing is public for your account yet.")).toBeVisible();
+    await expect(employee.getByText("No published schedules assigned to you")).toBeVisible();
     await employee.getByRole("button", { name: "Request a shift correction" }).click();
     const wizard = employee.getByRole("dialog", { name: "Request a shift change" });
     const next = wizard.getByRole("button", { name: "Continue", exact: true });
@@ -220,7 +220,7 @@ isolatedTest("an unenrolled employee joins a public schedule only when Home appr
     await expect(wizard.getByText("Pending approval")).toBeVisible();
     expect(await roster()).toEqual([]);
     await employee.reload();
-    await expect(employee.getByText("Nothing is public for your account yet.")).toBeVisible();
+    await expect(employee.getByText("No published schedules assigned to you")).toBeVisible();
 
     await loginAsManager(page);
     await page.goto("/");
@@ -375,7 +375,7 @@ test("Schedule Activity compares cross-schedule exchanges one schedule at a time
   const body = dialog.getByRole("region", { name: "Swap comparison" });
   expect(await body.evaluate(element => element.scrollHeight <= element.clientHeight + 1)).toBe(true);
   expect(await tables.first().evaluate(element => {
-    const tableViewport = element.parentElement!;
+    const tableViewport = element.parentElement!.parentElement!;
     return tableViewport.scrollHeight > tableViewport.clientHeight;
   })).toBe(true);
   const desktopShadowSpace = await body.evaluate(element => {
@@ -390,7 +390,7 @@ test("Schedule Activity compares cross-schedule exchanges one schedule at a time
     await expect(tables).toHaveCount(2);
   }
   expect(await tables.first().evaluate(element => {
-    const tableViewport = element.parentElement!;
+    const tableViewport = element.parentElement!.parentElement!;
     return tableViewport.scrollWidth > tableViewport.clientWidth &&
       tableViewport.scrollHeight <= tableViewport.clientHeight + 1;
   })).toBe(true);
@@ -430,10 +430,10 @@ test("new graph manual columns are matrix drafts and Schedule Activity keeps off
   await expect(activity.getByRole("button", { name: "Publish shift" })).toBeDisabled();
   await activity.getByRole("button", { name: "Close", exact: true }).click();
   await page.getByRole("button", { name: "Add manual column on the left" }).click();
-  const actions = page.getByRole("button", { name: /^Actions for manual column/ });
-  await actions.click();
-  await page.getByRole("menuitem", { name: "Delete manual column" }).click();
-  await expect(actions).toHaveCount(0);
+  const column = page.getByRole("textbox", { name: "Manual column 1 header" });
+  await column.locator("xpath=ancestor::th[1]").getByRole("button", { name: "Delete manual column" }).click();
+  await page.getByRole("dialog", { name: "Delete manual column?" }).getByRole("button", { name: "Delete column" }).click();
+  await expect(column).toHaveCount(0);
   expect(requests).toEqual([]);
   expect(writes).toEqual([]);
 });

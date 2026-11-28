@@ -51,4 +51,17 @@ public sealed partial class ExportLayerDeepTests
             .ExportPublishedGraphToXlsxAsync(employeeId, graphId));
         Assert.Equal("Schedule was not found.", error.Message);
     }
+
+    [Fact]
+    public async Task PublicPreviewWorkbookDoesNotGrantOrdinaryEmployeeExportForAnotherGraph()
+    {
+        using var templates = new TempExcelTemplates();
+        var fixture = TemplateExportFixture.CreateRich(false);
+        fixture.PrimaryGraph.PublicationStatus = SchedulePublicationStatus.Public;
+        var service = fixture.CreateService(templates);
+        var (preview, _) = await service.ExportPublishedPreviewToXlsxAsync(fixture.PrimaryGraph.ContainerId, fixture.PrimaryGraph.Id);
+        using var book = new XLWorkbook(new MemoryStream(preview));
+        Assert.NotEmpty(book.Worksheets);
+        await Assert.ThrowsAsync<KeyNotFoundException>(() => service.ExportPublishedGraphToXlsxAsync(99, fixture.PrimaryGraph.Id));
+    }
 }

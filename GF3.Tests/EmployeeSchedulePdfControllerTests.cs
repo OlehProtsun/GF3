@@ -77,7 +77,7 @@ public sealed class EmployeeSchedulePdfControllerTests
     [InlineData("ok")]
     [InlineData("export")]
     [InlineData("render")]
-    public async Task GetPublicPdf_EnforcesRelatedPublishedScopeAndUsesPreviewExport(string scenario)
+    public async Task GetPublicPdf_AllowsNonmembersOfPublishedSchedulesAndUsesPreviewExport(string scenario)
     {
         await using var database = await SqliteTestDatabase.CreateAsync();
         await using var db = database.CreateContext();
@@ -88,6 +88,7 @@ public sealed class EmployeeSchedulePdfControllerTests
         var controller = Create(exporter, renderer, fixture.Owner.ToString());
         foreach (var denied in fixture.Hidden)
             Assert.IsType<NotFoundResult>(await controller.GetPublicPdf(denied, db, default));
+        Assert.IsType<NotFoundResult>(await Create(exporter, renderer, int.MaxValue.ToString()).GetPublicPdf(fixture.Preview, db, default));
         Assert.Null(exporter.PreviewRequest);
         var result = await controller.GetPublicPdf(fixture.Preview, db, default);
         Assert.Equal((fixture.Container, fixture.Preview), exporter.PreviewRequest);
@@ -98,6 +99,8 @@ public sealed class EmployeeSchedulePdfControllerTests
             Assert.Equal("application/pdf", file.ContentType);
             Assert.EndsWith(".pdf", file.FileDownloadName);
             Assert.Equal(renderer.Bytes, file.FileContents);
+            var unrelated = await controller.GetPublicPdf(fixture.Unrelated, db, default);
+            Assert.IsType<FileContentResult>(unrelated);
         }
         else
         {
